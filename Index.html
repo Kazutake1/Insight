@@ -1,0 +1,2929 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no,viewport-fit=cover"/>
+
+<!-- PWA: ホーム画面に追加 -->
+<meta name="apple-mobile-web-app-capable" content="yes"/>
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent"/>
+<meta name="apple-mobile-web-app-title" content="Insight"/>
+<meta name="mobile-web-app-capable" content="yes"/>
+<meta name="theme-color" content="#1a1a1a"/>
+<meta name="description" content="コンビニ経営ダッシュボード — 売上・客数・廃棄を管理"/>
+
+<!-- Manifest -->
+<link rel="manifest" id="manifestLink"/>
+
+<!-- Apple Touch Icons (SVG → data URI) -->
+<link rel="apple-touch-icon" sizes="180x180" id="appleIcon180"/>
+<link rel="apple-touch-icon" sizes="152x152" id="appleIcon152"/>
+<link rel="icon" type="image/svg+xml" id="favicon"/>
+
+<!-- iPad スプラッシュスクリーン -->
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent"/>
+
+<title>Insight</title>
+<script>
+// Chart.js読み込み失敗時のフォールバック（ダミー）
+window.addEventListener('error', function(e){
+  if(e.message && e.message.includes('Chart')) {
+    console.warn('Chart.js load failed - charts will not render');
+  }
+}, true);
+</script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"
+  crossorigin="anonymous"
+  onerror="window.Chart={register:()=>{},defaults:{}};console.warn('Chart.js offline');">
+</script>
+<style>
+*{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent;}
+html,body{width:100%;height:100%;overflow:hidden;background:var(--bg);
+  font-family:-apple-system,'Hiragino Kaku Gothic ProN','Noto Sans JP',sans-serif;}
+input,select{-webkit-user-select:text!important;user-select:text!important;}
+input[type=number]::-webkit-inner-spin-button,
+input[type=number]::-webkit-outer-spin-button{-webkit-appearance:none;margin:0;}
+input[type=number]{-moz-appearance:textfield;}
+#app{display:flex;width:100vw;height:100vh;overflow:hidden;
+  padding-top:env(safe-area-inset-top);
+  padding-left:env(safe-area-inset-left);
+  padding-right:env(safe-area-inset-right);
+  padding-bottom:env(safe-area-inset-bottom);
+  background:var(--bg);}
+
+/* ══ ライト/ダークモード CSS変数 ══ */
+:root{
+  --bg:#eef0f5;
+  --surface:#fff;
+  --surface2:#f5f5f7;
+  --surface3:#fafafa;
+  --border:#e8e8e8;
+  --border2:#f0f0f0;
+  --text:#1a1a1a;
+  --text2:#444;
+  --text3:#666;
+  --text4:#888;
+  --text5:#aaa;
+  --text6:#bbb;
+  --shadow:rgba(0,0,0,0.07);
+  --shadow2:rgba(0,0,0,0.05);
+  --input-bg:#fafafa;
+  --input-border:#e0e0e0;
+  --nav-inactive:#666;
+  --nav-border:#ddd;
+}
+.dark{
+  --bg:#0f0f12;
+  --surface:#1c1c22;
+  --surface2:#252530;
+  --surface3:#2a2a35;
+  --border:#333340;
+  --border2:#2a2a35;
+  --text:#f0f0f4;
+  --text2:#d0d0d8;
+  --text3:#aaaabc;
+  --text4:#888898;
+  --text5:#666676;
+  --text6:#555565;
+  --shadow:rgba(0,0,0,0.4);
+  --shadow2:rgba(0,0,0,0.3);
+  --input-bg:#252530;
+  --input-border:#444455;
+  --nav-inactive:#aaaabc;
+  --nav-border:#444455;
+}
+
+/* Sidebar */
+#sidebar{width:190px;flex-shrink:0;height:100%;background:var(--surface);display:flex;
+  flex-direction:column;padding:22px 13px;box-shadow:2px 0 14px var(--shadow);z-index:10;}
+#sidebar h1{font-size:22px;font-weight:800;color:var(--text);margin-bottom:3px;padding-left:6px;letter-spacing:-0.03em;}
+.sidebar-sub{font-size:10.5px;color:var(--text4);padding-left:7px;margin-bottom:24px;letter-spacing:0.03em;}
+.nav-list{display:flex;flex-direction:column;gap:3px;flex:1;}
+.nav-btn{display:flex;align-items:center;gap:10px;padding:12px 13px;border-radius:12px;cursor:pointer;
+  font-size:13.5px;font-weight:500;color:var(--nav-inactive);border:none;background:transparent;
+  font-family:inherit;width:100%;text-align:left;transition:all .18s;}
+.nav-btn:active{background:rgba(128,128,128,0.12);}
+.nav-btn.active{background:var(--text);color:#fff;}
+.nav-btn.quick{border:1.5px solid var(--nav-border);color:var(--text2);font-weight:700;}
+.nav-btn.quick.active{background:var(--text);border-color:var(--text);color:#fff;}
+.nav-icon{font-size:15px;width:19px;text-align:center;}
+.today-badge{font-size:9px;font-weight:700;background:rgba(34,197,94,0.15);color:#16a34a;
+  padding:2px 6px;border-radius:5px;margin-left:auto;}
+.nav-btn.active .today-badge{background:rgba(255,255,255,0.2);color:#fff;}
+.missing-badge{font-size:9px;font-weight:700;background:#fee2e2;color:#dc2626;
+  padding:2px 6px;border-radius:5px;margin-left:auto;animation:pulse 2s infinite;}
+.nav-btn.active .missing-badge{background:rgba(255,255,255,0.25);color:#fff;}
+@keyframes pulse{0%,100%{opacity:1;}50%{opacity:0.6;}}
+.warn-badge{font-size:9px;font-weight:700;background:#fef3c7;color:#d97706;
+  padding:2px 6px;border-radius:5px;margin-left:auto;}
+.nav-btn.active .warn-badge{background:rgba(255,255,255,0.2);color:#fff;}
+
+/* Main */
+#main{flex:1;display:flex;flex-direction:column;overflow:hidden;}
+.page{display:none;flex:1;flex-direction:column;overflow:hidden;padding:16px 20px 14px;}
+.page.show{display:flex;}
+.page-header{display:flex;align-items:center;justify-content:space-between;margin-bottom:11px;flex-shrink:0;}
+.page-title{font-size:20px;font-weight:800;color:var(--text);letter-spacing:-0.03em;}
+.header-right{display:flex;gap:8px;align-items:center;}
+
+/* Store selector */
+.store-sel-wrap{display:flex;align-items:center;gap:5px;margin-bottom:18px;padding:0 2px;}
+.store-sel{flex:1;padding:7px 10px;border-radius:10px;border:1.5px solid #e0e0e0;
+  background:var(--surface2);color:var(--text);font-size:12px;font-weight:700;
+  font-family:inherit;outline:none;cursor:pointer;-webkit-appearance:none;}
+.store-sel:focus{border-color:#1a1a1a;}
+.store-menu-btn{width:32px;height:32px;border-radius:8px;border:1.5px solid #e0e0e0;
+  background:var(--surface);color:var(--text3);font-size:16px;font-weight:700;cursor:pointer;
+  display:flex;align-items:center;justify-content:center;flex-shrink:0;}
+.store-menu{position:absolute;left:13px;z-index:50;background:#fff;
+  border-radius:12px;box-shadow:0 8px 30px rgba(0,0,0,0.15);
+  padding:6px;min-width:170px;border:1px solid #ebebeb;}
+.store-menu-item{display:flex;align-items:center;gap:8px;padding:9px 12px;
+  border-radius:8px;cursor:pointer;font-size:12.5px;font-weight:500;color:#333;
+  border:none;background:transparent;font-family:inherit;width:100%;text-align:left;}
+.store-menu-item:hover{background:#f5f5f7;}
+.store-menu-item.danger{color:#dc2626;}
+.store-menu-sep{height:1px;background:#f0f0f0;margin:4px 0;}
+.year-bar{display:flex;align-items:center;gap:10px;margin-bottom:10px;flex-shrink:0;flex-wrap:wrap;}
+.year-sel-group{display:flex;align-items:center;gap:6px;}
+.year-sel-label{font-size:10px;font-weight:700;color:#888;letter-spacing:0.08em;text-transform:uppercase;}
+
+/* Color theme picker */
+.theme-row{display:flex;align-items:center;gap:7px;margin-bottom:10px;flex-shrink:0;}
+.theme-label{font-size:10px;font-weight:700;color:#888;letter-spacing:0.08em;text-transform:uppercase;margin-right:2px;}
+.theme-btn{width:22px;height:22px;border-radius:50%;border:2px solid transparent;cursor:pointer;transition:all .15s;}
+.theme-btn.active{border-color:#fff;box-shadow:0 0 0 2px #1a1a1a;}
+
+/* Sidebar bottom buttons */
+.sidebar-btns{display:flex;flex-direction:column;gap:4px;padding:10px 2px 4px;
+  border-top:1px solid var(--border);margin-top:12px;}
+.sidebar-btn{display:flex;align-items:center;gap:8px;padding:9px 11px;border-radius:10px;
+  border:1.5px solid var(--border);background:transparent;color:var(--text3);
+  font-size:11px;font-weight:700;cursor:pointer;font-family:inherit;width:100%;
+  text-align:left;transition:background .15s;}
+.sidebar-btn:active{background:var(--surface2);}
+.sidebar-btn-text{display:flex;flex-direction:column;align-items:flex-start;gap:1px;}
+.sidebar-btn-sub{font-size:9px;font-weight:600;color:var(--text4);}
+.dark .sidebar-btn{border-color:var(--border);color:var(--text3);}
+.dark .sidebar-btn:active{background:var(--surface3);}
+
+/* Dashboard month bar */
+.dash-month-bar{margin-bottom:10px;flex-shrink:0;}
+.dash-month-scroll{overflow-x:auto;scrollbar-width:none;-webkit-overflow-scrolling:touch;}
+.dash-month-scroll::-webkit-scrollbar{display:none;}
+
+/* KPI */
+.kpi-row{display:flex;gap:10px;margin-bottom:10px;flex-shrink:0;}
+.kpi-card{background:var(--surface);border-radius:15px;flex:1;padding:13px 15px;
+  box-shadow:0 2px 12px var(--shadow2);cursor:pointer;position:relative;
+  overflow:hidden;transition:transform .15s,outline .1s;}
+.kpi-card:active{transform:scale(0.98);}
+.kpi-card.sel1{outline:2.5px solid var(--c-primary);}
+.kpi-card.sel2{outline:2.5px solid var(--c-secondary);}
+.kpi-dot{position:absolute;top:9px;right:9px;width:7px;height:7px;border-radius:50%;display:none;}
+.kpi-card.sel1 .kpi-dot{display:block;background:var(--c-primary);}
+.kpi-card.sel2 .kpi-dot{display:block;background:var(--c-secondary);}
+.kpi-label{font-size:10px;font-weight:700;letter-spacing:0.08em;text-transform:uppercase;color:var(--text4);margin-bottom:5px;}
+.kpi-value{font-size:19px;font-weight:800;color:var(--text);letter-spacing:-0.02em;margin-bottom:5px;}
+.kpi-value .kpi-unit{font-size:12px;font-weight:600;color:var(--text4);letter-spacing:0;}
+.kpi-yoy{display:flex;align-items:center;gap:5px;}
+.kpi-badge{display:inline-flex;align-items:center;gap:2px;padding:3px 8px;border-radius:100px;font-size:10px;font-weight:700;}
+.kpi-badge.up{background:#dcfce7;color:#15803d;}
+.kpi-badge.dn{background:#fee2e2;color:#dc2626;}
+.kpi-prev{font-size:10px;color:var(--text4);}
+
+/* Derived */
+.derived-row{display:flex;gap:10px;margin-bottom:10px;flex-shrink:0;}
+.derived-card{background:var(--surface);border-radius:12px;flex:1;padding:11px 14px;box-shadow:0 1px 8px var(--shadow2);}
+.derived-label{font-size:10px;font-weight:700;letter-spacing:0.08em;text-transform:uppercase;color:var(--text4);margin-bottom:4px;}
+.derived-value{font-size:15px;font-weight:800;color:var(--text);margin-bottom:2px;}
+.derived-chg{font-size:10.5px;font-weight:600;}
+
+/* Charts */
+.charts-row{flex:1;display:flex;gap:11px;min-height:0;}
+.card{background:var(--surface);border-radius:18px;box-shadow:0 2px 14px var(--shadow);}
+.main-chart-card{flex:1 1 0;padding:14px 16px 12px;display:flex;flex-direction:column;}
+.right-col{width:268px;display:flex;flex-direction:column;gap:11px;flex-shrink:0;overflow-y:auto;-webkit-overflow-scrolling:touch;scrollbar-width:none;}
+.right-col::-webkit-scrollbar{display:none;}
+.bar-card{padding:13px 14px 11px;flex:0 0 155px;display:flex;flex-direction:column;min-height:0;}
+.donut-card{padding:13px 15px;flex:0 0 auto;display:flex;flex-direction:column;}
+.donut-inner{display:flex;flex-direction:column;align-items:center;gap:11px;}
+.donut-wrap{position:relative;width:114px;height:114px;flex-shrink:0;}
+.donut-legends{width:100%;display:flex;flex-direction:column;gap:0;}
+.donut-leg{display:flex;align-items:center;font-size:11.5px;padding:5px 0;border-bottom:1px solid var(--border2);}
+.donut-leg:last-child{border-bottom:none;}
+.donut-dot{width:9px;height:9px;border-radius:2px;flex-shrink:0;margin-right:8px;}
+.donut-name{color:var(--text3);flex:1;}
+.donut-val{font-weight:700;color:var(--text);text-align:right;}
+.summary-card{padding:12px 14px;flex-shrink:0;}
+.summary-title{font-size:12px;font-weight:800;color:var(--text);margin-bottom:8px;}
+.sum-row{display:flex;justify-content:space-between;align-items:center;padding:6px 0;border-bottom:1px solid var(--border2);}
+.sum-row:last-child{border-bottom:none;}
+.sum-left{display:flex;align-items:center;gap:7px;}
+.sum-bar{width:3px;height:13px;border-radius:2px;background:var(--border);}
+.sum-bar.act{background:var(--c-primary);}
+.sum-name{font-size:11.5px;color:var(--text3);}
+.sum-val{font-size:12px;font-weight:700;color:var(--text);}
+.sum-yoy{font-size:10px;font-weight:600;}
+
+/* Chart controls */
+.chart-hd{display:flex;align-items:flex-start;justify-content:space-between;margin-bottom:8px;flex-shrink:0;}
+.chart-title{font-size:13px;font-weight:700;color:var(--text);}
+.chart-sub{font-size:10px;color:var(--text4);margin-top:2px;}
+.chart-controls{display:flex;gap:3px;align-items:center;flex-wrap:wrap;justify-content:flex-end;}
+.tab-btn{padding:5px 10px;border-radius:7px;font-size:10.5px;font-weight:700;cursor:pointer;border:none;
+  font-family:inherit;background:transparent;color:var(--text4);transition:all .15s;}
+.tab-btn.active{background:var(--c-primary);color:#fff;}
+.sep{width:1px;height:14px;background:var(--border);margin:0 2px;}
+.month-scroll{overflow-x:auto;scrollbar-width:none;-webkit-overflow-scrolling:touch;flex-shrink:0;margin-bottom:7px;}
+.month-scroll::-webkit-scrollbar{display:none;}
+.month-btns{display:flex;gap:4px;padding-bottom:2px;}
+.m-btn{padding:4px 9px;border-radius:7px;font-size:10.5px;font-weight:600;cursor:pointer;border:none;
+  font-family:inherit;white-space:nowrap;background:var(--surface2);color:var(--text3);transition:all .15s;}
+.m-btn.active{background:var(--c-primary);color:#fff;}
+.legend-row{display:flex;gap:12px;margin-bottom:7px;flex-shrink:0;flex-wrap:wrap;}
+.legend-item{display:flex;align-items:center;gap:5px;font-size:10.5px;color:var(--text3);}
+.legend-line{width:14px;height:2.5px;border-radius:2px;}
+.legend-dash{width:14px;height:0;border-top:2px dashed var(--text5);}
+.chart-wrap{flex:1;min-height:0;position:relative;}
+
+/* Correlation charts */
+.corr-row{display:flex;gap:10px;margin-top:9px;flex-shrink:0;}
+.corr-card{background:var(--surface);border-radius:14px;flex:1;padding:11px 14px;
+  box-shadow:0 1px 8px var(--shadow2);}
+.corr-title{font-size:11px;font-weight:700;color:var(--text3);margin-bottom:8px;letter-spacing:0.03em;}
+
+/* Quick input page */
+.quick-page{padding:14px 18px 12px;}
+.quick-date-bar{display:flex;align-items:center;gap:10px;margin-bottom:14px;flex-shrink:0;flex-wrap:wrap;}
+.quick-date{font-size:22px;font-weight:800;color:var(--text);letter-spacing:-0.02em;}
+.quick-weekday{font-size:13px;font-weight:700;padding:3px 10px;border-radius:20px;background:rgba(128,128,128,0.12);color:var(--text);}
+.quick-weekday.holiday{background:rgba(220,38,38,0.1);color:#dc2626;}
+.weather-sel{display:flex;gap:5px;}
+.wx-btn{font-size:18px;padding:4px 8px;border-radius:8px;border:2px solid transparent;
+  cursor:pointer;background:#fff;transition:all .15s;line-height:1;}
+.wx-btn.active{border-color:#1a1a1a;background:#f8f8f8;}
+
+.quick-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px;flex:1;overflow-y:auto;
+  -webkit-overflow-scrolling:touch;}
+.quick-section{background:#fff;border-radius:16px;padding:14px 16px;
+  box-shadow:0 2px 10px rgba(0,0,0,0.06);display:flex;flex-direction:column;gap:10px;}
+.quick-section.wide{grid-column:1/-1;}
+.qs-title{font-size:10px;font-weight:700;letter-spacing:0.1em;text-transform:uppercase;color:#c8c8d0;margin-bottom:4px;}
+.qs-field{display:flex;align-items:center;justify-content:space-between;gap:8px;}
+.qs-label{font-size:12.5px;color:#555;font-weight:500;white-space:nowrap;}
+.qs-unit{font-size:11px;color:#bbb;white-space:nowrap;}
+.qs-input{width:110px;border:1.5px solid #efefef;border-radius:9px;padding:8px 10px;
+  font-size:14px;font-weight:700;color:#1a1a1a;text-align:right;outline:none;
+  font-family:inherit;background:var(--input-bg);-webkit-appearance:none;transition:all .15s;}
+.qs-input:focus{border-color:#1a1a1a;background:#fff;}
+.quick-save{width:100%;padding:14px;border-radius:13px;background:#1a1a1a;color:#fff;
+  border:none;font-size:14px;font-weight:800;cursor:pointer;font-family:inherit;
+  margin-top:10px;flex-shrink:0;letter-spacing:0.02em;}
+.quick-nav-row{display:flex;gap:4px;margin-bottom:10px;flex-shrink:0;}
+.qnav{padding:5px 12px;border-radius:8px;font-size:11px;font-weight:700;border:none;cursor:pointer;
+  font-family:inherit;background:#fff;color:#999;box-shadow:0 1px 5px rgba(0,0,0,0.07);}
+.qnav.active{background:#1a1a1a;color:#fff;box-shadow:none;}
+
+/* Input pages */
+.input-pg{padding:14px 18px 12px;}
+.input-year-row{display:flex;align-items:center;gap:7px;margin-bottom:10px;flex-shrink:0;flex-wrap:wrap;}
+.iytab{padding:6px 14px;border-radius:10px;font-size:12px;font-weight:700;border:none;cursor:pointer;
+  font-family:inherit;transition:all .15s;background:var(--surface);color:var(--text3);box-shadow:0 1px 6px var(--shadow2);}
+.iytab.active{background:#1a1a1a;color:#fff;box-shadow:none;}
+.btn-del-year{padding:5px 8px;border-radius:7px;font-size:11px;font-weight:700;border:none;cursor:pointer;
+  font-family:inherit;background:#fee2e2;color:#dc2626;margin-left:3px;}
+.month-tab-row{display:flex;gap:5px;margin-bottom:10px;flex-wrap:wrap;flex-shrink:0;}
+.mtab{padding:6px 11px;border-radius:8px;font-size:11.5px;font-weight:700;border:none;cursor:pointer;
+  font-family:inherit;transition:all .15s;background:var(--surface);color:var(--text3);box-shadow:0 1px 6px var(--shadow2);}
+.mtab.active{background:#1a1a1a;color:#fff;box-shadow:none;}
+.table-card{flex:1;background:var(--surface);border-radius:16px;box-shadow:0 2px 12px var(--shadow);
+  overflow:hidden;display:flex;flex-direction:column;}
+.table-head{background:var(--surface2);border-bottom:1px solid var(--border);padding:0 14px;flex-shrink:0;display:grid;}
+.th{padding:9px 4px;font-size:10.5px;font-weight:700;color:var(--text3);text-align:right;}
+.th:first-child{text-align:left;color:var(--text4);}
+.th span{font-size:9px;color:#aaa;margin-left:2px;}
+.table-body{flex:1;overflow-y:auto;padding:0 14px;-webkit-overflow-scrolling:touch;}
+.tr{display:grid;border-bottom:1px solid var(--border2);align-items:center;}
+.td-day{font-size:12px;font-weight:700;color:var(--text3);padding:3px 0;line-height:1.4;}
+.td-wday{font-size:9.5px;color:#aaa;display:block;font-weight:600;}
+.td-wday.sat{color:#3b82f6;}
+.td-wday.sun,.td-wday.hol{color:#dc2626;}
+.td-inp{padding:3px 4px;}
+.td-inp input{width:100%;border:1.5px solid var(--input-border);border-radius:7px;padding:6px 8px;
+  font-size:13px;font-weight:600;color:var(--text);text-align:right;outline:none;
+  font-family:inherit;background:#fafafa;-webkit-appearance:none;transition:all .15s;}
+.td-inp input:focus{border-color:#1a1a1a;background:#fff;}
+.td-wx{padding:3px 4px;}
+.td-wx select{width:100%;border:1.5px solid #e8e8e8;border-radius:7px;padding:5px 3px;
+  font-size:12px;background:#fafafa;font-family:inherit;outline:none;color:#444;
+  -webkit-appearance:none;text-align:center;}
+.td-sub{font-size:10.5px;font-weight:700;color:#666;padding:0 6px;text-align:right;align-self:center;}
+.tr-total{display:grid;border-top:2px solid var(--border);background:var(--surface2);align-items:center;position:sticky;bottom:0;}
+.td-total-label{font-size:10.5px;font-weight:800;color:var(--text3);padding:9px 0;}
+.td-total-val{padding:9px 10px;text-align:right;font-size:12.5px;font-weight:800;color:var(--text);}
+/* 廃棄・売上 2ペイン */
+.haiki-pane{flex:1;display:flex;min-height:0;overflow:hidden;}
+.haiki-day-list{width:114px;flex-shrink:0;border-right:1px solid var(--border);overflow-y:auto;
+  -webkit-overflow-scrolling:touch;background:var(--surface2);}
+.haiki-day-btn{width:100%;padding:10px 11px;border:none;background:transparent;cursor:pointer;
+  font-family:inherit;text-align:left;border-bottom:1px solid var(--border);transition:background .12s;}
+.haiki-day-btn.sel{background:#1a1a1a;}
+.hdb-num{font-size:14px;font-weight:800;color:var(--text);line-height:1.2;}
+.haiki-day-btn.sel .hdb-num{color:#fff;}
+.hdb-wd{font-size:10.5px;color:var(--text4);font-weight:600;}
+.haiki-day-btn.sel .hdb-wd{color:rgba(255,255,255,0.6);}
+.hdb-wd.sat{color:#3b82f6;}.haiki-day-btn.sel .hdb-wd.sat{color:#93c5fd;}
+.hdb-wd.hol{color:#dc2626;}.haiki-day-btn.sel .hdb-wd.hol{color:#fca5a5;}
+.hdb-wd.sun{color:#dc2626;}.haiki-day-btn.sel .hdb-wd.sun{color:#fca5a5;}
+.hdb-tot{font-size:10px;color:var(--text5);margin-top:2px;}
+.haiki-day-btn.has-data .hdb-tot{color:#16a34a;}
+.haiki-day-btn.sel .hdb-tot{color:rgba(255,255,255,0.6);}
+.haiki-day-btn.sel.has-data .hdb-tot{color:#86efac;}
+.haiki-form{flex:1;overflow-y:auto;padding:16px 22px;background:var(--surface);-webkit-overflow-scrolling:touch;}
+.hf-title{font-size:17px;font-weight:800;color:var(--text);margin-bottom:16px;letter-spacing:-0.01em;}
+.hf-field{display:flex;align-items:center;justify-content:space-between;
+  padding:11px 0;border-bottom:1px solid var(--border2);gap:10px;}
+.hf-field:last-of-type{border-bottom:none;}
+.hf-label{font-size:14px;font-weight:600;color:var(--text2);flex:1;}
+.hf-input-wrap{display:flex;align-items:center;gap:6px;}
+.hf-input-wrap input{width:150px;border:1.5px solid var(--input-border);border-radius:10px;
+  padding:9px 14px;font-size:15px;font-weight:700;color:var(--text);text-align:right;
+  outline:none;font-family:inherit;background:var(--input-bg);-webkit-appearance:none;transition:all .15s;}
+.hf-input-wrap input:focus{border-color:#1a1a1a;background:#fff;}
+.hf-unit{font-size:12px;color:var(--text4);white-space:nowrap;font-weight:600;}
+.hf-total{margin-top:16px;padding:13px 16px;background:#fff1f2;border-radius:12px;
+  display:flex;justify-content:space-between;align-items:center;}
+.hf-total-label{font-size:12px;font-weight:700;color:#666;}
+.hf-total-val{font-size:18px;font-weight:800;color:#b91c1c;}
+.save-btn{background:var(--text);color:var(--surface);border:none;border-radius:10px;padding:8px 18px;
+  font-size:12.5px;font-weight:700;cursor:pointer;font-family:inherit;}
+.saved-msg{display:none;align-items:center;gap:5px;font-size:11.5px;font-weight:600;
+  color:#15803d;background:#dcfce7;border-radius:9px;padding:6px 12px;}
+
+/* 客数 カードグリッド */
+.kyaku-grid-wrap{flex:1;overflow-y:auto;-webkit-overflow-scrolling:touch;}
+.kyaku-month-total{display:flex;align-items:center;justify-content:space-between;
+  padding:12px 18px;background:var(--surface);border-radius:14px;
+  box-shadow:0 1px 8px var(--shadow2);margin-bottom:13px;flex-shrink:0;}
+.kyaku-month-label{font-size:11px;font-weight:700;letter-spacing:0.08em;text-transform:uppercase;color:var(--text4);}
+.kyaku-month-val{font-size:20px;font-weight:800;color:var(--text);}
+.kyaku-month-sub{font-size:11px;color:var(--text4);margin-top:2px;}
+.kyaku-grid{display:grid;grid-template-columns:repeat(7,1fr);gap:7px;}
+.kyaku-day-header{text-align:center;font-size:11px;font-weight:700;color:#888;padding:5px 0;}
+.kyaku-day-header.sat{color:#3b82f6;}
+.kyaku-day-header.sun{color:#dc2626;}
+.kyaku-day-card{background:var(--surface);border-radius:11px;padding:9px 6px;
+  box-shadow:0 1px 7px var(--shadow2);display:flex;flex-direction:column;align-items:center;gap:5px;}
+.kyaku-day-card.sat-card{border-top:2px solid #bfdbfe;}
+.kyaku-day-card.sun-card{border-top:2px solid #fecaca;}
+.kyaku-day-card.empty{background:var(--surface2);box-shadow:none;}
+.kyaku-day-num{font-size:11.5px;font-weight:700;color:var(--text3);}
+.kyaku-day-num.sat{color:#3b82f6;}
+.kyaku-day-num.sun{color:#dc2626;}
+.kyaku-day-num.hol{color:#dc2626;}
+.kyaku-wx{font-size:14px;line-height:1;}
+.kyaku-input{width:100%;border:1.5px solid var(--input-border);border-radius:8px;
+  padding:7px 4px;font-size:14px;font-weight:700;color:var(--text);text-align:center;
+  outline:none;font-family:inherit;background:var(--input-bg);-webkit-appearance:none;transition:all .15s;}
+.kyaku-input:focus{border-color:#1a1a1a;background:#fff;}
+.kyaku-input.has-val{background:#f0fdf4;border-color:#86efac;}
+.kyaku-week-sep{grid-column:1/-1;height:1px;background:#f0f0f0;margin:2px 0;}
+
+/* 廃棄チャートカード */
+.haiki-chart-card{background:var(--surface);border-radius:14px;padding:12px 16px 10px;
+  box-shadow:0 2px 10px rgba(0,0,0,0.07);margin-bottom:10px;flex-shrink:0;}
+.haiki-chart-header{display:flex;align-items:flex-start;justify-content:space-between;margin-bottom:8px;}
+.haiki-chart-title{font-size:12px;font-weight:700;color:var(--text);}
+.haiki-chart-sub{font-size:10px;color:#888;margin-top:2px;}
+.haiki-chart-total{text-align:right;}
+.haiki-chart-total-label{font-size:9.5px;color:#888;font-weight:600;}
+.haiki-chart-total-val{font-size:16px;font-weight:800;color:#b91c1c;}
+
+/* 廃棄予算 */
+.hf-budget-section{margin-top:18px;border-top:1.5px solid var(--border);padding-top:14px;}
+.hf-budget-title{font-size:11px;font-weight:700;letter-spacing:0.08em;color:var(--text4);
+  text-transform:uppercase;margin-bottom:10px;display:flex;align-items:center;justify-content:space-between;}
+.hf-budget-edit-btn{font-size:10px;font-weight:700;padding:3px 10px;border-radius:7px;
+  border:1.5px solid var(--input-border);background:transparent;color:var(--text3);
+  cursor:pointer;font-family:inherit;}
+.hf-budget-row{display:flex;align-items:center;padding:6px 0;border-bottom:1px solid var(--border2);gap:8px;}
+.hf-budget-row:last-child{border-bottom:none;}
+.hf-budget-label{font-size:12px;color:var(--text2);flex:1;}
+.hf-budget-actual{font-size:12.5px;font-weight:700;color:var(--text);text-align:right;min-width:80px;}
+.hf-budget-actual.over{color:#dc2626;}
+.hf-budget-limit{font-size:11px;color:var(--text4);text-align:right;min-width:80px;}
+.hf-budget-bar-wrap{width:60px;height:8px;border-radius:4px;background:var(--border);overflow:hidden;flex-shrink:0;}
+.hf-budget-bar{height:100%;border-radius:4px;background:#16a34a;transition:width .3s;}
+.hf-budget-bar.over{background:#dc2626;}
+.hf-budget-total-row{display:flex;align-items:center;padding:10px 0 0;margin-top:4px;
+  border-top:2px solid var(--border);}
+
+/* 予算編集モーダル */
+.budget-modal-bg{display:none;position:fixed;inset:0;background:rgba(0,0,0,0.35);z-index:200;
+  align-items:center;justify-content:center;}
+.budget-modal-bg.show{display:flex;}
+.budget-modal{background:var(--surface);border-radius:18px;padding:22px 24px;
+  box-shadow:0 20px 60px rgba(0,0,0,0.25);width:320px;max-height:85vh;overflow-y:auto;}
+.budget-modal-title{font-size:15px;font-weight:800;color:var(--text);margin-bottom:16px;}
+.budget-edit-row{display:flex;align-items:center;gap:8px;padding:7px 0;
+  border-bottom:1px solid var(--border2);}
+.budget-edit-row:last-of-type{border-bottom:none;}
+.budget-edit-label{font-size:12px;color:var(--text2);flex:1;}
+.budget-edit-input{width:110px;padding:6px 10px;border:1.5px solid var(--input-border);
+  border-radius:8px;font-size:13px;font-weight:700;color:var(--text);text-align:right;
+  background:var(--input-bg);font-family:inherit;outline:none;}
+.budget-edit-unit{font-size:11px;color:var(--text4);}
+.budget-modal-btns{display:flex;gap:8px;margin-top:18px;}
+.budget-modal-save{flex:1;padding:10px;border-radius:10px;border:none;
+  background:var(--text);color:var(--surface);font-size:13px;font-weight:700;
+  cursor:pointer;font-family:inherit;}
+.budget-modal-cancel{padding:10px 16px;border-radius:10px;border:1.5px solid var(--border);
+  background:transparent;color:var(--text3);font-size:13px;font-weight:700;
+  cursor:pointer;font-family:inherit;}
+.modal-bg{display:none;position:fixed;inset:0;background:rgba(0,0,0,0.3);z-index:100;align-items:center;justify-content:center;}
+.modal-bg.show{display:flex;}
+.modal{background:var(--surface);border-radius:18px;padding:24px 28px;box-shadow:0 20px 60px rgba(0,0,0,0.2);min-width:280px;text-align:center;}
+.modal h2{font-size:15px;font-weight:800;color:#1a1a1a;margin-bottom:7px;}
+.modal p{font-size:12px;color:#888;margin-bottom:18px;line-height:1.5;}
+.modal-btns{display:flex;gap:8px;justify-content:center;}
+.modal-btn{padding:8px 20px;border-radius:9px;font-size:12px;font-weight:700;border:none;cursor:pointer;font-family:inherit;}
+.modal-btn.cancel{background:#f2f2f4;color:#666;}
+.modal-btn.danger{background:#dc2626;color:#fff;}
+/* ══ ダークモード上書き ══ */
+.dark body,.dark #app{background:var(--bg);}
+.dark #sidebar{background:var(--surface);box-shadow:2px 0 14px var(--shadow);}
+.dark #sidebar h1{color:var(--text);}
+.dark .sidebar-sub{color:var(--text4);}
+.dark .nav-btn{color:var(--nav-inactive);}
+.dark .nav-btn.active{background:#e0e0e8;color:#111;}
+.dark .nav-btn.quick{border-color:var(--nav-border);color:var(--text2);}
+.dark .nav-btn.quick.active{background:#e0e0e8;border-color:#e0e0e8;color:#111;}
+.dark .store-sel{background:var(--surface2);border-color:var(--input-border);color:var(--text);}
+.dark .store-menu-btn{background:var(--surface2);border-color:var(--input-border);color:var(--text3);}
+.dark .store-menu{background:var(--surface);border-color:var(--border);box-shadow:0 8px 30px var(--shadow);}
+.dark .store-menu-item{color:var(--text2);}
+.dark .store-menu-item:hover{background:var(--surface2);}
+.dark .user-row{border-top-color:var(--border);}
+.dark #main{background:var(--bg);}
+.dark .card{background:var(--surface);}
+.dark .kpi-card{background:var(--surface);box-shadow:0 2px 12px var(--shadow2);}
+.dark .kpi-label{color:var(--text4);}
+.dark .kpi-value{color:var(--text);}
+.dark .kpi-prev{color:var(--text4);}
+.dark .derived-card{background:var(--surface);box-shadow:0 1px 8px var(--shadow2);}
+.dark .derived-label{color:var(--text4);}
+.dark .derived-value{color:var(--text);}
+.dark .chart-title{color:var(--text);}
+.dark .chart-sub{color:var(--text4);}
+.dark .tab-btn{color:var(--text4);}
+.dark .sep{background:var(--border);}
+.dark .m-btn{background:var(--surface2);color:var(--text3);}
+.dark .legend-item{color:var(--text3);}
+.dark .legend-dash{border-top-color:var(--text5);}
+.dark .corr-card{background:var(--surface);box-shadow:0 1px 8px var(--shadow2);}
+.dark .corr-title{color:var(--text3);}
+.dark .donut-leg{border-bottom-color:var(--border2);}
+.dark .donut-name{color:var(--text3);}
+.dark .donut-val{color:var(--text);}
+.dark .summary-title{color:var(--text);}
+.dark .sum-row{border-bottom-color:var(--border2);}
+.dark .sum-bar{background:var(--border);}
+.dark .sum-name{color:var(--text3);}
+.dark .sum-val{color:var(--text);}
+.dark .quick-date{color:var(--text);}
+.dark .quick-weekday{background:rgba(180,180,200,0.15);color:var(--text);}
+.dark .quick-section{background:var(--surface);box-shadow:0 1px 8px var(--shadow2);}
+.dark .qs-title{color:var(--text3);}
+.dark .qs-label{color:var(--text2);}
+.dark .qs-input{background:var(--input-bg);border-color:var(--input-border);color:var(--text);}
+.dark .qs-unit{color:var(--text4);}
+.dark .input-pg{background:var(--bg);}
+.dark .table-card{background:var(--surface);box-shadow:0 2px 12px var(--shadow);}
+.dark .table-head{background:var(--surface2);border-bottom-color:var(--border);}
+.dark .th{color:var(--text3);}
+.dark .table-row{border-bottom-color:var(--border2);}
+.dark .td-day{color:var(--text3);}
+.dark .td-inp input{background:var(--input-bg);border-color:var(--input-border);color:var(--text);}
+.dark .tr-total{background:var(--surface2);border-top-color:var(--border);}
+.dark .haiki-day-list{background:var(--surface2);border-right-color:var(--border);}
+.dark .haiki-day-btn{border-bottom-color:var(--border);}
+.dark .hdb-num{color:var(--text);}
+.dark .hdb-wd{color:var(--text4);}
+.dark .hdb-tot{color:var(--text5);}
+.dark .hf-title{color:var(--text);}
+.dark .hf-label{color:var(--text2);}
+.dark .hf-input-wrap input{background:var(--input-bg);border-color:var(--input-border);color:var(--text);}
+.dark .hf-unit{color:var(--text4);}
+.dark .hf-total{background:var(--surface2);}
+.dark .hf-total-label{color:var(--text3);}
+.dark .kyaku-month-total{background:var(--surface);box-shadow:0 1px 8px var(--shadow2);}
+.dark .kyaku-total-label{color:var(--text4);}
+.dark .kyaku-total-val{color:var(--text);}
+.dark .kyaku-total-sub{color:var(--text4);}
+.dark .kyaku-day-header{color:var(--text4);}
+.dark .kyaku-day-card{background:var(--surface);box-shadow:0 1px 7px var(--shadow2);}
+.dark .kyaku-day-card.empty{background:var(--surface2);}
+.dark .kyaku-day-num{color:var(--text3);}
+.dark .kyaku-input{background:var(--input-bg);border-color:var(--input-border);color:var(--text);}
+.dark .iytab{background:var(--surface2);color:var(--text3);}
+.dark .iytab.active{background:var(--text);color:var(--surface);}
+.dark .mtab{background:var(--surface2);color:var(--text3);}
+.dark .mtab.active{background:var(--text);color:var(--surface);}
+.dark .haiki-chart-card{background:var(--surface);}
+.dark .haiki-chart-title{color:var(--text);}
+.dark .modal-card{background:var(--surface);}
+.dark .modal-title{color:var(--text);}
+.dark .modal-msg{color:var(--text3);}
+.dark .save-btn{background:var(--text);color:var(--bg);}
+.dark #darkModeBtn{border-color:var(--input-border);color:var(--text3);}
+.dark [style*="color:#1a1a1a"]{color:var(--text)!important;}
+.dark [style*="color:#333"]{color:var(--text2)!important;}
+.dark [style*="color:#555"]{color:var(--text3)!important;}
+.dark [style*="color:#666"]{color:var(--text3)!important;}
+.dark [style*="color:#888"]{color:var(--text4)!important;}
+.dark [style*="color:#aaa"]{color:var(--text5)!important;}
+.dark [style*="color:#bbb"]{color:var(--text5)!important;}
+.dark [style*="color:#ccc"]{color:var(--text6)!important;}
+.dark [style*="background:#fff"]{background:var(--surface)!important;}
+.dark [style*="background:#fafafa"]{background:var(--input-bg)!important;}
+.dark [style*="background:#f5f5f7"]{background:var(--surface2)!important;}
+.dark [style*="background:#ebebed"]{background:var(--surface2)!important;}
+.dark [style*="background:#f8f8f8"]{background:var(--surface2)!important;}
+.dark [style*="background:#f0f0f0"]{background:var(--surface2)!important;}
+.dark select{background:var(--input-bg)!important;color:var(--text)!important;border-color:var(--input-border)!important;}
+.dark input{background:var(--input-bg)!important;color:var(--text)!important;border-color:var(--input-border)!important;}
+</style>
+</head>
+<body>
+<div id="app">
+  <div id="sidebar">
+    <h1>Insight</h1>
+    <div class="sidebar-sub">コンビニ経営ダッシュボード</div>
+    <!-- 店舗セレクター -->
+    <div class="store-sel-wrap">
+      <select id="storeSel" onchange="switchStore(this.value)" class="store-sel"></select>
+      <button onclick="showStoreMenu()" class="store-menu-btn" id="storeMenuBtn">⋯</button>
+    </div>
+    <div id="storeMenu" class="store-menu" style="display:none;"></div>
+    <div class="nav-list">
+      <button class="nav-btn quick active" id="nav0" onclick="gotoNav(0)">
+        <span class="nav-icon">⚡</span>今日の入力
+        <span class="today-badge" id="todayBadge">今日</span>
+      </button>
+      <button class="nav-btn" id="nav1" onclick="gotoNav(1)"><span class="nav-icon">⊞</span>ダッシュボード</button>
+      <button class="nav-btn" id="nav2" onclick="gotoNav(2)"><span class="nav-icon">💴</span>売上入力</button>
+      <button class="nav-btn" id="nav3" onclick="gotoNav(3)"><span class="nav-icon">👥</span>客数入力</button>
+      <button class="nav-btn" id="nav4" onclick="gotoNav(4)"><span class="nav-icon">🗑</span>廃棄入力</button>
+    </div>
+    <div class="sidebar-btns">
+      <button onclick="backupData()" id="backupBtn" class="sidebar-btn">
+        <span>📥</span>
+        <div class="sidebar-btn-text">
+          <span>バックアップ</span>
+          <span id="backupDaysLabel" class="sidebar-btn-sub"></span>
+        </div>
+      </button>
+      <button onclick="document.getElementById('restoreFile').click()" class="sidebar-btn">
+        <span>📤</span><span>データ復元</span>
+      </button>
+      <button onclick="toggleDarkMode()" id="darkModeBtn" class="sidebar-btn">
+        <span id="darkModeIcon">🌙</span><span id="darkModeLabel">ダークモード</span>
+      </button>
+      <input type="file" id="restoreFile" accept=".json" style="display:none" onchange="restoreData(event)">
+    </div>
+  </div>
+
+  <div id="main">
+
+    <!-- ══ クイック入力 ══ -->
+    <div class="page show quick-page" id="pageQuick">
+      <div class="quick-date-bar">
+        <div>
+          <div class="quick-date" id="qDate"></div>
+        </div>
+        <div class="quick-weekday" id="qWeekday"></div>
+        <div class="weather-sel" id="qWeatherSel">
+          <button class="wx-btn active" data-wx="快晴" onclick="setWeather('快晴')">☀️</button>
+          <button class="wx-btn" data-wx="晴" onclick="setWeather('晴')">🌤️</button>
+          <button class="wx-btn" data-wx="晴曇" onclick="setWeather('晴曇')">⛅</button>
+          <button class="wx-btn" data-wx="曇" onclick="setWeather('曇')">☁️</button>
+          <button class="wx-btn" data-wx="小雨" onclick="setWeather('小雨')">🌦️</button>
+          <button class="wx-btn" data-wx="雨" onclick="setWeather('雨')">🌧️</button>
+          <button class="wx-btn" data-wx="大雨" onclick="setWeather('大雨')">⛈️</button>
+          <button class="wx-btn" data-wx="みぞれ" onclick="setWeather('みぞれ')">🌨️</button>
+          <button class="wx-btn" data-wx="雪" onclick="setWeather('雪')">❄️</button>
+        </div>
+        <button id="autoWxBtn" onclick="fetchWeather()" style="padding:4px 10px;border-radius:8px;
+          border:1.5px solid #ddd;background:#fff;
+          color:#333;font-size:10.5px;font-weight:700;cursor:pointer;font-family:inherit;
+          display:flex;align-items:center;gap:4px;">
+          <span>📡</span><span id="autoWxLabel">自動取得</span>
+        </button>
+        <div id="qNavRow" class="quick-nav-row" style="margin-bottom:0;"></div>
+      </div>
+      <div class="quick-grid" id="quickGrid"></div>
+      <button class="quick-save" onclick="saveQuick()">保存する</button>
+    </div>
+
+    <!-- ══ Dashboard ══ -->
+    <div class="page" id="pageDash">
+      <div class="page-header">
+        <div class="page-title">売上分析ダッシュボード</div>
+      </div>
+      <div class="year-bar">
+        <div class="year-sel-group">
+          <span class="year-sel-label">基準年</span>
+          <select id="baseYearSel" onchange="onBaseYearChange(this.value)"
+            style="padding:5px 10px;border-radius:9px;border:2px solid #1a1a1a;
+            background:#1a1a1a;color:#fff;font-size:12px;font-weight:700;
+            font-family:inherit;outline:none;cursor:pointer;"></select>
+        </div>
+        <span style="font-size:16px;color:var(--text5);">vs</span>
+        <div class="year-sel-group">
+          <span class="year-sel-label">比較年</span>
+          <select id="cmpYearSel" onchange="onCmpYearChange(this.value)"
+            style="padding:5px 10px;border-radius:9px;border:2px solid #888;
+            background:var(--surface);color:var(--text2);font-size:12px;font-weight:700;
+            font-family:inherit;outline:none;cursor:pointer;"></select>
+        </div>
+        <button onclick="showAddYear()" id="addYearBtn"
+          style="padding:5px 12px;border-radius:9px;border:1.5px dashed #ccc;
+          background:transparent;color:#999;font-size:11px;font-weight:700;
+          cursor:pointer;font-family:inherit;">＋ 年度追加</button>
+        <div id="addYearInlineWrap"></div>
+      </div>
+      <div class="dash-month-bar">
+        <div class="dash-month-scroll">
+          <div class="month-btns" id="dashMonthBtns"></div>
+        </div>
+      </div>
+      <div class="kpi-row" id="kpiRow"></div>
+      <div class="derived-row" id="derivedRow"></div>
+      <div class="charts-row">
+        <div class="card main-chart-card">
+          <div class="chart-hd">
+            <div>
+              <div class="chart-title" id="chartTitle">月次推移</div>
+              <div class="chart-sub" id="chartSub"></div>
+            </div>
+            <div class="chart-controls">
+              <button class="tab-btn" id="tabDay" onclick="setView('日')">日別</button>
+              <button class="tab-btn active" id="tabMonth" onclick="setView('月')">月別</button>
+            </div>
+          </div>
+          <div class="legend-row" id="legendRow"></div>
+          <div class="chart-wrap"><canvas id="mainChart"></canvas></div>
+          <!-- 曜日別分析 -->
+          <div class="corr-row" id="corrRow" style="display:none;">
+            <div class="corr-card"><div class="corr-title">曜日別平均売上</div><div style="height:70px;position:relative;"><canvas id="wdChart"></canvas></div></div>
+          </div>
+        </div>
+        <div class="right-col">
+          <div class="card donut-card">
+            <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:6px;">
+              <div><div class="chart-title">廃棄内訳</div><div class="chart-sub" id="donutSub">月合計</div></div>
+              <div style="display:flex;align-items:center;gap:5px;">
+                <div style="display:flex;border-radius:7px;overflow:hidden;border:1px solid #e0e0e0;">
+                  <button id="donutBtnAmt" onclick="setDonutMode('amount')"
+                    style="padding:3px 9px;border:none;font-size:10px;font-weight:700;
+                    cursor:pointer;font-family:inherit;background:var(--text);color:var(--surface);">金額</button>
+                  <button id="donutBtnPct" onclick="setDonutMode('percent')"
+                    style="padding:3px 9px;border:none;font-size:10px;font-weight:700;
+                    cursor:pointer;font-family:inherit;background:var(--surface);color:var(--text4);">割合</button>
+                </div>
+                <div id="donutDayPicker" style="display:none;">
+                  <select id="donutDaySelect" onchange="refreshDonut()"
+                    style="font-size:9.5px;font-weight:700;border:1px solid #eee;border-radius:6px;
+                    padding:3px 5px;color:var(--text3);background:var(--input-bg);font-family:inherit;"></select>
+                </div>
+              </div>
+            </div>
+            <div class="donut-inner">
+              <div class="donut-wrap"><canvas id="donutChart"></canvas></div>
+              <div class="donut-legends" id="donutLegends"></div>
+            </div>
+          </div>
+          <div class="card bar-card">
+            <div class="chart-title" id="barTitle" style="margin-bottom:2px">月別売上</div>
+            <div class="chart-sub" style="margin-bottom:6px">年度比較</div>
+            <div class="chart-wrap"><canvas id="barChart"></canvas></div>
+          </div>
+          <div class="card summary-card">
+            <div class="summary-title">年間サマリー</div>
+            <div id="summaryBody"></div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ══ 売上入力 ══ -->
+    <div class="page input-pg" id="pageSales">
+      <div class="page-header">
+        <div class="page-title">売上入力</div>
+        <div class="header-right">
+          <div class="saved-msg" id="savedSales">✓ 保存しました</div>
+          <button class="save-btn" onclick="saveInput('sales')">保存する</button>
+        </div>
+      </div>
+      <div class="input-year-row" id="salesYearRow"></div>
+      <div class="month-tab-row" id="salesMonthTabs"></div>
+      <div class="table-card">
+        <div class="haiki-pane">
+          <div class="haiki-day-list" id="salesDayList"></div>
+          <div class="haiki-form" id="salesForm"></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ══ 客数入力 ══ -->
+    <div class="page input-pg" id="pageKyaku">
+      <div class="page-header">
+        <div class="page-title">客数入力</div>
+        <div class="header-right">
+          <div class="saved-msg" id="savedKyaku">✓ 保存しました</div>
+          <button class="save-btn" onclick="saveInput('kyaku')">保存する</button>
+        </div>
+      </div>
+      <div class="input-year-row" id="kyakuYearRow"></div>
+      <div class="month-tab-row" id="kyakuMonthTabs"></div>
+      <div class="kyaku-grid-wrap" id="kyakuGridWrap">
+        <div class="kyaku-month-total" id="kyakuMonthTotal"></div>
+        <div class="kyaku-grid" id="kyakuGrid"></div>
+      </div>
+    </div>
+
+    <!-- ══ 廃棄入力 ══ -->
+    <div class="page input-pg" id="pageHaiki">
+      <div class="page-header">
+        <div class="page-title">廃棄入力</div>
+        <div class="header-right">
+          <div class="saved-msg" id="savedHaiki">✓ 保存しました</div>
+          <button class="save-btn" onclick="saveInput('haiki')">保存する</button>
+        </div>
+      </div>
+      <div class="input-year-row" id="haikiYearRow"></div>
+      <div class="month-tab-row" id="haikiMonthTabs"></div>
+      <div style="display:flex;gap:10px;margin-bottom:10px;flex-shrink:0;">
+        <div class="haiki-chart-card" id="haikiChartCard" style="flex:1;margin-bottom:0;">
+          <div class="haiki-chart-header">
+            <div>
+              <div class="haiki-chart-title" id="haikiChartTitle">廃棄金額 日別推移</div>
+              <div class="haiki-chart-sub" id="haikiChartSub"></div>
+            </div>
+            <div class="haiki-chart-total" id="haikiChartTotal"></div>
+          </div>
+          <div style="height:90px;position:relative;">
+            <canvas id="haikiBarChart"></canvas>
+          </div>
+        </div>
+        <div class="haiki-chart-card" style="width:200px;flex-shrink:0;margin-bottom:0;padding:8px 10px 8px;">
+          <div class="haiki-chart-title" style="margin-bottom:5px;font-size:11px;">曜日別平均廃棄</div>
+          <div style="height:105px;position:relative;">
+            <canvas id="haikiWdChart"></canvas>
+          </div>
+        </div>
+      </div>
+      <div class="table-card">
+        <div class="haiki-pane">
+          <div class="haiki-day-list" id="haikiDayList"></div>
+          <div class="haiki-form" id="haikiForm"></div>
+        </div>
+      </div>
+    </div>
+
+  </div>
+</div>
+
+<div class="budget-modal-bg" id="budgetModalBg">
+  <div class="budget-modal">
+    <div class="budget-modal-title">廃棄予算の設定</div>
+    <div id="budgetEditRows"></div>
+    <div class="budget-modal-btns">
+      <button class="budget-modal-cancel" onclick="closeBudgetModal()">キャンセル</button>
+      <button class="budget-modal-save" onclick="saveBudget()">保存する</button>
+    </div>
+  </div>
+</div>
+
+<div class="modal-bg" id="modalBg">
+  <div class="modal">
+    <h2>年度を削除しますか？</h2>
+    <p id="modalMsg"></p>
+    <div class="modal-btns">
+      <button class="modal-btn cancel" onclick="closeModal()">キャンセル</button>
+      <button class="modal-btn danger" onclick="confirmDeleteYear()">削除する</button>
+    </div>
+  </div>
+</div>
+
+<script>
+/* ══ Constants ══ */
+const MONTHS=["1月","2月","3月","4月","5月","6月","7月","8月","9月","10月","11月","12月"];
+const DAYS_IN_MONTH=[31,28,31,30,31,30,31,31,30,31,30,31];
+const HAIKI_CATS=["米飯","調理パン","麺類・その他","デリカ","スイーツ","FF","その他デイリー","パン・ペストリー"];
+const HAIKI_COLORS=["#7f1d1d","#991b1b","#b91c1c","#dc2626","#ef4444","#f87171","#fca5a5","#fecaca"];
+const WEEKDAYS=["日","月","火","水","木","金","土"];
+const WX_KEYS=["快晴","晴","晴曇","曇","小雨","雨","大雨","みぞれ","雪"];
+const WX_ICONS={"快晴":"☀️","晴":"🌤️","晴曇":"⛅","曇":"☁️","小雨":"🌦️","雨":"🌧️","大雨":"⛈️","みぞれ":"🌨️","雪":"❄️","":""};
+const SK="insight_v11";
+
+function migrateOldData(old){
+  // v9以前の単店舗データをマイグレーション
+  const t=todayFY();
+  const sid="store_1";
+  return{current:sid,stores:{[sid]:{name:"本店",years:old.years||[t.fy],data:old.data||{[t.fy]:blankYearData(t.fy)}}}};
+}
+
+function loadAll(){
+  try{
+    const s=localStorage.getItem(SK);
+    if(s){
+      const all=JSON.parse(s);
+      // 各店舗データのマイグレーション
+      Object.values(all.stores).forEach(st=>{
+        Object.values(st.data).forEach(yd=>{
+          Object.values(yd).forEach(rows=>{
+            if(Array.isArray(rows))rows.forEach(r=>{
+              if(!r.haiki)r.haiki=blankHaiki();
+              if(r.weather===undefined)r.weather="";
+            });
+          });
+        });
+      });
+      return all;
+    }
+    // 古いキー(v8/v9)からのマイグレーション
+    for(const oldKey of["insight_v9","insight_v8"]){
+      const old=localStorage.getItem(oldKey);
+      if(old){
+        const migrated=migrateOldData(JSON.parse(old));
+        return migrated;
+      }
+    }
+  }catch(e){}
+  // 初回：今年度の空データ
+  const t=todayFY();
+  const sid="store_1";
+  return{current:sid,stores:{[sid]:{name:"店舗1",years:[t.fy],data:{[t.fy]:blankYearData(t.fy)}}}};
+}
+
+function persist(){
+  try{localStorage.setItem(SK,JSON.stringify(allStores));}catch(e){}
+}
+
+const METRICS=[
+  {key:"売上",label:"売上",unit:"千円",up:true,
+   color:"#166534",colorBg:"rgba(22,101,52,0.08)",
+   fmt:v=>`${v.toLocaleString()}千円`,
+   short:v=>`${v.toLocaleString()}<span class="kpi-unit">千円</span>`,
+   yFmt:v=>v>=1000?`${(v/1000).toFixed(0)}万`:`${v}千`},
+  {key:"客数",label:"客数",unit:"人",up:true,
+   color:"#555",colorBg:"rgba(80,80,80,0.07)",
+   fmt:v=>`${v.toLocaleString()}人`,short:v=>`${v.toLocaleString()}<span class="kpi-unit">人</span>`,
+   yFmt:v=>`${(v/1000).toFixed(1)}k`},
+  {key:"買上点数",label:"買上点数",unit:"点",up:true,
+   color:"#1e40af",colorBg:"rgba(30,64,175,0.08)",
+   fmt:v=>`${v.toLocaleString()}点`,short:v=>`${v.toFixed(2)}<span class="kpi-unit">点</span>`,
+   yFmt:v=>`${(v/1000).toFixed(1)}k`},
+  {key:"廃棄金額",label:"廃棄金額",unit:"円",up:false,
+   color:"#b91c1c",colorBg:"rgba(185,28,28,0.08)",
+   fmt:v=>`¥${v.toLocaleString()}`,short:v=>`¥${v.toLocaleString()}`,
+   yFmt:v=>v>=10000?`${(v/10000).toFixed(0)}万`:`${v}`},
+];
+
+/* ══ カンマ入力ユーティリティ ══ */
+function toComma(v){
+  const n=parseInt(String(v).replace(/,/g,""))||0;
+  return n===0?"":n.toLocaleString();
+}
+function fromComma(v){return parseInt(String(v).replace(/,/g,""))||0;}
+function fromCommaFloat(v){return parseFloat(String(v).replace(/,/g,""))||0;}
+
+// 計算式を安全に評価（+,-,*,/のみ対応）
+function evalFormula(str){
+  const s=String(str).replace(/,/g,"").trim();
+  if(!s)return 0;
+  // 数字・演算子・小数点・スペースのみ許可
+  if(!/^[\d\s\+\-\*\/\.]+$/.test(s))return fromCommaFloat(s);
+  try{
+    // トークン分割で安全に計算
+    const tokens=s.match(/[\d\.]+|[\+\-\*\/]/g)||[];
+    if(!tokens.length)return 0;
+    // 掛け算・割り算を先に処理
+    let i=0;const nums=[];const ops=[];
+    tokens.forEach(t=>{
+      if(/[\d\.]+/.test(t))nums.push(parseFloat(t));
+      else ops.push(t);
+    });
+    // 演算子と数値を交互に処理（掛割優先）
+    let result=[nums[0]];let resOps=[];
+    for(let j=0;j<ops.length;j++){
+      if(ops[j]==="*"||ops[j]==="/"){
+        const a=result.pop();
+        const b=nums[j+1];
+        result.push(ops[j]==="*"?a*b:b!==0?a/b:0);
+      }else{
+        result.push(nums[j+1]);
+        resOps.push(ops[j]);
+      }
+    }
+    let final=result[0];
+    for(let j=0;j<resOps.length;j++){
+      final=resOps[j]==="+"?final+result[j+1]:final-result[j+1];
+    }
+    return isNaN(final)||final<0?0:Math.round(final);
+  }catch(e){return fromCommaFloat(s);}
+}
+
+function commaBlurWithFormula(el){
+  const n=evalFormula(el.value);
+  el.value=n>0?n.toLocaleString():"";
+  return n;
+}
+function commaFocus(el){
+  const n=fromCommaFloat(el.value);
+  el.value=n||"";
+}
+function commaBlur(el){
+  const n=fromComma(el.value);
+  el.value=n>0?n.toLocaleString():"";
+}
+function commaFloatBlur(el,decimals=2){
+  const n=fromCommaFloat(el.value);
+  el.value=n>0?n.toFixed(decimals):"";
+}
+function applyCommaInput(el){
+  el.addEventListener("focus",()=>commaFocus(el));
+  el.addEventListener("blur",()=>commaBlur(el));
+  const n=fromComma(el.value);
+  if(n>0)el.value=n.toLocaleString();
+}
+function applyCommaFloatInput(el,decimals=2){
+  el.addEventListener("focus",()=>commaFocus(el));
+  el.addEventListener("blur",()=>commaFloatBlur(el,decimals));
+  const n=fromCommaFloat(el.value);
+  if(n>0)el.value=n.toFixed(decimals);
+}
+
+/* ══ Date helpers ══ */
+function getWeekday(fyear,mIdx,day){
+  const cy=parseInt(fyear);
+  const cm=mIdx+1; // 1月=1, 12月=12
+  return new Date(cy,cm-1,day).getDay(); // 0=Sun
+}
+function todayFY(){
+  const t=new Date();
+  const y=t.getFullYear(),m=t.getMonth()+1,d=t.getDate();
+  const mIdx=m-1; // 0始まり
+  return{fy:String(y),mIdx,month:MONTHS[mIdx],day:d};
+}
+
+/* ══ Data ══ */
+function blankHaiki(){const h={};HAIKI_CATS.forEach(c=>{h[c]=0;});return h;}
+function blankRow(d){return{d:String(d),売上:0,客数:0,買上点数:0,廃棄金額:0,haiki:blankHaiki(),weather:""};}
+function blankMonthData(mi,fy){
+  // 2月（mIdx=1）のうるう年対応
+  const days=(mi===1&&fy&&parseInt(fy)%4===0&&(parseInt(fy)%100!==0||parseInt(fy)%400===0))?29:DAYS_IN_MONTH[mi];
+  return Array.from({length:days},(_,di)=>blankRow(di+1));
+}
+function blankYearData(fy){const d={};MONTHS.forEach((m,mi)=>{d[m]=blankMonthData(mi,fy);});return d;}
+
+function sampleYearData(factor){
+  const base={
+    売上:[82000,94000,78000,105000,112000,99000,124000,131000,156000,118000,129000,142000],
+    客数:[1640,1880,1560,2100,2240,1980,2480,2620,3120,2360,2580,2840],
+    買上点数:[5248,5828,4836,6510,6944,6138,7688,8122,9672,7316,7998,8804],
+    廃棄金額:[328000,376000,390000,315000,280000,360000,290000,305000,260000,340000,310000,275000],
+  };
+  const hRatio=[0.28,0.18,0.16,0.14,0.13,0.11];
+  const wxList=["快晴","晴","晴","晴曇","曇","小雨","雨","晴"];
+  const daily={};
+  MONTHS.forEach((m,mi)=>{
+    const days=DAYS_IN_MONTH[mi];
+    daily[m]=Array.from({length:days},(_,di)=>{
+      const d=di+1,row={d:String(d)};
+      const r1=((d*17+mi*31)%97)/97,t=d/days;
+      row.売上=Math.round(base.売上[mi]*factor/days*(0.5+r1*1.2)*(0.85+t*0.3));
+      const r2=((d*17+mi*31+7)%97)/97;
+      row.客数=Math.round(base.客数[mi]*factor/days*(0.5+r2*1.2)*(0.85+t*0.3));
+      const r3=((d*17+mi*31+14)%97)/97;
+      row.買上点数=Math.round(base.買上点数[mi]*factor/days*(0.5+r3*1.2)*(0.85+t*0.3));
+      const r4=((d*17+mi*31+21)%97)/97;
+      row.廃棄金額=Math.round(base.廃棄金額[mi]*factor/days*(0.5+r4*1.2)*(0.85+t*0.3));
+      const h={};let acc=0;
+      HAIKI_CATS.forEach((c,ci)=>{
+        const nr=((d*13+mi*23+ci*11)%97)/97;
+        h[c]=ci===HAIKI_CATS.length-1?Math.max(0,row.廃棄金額-acc):Math.round(row.廃棄金額*hRatio[ci]*(0.7+nr*0.6));
+        acc+=h[c];
+      });
+      row.haiki=h;
+      row.weather=wxList[(d+mi)%wxList.length];
+      return row;
+    });
+  });
+  return daily;
+}
+
+
+/* ══ State ══ */
+let allStores=loadAll();  // 新旧どちらの形式でも初期値取得
+// 旧形式（単店舗）を多店舗形式に変換
+if(!allStores.stores){
+  const sid="store_1";
+  allStores={current:sid,stores:{[sid]:{name:"本店",years:allStores.years,data:allStores.data}}};
+}
+let store=allStores.stores[allStores.current];
+
+let baseYear=store.years[store.years.length-1];
+let cmpYear=store.years.length>1?store.years[store.years.length-2]:null;
+let viewMode="月",selMonth="4月";
+let activeMetrics=["売上","客数"];
+let currentNav=0;
+let editYear={sales:baseYear,kyaku:baseYear,haiki:baseYear};
+let editMonth={sales:"4月",kyaku:"4月",haiki:"4月"};
+let drafts={sales:[],kyaku:[],haiki:[]};
+let yearToDelete=null;
+let quickWeather="快晴";
+let todayInfo=todayFY();
+let quickEditDay=todayInfo.day; // which day is shown in quick view
+let mainChartInst=null,barChartInst=null,donutInst=null,wdChartInst=null,haikiBarInst=null,haikiWdChartInst=null;
+let donutMode="amount"; // 'amount' | 'percent'
+
+/* ══ Theme ══ */
+/* ══ 店舗管理 ══ */
+function genStoreId(){return"store_"+Date.now();}
+
+function renderStoreSel(){
+  const sel=document.getElementById("storeSel");
+  if(!sel)return;
+  sel.innerHTML="";
+  Object.entries(allStores.stores).forEach(([id,st])=>{
+    const opt=document.createElement("option");
+    opt.value=id;
+    opt.textContent=st.name;
+    if(id===allStores.current)opt.selected=true;
+    sel.appendChild(opt);
+  });
+}
+
+function switchStore(id){
+  if(!allStores.stores[id])return;
+  allStores.current=id;
+  store=allStores.stores[id];
+  baseYear=store.years[store.years.length-1];
+  cmpYear=store.years.length>1?store.years[store.years.length-2]:null;
+  editYear={sales:baseYear,kyaku:baseYear,haiki:baseYear};
+  const t=todayFY();
+  editMonth={sales:t.month,kyaku:t.month,haiki:t.month};
+  persist();
+  renderStoreSel();
+  if(currentNav===0)initQuickPage();
+  else if(currentNav===1)refreshDash();
+  else initInputPage(["","","sales","kyaku","haiki"][currentNav]);
+  updateMissingBadge();
+  document.getElementById("storeMenu").style.display="none";
+}
+
+function showStoreMenu(){
+  const menu=document.getElementById("storeMenu");
+  if(menu.style.display!=="none"){menu.style.display="none";return;}
+  menu.innerHTML="";
+
+  // 店舗名変更
+  const rename=document.createElement("button");
+  rename.className="store-menu-item";
+  rename.innerHTML=`<span>✏️</span> 店舗名を変更`;
+  rename.onclick=()=>{
+    const cur=allStores.stores[allStores.current];
+    const name=prompt("店舗名を入力してください",cur.name);
+    if(name&&name.trim()){
+      cur.name=name.trim();persist();renderStoreSel();
+    }
+    menu.style.display="none";
+  };
+  menu.appendChild(rename);
+
+  // 新しい店舗を追加
+  const add=document.createElement("button");
+  add.className="store-menu-item";
+  add.innerHTML=`<span>＋</span> 新しい店舗を追加`;
+  add.onclick=()=>{
+    const name=prompt("新しい店舗名を入力してください","店舗2");
+    if(name&&name.trim()){
+      const id=genStoreId();
+      const t=todayFY();
+      allStores.stores[id]={name:name.trim(),years:[t.fy],data:{[t.fy]:blankYearData(t.fy)}};
+      persist();
+      switchStore(id);
+    }
+    menu.style.display="none";
+  };
+  menu.appendChild(add);
+
+  // 区切り線
+  if(Object.keys(allStores.stores).length>1){
+    const sep=document.createElement("div");sep.className="store-menu-sep";menu.appendChild(sep);
+
+    // この店舗を削除
+    const del=document.createElement("button");
+    del.className="store-menu-item danger";
+    del.innerHTML=`<span>🗑</span> この店舗を削除`;
+    del.onclick=()=>{
+      const cur=allStores.stores[allStores.current];
+      if(!confirm(`「${cur.name}」を削除します。\nこの店舗のデータはすべて消えます。よろしいですか？`)){
+        menu.style.display="none";return;
+      }
+      const ids=Object.keys(allStores.stores);
+      const nextId=ids.find(id=>id!==allStores.current)||ids[0];
+      delete allStores.stores[allStores.current];
+      persist();
+      switchStore(nextId);
+      menu.style.display="none";
+    };
+    menu.appendChild(del);
+  }
+
+  menu.style.display="block";
+
+  // メニュー外クリックで閉じる
+  setTimeout(()=>{
+    document.addEventListener("click",function closeMenu(e){
+      if(!menu.contains(e.target)&&e.target.id!=="storeMenuBtn"){
+        menu.style.display="none";
+      }
+      document.removeEventListener("click",closeMenu);
+    });
+  },50);
+}
+
+const THEMES={
+  mono:{primary:"#1a1a1a",secondary:"#888",accent:"#555",bg:"rgba(26,26,26,0.07)"},
+};
+
+function applyTheme(t){
+  const th=THEMES[t]||THEMES.mono;
+  document.documentElement.style.setProperty("--c-primary",th.primary);
+  document.documentElement.style.setProperty("--c-secondary",th.secondary);
+  document.documentElement.style.setProperty("--c-accent",th.accent);
+  document.documentElement.style.setProperty("--c-bg",th.bg);
+  document.querySelectorAll(".theme-btn").forEach(b=>{
+    b.classList.toggle("active",b.onclick?.toString().includes(`'${t}'`)||b.getAttribute("onclick")?.includes(`'${t}'`));
+  });
+}
+function setTheme(t){store.theme=t;persist();applyTheme(t);if(currentNav===1)refreshDash();}
+
+/* ══ Nav ══ */
+function gotoNav(i){
+  [0,1,2,3,4].forEach(j=>document.getElementById(`nav${j}`).classList.toggle("active",j===i));
+  currentNav=i;
+  ["pageQuick","pageDash","pageSales","pageKyaku","pageHaiki"].forEach((id,j)=>{
+    document.getElementById(id).classList.toggle("show",j===i);
+  });
+  if(i===0)initQuickPage();
+  else if(i===1)refreshDash();
+  else if(i===2){editYear.sales=null;initInputPage("sales");}
+  else if(i===3){editYear.kyaku=null;initInputPage("kyaku");}
+  else if(i===4){editYear.haiki=null;initInputPage("haiki");}
+}
+
+/* ══ Quick input page ══ */
+function initQuickPage(){
+  todayInfo=todayFY();
+  document.getElementById("todayBadge").textContent="今日";
+  renderQuickNav();
+  renderQuickPage();
+  // 今日のページを開いたとき、天気が未設定なら自動取得
+  if(quickEditDay===todayInfo.day){
+    const fy=todayInfo.fy,month=todayInfo.month;
+    const row=store.data[fy]?.[month]?.[quickEditDay-1];
+    if(!row||!row.weather){
+      fetchWeather();
+    }
+  }
+}
+
+function renderQuickNav(){
+  // Show prev/next day navigation around today
+  const nav=document.getElementById("qNavRow");
+  nav.innerHTML="";
+  // Show a few days around today for quick access
+  const mi=MONTHS.indexOf(todayInfo.month);
+  const maxDay=DAYS_IN_MONTH[mi];
+  const days=[];
+  for(let d=Math.max(1,quickEditDay-2);d<=Math.min(maxDay,quickEditDay+2);d++)days.push(d);
+  days.forEach(d=>{
+    const btn=document.createElement("button");
+    btn.className="qnav"+(d===quickEditDay?" active":"");
+    btn.textContent=`${d}日`;
+    btn.onclick=()=>{quickEditDay=d;renderQuickNav();renderQuickPage();};
+    nav.appendChild(btn);
+  });
+}
+
+function renderQuickPage(){
+  const fy=todayInfo.fy,mIdx=todayInfo.mIdx,month=todayInfo.month;
+  const wdIdx=getWeekday(fy,mIdx,quickEditDay);
+  const wd=WEEKDAYS[wdIdx];
+  const isSat=wdIdx===6;
+  const isSunOrHol=wdIdx===0||isHolidayFY(fy,mIdx,quickEditDay);
+
+  // Header
+  document.getElementById("qDate").textContent=`${month} ${quickEditDay}日`;
+  const wdEl=document.getElementById("qWeekday");
+  wdEl.textContent=`${wd}曜日`;
+  wdEl.className="quick-weekday"+(isSunOrHol?" holiday":isSat?" sat":"");
+
+  // Load existing data for this day
+  const rows=store.data[fy]?.[month]||[];
+  const existingRow=rows[quickEditDay-1]||blankRow(quickEditDay);
+  quickWeather=existingRow.weather||"快晴";
+
+  // Set weather buttons
+  document.querySelectorAll(".wx-btn").forEach(b=>{
+    b.classList.toggle("active",b.dataset.wx===quickWeather);
+  });
+
+  // Build quick grid
+  const grid=document.getElementById("quickGrid");
+  grid.innerHTML="";
+
+  // 売上 + 買上点数
+  const secSales=document.createElement("div");secSales.className="quick-section";
+  secSales.innerHTML=`<div class="qs-title">売上・点数</div>
+    <div class="qs-field"><span class="qs-label">売上</span>
+      <div style="display:flex;align-items:center;gap:4px;">
+        <input class="qs-input" id="qi_売上" type="text" inputmode="numeric"
+          value="${existingRow.売上>0?existingRow.売上.toLocaleString():""}"
+          placeholder="0">
+        <span class="qs-unit">千円</span>
+      </div></div>
+    <div class="qs-field"><span class="qs-label">買上点数</span>
+      <div style="display:flex;align-items:center;gap:4px;">
+        <input class="qs-input" id="qi_買上点数" type="number" inputmode="numeric"
+          value="${existingRow.買上点数>0?existingRow.買上点数:""}"
+          placeholder="0">
+        <span class="qs-unit">点</span>
+      </div></div>`;
+  grid.appendChild(secSales);
+  // DOM挿入後に適用
+  const qiUriage=document.getElementById("qi_売上");
+  if(qiUriage){
+    qiUriage.addEventListener("focus",()=>{const n=fromComma(qiUriage.value);qiUriage.value=n>0?String(n):"";});
+    qiUriage.addEventListener("blur",()=>commaBlurWithFormula(qiUriage));
+  }
+
+  // 客数
+  const secKyaku=document.createElement("div");secKyaku.className="quick-section";
+  secKyaku.innerHTML=`<div class="qs-title">客数</div>
+    <div class="qs-field"><span class="qs-label">客数</span>
+      <div style="display:flex;align-items:center;gap:4px;">
+        <input class="qs-input" id="qi_客数" type="number" inputmode="numeric"
+          value="${existingRow.客数>0?existingRow.客数:""}"
+          placeholder="0">
+        <span class="qs-unit">人</span>
+      </div></div>
+    <div style="font-size:10px;color:var(--text5);margin-top:4px;">
+      客単価: ¥${existingRow.客数>0?Math.round((existingRow.売上*1000)/existingRow.客数).toLocaleString():"-"}</div>`;
+  grid.appendChild(secKyaku);
+
+  // 廃棄
+  const secHaiki=document.createElement("div");secHaiki.className="quick-section wide";
+  let haikiFields=`<div class="qs-title">廃棄内訳（円）</div>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;">`;
+  HAIKI_CATS.forEach(c=>{
+    const hv=existingRow.haiki?.[c]||0;
+    haikiFields+=`<div class="qs-field"><span class="qs-label" style="font-size:11.5px;">${c}</span>
+      <input class="qs-input" id="qi_h_${c}" type="text" inputmode="numeric"
+        value="${hv>0?hv.toLocaleString():""}"
+        placeholder="0" style="width:90px;">
+    </div>`;
+  });
+  haikiFields+=`</div>`;
+  secHaiki.innerHTML=haikiFields;
+  grid.appendChild(secHaiki);
+  // DOM挿入後にカンマ入力適用
+  HAIKI_CATS.forEach(c=>{
+    const el=document.getElementById(`qi_h_${c}`);
+    if(el){
+      el.addEventListener("focus",()=>{const n=fromComma(el.value);el.value=n>0?String(n):"";});
+      el.addEventListener("blur",()=>commaBlurWithFormula(el));
+    }
+  });
+}
+
+function setWeather(wx){
+  quickWeather=wx;
+  document.querySelectorAll(".wx-btn").forEach(b=>b.classList.toggle("active",b.dataset.wx===wx));
+}
+
+/* JMAコードを天気種別にマッピング */
+function jmaCodeToWx(code){
+  const c=parseInt(code)||0;
+  if(c>=400) return "雪";
+  if(c>=300){
+    if(c===304||c===307||c===308)return"大雨";
+    if(c===303||c===309||c===322)return"みぞれ";
+    if(c===301||c===311||c===313||c===314||c===315)return"小雨";
+    return"雨";
+  }
+  if(c>=200){
+    if(c===201||c===210||c===211||c===223)return"晴曇";
+    return"曇";
+  }  // 100系
+  if(c===100)return"快晴";
+  if(c===101||c===110||c===111||c===130||c===131)return"晴曇";
+  return"晴";
+}
+
+async function fetchWeather(){
+  const btn=document.getElementById("autoWxBtn");
+  const label=document.getElementById("autoWxLabel");
+  label.textContent="取得中…";btn.disabled=true;
+  try{
+    // 気象庁 愛知県(230000) 予報API - CORSフリー公開API
+    const res=await fetch("https://www.jma.go.jp/bosai/forecast/data/forecast/230000.json");
+    if(!res.ok)throw new Error("fetch failed");
+    const data=await res.json();
+    // timeSeries[0] = 天気予報, areas内で尾張(稲沢市エリア)を探す
+    const ts=data[0]?.timeSeries?.[0];
+    if(!ts)throw new Error("no data");
+    const today=new Date().toISOString().slice(0,10);
+    const todayIdx=ts.timeDefines.findIndex(t=>t.startsWith(today));
+    // 尾張(230010)を優先、なければ最初のエリア
+    const area=ts.areas.find(a=>a.area.code==="230010")||ts.areas[0];
+    const idx=todayIdx>=0?todayIdx:0;
+    const code=area?.weatherCodes?.[idx]||"100";
+    const wx=jmaCodeToWx(code);
+    const weatherText=area?.weathers?.[idx]||"";
+    setWeather(wx);
+    label.textContent=`取得済 ${WX_ICONS[wx]}`;
+    setTimeout(()=>{label.textContent="自動取得";},3000);
+    // ツールチップ的に気象庁のテキストを表示
+    if(weatherText){
+      btn.title=`気象庁: ${weatherText.trim()}`;
+    }
+  }catch(e){
+    label.textContent="取得失敗";
+    btn.title="気象庁APIへの接続に失敗しました。手動で選択してください。";
+    setTimeout(()=>{label.textContent="自動取得";},3000);
+  }finally{
+    btn.disabled=false;
+  }
+}
+
+function saveQuick(){
+  const fy=todayInfo.fy,month=todayInfo.month;
+  if(!store.data[fy])store.data[fy]=blankYearData(fy);
+  if(!store.years.includes(fy)){store.years.push(fy);store.years.sort();}
+  const rows=store.data[fy][month];
+  const ri=quickEditDay-1;
+  if(!rows[ri])rows[ri]=blankRow(quickEditDay);
+  const r=rows[ri];
+  r.売上=fromComma(document.getElementById("qi_売上")?.value)||0;
+  r.客数=Number(document.getElementById("qi_客数")?.value)||0;
+  r.買上点数=parseFloat(document.getElementById("qi_買上点数")?.value)||0;
+  const h={};let total=0;
+  HAIKI_CATS.forEach(c=>{
+    h[c]=fromComma(document.getElementById(`qi_h_${c}`)?.value)||0;
+    total+=h[c];
+  });
+  r.haiki=h;r.廃棄金額=total;r.weather=quickWeather;
+  persist();
+  // Flash feedback
+  const btn=document.querySelector(".quick-save");
+  btn.textContent="✓ 保存しました";btn.style.background="#16a34a";
+  setTimeout(()=>{btn.textContent="保存する";btn.style.background="";},2000);
+  updateMissingBadge();
+}
+
+/* ══ Year pills ══ */
+function renderYearPills(){
+  const base=document.getElementById("baseYearSel");
+  const cmp=document.getElementById("cmpYearSel");
+  if(!base||!cmp)return;
+
+  // 基準年セレクター
+  base.innerHTML=store.years.map(y=>`<option value="${y}" ${y===baseYear?"selected":""}>${y}年</option>`).join("");
+
+  // 比較年セレクター（なし + 他の年）
+  cmp.innerHTML=`<option value="" ${!cmpYear?"selected":""}>比較なし</option>`+
+    store.years.filter(y=>y!==baseYear).map(y=>`<option value="${y}" ${y===cmpYear?"selected":""}>${y}年</option>`).join("");
+}
+
+function onBaseYearChange(y){
+  baseYear=y;
+  if(cmpYear===y)cmpYear=null;
+  renderYearPills();refreshDash();
+}
+function onCmpYearChange(y){
+  cmpYear=y||null;
+  renderYearPills();refreshDash();
+}
+function selectYear(y){
+  baseYear=y;cmpYear=null;renderYearPills();refreshDash();
+}
+function showAddYear(){
+  const wrap=document.getElementById("addYearInlineWrap");if(!wrap)return;
+  if(wrap.innerHTML)return;
+  wrap.innerHTML=`<span style="display:inline-flex;align-items:center;gap:5px;">
+    <input id="ayInput" type="number" placeholder="例: 2026"
+      style="width:90px;padding:5px 8px;border:1.5px solid #ddd;border-radius:8px;
+      font-size:12px;font-weight:600;color:var(--text);font-family:inherit;outline:none;text-align:center;"
+      onkeydown="if(event.key==='Enter')addYear(document.getElementById('ayInput').value);
+                 if(event.key==='Escape')document.getElementById('addYearInlineWrap').innerHTML='';">
+    <button onclick="addYear(document.getElementById('ayInput').value)"
+      style="padding:5px 10px;border-radius:8px;font-size:12px;font-weight:700;border:none;
+      cursor:pointer;font-family:inherit;background:#e8eaed;color:#444;">追加</button>
+  </span>`;
+  document.getElementById("ayInput")?.focus();
+}
+function addYear(val){
+  const y=String(parseInt(val)||"").trim();
+  if(!y||y.length!==4){alert("4桁の西暦を入力してください");return;}
+  if(store.years.includes(y)){alert(`${y}年は既に存在します`);return;}
+  store.years.push(y);store.years.sort();store.data[y]=blankYearData(y);
+  baseYear=y;cmpYear=store.years.length>1?store.years[store.years.indexOf(y)-1]||null:null;
+  persist();
+  const wrap=document.getElementById("addYearInlineWrap");if(wrap)wrap.innerHTML="";
+  renderYearPills();refreshDash();
+}
+function showDeleteYear(y){yearToDelete=y;
+  document.getElementById("modalMsg").textContent=`${y}年のデータはすべて削除されます。この操作は元に戻せません。`;
+  document.getElementById("modalBg").classList.add("show");}
+function closeModal(){yearToDelete=null;document.getElementById("modalBg").classList.remove("show");}
+function confirmDeleteYear(){
+  if(!yearToDelete)return;
+  store.years=store.years.filter(y=>y!==yearToDelete);delete store.data[yearToDelete];
+  if(baseYear===yearToDelete)baseYear=store.years[store.years.length-1]||null;
+  if(cmpYear===yearToDelete)cmpYear=null;
+  ["sales","kyaku","haiki"].forEach(t=>{if(editYear[t]===yearToDelete)editYear[t]=baseYear||store.years[0];});
+  persist();closeModal();renderYearPills();
+  if(currentNav===1)refreshDash();else if(currentNav>1)initInputPage(["","","sales","kyaku","haiki"][currentNav]);
+}
+
+/* ══ Aggregation ══ */
+function getMonthly(year){
+  if(!store.data[year])return MONTHS.map(m=>({m,売上:0,客数:0,買上点数:0,廃棄金額:0,haiki:blankHaiki(),filledDays:0}));
+  return MONTHS.map((m,mi)=>{
+    const rows=store.data[year][m]||[];
+    const entry={m};
+    ["売上","客数","買上点数","廃棄金額"].forEach(k=>{entry[k]=rows.reduce((s,r)=>s+(Number(r[k])||0),0);});
+    const haiki={};HAIKI_CATS.forEach(c=>{haiki[c]=rows.reduce((s,r)=>s+(Number(r.haiki?.[c])||0),0);});
+    entry.haiki=haiki;
+    // 入力済み日数（売上 or 客数が入力されている日）
+    entry.filledDays=rows.filter(r=>(Number(r.売上)||0)>0||(Number(r.客数)||0)>0).length;
+    return entry;
+  });
+}
+function getAnnual(monthly){
+  const t={};["売上","客数","買上点数","廃棄金額"].forEach(k=>{t[k]=monthly.reduce((s,m)=>s+(m[k]||0),0);});
+  const haiki={};HAIKI_CATS.forEach(c=>{haiki[c]=monthly.reduce((s,m)=>s+(m.haiki?.[c]||0),0);});
+  t.haiki=haiki;
+  // 年間入力済み日数
+  t.filledDays=monthly.reduce((s,m)=>s+(m.filledDays||0),0);
+  // 1日平均
+  const d=t.filledDays||1;
+  t.avg={
+    売上:Math.round(t.売上/d),
+    客数:Math.round(t.客数/d),
+    買上点数:Math.round(t.買上点数/d),
+    廃棄金額:Math.round(t.廃棄金額/d),
+  };
+  return t;
+}
+function yoy(cur,prev){
+  if(!prev||prev===0)return null;
+  const pct=(cur-prev)/prev*100;return{pct,up:pct>=0,str:(pct>=0?"+":"")+pct.toFixed(1)+"%"};
+}
+
+/* ══ Correlation data ══ */
+function getCorrData(year){
+  const wdSales=Array(7).fill(0),wdCount=Array(7).fill(0);
+  // グループ化: 快晴+晴+晴曇→晴れ系, 曇→曇り系, 小雨+雨+大雨→雨系, みぞれ+雪→雪系
+  const wxGroups={"晴れ":["快晴","晴","晴曇"],"曇り":["曇"],"雨":["小雨","雨","大雨"],"雪":["みぞれ","雪"]};
+  const wxSales={},wxCount={};
+  Object.keys(wxGroups).forEach(g=>{wxSales[g]=0;wxCount[g]=0;});
+  MONTHS.forEach((m,mi)=>{
+    const rows=store.data[year]?.[m]||[];
+    rows.forEach((r,di)=>{
+      const wd=getWeekday(year,mi,parseInt(r.d));
+      wdSales[wd]+=(Number(r.売上)||0);wdCount[wd]++;
+      const wx=r.weather||"";
+      for(const [grp,cats] of Object.entries(wxGroups)){
+        if(cats.includes(wx)){wxSales[grp]+=(Number(r.売上)||0);wxCount[grp]++;break;}
+      }
+    });
+  });
+  const wdAvg=wdSales.map((s,i)=>wdCount[i]>0?Math.round(s/wdCount[i]):0);
+  const wxAvg={};Object.keys(wxSales).forEach(k=>{wxAvg[k]=wxCount[k]>0?Math.round(wxSales[k]/wxCount[k]):0;});
+  return{wdAvg,wxAvg,wxGroups};
+}
+
+/* ══ KPI ══ */
+function renderKPI(aNow,aPrev){
+  const row=document.getElementById("kpiRow");row.innerHTML="";
+  METRICS.forEach(m=>{
+    const iS1=activeMetrics[0]===m.key,iS2=activeMetrics[1]===m.key;
+    const avgNow=aNow.avg?.[m.key]??aNow[m.key];
+    const avgPrev=aPrev?.avg?.[m.key]??aPrev?.[m.key];
+    const yoyVal=aPrev?yoy(avgNow,avgPrev):null;
+    const card=document.createElement("div");card.className=`kpi-card${iS1?" sel1":iS2?" sel2":""}`;
+    card.dataset.key=m.key;
+    card.onclick=()=>toggleMetric(m.key);
+    card.innerHTML=`<div class="kpi-dot"></div>
+      <div class="kpi-label">${m.label} <span style="font-weight:500;font-size:8.5px;color:var(--text5);">${selMonth} 1日平均</span></div>
+      <div class="kpi-value" style="color:${yoyVal&&!yoyVal.up&&m.up?'#dc2626':'#1a1a1a'}">${m.short(avgNow)}</div>
+      ${yoyVal?`<div class="kpi-yoy"><span class="kpi-badge ${yoyVal.up?"up":"dn"}">${yoyVal.up?"▲":"▼"} ${yoyVal.str}</span>
+        <span class="kpi-prev">${cmpYear}年比</span></div>`:""}`;
+    row.appendChild(card);
+  });
+}
+function toggleMetric(key){
+  if(activeMetrics.includes(key)){if(activeMetrics.length===1)return;activeMetrics=activeMetrics.filter(k=>k!==key);}
+  else{activeMetrics=activeMetrics.length>=2?[activeMetrics[1],key]:[...activeMetrics,key];}
+  refreshDash();
+}
+
+/* ══ Derived ══ */
+function renderDerived(aNow,aPrev){
+  const row=document.getElementById("derivedRow");row.innerHTML="";
+  const 客単価=aNow.客数>0?Math.round(aNow.売上*1000/aNow.客数):0;
+  const prev客=aPrev&&aPrev.客数>0?Math.round(aPrev.売上*1000/aPrev.客数):null;
+  const 廃棄率=aNow.売上>0?(aNow.廃棄金額/(aNow.売上*1000)*100).toFixed(2):"-";
+  const prev廃棄=aPrev&&aPrev.売上>0?aPrev.廃棄金額/(aPrev.売上*1000)*100:null;
+  [{label:"客単価",value:`¥${客単価.toLocaleString()}`,chg:prev客?yoy(客単価,prev客):null,good:true},
+   {label:"廃棄率",value:`${廃棄率}%`,chg:prev廃棄?yoy(parseFloat(廃棄率),prev廃棄):null,good:false},
+  ].forEach(item=>{
+    const div=document.createElement("div");div.className="derived-card";
+    const pos=item.chg?(item.good?item.chg.up:!item.chg.up):null;
+    div.innerHTML=`<div class="derived-label">${item.label}</div>
+      <div class="derived-value">${item.value}</div>
+      ${item.chg?`<div class="derived-chg" style="color:${pos?"#16a34a":"#dc2626"}">${item.chg.up?"▲":"▼"} ${item.chg.str} 前年比</div>`:""}`;
+    row.appendChild(div);
+  });
+}
+
+/* ══ Correlation charts ══ */
+function refreshCorrCharts(){
+  const corrRow=document.getElementById("corrRow");
+  corrRow.style.display=viewMode==="日"?"flex":"none";
+  if(viewMode!=="日")return;
+  const {wdAvg}=getCorrData(baseYear);
+  const p=METRICS.find(m=>m.key===activeMetrics[0]);
+  const pri=p.color||"#1a1a1a";
+
+  if(wdChartInst){wdChartInst.destroy();wdChartInst=null;}
+  wdChartInst=new Chart(document.getElementById("wdChart"),{type:"bar",
+    data:{labels:WEEKDAYS,datasets:[{data:wdAvg,backgroundColor:WEEKDAYS.map((_,i)=>{
+      if(i===0)return"rgba(220,38,38,0.7)";if(i===6)return"rgba(59,130,246,0.7)";return pri+"cc";
+    }),borderRadius:4,borderSkipped:false}]},
+    options:{responsive:true,maintainAspectRatio:false,animation:{duration:200},
+      plugins:{legend:{display:false},tooltip:{backgroundColor:"#fff",titleColor:"#111",bodyColor:"#666",
+        borderColor:"#e8e8e8",borderWidth:1,padding:7,callbacks:{label:c=>`平均: ${c.parsed.y.toLocaleString()}千円`}}},
+      scales:{x:{grid:{display:false},ticks:{color:"#ccc",font:{size:9}},border:{display:false}},
+        y:{grid:{color:"#f2f2f2"},ticks:{color:"#ccc",font:{size:8},callback:v=>v>=1000?`${(v/1000).toFixed(0)}万`:`${v}千`},border:{display:false}}}}});
+}
+
+/* ══ Donut ══ */
+function buildDonutData(){
+  const isDaily=viewMode==="日";
+  let haiki={};HAIKI_CATS.forEach(c=>{haiki[c]=0;});
+  if(isDaily){
+    const sel=document.getElementById("donutDaySelect");
+    const dayIdx=sel?parseInt(sel.value):0;
+    const rows=store.data[baseYear]?.[selMonth]||[];
+    const r=rows[dayIdx]||{haiki:blankHaiki()};
+    haiki=r.haiki||blankHaiki();
+    document.getElementById("donutSub").textContent=`${selMonth} ${dayIdx+1}日`;
+  }else{
+    const rows=store.data[baseYear]?.[selMonth]||[];
+    rows.forEach(r=>{HAIKI_CATS.forEach(c=>{haiki[c]+=(Number(r.haiki?.[c])||0);});});
+    document.getElementById("donutSub").textContent=`${selMonth} 月合計`;
+  }
+  return haiki;
+}
+function renderDonutDayPicker(){
+  const isDaily=viewMode==="日";
+  document.getElementById("donutDayPicker").style.display=isDaily?"block":"none";
+  if(!isDaily)return;
+  const sel=document.getElementById("donutDaySelect");
+  const mi=MONTHS.indexOf(selMonth);const days=DAYS_IN_MONTH[mi];const prev=sel.value;
+  sel.innerHTML=Array.from({length:days},(_,i)=>`<option value="${i}">${i+1}日</option>`).join("");
+  if(prev&&parseInt(prev)<days)sel.value=prev;
+}
+function refreshDonut(){
+  const haiki=buildDonutData();
+  const vals=HAIKI_CATS.map(c=>haiki[c]);
+  const total=vals.reduce((a,b)=>a+b,0);
+  const ctx=document.getElementById("donutChart");
+  if(donutInst){donutInst.destroy();donutInst=null;}
+  donutInst=new Chart(ctx,{type:"doughnut",
+    data:{labels:HAIKI_CATS,datasets:[{data:vals,backgroundColor:HAIKI_COLORS,borderColor:"#fff",borderWidth:2,hoverOffset:4}]},
+    options:{responsive:true,maintainAspectRatio:false,cutout:"68%",animation:{duration:300},
+      plugins:{legend:{display:false},tooltip:{backgroundColor:"#fff",titleColor:"#111",bodyColor:"#666",
+        borderColor:"#e8e8e8",borderWidth:1,padding:7,callbacks:{label:c=>`${c.label}: ¥${c.parsed.toLocaleString()} (${total>0?(c.parsed/total*100).toFixed(1):0}%)`}}}}});
+  const leg=document.getElementById("donutLegends");leg.innerHTML="";
+  // 合計行
+  if(total>0){
+    const totRow=document.createElement("div");
+    totRow.style.cssText="display:flex;justify-content:space-between;padding:5px 0 7px;border-bottom:2px solid #e8e8e8;margin-bottom:2px;";
+    totRow.innerHTML=`<span style="font-size:11px;font-weight:700;color:var(--text3);">合計</span>
+      <span style="font-size:13px;font-weight:800;color:#b91c1c;">¥${total.toLocaleString()}</span>`;
+    leg.appendChild(totRow);
+  }
+  HAIKI_CATS.forEach((c,i)=>{
+    if(vals[i]===0)return;
+    const pct=total>0?(vals[i]/total*100).toFixed(1):"0.0";
+    const dispVal=donutMode==="amount"?`¥${vals[i].toLocaleString()}`:`${pct}%`;
+    const div=document.createElement("div");div.className="donut-leg";
+    div.innerHTML=`<span class="donut-dot" style="background:${HAIKI_COLORS[i]};"></span>
+      <span class="donut-name">${c}</span>
+      <span class="donut-val">${dispVal}</span>`;
+    leg.appendChild(div);
+  });
+  if(total===0){
+    const empty=document.createElement("div");
+    empty.style.cssText="font-size:11px;color:#bbb;text-align:center;padding:12px 0;";
+    empty.textContent="データなし";
+    leg.appendChild(empty);
+  }
+}
+
+function setDonutMode(mode){
+  donutMode=mode;
+  const btnAmt=document.getElementById("donutBtnAmt");
+  const btnPct=document.getElementById("donutBtnPct");
+  if(btnAmt){btnAmt.style.background=mode==="amount"?"#1a1a1a":"#fff";btnAmt.style.color=mode==="amount"?"#fff":"#999";}
+  if(btnPct){btnPct.style.background=mode==="percent"?"#1a1a1a":"#fff";btnPct.style.color=mode==="percent"?"#fff":"#999";}
+  refreshDonut();
+}
+
+/* ══ Chart type / view ══ */
+function setView(v){
+  viewMode=v;
+  document.getElementById("tabDay").classList.toggle("active",v==="日");
+  document.getElementById("tabMonth").classList.toggle("active",v==="月");
+  renderDonutDayPicker();refreshDash();
+}
+function renderMonthBtns(){
+  ["dashMonthBtns"].forEach(id=>{
+    const c=document.getElementById(id);if(!c)return;
+    c.innerHTML="";
+    MONTHS.forEach(m=>{
+      const btn=document.createElement("button");btn.className="m-btn"+(m===selMonth?" active":"");
+      btn.textContent=m;
+      btn.onclick=()=>{
+        selMonth=m;
+        renderMonthBtns();
+        renderDonutDayPicker();
+        refreshMainChart();
+        refreshDonut();
+        refreshCorrCharts();
+        // KPI・派生指標も選択月で更新
+        const mNow=getMonthly(baseYear),mCmp=cmpYear?getMonthly(cmpYear):null;
+        const aNow=getAnnual(mNow),aCmp=mCmp?getAnnual(mCmp):null;
+        const mIdx=MONTHS.indexOf(selMonth);
+        const mNowSel=mNow[mIdx]||{売上:0,客数:0,買上点数:0,廃棄金額:0,filledDays:0};
+        const mCmpSel=mCmp?mCmp[mIdx]:null;
+        function monthAvg(md){const d=md.filledDays||1;return{...md,avg:{売上:Math.round(md.売上/d),客数:Math.round(md.客数/d),買上点数:md.filledDays>0?(md.買上点数/d):0,廃棄金額:Math.round(md.廃棄金額/d)}};}
+        renderKPI(monthAvg(mNowSel),mCmpSel?monthAvg(mCmpSel):null);
+        renderDerived(aNow,aCmp);
+      };
+      c.appendChild(btn);
+    });
+  });
+}
+function renderLegend(){
+  const row=document.getElementById("legendRow");row.innerHTML="";
+  const mSales=METRICS.find(m=>m.key==="売上");
+  const mKyaku=METRICS.find(m=>m.key==="客数");
+  [{meta:mSales,type:"bar"},{meta:mKyaku,type:"line"}].forEach(({meta,type})=>{
+    const div=document.createElement("div");div.className="legend-item";
+    const indicator=type==="bar"
+      ?`<div style="width:12px;height:12px;border-radius:3px;background:${meta.color}bb;"></div>`
+      :`<div class="legend-line" style="background:${meta.color};width:18px;height:2.5px;border-radius:2px;"></div>`;
+    div.innerHTML=`${indicator}<span>${meta.label}（${meta.unit}）</span>`;
+    row.appendChild(div);
+  });
+  if(cmpYear){
+    [{color:"rgba(180,180,180,0.7)",label:`${cmpYear}年 売上`,type:"bar"},
+     {color:"#aaa",label:`${cmpYear}年 客数`,type:"line"}].forEach(l=>{
+      const div=document.createElement("div");div.className="legend-item";
+      const indicator=l.type==="bar"
+        ?`<div style="width:12px;height:12px;border-radius:3px;background:${l.color};"></div>`
+        :`<div style="width:18px;height:0;border-top:2px dashed #aaa;"></div>`;
+      div.innerHTML=`${indicator}<span style="color:var(--text5)">${l.label}</span>`;
+      row.appendChild(div);
+    });
+  }
+}
+
+/* ══ Main chart ══ */
+function refreshMainChart(){
+  if(!baseYear)return;
+  const mNow=getMonthly(baseYear),mCmp=cmpYear?getMonthly(cmpYear):null;
+  const isDaily=viewMode==="日";
+  const ctx=document.getElementById("mainChart");
+  if(mainChartInst){mainChartInst.destroy();mainChartInst=null;}
+
+  const nowD=isDaily?store.data[baseYear][selMonth]:mNow;
+  const cmpD=cmpYear?(isDaily?store.data[cmpYear]?.[selMonth]:mCmp):null;
+  const labels=nowD.map(d=>isDaily?`${d.d}日`:d.m);
+
+  const mSales=METRICS.find(m=>m.key==="売上");
+  const mKyaku=METRICS.find(m=>m.key==="客数");
+
+  // 月計・前年比
+  const mt売上=isDaily?nowD.reduce((s,d)=>s+(Number(d.売上)||0),0):null;
+  const mc売上=isDaily&&cmpD?cmpD.reduce((s,d)=>s+(Number(d.売上)||0),0):null;
+  const yoyInfo=mt売上!=null&&mc売上?yoy(mt売上,mc売上):null;
+  document.getElementById("chartTitle").textContent=isDaily?`${selMonth} 日別推移`:"月次推移";
+  document.getElementById("chartSub").textContent=
+    "売上（棒）＆ 客数（折れ線）"+
+    (mt売上!=null?`　売上月計: ${mSales.fmt(mt売上)}`:"")
+    +(yoyInfo?`　前年比: ${yoyInfo.str}`:"");
+
+  // datasets: 今年売上（棒）、前年売上（棒・薄）、今年客数（折れ線）、前年客数（折れ線・破線）
+  const ds=[
+    // 今年 売上 → 棒
+    {type:"bar",label:`${baseYear}年 売上`,data:nowD.map(d=>d.売上),
+     backgroundColor:mSales.color+"bb",borderRadius:5,borderSkipped:false,
+     yAxisID:"y",order:2},
+  ];
+  if(cmpD) ds.push(
+    // 前年 売上 → 棒（薄）
+    {type:"bar",label:`${cmpYear}年 売上`,data:cmpD.map(d=>d.売上),
+     backgroundColor:"rgba(180,180,180,0.45)",borderRadius:5,borderSkipped:false,
+     yAxisID:"y",order:3}
+  );
+  // 今年 客数 → 折れ線
+  ds.push(
+    {type:"line",label:`${baseYear}年 客数`,data:nowD.map(d=>d.客数),
+     borderColor:mKyaku.color,borderWidth:2.5,backgroundColor:"transparent",
+     fill:false,tension:0.4,pointRadius:isDaily?0:3,pointHoverRadius:5,
+     pointBackgroundColor:mKyaku.color,yAxisID:"y2",order:1}
+  );
+  if(cmpD) ds.push(
+    // 前年 客数 → 折れ線破線
+    {type:"line",label:`${cmpYear}年 客数`,data:cmpD.map(d=>d.客数),
+     borderColor:"#aaa",borderWidth:1.5,backgroundColor:"transparent",
+     fill:false,tension:0.4,borderDash:[4,3],pointRadius:0,pointHoverRadius:4,
+     yAxisID:"y2",order:1}
+  );
+
+  const scales={
+    x:{grid:{color:"#f0f0f0",drawBorder:false},
+       ticks:{color:"#888",font:{size:isDaily?9:10},maxTicksLimit:isDaily?8:12},
+       border:{display:false}},
+    y:{position:"left",grid:{color:"#f0f0f0",drawBorder:false},
+       ticks:{color:mSales.color,font:{size:10},callback:mSales.yFmt},
+       border:{display:false},
+       title:{display:true,text:"売上",color:mSales.color,font:{size:10,weight:"700"}}},
+    y2:{position:"right",grid:{display:false},
+        ticks:{color:mKyaku.color,font:{size:10},callback:mKyaku.yFmt},
+        border:{display:false},
+        title:{display:true,text:"客数",color:mKyaku.color,font:{size:10,weight:"700"}}},
+  };
+
+  mainChartInst=new Chart(ctx,{
+    type:"bar", // ComposedChart: typeはbaseとして指定
+    data:{labels,datasets:ds},
+    options:{
+      responsive:true,maintainAspectRatio:false,animation:{duration:300},
+      interaction:{mode:"index",intersect:false},
+      plugins:{
+        legend:{display:false},
+        tooltip:{
+          backgroundColor:"#fff",titleColor:"#111",bodyColor:"#555",
+          borderColor:"#e0e0e0",borderWidth:1,padding:10,
+          callbacks:{
+            label:c=>{
+              if(c.dataset.label?.includes("売上"))
+                return ` ${c.dataset.label}: ${mSales.fmt(c.parsed.y)}`;
+              if(c.dataset.label?.includes("客数"))
+                return ` ${c.dataset.label}: ${mKyaku.fmt(c.parsed.y)}`;
+              return ` ${c.dataset.label}: ${c.parsed.y?.toLocaleString()}`;
+            }
+          }
+        }
+      },
+      scales
+    }
+  });
+}
+
+/* ══ Bar ══ */
+function refreshBarChart(mNow,mCmp){
+  const p=METRICS.find(m=>m.key===activeMetrics[0]);
+  document.getElementById("barTitle").textContent=`月別${p.label}`;
+  const ctx=document.getElementById("barChart");
+  if(barChartInst){barChartInst.destroy();barChartInst=null;}
+  const pri=p.color||"#1a1a1a";
+  const ds=[{label:`${baseYear}年`,data:mNow.map(m=>m[activeMetrics[0]]),backgroundColor:pri,borderRadius:4,borderSkipped:false}];
+  if(mCmp)ds.push({label:`${cmpYear}年`,data:mCmp.map(m=>m[activeMetrics[0]]),backgroundColor:"#ddd",borderRadius:4,borderSkipped:false});
+  barChartInst=new Chart(ctx,{type:"bar",data:{labels:mNow.map(m=>m.m),datasets:ds},
+    options:{responsive:true,maintainAspectRatio:false,animation:{duration:300},
+      plugins:{legend:{display:false},tooltip:{backgroundColor:"#fff",titleColor:"#111",bodyColor:"#666",borderColor:"#e8e8e8",borderWidth:1,padding:7,callbacks:{label:c=>`${c.dataset.label}: ${p.fmt(c.parsed.y)}`}}},
+      scales:{x:{grid:{display:false},ticks:{color:"#ccc",font:{size:8.5}},border:{display:false}},
+        y:{grid:{color:"#f2f2f2",drawBorder:false},ticks:{color:"#ccc",font:{size:8.5},callback:p.yFmt},border:{display:false}}}}});
+}
+
+/* ══ Summary ══ */
+function renderSummary(aNow,aPrev){
+  const body=document.getElementById("summaryBody");body.innerHTML="";
+  METRICS.forEach(m=>{
+    const isAct=activeMetrics.includes(m.key);
+    const yoyVal=aPrev?yoy(aNow[m.key],aPrev[m.key]):null;
+    const div=document.createElement("div");div.className="sum-row";
+    div.innerHTML=`<div class="sum-left"><div class="sum-bar${isAct?" act":""}"></div><span class="sum-name">${m.label}</span></div>
+      <div class="sum-right"><div class="sum-val">${m.short(aNow[m.key])}</div>
+      ${yoyVal?`<div class="sum-yoy" style="color:${(m.up?yoyVal.up:!yoyVal.up)?"#16a34a":"#dc2626"}">${yoyVal.up?"▲":"▼"} ${yoyVal.str}</div>`:""}</div>`;
+    body.appendChild(div);
+  });
+}
+
+/* ══ Dashboard ══ */
+function refreshDash(){
+  if(!baseYear)return;
+  renderYearPills();
+  const mNow=getMonthly(baseYear),mCmp=cmpYear?getMonthly(cmpYear):null;
+  const aNow=getAnnual(mNow),aCmp=mCmp?getAnnual(mCmp):null;
+
+  // 選択月の月次データで1日平均を計算してKPIに渡す
+  const mIdx=MONTHS.indexOf(selMonth);
+  const mNowSel=mNow[mIdx]||{売上:0,客数:0,買上点数:0,廃棄金額:0,filledDays:0};
+  const mCmpSel=mCmp?mCmp[mIdx]:null;
+  function monthAvg(md){
+    const d=md.filledDays||1;
+    return{...md,avg:{売上:Math.round(md.売上/d),客数:Math.round(md.客数/d),買上点数:md.filledDays>0?(md.買上点数/d):0,廃棄金額:Math.round(md.廃棄金額/d)}};
+  }
+  const kpiNow=monthAvg(mNowSel);
+  const kpiPrev=mCmpSel?monthAvg(mCmpSel):null;
+
+  renderKPI(kpiNow,kpiPrev);renderDerived(aNow,aCmp);renderLegend();renderMonthBtns();
+  renderDonutDayPicker();refreshMainChart();refreshBarChart(mNow,mCmp);renderSummary(aNow,aCmp);
+  refreshDonut();refreshCorrCharts();
+}
+
+/* ══ Input pages ══ */
+function initInputPage(type){
+  const t=todayFY();
+  // editYear[type]がstoreに存在する年ならそのまま維持、なければ今日の年か最新年にセット
+  if(!editYear[type]||!store.years.includes(editYear[type])){
+    editYear[type]=store.years.includes(t.fy)?t.fy:store.years[store.years.length-1];
+    editMonth[type]=t.month;
+  }
+  const yrId={sales:"salesYearRow",kyaku:"kyakuYearRow",haiki:"haikiYearRow"}[type];
+  const moId={sales:"salesMonthTabs",kyaku:"kyakuMonthTabs",haiki:"haikiMonthTabs"}[type];
+  const row=document.getElementById(yrId);row.innerHTML="";
+  store.years.forEach(y=>{
+    const wrap=document.createElement("span");wrap.style.cssText="display:inline-flex;align-items:center;gap:2px;";
+    const btn=document.createElement("button");btn.className="iytab"+(y===editYear[type]?" active":"");
+    btn.textContent=y+"年";btn.onclick=()=>{
+      editYear[type]=y;
+      const t=todayFY();
+      if(type==="haiki")window.haikiSelDay=(t.fy===y&&t.month===editMonth.haiki)?t.day:1;
+      if(type==="sales")window.salesSelDay=(t.fy===y&&t.month===editMonth.sales)?t.day:1;
+      initInputPage(type);};wrap.appendChild(btn);
+    if(store.years.length>1){
+      const del=document.createElement("button");del.className="btn-del-year";del.textContent="✕";
+      del.onclick=()=>showDeleteYear(y);wrap.appendChild(del);
+    }
+    row.appendChild(wrap);
+  });
+  const aw=document.createElement("span");aw.className="add-year-form";
+  const ai=document.createElement("input");ai.type="number";ai.placeholder="年度追加";
+  ai.addEventListener("keydown",e=>{if(e.key==="Enter"){
+    const y=String(parseInt(ai.value)||"").trim();
+    if(y&&y.length===4&&!store.years.includes(y)){
+      store.years.push(y);store.years.sort();store.data[y]=blankYearData(y);persist();
+      // 追加しても現在選択中の年を維持する
+    }
+    initInputPage(type);
+  }});
+  const ab=document.createElement("button");ab.className="btn-add";ab.textContent="追加";
+  ab.onclick=()=>{
+    const y=String(parseInt(ai.value)||"").trim();
+    if(y&&y.length===4&&!store.years.includes(y)){
+      store.years.push(y);store.years.sort();store.data[y]=blankYearData(y);persist();
+      // 追加しても現在選択中の年を維持する
+    }
+    initInputPage(type);
+  };
+  aw.appendChild(ai);aw.appendChild(ab);row.appendChild(aw);
+  const tabs=document.getElementById(moId);tabs.innerHTML="";
+  MONTHS.forEach(m=>{
+    const btn=document.createElement("button");btn.className="mtab"+(m===editMonth[type]?" active":"");
+    btn.textContent=m;btn.onclick=()=>{editMonth[type]=m;
+      if(type==="haiki"){const t=todayFY();window.haikiSelDay=(t.month===m&&t.fy===editYear.haiki)?t.day:1;}
+      if(type==="sales"){const t=todayFY();window.salesSelDay=(t.month===m&&t.fy===editYear.sales)?t.day:1;}
+      document.querySelectorAll(`#${moId} .mtab`).forEach((b,i)=>b.classList.toggle("active",MONTHS[i]===m));
+      renderTable(type);};
+    tabs.appendChild(btn);
+  });
+  renderTable(type);
+}
+
+/* ══ 廃棄予算 ══ */
+function getHaikiBudget(){
+  // store.haikibudget = {total:0, cats:{カテゴリ名:0, ...}}
+  if(!store.haikibudget){
+    store.haikibudget={total:0,cats:{}};
+    HAIKI_CATS.forEach(c=>{store.haikibudget.cats[c]=0;});
+  }
+  return store.haikibudget;
+}
+
+function renderHaikiBudgetSection(actualTotal, actualCats){
+  const budget=getHaikiBudget();
+  const hasBudget=budget.total>0||HAIKI_CATS.some(c=>budget.cats[c]>0);
+
+  let html=`<div class="hf-budget-section">
+    <div class="hf-budget-title">
+      <span>予算</span>
+      <button class="hf-budget-edit-btn" onclick="openBudgetModal()">⚙️ 設定</button>
+    </div>`;
+
+  if(!hasBudget){
+    html+=`<div style="font-size:11px;color:var(--text5);padding:8px 0;">予算未設定 — ⚙️設定から入力できます</div>`;
+  }else{
+    // 項目ごと
+    HAIKI_CATS.forEach(c=>{
+      const limit=budget.cats[c]||0;
+      if(limit===0)return;
+      const actual=actualCats[c]||0;
+      const over=actual>limit;
+      const pct=limit>0?Math.min(100,Math.round(actual/limit*100)):0;
+      html+=`<div class="hf-budget-row">
+        <span class="hf-budget-label">${c}</span>
+        <div class="hf-budget-bar-wrap"><div class="hf-budget-bar${over?" over":""}" style="width:${pct}%;"></div></div>
+        <span class="hf-budget-actual${over?" over":""}">¥${actual.toLocaleString()}</span>
+        <span class="hf-budget-limit">/ ¥${limit.toLocaleString()}</span>
+      </div>`;
+    });
+    // 合計行
+    if(budget.total>0){
+      const over=actualTotal>budget.total;
+      const pct=Math.min(100,Math.round(actualTotal/budget.total*100));
+      html+=`<div class="hf-budget-total-row">
+        <span class="hf-budget-label" style="font-weight:700;">合計</span>
+        <div class="hf-budget-bar-wrap"><div class="hf-budget-bar${over?" over":""}" style="width:${pct}%;"></div></div>
+        <span class="hf-budget-actual${over?" over":""}" style="font-size:14px;">¥${actualTotal.toLocaleString()}</span>
+        <span class="hf-budget-limit">/ ¥${budget.total.toLocaleString()}</span>
+      </div>`;
+    }
+  }
+  html+=`</div>`;
+  return html;
+}
+
+function openBudgetModal(){
+  const budget=getHaikiBudget();
+  const rows=document.getElementById("budgetEditRows");
+  rows.innerHTML=
+    HAIKI_CATS.map(c=>`
+      <div class="budget-edit-row">
+        <span class="budget-edit-label">${c}</span>
+        <input type="text" inputmode="numeric" class="budget-edit-input" id="be_${c}"
+          value="${budget.cats[c]>0?budget.cats[c].toLocaleString():""}" placeholder="0">
+        <span class="budget-edit-unit">円</span>
+      </div>`).join("")+
+    `<div class="budget-edit-row" style="margin-top:4px;border-top:2px solid var(--border);padding-top:10px;border-bottom:none;">
+      <span class="budget-edit-label" style="font-weight:700;">合計上限</span>
+      <input type="text" inputmode="numeric" class="budget-edit-input" id="be_total"
+        value="${budget.total>0?budget.total.toLocaleString():""}" placeholder="0">
+      <span class="budget-edit-unit">円</span>
+    </div>`;
+  // カンマ入力適用
+  document.querySelectorAll(".budget-edit-input").forEach(el=>applyCommaInput(el));
+  document.getElementById("budgetModalBg").classList.add("show");
+}
+
+function closeBudgetModal(){
+  document.getElementById("budgetModalBg").classList.remove("show");
+}
+
+function saveBudget(){
+  const budget=getHaikiBudget();
+  HAIKI_CATS.forEach(c=>{
+    const el=document.getElementById(`be_${c}`);
+    budget.cats[c]=el?fromComma(el.value):0;
+  });
+  const tot=document.getElementById("be_total");
+  budget.total=tot?fromComma(tot.value):0;
+  store.haikibudget=budget;
+  persist();
+  closeBudgetModal();
+  // フォームを再描画して予算セクションを更新
+  const fy=editYear.haiki;
+  const mi=MONTHS.indexOf(editMonth.haiki);
+  if(window.haikiSelDay)renderHaikiForm(fy,mi,window.haikiSelDay);
+}
+
+/* ══ 日本祝日計算 ══ */
+function calcJpHolidays(year){
+  const h=new Set();
+  const add=(m,d)=>h.add(`${year}-${String(m).padStart(2,'0')}-${String(d).padStart(2,'0')}`);
+
+  // 固定祝日
+  add(1,1);   // 元日
+  add(2,11);  // 建国記念の日
+  add(2,23);  // 天皇誕生日
+  add(4,29);  // 昭和の日
+  add(5,3);   // 憲法記念日
+  add(5,4);   // みどりの日
+  add(5,5);   // こどもの日
+  add(8,11);  // 山の日
+  add(11,3);  // 文化の日
+  add(11,23); // 勤労感謝の日
+
+  // ハッピーマンデー
+  const nthMon=(m,n)=>{let d=1;let cnt=0;while(true){if(new Date(year,m-1,d).getDay()===1){cnt++;if(cnt===n)return d;}d++;}};
+  add(1, nthMon(1,2));  // 成人の日（1月第2月）
+  add(7, nthMon(7,3));  // 海の日（7月第3月）
+  add(9, nthMon(9,3));  // 敬老の日（9月第3月）
+  add(10,nthMon(10,2)); // スポーツの日（10月第2月）
+
+  // 春分の日・秋分の日（簡易計算）
+  const shunbun=Math.floor(20.8431+0.242194*(year-1980)-Math.floor((year-1980)/4));
+  const shubun=Math.floor(23.2488+0.242194*(year-1980)-Math.floor((year-1980)/4));
+  add(3,shunbun);
+  add(9,shubun);
+
+  // 振替休日（祝日が日曜→翌月曜）
+  const extra=new Set();
+  h.forEach(s=>{
+    const dt=new Date(s);
+    if(dt.getDay()===0){
+      let next=new Date(dt);
+      do{next.setDate(next.getDate()+1);}while(h.has(next.toISOString().slice(0,10))||extra.has(next.toISOString().slice(0,10)));
+      extra.add(next.toISOString().slice(0,10));
+    }
+  });
+  extra.forEach(s=>h.add(s));
+
+  // 国民の休日（祝日に挟まれた平日）
+  const arr=[...h].sort();
+  for(let i=0;i<arr.length-1;i++){
+    const a=new Date(arr[i]),b=new Date(arr[i+1]);
+    if((b-a)===2*86400000){
+      const mid=new Date(a.getTime()+86400000);
+      if(mid.getDay()!==0&&mid.getDay()!==6) h.add(mid.toISOString().slice(0,10));
+    }
+  }
+  return h;
+}
+
+// 年ごとのキャッシュ
+const _jpHolCache={};
+function isJpHoliday(year,month,day){
+  if(!_jpHolCache[year])_jpHolCache[year]=calcJpHolidays(parseInt(year));
+  // FY年度→西暦変換
+  const cy=parseInt(month)<=3?parseInt(year)+1:parseInt(year); // MONTHS使う場合
+  // 引数はすでに西暦yearとして渡す想定
+  const key=`${year}-${String(month).padStart(2,'0')}-${String(day).padStart(2,'0')}`;
+  return _jpHolCache[year].has(key);
+}
+
+// 実際の西暦年・月・日を受け取って祝日判定
+function isHoliday(cyear,cmonth,cday){
+  if(!_jpHolCache[cyear])_jpHolCache[cyear]=calcJpHolidays(parseInt(cyear));
+  const key=`${cyear}-${String(cmonth).padStart(2,'0')}-${String(cday).padStart(2,'0')}`;
+  return _jpHolCache[cyear].has(key);
+}
+
+// 会計年度(fy)・月インデックス・日から西暦年月を求めて祝日判定
+function isHolidayFY(fy,mIdx,day){
+  const cy=parseInt(fy);
+  const cm=mIdx+1;
+  return isHoliday(cy,cm,day);
+}
+
+function wdClass(fy,mIdx,day){
+  const w=getWeekday(fy,mIdx,day);
+  if(w===0)return"sun";
+  if(w===6)return"sat";
+  if(isHolidayFY(fy,mIdx,day))return"hol";
+  return"";
+}
+
+function renderTable(type){
+  const mi=MONTHS.indexOf(editMonth[type]);
+  const fy=editYear[type];
+  const src=store.data[fy]?.[editMonth[type]];
+  drafts[type]=src?src.map(r=>({...r,haiki:{...blankHaiki(),...(r.haiki||{})},weather:r.weather||""})):blankMonthData(mi);
+
+  if(type==="sales"){
+    if(!window.salesSelDay||window.salesSelDay>DAYS_IN_MONTH[mi]){
+      // 今日が同じ月なら今日、そうでなければ1日
+      const t=todayFY();
+      window.salesSelDay=(t.fy===fy&&t.month===editMonth.sales)?t.day:1;
+    }
+    renderSalesDayList(fy,mi);
+    renderSalesForm(fy,mi,window.salesSelDay);
+  }else if(type==="kyaku"){
+    renderKyakuGrid(fy,mi);
+  }else{
+    // 廃棄 2ペイン: 左=日付リスト, 右=入力フォーム
+    const mi2=MONTHS.indexOf(editMonth.haiki);
+    const fy2=editYear.haiki;
+    // 最初の日を選択
+    if(!window.haikiSelDay||window.haikiSelDay>DAYS_IN_MONTH[mi2]){
+      const t=todayFY();
+      window.haikiSelDay=(t.fy===fy2&&t.month===editMonth.haiki)?t.day:1;
+    }
+    renderHaikiDayList(fy2,mi2);
+    renderHaikiForm(fy2,mi2,window.haikiSelDay);
+    // ページ表示後にcanvasサイズが確定するよう1フレーム遅らせる
+    requestAnimationFrame(()=>{refreshHaikiBarChart(fy2,mi2);refreshHaikiWdChart(fy2,mi2);});
+  }
+}
+
+function renderKyakuGrid(fy,mi){
+  const grid=document.getElementById("kyakuGrid");
+  if(!grid)return;
+  grid.innerHTML="";
+  const days=DAYS_IN_MONTH[mi];
+  // 1日の曜日インデックス (0=日〜6=土)
+  const firstWd=getWeekday(fy,mi,1);
+  // ヘッダー行 (日月火水木金土)
+  const WD_ORDER=["日","月","火","水","木","金","土"];
+  WD_ORDER.forEach((w,i)=>{
+    const h=document.createElement("div");
+    h.className=`kyaku-day-header${i===0?" sun":i===6?" sat":""}`;
+    h.textContent=w;grid.appendChild(h);
+  });
+  // 1日前の空白
+  for(let i=0;i<firstWd;i++){
+    const blank=document.createElement("div");blank.className="kyaku-day-card empty";
+    grid.appendChild(blank);
+  }
+  // 日付カード
+  let col=firstWd;
+  drafts.kyaku.forEach((row,ri)=>{
+    const d=parseInt(row.d);
+    const wd=getWeekday(fy,mi,d); // 0=Sun,6=Sat
+    const isSun=wd===0,isSat=wd===6;
+    const isHol=!isSun&&isHolidayFY(fy,mi,d);
+    const isRedDay=isSun||isHol;
+    const kyaku=Number(row.客数)||0;
+    const wx=row.weather||"";
+    const card=document.createElement("div");
+    card.className=`kyaku-day-card${isRedDay?" sun-card":isSat?" sat-card":""}`;
+    card.innerHTML=`
+      <div class="kyaku-day-num${isRedDay?" sun":isSat?" sat":""}">${d}</div>
+      <div class="kyaku-wx">${WX_ICONS[wx]||"　"}</div>
+      <input class="kyaku-input${kyaku>0?" has-val":""}" type="number"
+        inputmode="numeric" value="${kyaku||""}" placeholder="0"
+        data-ri="${ri}">
+    `;
+    grid.appendChild(card);
+    // 土曜後に区切り（最終日でなければ）
+    col=(col+1)%7;
+    if(isSat&&d<days){
+      const sep=document.createElement("div");sep.className="kyaku-week-sep";
+      grid.appendChild(sep);
+      col=0;
+    }
+  });
+  // 末尾の空白
+  if(col>0){for(let i=col;i<7;i++){const b=document.createElement("div");b.className="kyaku-day-card empty";grid.appendChild(b);}}
+
+  // 月合計
+  updateKyakuTotal();
+
+  // イベント
+  grid.querySelectorAll("input.kyaku-input").forEach(inp=>{
+    attachValidation(inp,"客数",()=>drafts.kyaku);
+    inp.addEventListener("input",e=>{
+      const ri=+e.target.dataset.ri;
+      drafts.kyaku[ri].客数=e.target.value;
+      e.target.classList.toggle("has-val",(Number(e.target.value)||0)>0);
+      updateKyakuTotal();
+    });
+  });
+}
+
+function updateKyakuTotal(){
+  const total=drafts.kyaku.reduce((s,r)=>s+(Number(r.客数)||0),0);
+  const avg=total>0?(total/drafts.kyaku.filter(r=>(Number(r.客数)||0)>0).length).toFixed(0):"-";
+  const el=document.getElementById("kyakuMonthTotal");
+  if(!el)return;
+  el.innerHTML=`
+    <div>
+      <div class="kyaku-month-label">月間客数</div>
+      <div class="kyaku-month-sub">入力済日の平均 ${avg}人/日</div>
+    </div>
+    <div class="kyaku-month-val">${total.toLocaleString()}人</div>`;
+}
+
+function renderSalesDayList(fy,mi){
+  const list=document.getElementById("salesDayList");
+  if(!list)return;
+  list.innerHTML="";
+  drafts.sales.forEach((row,ri)=>{
+    const d=parseInt(row.d);
+    const wd=getWeekday(fy,mi,d);
+    const isHol=wd!==0&&isHolidayFY(fy,mi,d);
+    const wdc=wd===0?"sun":wd===6?"sat":isHol?"hol":"";
+    const wdLabel=WEEKDAYS[wd];
+    const hasData=(Number(row.売上)||0)>0;
+    const btn=document.createElement("button");
+    btn.className=`haiki-day-btn${d===window.salesSelDay?" sel":""}${hasData?" has-data":""}`;
+    const wx=row.weather||"";
+    btn.innerHTML=`<div class="hdb-num">${d}日 ${WX_ICONS[wx]||""}</div>
+      <div class="hdb-wd ${wdc}">${wdLabel}曜</div>
+      <div class="hdb-tot">${hasData?"¥"+(Number(row.売上)||0).toLocaleString()+"千":"未入力"}</div>`;
+    btn.onclick=()=>{window.salesSelDay=d;renderSalesDayList(fy,mi);renderSalesForm(fy,mi,d);};
+    list.appendChild(btn);
+  });
+}
+
+function renderSalesForm(fy,mi,day){
+  const form=document.getElementById("salesForm");
+  if(!form)return;
+  const ri=day-1;
+  const row=drafts.sales[ri]||blankRow(day);
+  const wd=getWeekday(fy,mi,day);
+  const 売上val=Number(row.売上)||0;
+  const 点数val=Number(row.買上点数)||0;
+  form.innerHTML=`
+    <div class="hf-title">${editMonth.sales} ${day}日（${WEEKDAYS[wd]}曜日）</div>
+
+    <div style="margin-bottom:10px;">
+      <div style="font-size:9px;font-weight:700;letter-spacing:0.1em;text-transform:uppercase;color:var(--text5);margin-bottom:6px;">天気</div>
+      <div style="display:flex;gap:5px;flex-wrap:wrap;">
+        ${WX_KEYS.map(w=>`<button onclick="setSalesWeather(${ri},'${w}')" style="font-size:16px;padding:5px 8px;border-radius:8px;border:2px solid ${row.weather===w?"#1a1a1a":"transparent"};background:${row.weather===w?"#f8f8f8":"#fff"};cursor:pointer;line-height:1;" id="swx_${ri}_${w}">${WX_ICONS[w]}</button>`).join("")}
+      </div>
+    </div>
+
+    <div class="hf-field">
+      <span class="hf-label">売上</span>
+      <div class="hf-input-wrap">
+        <input type="text" inputmode="numeric" value="${売上val>0?売上val.toLocaleString():""}" placeholder="0"
+          id="sf_売上" data-ri="${ri}" data-k="売上">
+        <span class="hf-unit">千円</span>
+      </div>
+    </div>
+    <div style="font-size:10px;color:#bbb;padding:3px 0 8px;text-align:right;" id="sfYen" style="font-size:10px;color:var(--text5);padding:3px 0 8px;text-align:right;">
+      ${売上val>0?`= ¥${(売上val*1000).toLocaleString()}`:""}
+    </div>
+
+    <div class="hf-field">
+      <span class="hf-label">買上点数</span>
+      <div class="hf-input-wrap">
+        <input type="text" inputmode="numeric" value="${点数val>0?点数val.toFixed(2):""}" placeholder="0.00"
+          id="sf_買上点数" data-ri="${ri}" data-k="買上点数">
+        <span class="hf-unit">点</span>
+      </div>
+    </div>
+
+    <div class="hf-total" style="background:#f0fdf4;">
+      <span class="hf-total-label">客単価（参考）</span>
+      <span class="hf-total-val" id="sfTanka" style="color:#166534;">
+        ${row.客数>0?"¥"+(Math.round(売上val*1000/row.客数)).toLocaleString():"-"}
+      </span>
+    </div>`;
+
+  // イベント
+  form.querySelectorAll("input[data-k]").forEach(inp=>{
+    const k=inp.dataset.k;
+    if(k==="買上点数") applyCommaFloatInput(inp,2);
+    else applyCommaInput(inp);
+    attachValidation(inp,k,()=>drafts.sales);
+    inp.addEventListener("input",e=>{
+      const ri2=+e.target.dataset.ri,k=e.target.dataset.k;
+      drafts.sales[ri2][k]=k==="買上点数"?fromCommaFloat(e.target.value):fromComma(e.target.value);
+      // 円換算表示更新
+      if(k==="売上"){
+        const yen=document.getElementById("sfYen");
+        const n=fromComma(e.target.value);
+        if(yen)yen.textContent=n>0?`= ¥${(n*1000).toLocaleString()}`:"";
+      }
+      // 日付リストのバッジ更新
+      const hasD=(fromComma(drafts.sales[ri2].売上)||0)>0;
+      const btnEl=document.querySelector(`#salesDayList .haiki-day-btn:nth-child(${ri2+1})`);
+      if(btnEl){
+        btnEl.classList.toggle("has-data",hasD);
+        const totEl=btnEl.querySelector(".hdb-tot");
+        if(totEl)totEl.textContent=hasD?"¥"+(fromComma(drafts.sales[ri2].売上)||0).toLocaleString()+"千":"未入力";
+      }
+      updateTotals("sales");
+    });
+  });
+}
+
+function setSalesWeather(ri,wx){
+  drafts.sales[ri].weather=wx;
+  // ボタンのハイライト更新
+  WX_KEYS.forEach(w=>{
+    const btn=document.getElementById(`swx_${ri}_${w}`);
+    if(btn){btn.style.borderColor=w===wx?"#1a1a1a":"transparent";btn.style.background=w===wx?"#f8f8f8":"#fff";}
+  });
+  // 日付リストのアイコン更新
+  const btnEl=document.querySelector(`#salesDayList .haiki-day-btn:nth-child(${ri+1})`);
+  if(btnEl){const num=btnEl.querySelector(".hdb-num");if(num)num.textContent=`${ri+1}日 ${WX_ICONS[wx]||""}`;}
+}
+
+function refreshHaikiBarChart(fy,mi){
+  const ctx=document.getElementById("haikiBarChart");
+  if(!ctx)return;
+  if(haikiBarInst){haikiBarInst.destroy();haikiBarInst=null;}
+
+  const rows=drafts.haiki;
+  const labels=rows.map(r=>r.d+"日");
+  const totals=rows.map(r=>HAIKI_CATS.reduce((s,c)=>s+(Number(r.haiki?.[c])||0),0));
+  const grand=totals.reduce((a,b)=>a+b,0);
+  const selIdx=window.haikiSelDay-1;
+
+  // タイトル・合計更新
+  const month=editMonth.haiki;
+  document.getElementById("haikiChartTitle").textContent=`${month} 廃棄金額 日別`;
+  document.getElementById("haikiChartSub").textContent="棒をタップで日付選択";
+  document.getElementById("haikiChartTotal").innerHTML=
+    `<div class="haiki-chart-total-label">月合計</div>
+     <div class="haiki-chart-total-val">¥${grand.toLocaleString()}</div>`;
+
+  haikiBarInst=new Chart(ctx,{
+    type:"bar",
+    data:{
+      labels,
+      datasets:[{
+        data:totals,
+        backgroundColor:totals.map((_,i)=>
+          i===selIdx?"#b91c1c":"rgba(185,28,28,0.25)"
+        ),
+        borderRadius:4,
+        borderSkipped:false,
+      }]
+    },
+    options:{
+      responsive:true,maintainAspectRatio:false,animation:{duration:200},
+      onClick:(_,els)=>{
+        if(els.length>0){
+          const d=els[0].index+1;
+          window.haikiSelDay=d;
+          renderHaikiDayList(fy,mi);
+          renderHaikiForm(fy,mi,d);
+          refreshHaikiBarChart(fy,mi);
+          refreshHaikiWdChart(fy,mi);
+        }
+      },
+      plugins:{
+        legend:{display:false},
+        tooltip:{
+          backgroundColor:"#fff",titleColor:"#111",bodyColor:"#555",
+          borderColor:"#e0e0e0",borderWidth:1,padding:8,
+          callbacks:{
+            title:ctx2=>[ctx2[0].label],
+            label:ctx2=>`廃棄: ¥${ctx2.parsed.y.toLocaleString()}`,
+          }
+        }
+      },
+      scales:{
+        x:{grid:{display:false},ticks:{color:"#aaa",font:{size:8},
+          maxTicksLimit:15,maxRotation:0},border:{display:false}},
+        y:{grid:{color:"#f0f0f0",drawBorder:false},
+          ticks:{color:"#aaa",font:{size:8},
+            callback:v=>v>=10000?`${(v/10000).toFixed(0)}万`:v>0?v:""},
+          border:{display:false}}
+      }
+    }
+  });
+}
+
+function refreshHaikiWdChart(fy,mi){
+  const ctx=document.getElementById("haikiWdChart");
+  if(!ctx)return;
+  if(haikiWdChartInst){haikiWdChartInst.destroy();haikiWdChartInst=null;}
+
+  // 曜日別に廃棄金額を集計
+  const wdSums=Array(7).fill(0);
+  const wdCounts=Array(7).fill(0);
+  drafts.haiki.forEach(r=>{
+    const d=parseInt(r.d);
+    const total=HAIKI_CATS.reduce((s,c)=>s+(Number(r.haiki?.[c])||0),0);
+    if(total>0){
+      const wd=getWeekday(fy,mi,d);
+      wdSums[wd]+=total;
+      wdCounts[wd]++;
+    }
+  });
+  const wdAvg=wdSums.map((s,i)=>wdCounts[i]>0?Math.round(s/wdCounts[i]):0);
+
+  haikiWdChartInst=new Chart(ctx,{
+    type:"bar",
+    data:{
+      labels:WEEKDAYS,
+      datasets:[{
+        data:wdAvg,
+        backgroundColor:WEEKDAYS.map((_,i)=>{
+          if(i===0)return"rgba(220,38,38,0.7)";
+          if(i===6)return"rgba(59,130,246,0.7)";
+          return"rgba(185,28,28,0.55)";
+        }),
+        borderRadius:4,borderSkipped:false,
+      }]
+    },
+    options:{
+      responsive:true,maintainAspectRatio:false,animation:{duration:200},
+      plugins:{
+        legend:{display:false},
+        tooltip:{
+          backgroundColor:"#fff",titleColor:"#111",bodyColor:"#555",
+          borderColor:"#e0e0e0",borderWidth:1,padding:7,
+          callbacks:{label:c=>`平均: ¥${c.parsed.y.toLocaleString()}`}
+        }
+      },
+      scales:{
+        x:{grid:{display:false},ticks:{color:"#aaa",font:{size:9}},border:{display:false}},
+        y:{grid:{color:"#f0f0f0"},ticks:{color:"#aaa",font:{size:8},
+          callback:v=>v>=10000?`${(v/10000).toFixed(0)}万`:v>0?v:""},
+          border:{display:false}}
+      }
+    }
+  });
+}
+
+function renderHaikiDayList(fy,mi){
+  const list=document.getElementById("haikiDayList");
+  if(!list)return;
+  list.innerHTML="";
+  drafts.haiki.forEach((row,ri)=>{
+    const d=parseInt(row.d);
+    const wd=getWeekday(fy,mi,d);
+    const isHol=wd!==0&&isHolidayFY(fy,mi,d);
+    const wdLabel=WEEKDAYS[wd];
+    const wdc=wd===0?"sun":wd===6?"sat":isHol?"hol":"";
+    const total=HAIKI_CATS.reduce((s,c)=>s+(Number(row.haiki?.[c])||0),0);
+    const hasData=total>0;
+    const btn=document.createElement("button");
+    btn.className=`haiki-day-btn${d===window.haikiSelDay?" sel":""}${hasData?" has-data":""}`;
+    btn.innerHTML=`<div class="hdb-num">${d}日</div>
+      <div class="hdb-wd ${wdc}">${wdLabel}曜</div>
+      ${hasData?`<div class="hdb-tot">¥${total.toLocaleString()}</div>`:`<div class="hdb-tot">未入力</div>`}`;
+    btn.onclick=()=>{window.haikiSelDay=d;renderHaikiDayList(fy,mi);renderHaikiForm(fy,mi,d);};
+    list.appendChild(btn);
+  });
+}
+
+function renderHaikiForm(fy,mi,day){
+  const form=document.getElementById("haikiForm");
+  if(!form)return;
+  const ri=day-1;
+  const row=drafts.haiki[ri]||{haiki:blankHaiki()};
+  const wd=getWeekday(fy,mi,day);
+  const wdLabel=WEEKDAYS[wd];
+  form.innerHTML=`<div class="hf-title">${editMonth.haiki} ${day}日（${wdLabel}曜日）</div>`+
+    HAIKI_CATS.map(c=>`
+      <div class="hf-field">
+        <span class="hf-label">${c}</span>
+        <div class="hf-input-wrap">
+          <input type="text" inputmode="numeric"
+            value="${(row.haiki?.[c]||0)>0?(row.haiki[c]).toLocaleString():""}"
+            placeholder="0"
+            data-ri="${ri}" data-hc="${c}" id="hf_${c}">
+          <span class="hf-unit">円</span>
+        </div>
+      </div>`).join("")+
+    `<div class="hf-total">
+      <span class="hf-total-label">合計廃棄金額</span>
+      <span class="hf-total-val" id="hfTotalVal">¥${HAIKI_CATS.reduce((s,c)=>s+(Number(row.haiki?.[c])||0),0).toLocaleString()}円</span>
+    </div>`+
+    renderHaikiBudgetSection(
+      HAIKI_CATS.reduce((s,c)=>s+(Number(row.haiki?.[c])||0),0),
+      row.haiki||blankHaiki()
+    );
+  form.querySelectorAll("input[data-hc]").forEach(inp=>{
+    const c=inp.dataset.hc;
+    // 計算式対応: focusでカンマ除去、blurで式を評価してカンマ表示
+    inp.addEventListener("focus",()=>{
+      const n=fromComma(inp.value);
+      inp.value=n>0?String(n):"";
+    });
+    inp.addEventListener("blur",e=>{
+      const ri2=+e.target.dataset.ri,c=e.target.dataset.hc;
+      const n=commaBlurWithFormula(e.target);
+      if(!drafts.haiki[ri2].haiki)drafts.haiki[ri2].haiki=blankHaiki();
+      drafts.haiki[ri2].haiki[c]=n;
+      const total=HAIKI_CATS.reduce((s,cat)=>s+(Number(drafts.haiki[ri2].haiki?.[cat])||0),0);
+      const tv=document.getElementById("hfTotalVal");
+      if(tv)tv.textContent=`¥${total.toLocaleString()}円`;
+      const btnEl=document.querySelector(`.haiki-day-btn:nth-child(${ri2+1})`);
+      if(btnEl){
+        btnEl.classList.toggle("has-data",total>0);
+        const totEl=btnEl.querySelector(".hdb-tot");
+        if(totEl)totEl.textContent=total>0?`¥${total.toLocaleString()}`:"未入力";
+      }
+      updateTotals("haiki");
+      if(haikiBarInst){
+        const mi3=MONTHS.indexOf(editMonth.haiki);
+        haikiBarInst.data.datasets[0].backgroundColor=drafts.haiki.map((_,i)=>
+          i===(window.haikiSelDay-1)?"#b91c1c":"rgba(185,28,28,0.25)");
+        haikiBarInst.data.datasets[0].data=drafts.haiki.map(r=>
+          HAIKI_CATS.reduce((s,c)=>s+(Number(r.haiki?.[c])||0),0));
+        const grand=haikiBarInst.data.datasets[0].data.reduce((a,b)=>a+b,0);
+        const totEl=document.getElementById("haikiChartTotal");
+        if(totEl)totEl.innerHTML=`<div class="haiki-chart-total-label">月合計</div>
+          <div class="haiki-chart-total-val">¥${grand.toLocaleString()}</div>`;
+        haikiBarInst.update();
+      }
+      // 予算セクション更新
+      const budgetSec=form.querySelector(".hf-budget-section");
+      if(budgetSec){
+        const tmp=document.createElement("div");
+        tmp.innerHTML=renderHaikiBudgetSection(total,drafts.haiki[ri2].haiki||blankHaiki());
+        budgetSec.replaceWith(tmp.firstElementChild);
+      }
+    });
+    attachValidation(inp,c,()=>drafts.haiki);
+    inp.addEventListener("input",e=>{
+      const ri2=+e.target.dataset.ri,c=e.target.dataset.hc;
+      if(!drafts.haiki[ri2].haiki)drafts.haiki[ri2].haiki=blankHaiki();
+      drafts.haiki[ri2].haiki[c]=fromComma(e.target.value);
+      const total=HAIKI_CATS.reduce((s,cat)=>s+(Number(drafts.haiki[ri2].haiki?.[cat])||0),0);
+      const tv=document.getElementById("hfTotalVal");
+      if(tv)tv.textContent=`¥${total.toLocaleString()}円`;
+      // update day list total
+      const btnEl=document.querySelector(`.haiki-day-btn:nth-child(${ri2+1})`);
+      if(btnEl){
+        btnEl.classList.toggle("has-data",total>0);
+        const totEl=btnEl.querySelector(".hdb-tot");
+        if(totEl)totEl.textContent=total>0?`¥${total.toLocaleString()}`:"未入力";
+      }
+      updateTotals("haiki");
+      // グラフ更新（選択中の棒を強調）
+      if(haikiBarInst){
+        const mi3=MONTHS.indexOf(editMonth.haiki);
+        haikiBarInst.data.datasets[0].backgroundColor=drafts.haiki.map((_,i)=>
+          i===(window.haikiSelDay-1)?"#b91c1c":"rgba(185,28,28,0.25)");
+        haikiBarInst.data.datasets[0].data=drafts.haiki.map(r=>
+          HAIKI_CATS.reduce((s,c)=>s+(Number(r.haiki?.[c])||0),0));
+        const grand=haikiBarInst.data.datasets[0].data.reduce((a,b)=>a+b,0);
+        const totEl=document.getElementById("haikiChartTotal");
+        if(totEl)totEl.innerHTML=`<div class="haiki-chart-total-label">月合計</div>
+          <div class="haiki-chart-total-val">¥${grand.toLocaleString()}</div>`;
+        haikiBarInst.update();
+      }
+    });
+  });
+}
+
+function updateTotals(type){
+  if(type==="sales"){
+    // sales合計はフォームに表示（tot_salesは不要）
+    // 月合計をフォームのタイトル付近に反映させたい場合のみ更新
+  }else if(type==="kyaku"){
+    updateKyakuTotal();
+  }
+  // haiki合計はフォーム内で管理
+}
+
+function saveInput(type){
+  if(!store.data[editYear[type]])store.data[editYear[type]]=blankYearData(editYear[type]);
+  const clean=drafts[type].map(r=>{
+    const row={d:r.d,weather:r.weather||""};
+    ["売上","客数","買上点数"].forEach(k=>{
+      row[k]=r[k]===""?0:k==="買上点数"?parseFloat(r[k])||0:Number(r[k])||0;
+    });
+    const h={};HAIKI_CATS.forEach(c=>{h[c]=r.haiki?.[c]===""?0:Number(r.haiki?.[c])||0;});
+    row.haiki=h;
+    row.廃棄金額=type==="haiki"?HAIKI_CATS.reduce((s,c)=>s+(h[c]||0),0):(store.data[editYear[type]][editMonth[type]]?.[parseInt(r.d)-1]?.廃棄金額||0);
+    return row;
+  });
+  if(type!=="haiki"){
+    const existing=store.data[editYear[type]][editMonth[type]]||[];
+    clean.forEach((r,i)=>{if(existing[i]){r.haiki=existing[i].haiki||blankHaiki();r.廃棄金額=existing[i].廃棄金額||0;}});
+  }
+  store.data[editYear[type]][editMonth[type]]=clean;persist();
+  updateMissingBadge();
+  const msgId={sales:"savedSales",kyaku:"savedKyaku",haiki:"savedHaiki"}[type];
+  const msg=document.getElementById(msgId);
+  if(msg){msg.style.display="flex";setTimeout(()=>msg.style.display="none",3000);}
+}
+
+/* ══ バックアップ・復元 ══ */
+const BACKUP_KEY="insight_last_backup";
+
+function updateBackupDaysLabel(){
+  const label=document.getElementById("backupDaysLabel");
+  if(!label)return;
+  const last=localStorage.getItem(BACKUP_KEY);
+  if(!last){label.textContent="未バックアップ";label.style.color="#dc2626";return;}
+  const days=Math.floor((Date.now()-parseInt(last))/(1000*60*60*24));
+  if(days===0){label.textContent="今日バックアップ済";label.style.color="#15803d";}
+  else if(days<=7){label.textContent=`${days}日前`;label.style.color="#888";}
+  else{label.textContent=`${days}日経過 ⚠️`;label.style.color="#dc2626";}
+}
+
+function backupData(){
+  const now=new Date();
+  const pad=n=>String(n).padStart(2,"0");
+  const storeName=allStores.stores[allStores.current]?.name||"店舗";
+  const filename=`insight_backup_${storeName}_${now.getFullYear()}${pad(now.getMonth()+1)}${pad(now.getDate())}.json`;
+  const json=JSON.stringify(allStores,null,2);
+  const blob=new Blob([json],{type:"application/json"});
+  const url=URL.createObjectURL(blob);
+  const a=document.createElement("a");
+  a.href=url;a.download=filename;
+  document.body.appendChild(a);a.click();
+  document.body.removeChild(a);
+  URL.revokeObjectURL(url);
+  localStorage.setItem(BACKUP_KEY,String(Date.now()));
+  updateBackupDaysLabel();
+  showToast("📥 バックアップを保存しました","#15803d","#f0fdf4");
+}
+
+function restoreData(e){
+  const file=e.target.files[0];
+  if(!file)return;
+  const reader=new FileReader();
+  reader.onload=ev=>{
+    try{
+      const data=JSON.parse(ev.target.result);
+      // 新形式(allStores)・旧形式(単店舗)どちらも対応
+      let newAll;
+      if(data.stores&&data.current){
+        newAll=data;
+      }else if(data.years&&data.data){
+        newAll=migrateOldData(data);
+      }else throw new Error("invalid");
+      if(!confirm(`${file.name}\nのデータを復元します。現在の全データは上書きされます。よろしいですか？`)){
+        e.target.value="";return;
+      }
+      allStores=newAll;
+      store=allStores.stores[allStores.current];
+      persist();
+      baseYear=store.years[store.years.length-1];
+      cmpYear=store.years.length>1?store.years[store.years.length-2]:null;
+      editYear={sales:baseYear,kyaku:baseYear,haiki:baseYear};
+      editMonth={sales:todayFY().month,kyaku:todayFY().month,haiki:todayFY().month};
+      renderStoreSel();
+      if(currentNav===1)refreshDash();
+      else if(currentNav>1)initInputPage(["","","sales","kyaku","haiki"][currentNav]);
+      else initQuickPage();
+      updateMissingBadge();
+      showToast("📤 データを復元しました","#1d4ed8","#eff6ff");
+    }catch(err){
+      alert("ファイルの読み込みに失敗しました。\n正しいバックアップファイルを選択してください。");
+    }
+    e.target.value="";
+  };
+  reader.readAsText(file);
+}
+
+/* ══ ① 入力漏れの可視化 ══ */
+function checkTodayInput(){
+  const t=todayFY();
+  if(!store.data[t.fy])return{sales:false,kyaku:false,haiki:false};
+  const rows=store.data[t.fy][t.month]||[];
+  const row=rows[t.day-1];
+  if(!row)return{sales:false,kyaku:false,haiki:false};
+  return{
+    sales:(Number(row.売上)||0)>0,
+    kyaku:(Number(row.客数)||0)>0,
+    haiki:HAIKI_CATS.reduce((s,c)=>s+(Number(row.haiki?.[c])||0),0)>0,
+  };
+}
+
+function updateMissingBadge(){
+  const status=checkTodayInput();
+  const allDone=status.sales&&status.kyaku&&status.haiki;
+  const someDone=status.sales||status.kyaku||status.haiki;
+
+  // 今日の入力ボタン
+  const badge=document.getElementById("todayBadge");
+  if(badge){
+    if(allDone){
+      badge.textContent="✓ 完了";
+      badge.className="today-badge";
+    } else if(someDone){
+      const missing=[];
+      if(!status.sales)missing.push("売上");
+      if(!status.kyaku)missing.push("客数");
+      if(!status.haiki)missing.push("廃棄");
+      badge.textContent=missing.join("・")+"未入力";
+      badge.className="warn-badge";
+    } else {
+      badge.textContent="未入力";
+      badge.className="missing-badge";
+    }
+  }
+
+  // 各入力ページのナビボタン
+  const navMap={2:status.sales,3:status.kyaku,4:status.haiki};
+  Object.entries(navMap).forEach(([navIdx,done])=>{
+    const btn=document.getElementById(`nav${navIdx}`);
+    if(!btn)return;
+    // 既存バッジ削除
+    btn.querySelectorAll(".missing-badge,.warn-badge,.done-badge").forEach(b=>b.remove());
+    if(!done){
+      const b=document.createElement("span");
+      b.className="missing-badge";b.textContent="未";
+      b.style.marginLeft="auto";
+      btn.appendChild(b);
+    }
+  });
+}
+
+/* ══ ② 入力値バリデーション ══ */
+function validateInput(key,value,prevValues){
+  const n=Number(value)||0;
+  const warnings=[];
+
+  if(key==="売上"){
+    if(n<0)warnings.push("売上がマイナスです");
+    if(n>500000)warnings.push(`売上が${n.toLocaleString()}千円と非常に大きい値です`);
+    if(prevValues.length>0){
+      const avg=prevValues.reduce((a,b)=>a+b,0)/prevValues.length;
+      if(avg>0&&n>avg*5)warnings.push(`平均(${Math.round(avg).toLocaleString()}千円)の5倍以上です`);
+    }
+  }
+  if(key==="客数"){
+    if(n<0)warnings.push("客数がマイナスです");
+    if(n>3000)warnings.push(`客数が${n.toLocaleString()}人と非常に多い値です`);
+  }
+  if(key==="買上点数"){
+    if(n<0)warnings.push("買上点数がマイナスです");
+    if(n>10000)warnings.push(`買上点数が${n.toLocaleString()}点と非常に多い値です`);
+  }
+  if(HAIKI_CATS.includes(key)){
+    if(n<0)warnings.push("廃棄金額がマイナスです");
+    if(n>500000)warnings.push(`廃棄金額が¥${n.toLocaleString()}と非常に大きい値です`);
+  }
+  return warnings;
+}
+
+function attachValidation(input,key,getDraftFn){
+  input.addEventListener("blur",e=>{
+    const v=Number(e.target.value)||0;
+    // 同じキーの過去30日分を参考値として取得
+    const draft=getDraftFn();
+    const prevValues=draft
+      .filter(r=>r!==draft[+e.target.dataset.ri||0])
+      .map(r=>Number(r[key])||0)
+      .filter(n=>n>0)
+      .slice(-14);
+    const warns=validateInput(key,v,prevValues);
+    if(warns.length>0){
+      const ok=confirm("⚠️ 入力値の確認\n\n"+warns.join("\n")+"\n\nこの値で入力を続けますか？");
+      if(!ok){e.target.value="";e.target.focus();}
+    }
+  });
+}
+
+function showToast(msg,color,bg){
+  const t=document.createElement("div");
+  t.style.cssText=`position:fixed;bottom:24px;left:50%;transform:translateX(-50%);
+    background:${bg};color:${color};border-radius:12px;padding:10px 20px;
+    font-size:13px;font-weight:700;z-index:9999;box-shadow:0 4px 20px rgba(0,0,0,0.12);
+    white-space:nowrap;font-family:-apple-system,sans-serif;`;
+  t.textContent=msg;
+  document.body.appendChild(t);
+  setTimeout(()=>t.remove(),3000);
+}
+
+/* ══ ダークモード ══ */
+function toggleDarkMode(){
+  const isDark=document.documentElement.classList.toggle("dark");
+  document.getElementById("darkModeIcon").textContent=isDark?"☀️":"🌙";
+  document.getElementById("darkModeLabel").textContent=isDark?"ライトモード":"ダークモード";
+  localStorage.setItem("insight_dark",isDark?"1":"0");
+  // Chart.js グリッド・テキスト色を更新
+  const gridColor=isDark?"rgba(255,255,255,0.08)":"rgba(0,0,0,0.06)";
+  const tickColor=isDark?"#666676":"#ccc";
+  Chart.defaults.color=isDark?"#888898":"#999";
+  [mainChartInst,barChartInst,wdChartInst,haikiBarInst,haikiWdChartInst].forEach(inst=>{
+    if(!inst)return;
+    Object.values(inst.options.scales||{}).forEach(ax=>{
+      if(ax.grid)ax.grid.color=gridColor;
+      if(ax.ticks)ax.ticks.color=tickColor;
+    });
+    inst.update();
+  });
+}
+function applyDarkMode(isDark){
+  if(isDark){
+    document.documentElement.classList.add("dark");
+    document.getElementById("darkModeIcon").textContent="☀️";
+    document.getElementById("darkModeLabel").textContent="ライトモード";
+    Chart.defaults.color="#888898";
+  }
+}
+
+/* ══ Boot ══ */
+applyTheme("mono");
+renderStoreSel();
+initQuickPage();
+updateMissingBadge();
+updateBackupDaysLabel();
+if(localStorage.getItem("insight_dark")==="1")applyDarkMode(true);
+
+/* ══ PWA セットアップ ══ */
+(function setupPWA(){
+  // SVGアイコン生成
+  const svg=`<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
+    <rect width="512" height="512" rx="112" fill="#1a1a1a"/>
+    <text x="256" y="340" font-family="-apple-system,sans-serif" font-size="260"
+      font-weight="800" fill="white" text-anchor="middle">I</text>
+    <text x="256" y="430" font-family="-apple-system,sans-serif" font-size="72"
+      font-weight="600" fill="rgba(255,255,255,0.55)" text-anchor="middle">nsight</text>
+  </svg>`;
+  const svgDataUri="data:image/svg+xml;base64,"+btoa(unescape(encodeURIComponent(svg)));
+
+  // アイコン設定
+  document.getElementById("appleIcon180").href=svgDataUri;
+  document.getElementById("appleIcon152").href=svgDataUri;
+  document.getElementById("favicon").href=svgDataUri;
+
+  // Web Manifest（動的生成）
+  const manifest={
+    name:"Insight — コンビニ経営ダッシュボード",
+    short_name:"Insight",
+    description:"売上・客数・廃棄を日次管理するコンビニ向けダッシュボード",
+    start_url:"./",
+    display:"standalone",
+    orientation:"landscape",
+    background_color:"#1a1a1a",
+    theme_color:"#1a1a1a",
+    lang:"ja",
+    icons:[
+      {src:svgDataUri,sizes:"512x512",type:"image/svg+xml",purpose:"any maskable"},
+      {src:svgDataUri,sizes:"192x192",type:"image/svg+xml"},
+    ]
+  };
+  const manifestBlob=new Blob([JSON.stringify(manifest)],{type:"application/manifest+json"});
+  const manifestUrl=URL.createObjectURL(manifestBlob);
+  document.getElementById("manifestLink").href=manifestUrl;
+
+  // Service Worker: blob URLはiOS Safariで動作しないため省略
+  // Chart.jsはブラウザの通常キャッシュで自動的にオフライン対応される
+
+  // インストール促進バナー（未インストール時のみ）
+  window._deferredPrompt=null;
+  window.addEventListener("beforeinstallprompt",e=>{
+    e.preventDefault();window._deferredPrompt=e;showInstallBanner();
+  });
+  // iOSはbeforeinstallpromptが発火しないので別途案内
+  const isIOS=/iPad|iPhone|iPod/.test(navigator.userAgent);
+  const isStandalone=window.navigator.standalone===true;
+  if(isIOS&&!isStandalone){
+    setTimeout(showIOSInstallHint,2000);
+  }
+})();
+
+function showInstallBanner(){
+  const banner=document.createElement("div");
+  banner.id="installBanner";
+  banner.style.cssText=`position:fixed;bottom:20px;left:50%;transform:translateX(-50%);
+    background:#1a1a1a;color:#fff;border-radius:14px;padding:12px 20px;
+    display:flex;align-items:center;gap:12px;z-index:9999;
+    box-shadow:0 8px 30px rgba(0,0,0,0.3);font-family:-apple-system,sans-serif;
+    font-size:13px;font-weight:600;white-space:nowrap;`;
+  banner.innerHTML=`<span>📲 ホーム画面に追加して使う</span>
+    <button onclick="doInstall()" style="background:#fff;color:#1a1a1a;border:none;
+      border-radius:8px;padding:6px 14px;font-weight:800;font-size:12px;cursor:pointer;">
+      追加する
+    </button>
+    <button onclick="this.closest('#installBanner').remove()" style="background:transparent;
+      color:rgba(255,255,255,0.5);border:none;font-size:16px;cursor:pointer;padding:0 4px;">✕</button>`;
+  document.body.appendChild(banner);
+  setTimeout(()=>banner.remove&&banner.remove(),15000);
+}
+
+function doInstall(){
+  if(window._deferredPrompt){window._deferredPrompt.prompt();document.getElementById("installBanner")?.remove();}
+}
+
+function showIOSInstallHint(){
+  // すでにバナーがあれば表示しない
+  if(document.getElementById("iosHint"))return;
+  const hint=document.createElement("div");
+  hint.id="iosHint";
+  hint.style.cssText=`position:fixed;bottom:0;left:0;right:0;
+    background:#1a1a1a;color:#fff;border-radius:18px 18px 0 0;
+    padding:20px 24px 32px;z-index:9999;
+    box-shadow:0 -8px 30px rgba(0,0,0,0.3);font-family:-apple-system,sans-serif;`;
+  hint.innerHTML=`
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px;">
+      <div style="font-size:15px;font-weight:800;">📲 アプリとして使う</div>
+      <button onclick="this.closest('#iosHint').remove()" style="background:rgba(255,255,255,0.15);
+        color:#fff;border:none;border-radius:8px;padding:5px 10px;font-size:12px;cursor:pointer;">後で</button>
+    </div>
+    <div style="font-size:13px;color:rgba(255,255,255,0.75);line-height:1.7;">
+      Safariのアドレスバー下の <strong style="color:#fff;">共有ボタン（□↑）</strong> をタップして<br>
+      <strong style="color:#fff;">「ホーム画面に追加」</strong> を選ぶとアプリとして起動できます。
+    </div>
+    <div style="margin-top:14px;display:flex;gap:12px;align-items:center;">
+      <div style="text-align:center;background:rgba(255,255,255,0.1);border-radius:10px;padding:8px 12px;font-size:20px;">□↑</div>
+      <div style="font-size:11px;color:rgba(255,255,255,0.5);">ブラウザの共有ボタン</div>
+      <div style="font-size:20px;">→</div>
+      <div style="text-align:center;background:rgba(255,255,255,0.1);border-radius:10px;padding:8px 12px;font-size:20px;">＋</div>
+      <div style="font-size:11px;color:rgba(255,255,255,0.5);">ホーム画面に追加</div>
+    </div>`;
+  document.body.appendChild(hint);
+}
+</script>
+</body>
+</html>
