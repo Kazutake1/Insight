@@ -56,11 +56,25 @@ html,body{margin:0;width:100%;height:100%;background:#eef0f5;font-family:-apple-
     html=html.replace('.ai-analysis-toggle{right:12px;bottom:12px;}','.ai-analysis-toggle{right:12px;bottom:90px;}');
 
     /* Split View方式をオーバーレイ方式へ変更 */
-    html=html.replace('body.ai-analysis-open #main{margin-right:390px;}\nbody.ai-analysis-open .ai-analysis-toggle{display:none;}','body.ai-analysis-open .ai-analysis-toggle{display:none;}\n.ai-analysis-backdrop{position:fixed;inset:0;z-index:10000;background:rgba(15,15,18,.18);opacity:0;pointer-events:none;transition:opacity .24s ease;}\nbody.ai-analysis-open .ai-analysis-backdrop{opacity:1;pointer-events:auto;}');
+    html=html.replace('body.ai-analysis-open #main{margin-right:390px;}\nbody.ai-analysis-open .ai-analysis-toggle{display:none;}','body.ai-analysis-open .ai-analysis-toggle{display:none;}\n.ai-analysis-backdrop{position:fixed;inset:0;z-index:10000;background:rgba(142,142,147,.18);opacity:0;pointer-events:none;transition:opacity .24s ease;}\nbody.ai-analysis-open .ai-analysis-backdrop{opacity:1;pointer-events:auto;}');
     html=html.replace('  body.ai-analysis-open #main{margin-right:0;}\n','');
     html=html.replace('<aside id="aiAnalysisPanel" class="ai-analysis-panel" aria-hidden="true" aria-label="経営分析AI">','<div id="aiAnalysisBackdrop" class="ai-analysis-backdrop" hidden aria-hidden="true" onclick="closeAIAnalysisPanel()"></div>\n<aside id="aiAnalysisPanel" class="ai-analysis-panel" aria-hidden="true" aria-label="経営分析AI">');
     html=html.replace("function openAIAnalysisPanel(){\n  renderAIAnalysisPanel();\n  document.body.classList.add('ai-analysis-open');\n  const panel=document.getElementById('aiAnalysisPanel');\n  const toggle=document.getElementById('aiAnalysisToggle');\n  if(panel)panel.setAttribute('aria-hidden','false');\n  if(toggle)toggle.setAttribute('aria-expanded','true');\n}","function openAIAnalysisPanel(){\n  renderAIAnalysisPanel();\n  document.body.classList.add('ai-analysis-open');\n  const panel=document.getElementById('aiAnalysisPanel');\n  const toggle=document.getElementById('aiAnalysisToggle');\n  const backdrop=document.getElementById('aiAnalysisBackdrop');\n  if(panel)panel.setAttribute('aria-hidden','false');\n  if(toggle)toggle.setAttribute('aria-expanded','true');\n  if(backdrop){backdrop.hidden=false;backdrop.setAttribute('aria-hidden','false');}\n}");
     html=html.replace("function closeAIAnalysisPanel(){\n  document.body.classList.remove('ai-analysis-open');\n  const panel=document.getElementById('aiAnalysisPanel');\n  const toggle=document.getElementById('aiAnalysisToggle');\n  if(panel)panel.setAttribute('aria-hidden','true');\n  if(toggle)toggle.setAttribute('aria-expanded','false');\n}","function closeAIAnalysisPanel(){\n  document.body.classList.remove('ai-analysis-open');\n  const panel=document.getElementById('aiAnalysisPanel');\n  const toggle=document.getElementById('aiAnalysisToggle');\n  const backdrop=document.getElementById('aiAnalysisBackdrop');\n  if(panel)panel.setAttribute('aria-hidden','true');\n  if(toggle)toggle.setAttribute('aria-expanded','false');\n  if(backdrop){backdrop.setAttribute('aria-hidden','true');backdrop.hidden=true;}\n}");
+
+    /* iPad Slide Over風デザインへ変更 */
+    html=html.replace(
+      'position:fixed;top:0;right:0;bottom:0;z-index:10010;\n  width:390px;max-width:42vw;background:var(--surface);color:var(--text);\n  border-left:1px solid var(--border);box-shadow:-8px 0 28px var(--shadow);',
+      'position:fixed;top:14px;right:14px;bottom:14px;z-index:10010;\n  width:390px;max-width:42vw;background:#f2f2f7;color:#1a1a1a;\n  --surface:#f2f2f7;--surface2:#fff;--border:#d1d1d6;--text:#1a1a1a;--text2:#3a3a3c;--text3:#636366;--text4:#8e8e93;--text5:#aeaeb2;\n  border:1px solid rgba(60,60,67,.16);border-radius:24px;box-shadow:0 14px 44px rgba(0,0,0,.22);'
+    );
+    html=html.replace(
+      '  .ai-analysis-panel{width:min(390px,88vw);max-width:none;}',
+      '  .ai-analysis-panel{width:min(390px,88vw);max-width:none;top:12px;right:12px;bottom:12px;border-radius:22px;}'
+    );
+    html=html.replace(
+      '  .ai-analysis-panel{width:92vw;}',
+      '  .ai-analysis-panel{width:calc(100vw - 24px);max-width:none;top:12px;right:12px;bottom:12px;border-radius:22px;}'
+    );
 
     document.open();
     document.write(html);
