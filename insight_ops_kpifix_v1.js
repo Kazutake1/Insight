@@ -10,7 +10,7 @@
   function getMonthlyOps(year,month){
     var y=String(year!=null?year:(typeof baseYear!=='undefined'?baseYear:''));
     var m=month||(typeof selMonth!=='undefined'?selMonth:'');
-    if(!window.store||!m)return {laborCostYen:0,grossMarginRate:0};
+    if(typeof store==='undefined'||!store||!m)return {laborCostYen:0,grossMarginRate:0};
     if(!store.monthlyOps)store.monthlyOps={};
     if(!store.monthlyOps[y])store.monthlyOps[y]={};
     if(!store.monthlyOps[y][m])store.monthlyOps[y][m]={laborCostYen:0,grossMarginRate:0};
