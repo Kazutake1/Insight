@@ -69,11 +69,11 @@
     var laborRate=completed&&labor>0&&sales>0?labor/sales*100:null;
     var prevLaborRate=completed&&prevLabor>0&&prevSales>0?prevLabor/prevSales*100:null;
     return {
-      context:c,rows:rows,prevRows:prevRows,ops:ops,prevOps:prevOps,sales:sales,prevSales:prevSales,
+      context:c,completed:completed,rows:rows,prevRows:prevRows,ops:ops,prevOps:prevOps,sales:sales,prevSales:prevSales,
       labor:labor,prevLabor:prevLabor,laborRate:laborRate,prevLaborRate:prevLaborRate,
-      laborCostChange:prevLabor>0&&labor>0?(labor-prevLabor)/prevLabor*100:null,
+      laborCostChange:completed&&prevLabor>0&&labor>0?(labor-prevLabor)/prevLabor*100:null,
       laborRatePoint:laborRate!=null&&prevLaborRate!=null?laborRate-prevLaborRate:null,
-      grossMarginRate:gm,prevGrossMarginRate:prevGm,grossMarginPoint:gm>0&&prevGm>0?gm-prevGm:null,
+      grossMarginRate:gm,prevGrossMarginRate:prevGm,grossMarginPoint:completed&&gm>0&&prevGm>0?gm-prevGm:null,
       status:statusSummary(rows),prevStatus:statusSummary(prevRows)
     };
   }
@@ -90,11 +90,11 @@
   }
   function summaryLines(a){
     var out=[];
-    if(a.labor>0){
+    if(a.completed&&a.labor>0){
       if(a.laborRate!=null)out.push('人件費は'+yen(a.labor)+'、人件費率は'+pct(a.laborRate)+'です。');
       else out.push('人件費は'+yen(a.labor)+'入力されています。');
     }
-    if(a.grossMarginRate>0){
+    if(a.completed&&a.grossMarginRate>0){
       var g='粗利率は'+pct(a.grossMarginRate);
       if(a.grossMarginPoint!=null)g+='、前年差'+signedPt(a.grossMarginPoint);
       out.push(g+'です。');
@@ -151,18 +151,18 @@
     k.forEach(function(t){addLine(checks,t,false);});
   }
   function laborAnswer(a){
+    if(!a.completed)return '当月は途中経過のため、人件費は月次未確定として経営評価から除外しています。入力値がある場合も、月終了後に正式評価します。';
     if(a.labor<=0)return 'この月の人件費はまだ入力されていません。';
     var out=['人件費は'+yen(a.labor)+'です。'];
     if(a.laborCostChange!=null)out.push('人件費額は前年比'+signedPct(a.laborCostChange)+'です。');
     if(a.laborRate!=null){
       out.push('人件費率は'+pct(a.laborRate)+'です。');
       if(a.laborRatePoint!=null)out.push('人件費率は前年差'+signedPt(a.laborRatePoint)+'です。');
-    }else if(a.context.throughDay!=null){
-      out.push('当月は途中経過のため、月次人件費と途中時点の売上から人件費率を確定評価していません。');
     }
     return out.join('\n');
   }
   function grossMarginAnswer(a){
+    if(!a.completed)return '当月は途中経過のため、粗利率は月次未確定として経営評価から除外しています。入力値がある場合も、月終了後に正式評価します。';
     if(a.grossMarginRate<=0)return 'この月の粗利率はまだ入力されていません。';
     var out=['粗利率は'+pct(a.grossMarginRate)+'です。'];
     if(a.grossMarginPoint!=null)out.push('前年差は'+signedPt(a.grossMarginPoint)+'です。');
