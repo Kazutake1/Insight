@@ -85,4 +85,15 @@
     updateMissingBadge();
     showToast('🗑 '+t.month+day+'日の入力データをクリアしました','#dc2626','#fef2f2');
   };
+
+  if(typeof window.confirmDeleteYear==='function'){
+    var originalConfirmDeleteYear=window.confirmDeleteYear;
+    window.confirmDeleteYear=function(){
+      var deletedYear=typeof yearToDelete!=='undefined'?yearToDelete:null;
+      if(deletedYear!=null&&typeof store!=='undefined'&&store&&store.monthlyOps){
+        delete store.monthlyOps[String(deletedYear)];
+      }
+      return originalConfirmDeleteYear.apply(this,arguments);
+    };
+  }
 })();
