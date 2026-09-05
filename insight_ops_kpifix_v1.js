@@ -98,7 +98,7 @@
   if(document.getElementById('insightAiOpsV1'))return;
   var script=document.createElement('script');
   script.id='insightAiOpsV1';
-  script.src='./insight_ai_ops_v1.js?v=20260905-2';
+  script.src='./insight_ai_ops_v1.js?v=20260905-3';
   script.async=false;
   document.head.appendChild(script);
 })();
