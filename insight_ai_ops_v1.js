@@ -12,6 +12,16 @@
     try{if(typeof getAIAnalysisThroughDay==='function'&&year!=null&&month)throughDay=getAIAnalysisThroughDay(year,month);}catch(e){}
     return {year:year,month:month,prevYear:prevYear,throughDay:throughDay};
   }
+  function isCompletedMonth(year,month){
+    try{
+      if(typeof todayFY!=='function')return false;
+      var t=todayFY();
+      var y=Number(year),ty=Number(t&&t.fy);
+      var mi=typeof MONTHS!=='undefined'&&Array.isArray(MONTHS)?MONTHS.indexOf(month):-1;
+      if(!Number.isFinite(y)||!Number.isFinite(ty)||mi<0||!t||typeof t.mIdx!=='number')return false;
+      return y<ty||(y===ty&&mi<t.mIdx);
+    }catch(e){return false;}
+  }
   function getMonthlyOps(year,month){
     try{
       if(typeof store==='undefined'||!store||!store.monthlyOps)return null;
@@ -65,7 +75,7 @@
     var prevLabor=prevOps?num(prevOps.laborCostYen):0;
     var gm=ops?num(ops.grossMarginRate):0;
     var prevGm=prevOps?num(prevOps.grossMarginRate):0;
-    var completed=c.throughDay==null;
+    var completed=isCompletedMonth(c.year,c.month);
     var laborRate=completed&&labor>0&&sales>0?labor/sales*100:null;
     var prevLaborRate=completed&&prevLabor>0&&prevSales>0?prevLabor/prevSales*100:null;
     return {
@@ -151,7 +161,7 @@
     k.forEach(function(t){addLine(checks,t,false);});
   }
   function laborAnswer(a){
-    if(!a.completed)return '当月は途中経過のため、人件費は月次未確定として経営評価から除外しています。入力値がある場合も、月終了後に正式評価します。';
+    if(!a.completed)return 'この月は未確定のため、人件費は月次未確定として経営評価から除外しています。入力値がある場合も、月終了後に正式評価します。';
     if(a.labor<=0)return 'この月の人件費はまだ入力されていません。';
     var out=['人件費は'+yen(a.labor)+'です。'];
     if(a.laborCostChange!=null)out.push('人件費額は前年比'+signedPct(a.laborCostChange)+'です。');
@@ -162,7 +172,7 @@
     return out.join('\n');
   }
   function grossMarginAnswer(a){
-    if(!a.completed)return '当月は途中経過のため、粗利率は月次未確定として経営評価から除外しています。入力値がある場合も、月終了後に正式評価します。';
+    if(!a.completed)return 'この月は未確定のため、粗利率は月次未確定として経営評価から除外しています。入力値がある場合も、月終了後に正式評価します。';
     if(a.grossMarginRate<=0)return 'この月の粗利率はまだ入力されていません。';
     var out=['粗利率は'+pct(a.grossMarginRate)+'です。'];
     if(a.grossMarginPoint!=null)out.push('前年差は'+signedPt(a.grossMarginPoint)+'です。');
