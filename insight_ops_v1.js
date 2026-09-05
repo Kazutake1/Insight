@@ -1,17 +1,20 @@
 (function(){
-  function ensureMonthlyOps(){
+  function ensureMonthlyOps(year,month){
+    var y=String(year!=null?year:(baseYear||""));
+    var m=month||selMonth;
     if(!store.monthlyOps)store.monthlyOps={};
-    var y=String(baseYear||"");
     if(!store.monthlyOps[y])store.monthlyOps[y]={};
-    if(!store.monthlyOps[y][selMonth])store.monthlyOps[y][selMonth]={laborCostYen:0,grossMarginRate:0};
-    return store.monthlyOps[y][selMonth];
+    if(!store.monthlyOps[y][m])store.monthlyOps[y][m]={laborCostYen:0,grossMarginRate:0};
+    return store.monthlyOps[y][m];
   }
+
   function dailyRow(){
     var fy=todayInfo&&todayInfo.fy?todayInfo.fy:"";
     var m=todayInfo&&todayInfo.month?todayInfo.month:"";
     var rows=store.data&&store.data[fy]&&store.data[fy][m]?store.data[fy][m]:[];
     return rows[quickEditDay-1]||null;
   }
+
   function renderDailyOps(){
     var grid=document.getElementById("quickGrid");
     if(!grid||document.getElementById("opsDailyWrap"))return;
@@ -25,6 +28,7 @@
     var sel=document.getElementById("qi_stockout");
     if(sel)sel.value=so;
   }
+
   var oldRenderQuick=window.renderQuickPage||renderQuickPage;
   window.renderQuickPage=function(){oldRenderQuick.apply(this,arguments);renderDailyOps();};
 
@@ -40,37 +44,79 @@
     persist();
   };
 
-  function renderMonthlyOps(){
-    var anchor=document.querySelector("#pageDash .kpi-row-wrap");
-    if(!anchor)return;
-    var card=document.getElementById("monthlyOpsCard");
-    if(!card){
-      card=document.createElement("div");
-      card.id="monthlyOpsCard";
-      card.className="monthly-ops-card";
-      anchor.insertAdjacentElement("afterend",card);
-    }
-    var d=ensureMonthlyOps(),labor=Number(d.laborCostYen)||0,gm=Number(d.grossMarginRate)||0;
-    card.innerHTML='<div class="monthly-ops-title">月次経営データ <span style="font-size:10px;color:var(--text4);font-weight:600">'+baseYear+'年 '+selMonth+'</span></div><label class="monthly-ops-field"><span class="monthly-ops-label">人件費</span><div style="display:flex;align-items:center;gap:5px"><input id="monthlyLaborCost" class="monthly-ops-input" type="text" inputmode="numeric" value="'+(labor?labor.toLocaleString():"")+'" placeholder="0"><span style="font-size:10px;color:var(--text4)">円</span></div></label><label class="monthly-ops-field"><span class="monthly-ops-label">粗利率</span><div style="display:flex;align-items:center;gap:5px"><input id="monthlyGrossMargin" class="monthly-ops-input" type="number" inputmode="decimal" step="0.1" min="0" max="100" value="'+(gm||"")+'" placeholder="0.0"><span style="font-size:10px;color:var(--text4)">%</span></div></label><button class="monthly-ops-save" type="button" onclick="saveMonthlyOpsData()">保存する</button><div id="monthlyOpsSaved" class="monthly-ops-saved"></div>';
-    var el=document.getElementById("monthlyLaborCost");
-    if(el){
-      el.addEventListener("focus",function(){this.value=String(this.value).replace(/,/g,"")});
-      el.addEventListener("blur",function(){var n=parseInt(String(this.value).replace(/,/g,""),10)||0;this.value=n?n.toLocaleString():""});
-    }
+  function comparisonPct(now,prev){
+    now=Number(now)||0;prev=Number(prev)||0;
+    if(prev<=0)return null;
+    var pct=(now-prev)/prev*100;
+    return {up:pct>=0,str:Math.abs(pct).toFixed(1)+"%"};
   }
-  window.saveMonthlyOpsData=function(){
-    var d=ensureMonthlyOps(),l=document.getElementById("monthlyLaborCost"),g=document.getElementById("monthlyGrossMargin");
-    var labor=parseInt(String(l&&l.value||"").replace(/,/g,""),10)||0,gm=parseFloat(g&&g.value)||0;
-    if(gm<0)gm=0;if(gm>100)gm=100;
-    d.laborCostYen=labor;d.grossMarginRate=gm;persist();
-    var msg=document.getElementById("monthlyOpsSaved");
-    if(msg){msg.textContent="✓ 保存しました";setTimeout(function(){msg.textContent=""},1800);}
-    if(l)l.value=labor?labor.toLocaleString():"";
-    if(g)g.value=gm||"";
-  };
-  var oldRefreshDash=window.refreshDash||refreshDash;
-  window.refreshDash=function(){oldRefreshDash.apply(this,arguments);renderMonthlyOps();};
 
+  function grossMarginPoint(now,prev){
+    now=Number(now)||0;prev=Number(prev)||0;
+    if(prev<=0)return null;
+    var pt=now-prev;
+    return {up:pt>=0,str:Math.abs(pt).toFixed(1)+"pt"};
+  }
+
+  function createMonthlyKpiCard(type,label,valueHtml,comparison,prevLabel){
+    var card=document.createElement("div");
+    card.className="kpi-card";
+    card.dataset.monthlyOps=type;
+    card.title=label+"を編集";
+    card.onclick=function(){window.editMonthlyOpsKpi(type);};
+    var badge="";
+    if(comparison){
+      var positive=type==="labor"?!comparison.up:comparison.up;
+      badge='<div class="kpi-yoy"><span class="kpi-badge '+(positive?'up':'dn')+'">'+(comparison.up?'▲':'▼')+' '+comparison.str+'</span><span class="kpi-prev">'+prevLabel+'</span></div>';
+    }
+    card.innerHTML='<div class="kpi-label">'+label+' <span style="font-weight:500;font-size:8.5px;color:var(--text5);">'+selMonth+'</span></div><div class="kpi-value">'+valueHtml+'</div>'+badge;
+    return card;
+  }
+
+  function renderMonthlyOpsKpis(){
+    var row=document.getElementById("kpiRow");
+    if(!row)return;
+    row.querySelectorAll('[data-monthly-ops]').forEach(function(el){el.remove();});
+    var current=ensureMonthlyOps(baseYear,selMonth);
+    var prev=(typeof cmpYear!=="undefined"&&cmpYear!=null&&store.monthlyOps&&store.monthlyOps[String(cmpYear)]&&store.monthlyOps[String(cmpYear)][selMonth])?store.monthlyOps[String(cmpYear)][selMonth]:null;
+    var labor=Number(current.laborCostYen)||0;
+    var gm=Number(current.grossMarginRate)||0;
+    var laborCmp=prev?comparisonPct(labor,prev.laborCostYen):null;
+    var gmCmp=prev?grossMarginPoint(gm,prev.grossMarginRate):null;
+    var prevLabel=(typeof cmpYear!=="undefined"&&cmpYear!=null)?String(cmpYear)+"年比":"前年比";
+    row.appendChild(createMonthlyKpiCard("labor","人件費",labor?'¥'+labor.toLocaleString():'—',laborCmp,prevLabel));
+    row.appendChild(createMonthlyKpiCard("grossMargin","粗利率",gm?gm.toFixed(1)+'<span class="kpi-unit">%</span>':'—',gmCmp,prevLabel));
+  }
+
+  window.editMonthlyOpsKpi=function(type){
+    var d=ensureMonthlyOps(baseYear,selMonth);
+    if(type==="labor"){
+      var current=Number(d.laborCostYen)||0;
+      var entered=window.prompt(baseYear+'年 '+selMonth+'の人件費（円）を入力してください。',current?String(current):'');
+      if(entered===null)return;
+      var labor=parseInt(String(entered).replace(/[,，\s]/g,''),10);
+      if(!Number.isFinite(labor)||labor<0){window.alert('人件費は0以上の数字で入力してください。');return;}
+      d.laborCostYen=labor;
+    }else if(type==="grossMargin"){
+      var currentRate=Number(d.grossMarginRate)||0;
+      var enteredRate=window.prompt(baseYear+'年 '+selMonth+'の粗利率（%）を入力してください。',currentRate?String(currentRate):'');
+      if(enteredRate===null)return;
+      var gm=parseFloat(String(enteredRate).replace(/[%％\s]/g,''));
+      if(!Number.isFinite(gm)||gm<0||gm>100){window.alert('粗利率は0〜100の数字で入力してください。');return;}
+      d.grossMarginRate=gm;
+    }else{return;}
+    persist();
+    renderMonthlyOpsKpis();
+  };
+
+  var oldRefreshDash=window.refreshDash||refreshDash;
+  window.refreshDash=function(){oldRefreshDash.apply(this,arguments);renderMonthlyOpsKpis();};
+
+  var oldRenderMonthlyOps=window.renderMonthlyOps;
+  window.renderMonthlyOps=function(){renderMonthlyOpsKpis();};
+
+  var oldMonthly=document.getElementById("monthlyOpsCard");
+  if(oldMonthly)oldMonthly.remove();
   if(typeof currentNav!=="undefined"&&currentNav===0)renderDailyOps();
-  if(typeof currentNav!=="undefined"&&currentNav===1)renderMonthlyOps();
+  if(typeof currentNav!=="undefined"&&currentNav===1)renderMonthlyOpsKpis();
 })();
