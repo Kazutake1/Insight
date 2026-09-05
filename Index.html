@@ -47,12 +47,21 @@ html,body{margin:0;width:100%;height:100%;background:#eef0f5;font-family:-apple-
     if(html.indexOf('<!DOCTYPE html>')!==0&&html.indexOf('<!doctype html>')!==0){
       throw new Error('HTMLデータの検証に失敗しました');
     }
+
     /* 経営分析AIボタンの表示だけを変更 */
     html=html.replace('background:var(--surface);color:var(--text);box-shadow:0 6px 24px var(--shadow);','background:#1a1a1a;color:#fff;box-shadow:0 6px 24px var(--shadow);');
     html=html.replace('.ai-analysis-toggle svg{width:17px;height:17px;flex:none;}','.dark .ai-analysis-toggle{background:#fff;color:#1a1a1a;}');
     html=html.replace(/(<button id="aiAnalysisToggle"[\s\S]*?>)\s*<svg[\s\S]*?<\/svg>\s*経営分析AI/,'$1\n  経営分析AI');
     html=html.replace('position:fixed;right:18px;bottom:18px;z-index:10020;','position:fixed;right:18px;bottom:96px;z-index:10020;');
     html=html.replace('.ai-analysis-toggle{right:12px;bottom:12px;}','.ai-analysis-toggle{right:12px;bottom:90px;}');
+
+    /* Split View方式をオーバーレイ方式へ変更 */
+    html=html.replace('body.ai-analysis-open #main{margin-right:390px;}\nbody.ai-analysis-open .ai-analysis-toggle{display:none;}','body.ai-analysis-open .ai-analysis-toggle{display:none;}\n.ai-analysis-backdrop{position:fixed;inset:0;z-index:10000;background:rgba(15,15,18,.18);opacity:0;pointer-events:none;transition:opacity .24s ease;}\nbody.ai-analysis-open .ai-analysis-backdrop{opacity:1;pointer-events:auto;}');
+    html=html.replace('  body.ai-analysis-open #main{margin-right:0;}\n','');
+    html=html.replace('<aside id="aiAnalysisPanel" class="ai-analysis-panel" aria-hidden="true" aria-label="経営分析AI">','<div id="aiAnalysisBackdrop" class="ai-analysis-backdrop" hidden aria-hidden="true" onclick="closeAIAnalysisPanel()"></div>\n<aside id="aiAnalysisPanel" class="ai-analysis-panel" aria-hidden="true" aria-label="経営分析AI">');
+    html=html.replace("function openAIAnalysisPanel(){\n  renderAIAnalysisPanel();\n  document.body.classList.add('ai-analysis-open');\n  const panel=document.getElementById('aiAnalysisPanel');\n  const toggle=document.getElementById('aiAnalysisToggle');\n  if(panel)panel.setAttribute('aria-hidden','false');\n  if(toggle)toggle.setAttribute('aria-expanded','true');\n}","function openAIAnalysisPanel(){\n  renderAIAnalysisPanel();\n  document.body.classList.add('ai-analysis-open');\n  const panel=document.getElementById('aiAnalysisPanel');\n  const toggle=document.getElementById('aiAnalysisToggle');\n  const backdrop=document.getElementById('aiAnalysisBackdrop');\n  if(panel)panel.setAttribute('aria-hidden','false');\n  if(toggle)toggle.setAttribute('aria-expanded','true');\n  if(backdrop){backdrop.hidden=false;backdrop.setAttribute('aria-hidden','false');}\n}");
+    html=html.replace("function closeAIAnalysisPanel(){\n  document.body.classList.remove('ai-analysis-open');\n  const panel=document.getElementById('aiAnalysisPanel');\n  const toggle=document.getElementById('aiAnalysisToggle');\n  if(panel)panel.setAttribute('aria-hidden','true');\n  if(toggle)toggle.setAttribute('aria-expanded','false');\n}","function closeAIAnalysisPanel(){\n  document.body.classList.remove('ai-analysis-open');\n  const panel=document.getElementById('aiAnalysisPanel');\n  const toggle=document.getElementById('aiAnalysisToggle');\n  const backdrop=document.getElementById('aiAnalysisBackdrop');\n  if(panel)panel.setAttribute('aria-hidden','true');\n  if(toggle)toggle.setAttribute('aria-expanded','false');\n  if(backdrop){backdrop.setAttribute('aria-hidden','true');backdrop.hidden=true;}\n}");
+
     document.open();
     document.write(html);
     document.close();
