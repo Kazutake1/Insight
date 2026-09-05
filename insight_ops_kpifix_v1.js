@@ -111,3 +111,12 @@
   script.async=false;
   document.head.appendChild(script);
 })();
+
+(function(){
+  if(document.getElementById('insightStockoutFixV1'))return;
+  var script=document.createElement('script');
+  script.id='insightStockoutFixV1';
+  script.src='./insight_stockout_fix_v1.js?v=20260905-1';
+  script.async=false;
+  document.head.appendChild(script);
+})();
