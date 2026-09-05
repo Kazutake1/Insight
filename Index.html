@@ -6,108 +6,35 @@
 <meta name="theme-color" content="#1a1a1a">
 <title>Insight</title>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/pako/2.1.0/pako.es5.min.js"></script>
-<style>
-html,body{margin:0;width:100%;height:100%;background:#eef0f5;font-family:-apple-system,'Hiragino Kaku Gothic ProN','Noto Sans JP',sans-serif}
-#loading{height:100%;display:flex;align-items:center;justify-content:center;color:#666;font-size:14px}
-</style>
+<style>html,body{margin:0;width:100%;height:100%;background:#eef0f5;font-family:-apple-system,'Hiragino Kaku Gothic ProN','Noto Sans JP',sans-serif}#loading{height:100%;display:flex;align-items:center;justify-content:center;color:#666;font-size:14px}</style>
 </head>
 <body>
 <div id="loading">Insightを読み込んでいます…</div>
 <script>
 (function(){
-  var files=[
-    'insight_payload_v1_part01a.txt',
-    'insight_payload_v1_part01b.txt',
-    'insight_payload_v1_part02.txt',
-    'insight_payload_v1_part03.txt',
-    'insight_payload_v1_part04a.txt',
-    'insight_payload_v1_part04b.txt',
-    'insight_payload_v1_part05.txt',
-    'insight_payload_v1_part06.txt',
-    'insight_payload_v1_part07.txt'
-  ];
-  function fail(e){
-    document.body.innerHTML='<div style="padding:24px;font-family:-apple-system,sans-serif;color:#b42318">Insightの読み込みに失敗しました。<br><small>'+String(e&&e.message?e.message:e)+'</small></div>';
-  }
-  if(typeof pako==='undefined'){
-    fail(new Error('展開ライブラリを読み込めませんでした'));
-    return;
-  }
-  Promise.all(files.map(function(file){
-    return fetch('./'+file+'?v=20260905-2',{cache:'no-store'}).then(function(r){
-      if(!r.ok)throw new Error(file+' の取得に失敗しました ('+r.status+')');
-      return r.text();
-    });
-  })).then(function(parts){
-    var b64=parts.join('').replace(/\s/g,'');
-    var bin=atob(b64);
-    var bytes=new Uint8Array(bin.length);
-    for(var i=0;i<bin.length;i++)bytes[i]=bin.charCodeAt(i);
-    var html=pako.ungzip(bytes,{to:'string'});
-    if(html.indexOf('<!DOCTYPE html>')!==0&&html.indexOf('<!doctype html>')!==0){
-      throw new Error('HTMLデータの検証に失敗しました');
-    }
-
-    /* 経営分析AIボタンの表示だけを変更 */
-    html=html.replace('background:var(--surface);color:var(--text);box-shadow:0 6px 24px var(--shadow);','background:#1a1a1a;color:#fff;box-shadow:0 6px 24px var(--shadow);');
-    html=html.replace('.ai-analysis-toggle svg{width:17px;height:17px;flex:none;}','.dark .ai-analysis-toggle{background:#fff;color:#1a1a1a;}');
-    html=html.replace(/(<button id="aiAnalysisToggle"[\s\S]*?>)\s*<svg[\s\S]*?<\/svg>\s*経営分析AI/,'$1\n  経営分析AI');
-    html=html.replace('position:fixed;right:18px;bottom:18px;z-index:10020;','position:fixed;right:18px;bottom:96px;z-index:10020;');
-    html=html.replace('.ai-analysis-toggle{right:12px;bottom:12px;}','.ai-analysis-toggle{right:12px;bottom:90px;}');
-
-    /* Split View方式をオーバーレイ方式へ変更 */
-    html=html.replace('body.ai-analysis-open #main{margin-right:390px;}\nbody.ai-analysis-open .ai-analysis-toggle{display:none;}','body.ai-analysis-open .ai-analysis-toggle{display:none;}\n.ai-analysis-backdrop{position:fixed;inset:0;z-index:10000;background:rgba(142,142,147,.18);opacity:0;pointer-events:none;transition:opacity .24s ease;}\nbody.ai-analysis-open .ai-analysis-backdrop{opacity:1;pointer-events:auto;}');
-    html=html.replace('  body.ai-analysis-open #main{margin-right:0;}\n','');
-    html=html.replace('<aside id="aiAnalysisPanel" class="ai-analysis-panel" aria-hidden="true" aria-label="経営分析AI">','<div id="aiAnalysisBackdrop" class="ai-analysis-backdrop" hidden aria-hidden="true" onclick="closeAIAnalysisPanel()"></div>\n<aside id="aiAnalysisPanel" class="ai-analysis-panel" aria-hidden="true" aria-label="経営分析AI">');
-    html=html.replace("function openAIAnalysisPanel(){\n  renderAIAnalysisPanel();\n  document.body.classList.add('ai-analysis-open');\n  const panel=document.getElementById('aiAnalysisPanel');\n  const toggle=document.getElementById('aiAnalysisToggle');\n  if(panel)panel.setAttribute('aria-hidden','false');\n  if(toggle)toggle.setAttribute('aria-expanded','true');\n}","function openAIAnalysisPanel(){\n  renderAIAnalysisPanel();\n  document.body.classList.add('ai-analysis-open');\n  const panel=document.getElementById('aiAnalysisPanel');\n  const toggle=document.getElementById('aiAnalysisToggle');\n  const backdrop=document.getElementById('aiAnalysisBackdrop');\n  if(panel)panel.setAttribute('aria-hidden','false');\n  if(toggle)toggle.setAttribute('aria-expanded','true');\n  if(backdrop){backdrop.hidden=false;backdrop.setAttribute('aria-hidden','false');}\n}");
-    html=html.replace("function closeAIAnalysisPanel(){\n  document.body.classList.remove('ai-analysis-open');\n  const panel=document.getElementById('aiAnalysisPanel');\n  const toggle=document.getElementById('aiAnalysisToggle');\n  if(panel)panel.setAttribute('aria-hidden','true');\n  if(toggle)toggle.setAttribute('aria-expanded','false');\n}","function closeAIAnalysisPanel(){\n  document.body.classList.remove('ai-analysis-open');\n  const panel=document.getElementById('aiAnalysisPanel');\n  const toggle=document.getElementById('aiAnalysisToggle');\n  const backdrop=document.getElementById('aiAnalysisBackdrop');\n  if(panel)panel.setAttribute('aria-hidden','true');\n  if(toggle)toggle.setAttribute('aria-expanded','false');\n  if(backdrop){backdrop.setAttribute('aria-hidden','true');backdrop.hidden=true;}\n}");
-
-    /* iPad Slide Over風デザインへ変更 */
-    html=html.replace(
-      'position:fixed;top:0;right:0;bottom:0;z-index:10010;\n  width:390px;max-width:42vw;background:var(--surface);color:var(--text);\n  border-left:1px solid var(--border);box-shadow:-8px 0 28px var(--shadow);',
-      'position:fixed;top:14px;right:14px;bottom:14px;z-index:10010;\n  width:390px;max-width:42vw;background:#f2f2f7;color:#1a1a1a;\n  --surface:#f2f2f7;--surface2:#fff;--border:#d1d1d6;--text:#1a1a1a;--text2:#3a3a3c;--text3:#636366;--text4:#8e8e93;--text5:#aeaeb2;\n  border:1px solid rgba(60,60,67,.16);border-radius:24px;box-shadow:0 14px 44px rgba(0,0,0,.22);'
-    );
-    html=html.replace(
-      '  .ai-analysis-panel{width:min(390px,88vw);max-width:none;}',
-      '  .ai-analysis-panel{width:min(390px,88vw);max-width:none;top:12px;right:12px;bottom:12px;border-radius:22px;}'
-    );
-    html=html.replace(
-      '  .ai-analysis-panel{width:92vw;}',
-      '  .ai-analysis-panel{width:calc(100vw - 24px);max-width:none;top:12px;right:12px;bottom:12px;border-radius:22px;}'
-    );
-
-    /* 経営分析AIパネル内を4区分に整理（既存比較データのみ使用） */
-    html=html.replace(
-      '<div class="ai-analysis-card">\n      <div class="ai-analysis-card-title">経営コメント</div>\n      <div id="aiAnalysisComments"></div>\n    </div>',
-      '<div class="ai-analysis-card">\n      <div class="ai-analysis-card-title">今月の要点</div>\n      <div id="aiAnalysisSummary"></div>\n    </div>\n    <div class="ai-analysis-card">\n      <div class="ai-analysis-card-title">良い点</div>\n      <div id="aiAnalysisGood"></div>\n    </div>\n    <div class="ai-analysis-card">\n      <div class="ai-analysis-card-title">注意点</div>\n      <div id="aiAnalysisCaution"></div>\n    </div>\n    <div class="ai-analysis-card">\n      <div class="ai-analysis-card-title">確認事項</div>\n      <div id="aiAnalysisChecks"></div>\n    </div>'
-    );
-
-    var organizedScript = '<script>(function(){'+
-      'window.renderAIAnalysisPanel=function(){'+
-      'var periodEl=document.getElementById("aiAnalysisPeriod"),summaryEl=document.getElementById("aiAnalysisSummary"),goodEl=document.getElementById("aiAnalysisGood"),cautionEl=document.getElementById("aiAnalysisCaution"),checksEl=document.getElementById("aiAnalysisChecks");'+
-      'if(!periodEl||!summaryEl||!goodEl||!cautionEl||!checksEl)return;'+
-      'var month=typeof selMonth==="string"?selMonth:"",year=typeof baseYear!=="undefined"?baseYear:null,compare=typeof cmpYear!=="undefined"?cmpYear:null,throughDay=getAIAnalysisThroughDay(year,month),result=null,yoy=null;'+
-      'try{if(window.ManagementCommentEngine&&year!=null&&month)result=window.ManagementCommentEngine.getPeriod(year,month,throughDay,compare);if(window.YearComparisonEngine&&year!=null&&month)yoy=window.YearComparisonEngine.getPeriod(year,month,throughDay,compare);}catch(e){result=null;yoy=null;}'+
-      'periodEl.textContent=[year?year+"年度":null,month||null,throughDay?throughDay+"日まで":null,compare?"（前年差："+compare+"年度）":null].filter(Boolean).join(" ")||"対象期間を取得できません";'+
-      '[summaryEl,goodEl,cautionEl,checksEl].forEach(function(el){el.innerHTML="";});'+
-      'function addLine(el,text,empty){var p=document.createElement("p");p.className=empty?"ai-analysis-empty":"ai-analysis-comment";p.textContent=text;el.appendChild(p);}'+
-      'var comments=result&&Array.isArray(result.comments)?result.comments:[],c=yoy&&yoy.comparison?yoy.comparison:null;'+
-      'if(!c){addLine(summaryEl,"前年比較に必要なデータが不足しているため、経営コメントを表示できません。",true);addLine(goodEl,"比較できるデータがありません。",true);addLine(cautionEl,"比較できるデータがありません。",true);addLine(checksEl,"入力済みデータと比較対象年度を確認してください。",true);return;}'+
-      'if(comments.length)comments.forEach(function(t){addLine(summaryEl,t,false);});else addLine(summaryEl,"前年比較に必要なデータが不足しています。",true);'+
-      'var good=[],caution=[],checks=[],metrics=[["売上",c.salesYen],["客数",c.customers],["客単価",c.customerUnitPrice],["買上点数",c.items],["1人当たり買上点数",c.itemsPerCustomer],["1点当たり売上",c.salesPerItem]];'+
-      'metrics.forEach(function(m){var label=m[0],change=m[1];if(!change||change.pct==null)return;var value=formatPctForComment(change);if(change.direction==="up")good.push(label+"は前年比"+value+"です。");else if(change.direction==="down")caution.push(label+"は前年比"+value+"です。");});'+
-      'if(c.wasteYen&&c.wasteYen.pct!=null){var wv=formatPctForComment(c.wasteYen);if(c.wasteYen.direction==="down")good.push("廃棄額は前年比"+wv+"です。");else if(c.wasteYen.direction==="up")caution.push("廃棄額は前年比"+wv+"です。");}'+
-      'if(c.wasteRate&&c.wasteRate.point!=null){var wr=formatPointForComment(c.wasteRate);if(c.wasteRate.direction==="down")good.push("廃棄率は前年差"+wr+"です。");else if(c.wasteRate.direction==="up")caution.push("廃棄率は前年差"+wr+"です。");}'+
-      'good.forEach(function(t){addLine(goodEl,t,false);});caution.forEach(function(t){addLine(cautionEl,t,false);});'+
-      'if(!good.length)addLine(goodEl,"前年を上回る改善項目は現在の比較データからは確認できません。",true);if(!caution.length)addLine(cautionEl,"前年を下回る主要項目は現在の比較データからは確認できません。",true);'+
-      'if(c.salesYen&&c.salesYen.direction==="down")checks.push("売上低下に対して、客数と客単価のどちらの影響が大きいか確認してください。");if(c.customers&&c.customers.direction==="down")checks.push("客数の前年差について、曜日や天気との関係を確認してください。");if(c.customerUnitPrice&&c.customerUnitPrice.direction==="down")checks.push("客単価について、1人当たり買上点数と1点当たり売上の変化を確認してください。");if(c.wasteRate&&c.wasteRate.direction==="up")checks.push("廃棄率について、廃棄カテゴリの内訳を確認してください。");if(!checks.length)checks.push("現在の比較結果を継続して確認してください。");checks.forEach(function(t){addLine(checksEl,t,false);});'+
-      '};})();<\/script>';
-    html=html.replace('</body>',organizedScript+'</body>');
-
-    document.open();
-    document.write(html);
-    document.close();
-  }).catch(fail);
+var files=['insight_payload_v1_part01a.txt','insight_payload_v1_part01b.txt','insight_payload_v1_part02.txt','insight_payload_v1_part03.txt','insight_payload_v1_part04a.txt','insight_payload_v1_part04b.txt','insight_payload_v1_part05.txt','insight_payload_v1_part06.txt','insight_payload_v1_part07.txt'];
+function fail(e){document.body.innerHTML='<div style="padding:24px;font-family:-apple-system,sans-serif;color:#b42318">Insightの読み込みに失敗しました。<br><small>'+String(e&&e.message?e.message:e)+'</small></div>';}
+if(typeof pako==='undefined'){fail(new Error('展開ライブラリを読み込めませんでした'));return;}
+Promise.all(files.map(function(file){return fetch('./'+file+'?v=20260905-2',{cache:'no-store'}).then(function(r){if(!r.ok)throw new Error(file+' の取得に失敗しました ('+r.status+')');return r.text();});})).then(function(parts){
+var b64=parts.join('').replace(/\s/g,''),bin=atob(b64),bytes=new Uint8Array(bin.length);for(var i=0;i<bin.length;i++)bytes[i]=bin.charCodeAt(i);var html=pako.ungzip(bytes,{to:'string'});if(html.indexOf('<!DOCTYPE html>')!==0&&html.indexOf('<!doctype html>')!==0)throw new Error('HTMLデータの検証に失敗しました');
+html=html.replace('background:var(--surface);color:var(--text);box-shadow:0 6px 24px var(--shadow);','background:#1a1a1a;color:#fff;box-shadow:0 6px 24px var(--shadow);');
+html=html.replace('.ai-analysis-toggle svg{width:17px;height:17px;flex:none;}','.dark .ai-analysis-toggle{background:#fff;color:#1a1a1a;}');
+html=html.replace(/(<button id="aiAnalysisToggle"[\s\S]*?>)\s*<svg[\s\S]*?<\/svg>\s*経営分析AI/,'$1\n  経営分析AI');
+html=html.replace('position:fixed;right:18px;bottom:18px;z-index:10020;','position:fixed;right:18px;bottom:96px;z-index:10020;');
+html=html.replace('.ai-analysis-toggle{right:12px;bottom:12px;}','.ai-analysis-toggle{right:12px;bottom:90px;}');
+html=html.replace('body.ai-analysis-open #main{margin-right:390px;}\nbody.ai-analysis-open .ai-analysis-toggle{display:none;}','body.ai-analysis-open .ai-analysis-toggle{display:none;}\n.ai-analysis-backdrop{position:fixed;inset:0;z-index:10000;background:rgba(142,142,147,.18);opacity:0;pointer-events:none;transition:opacity .24s ease;}\nbody.ai-analysis-open .ai-analysis-backdrop{opacity:1;pointer-events:auto;}');
+html=html.replace('  body.ai-analysis-open #main{margin-right:0;}\n','');
+html=html.replace('<aside id="aiAnalysisPanel" class="ai-analysis-panel" aria-hidden="true" aria-label="経営分析AI">','<div id="aiAnalysisBackdrop" class="ai-analysis-backdrop" hidden aria-hidden="true" onclick="closeAIAnalysisPanel()"></div>\n<aside id="aiAnalysisPanel" class="ai-analysis-panel" aria-hidden="true" aria-label="経営分析AI">');
+html=html.replace("function openAIAnalysisPanel(){\n  renderAIAnalysisPanel();\n  document.body.classList.add('ai-analysis-open');\n  const panel=document.getElementById('aiAnalysisPanel');\n  const toggle=document.getElementById('aiAnalysisToggle');\n  if(panel)panel.setAttribute('aria-hidden','false');\n  if(toggle)toggle.setAttribute('aria-expanded','true');\n}","function openAIAnalysisPanel(){\n  renderAIAnalysisPanel();\n  document.body.classList.add('ai-analysis-open');\n  const panel=document.getElementById('aiAnalysisPanel');\n  const toggle=document.getElementById('aiAnalysisToggle');\n  const backdrop=document.getElementById('aiAnalysisBackdrop');\n  if(panel)panel.setAttribute('aria-hidden','false');\n  if(toggle)toggle.setAttribute('aria-expanded','true');\n  if(backdrop){backdrop.hidden=false;backdrop.setAttribute('aria-hidden','false');}\n}");
+html=html.replace("function closeAIAnalysisPanel(){\n  document.body.classList.remove('ai-analysis-open');\n  const panel=document.getElementById('aiAnalysisPanel');\n  const toggle=document.getElementById('aiAnalysisToggle');\n  if(panel)panel.setAttribute('aria-hidden','true');\n  if(toggle)toggle.setAttribute('aria-expanded','false');\n}","function closeAIAnalysisPanel(){\n  document.body.classList.remove('ai-analysis-open');\n  const panel=document.getElementById('aiAnalysisPanel');\n  const toggle=document.getElementById('aiAnalysisToggle');\n  const backdrop=document.getElementById('aiAnalysisBackdrop');\n  if(panel)panel.setAttribute('aria-hidden','true');\n  if(toggle)toggle.setAttribute('aria-expanded','false');\n  if(backdrop){backdrop.setAttribute('aria-hidden','true');backdrop.hidden=true;}\n}");
+html=html.replace('position:fixed;top:0;right:0;bottom:0;z-index:10010;\n  width:390px;max-width:42vw;background:var(--surface);color:var(--text);\n  border-left:1px solid var(--border);box-shadow:-8px 0 28px var(--shadow);','position:fixed;top:14px;right:14px;bottom:14px;z-index:10010;\n  width:390px;max-width:42vw;background:#f2f2f7;color:#1a1a1a;\n  --surface:#f2f2f7;--surface2:#fff;--border:#d1d1d6;--text:#1a1a1a;--text2:#3a3a3c;--text3:#636366;--text4:#8e8e93;--text5:#aeaeb2;\n  border:1px solid rgba(60,60,67,.16);border-radius:24px;box-shadow:0 14px 44px rgba(0,0,0,.22);');
+html=html.replace('  .ai-analysis-panel{width:min(390px,88vw);max-width:none;}','  .ai-analysis-panel{width:min(390px,88vw);max-width:none;top:12px;right:12px;bottom:12px;border-radius:22px;}');
+html=html.replace('  .ai-analysis-panel{width:92vw;}','  .ai-analysis-panel{width:calc(100vw - 24px);max-width:none;top:12px;right:12px;bottom:12px;border-radius:22px;}');
+html=html.replace('.ai-analysis-empty{font-size:12px;line-height:1.7;color:var(--text4);}', '.ai-analysis-empty{font-size:12px;line-height:1.7;color:var(--text4);}.ai-analysis-question-row{display:flex;gap:8px;align-items:flex-end}.ai-analysis-question-input{flex:1;min-width:0;min-height:38px;max-height:96px;resize:vertical;border:1px solid var(--border);border-radius:11px;background:var(--surface);color:var(--text);padding:9px 10px;font:500 12px/1.45 -apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;box-sizing:border-box;outline:none}.ai-analysis-question-input:focus{border-color:var(--text4)}.ai-analysis-question-send{height:38px;flex:none;border:0;border-radius:11px;background:#1a1a1a;color:#fff;padding:0 14px;font:700 12px/1 -apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;cursor:pointer}.ai-analysis-question-answer{margin-top:10px;padding:11px 12px;border-radius:11px;background:var(--surface);border:1px solid var(--border);font-size:12px;line-height:1.65;color:var(--text);white-space:pre-wrap}.ai-analysis-question-help{margin-top:8px;font-size:10px;line-height:1.5;color:var(--text4)}');
+html=html.replace('<div class="ai-analysis-card">\n      <div class="ai-analysis-card-title">経営コメント</div>\n      <div id="aiAnalysisComments"></div>\n    </div>','<div class="ai-analysis-card"><div class="ai-analysis-card-title">今月の要点</div><div id="aiAnalysisSummary"></div></div><div class="ai-analysis-card"><div class="ai-analysis-card-title">良い点</div><div id="aiAnalysisGood"></div></div><div class="ai-analysis-card"><div class="ai-analysis-card-title">注意点</div><div id="aiAnalysisCaution"></div></div><div class="ai-analysis-card"><div class="ai-analysis-card-title">確認事項</div><div id="aiAnalysisChecks"></div></div><div class="ai-analysis-card"><div class="ai-analysis-card-title">自由質問</div><div class="ai-analysis-question-row"><textarea id="aiAnalysisQuestion" class="ai-analysis-question-input" rows="1" placeholder="例：今月の問題点は？"></textarea><button class="ai-analysis-question-send" type="button" onclick="askAIAnalysisQuestion()">質問</button></div><div id="aiAnalysisAnswer" class="ai-analysis-question-answer" hidden></div><div class="ai-analysis-question-help">現在入力されているKPI・前年比較・廃棄データの範囲で回答します。</div></div>');
+var extra='<script>(function(){function C(){var m=typeof selMonth==="string"?selMonth:"",y=typeof baseYear!=="undefined"?baseYear:null,p=typeof cmpYear!=="undefined"?cmpYear:null,d=getAIAnalysisThroughDay(y,m),r=null;try{if(window.YearComparisonEngine&&y!=null&&m)r=window.YearComparisonEngine.getPeriod(y,m,d,p)}catch(e){}return r&&r.comparison?r.comparison:null}function A(l,x){return x&&x.pct!=null?l+"は前年比"+formatPctForComment(x)+"です。":l+"は比較できるデータがありません。"}function P(l,x){return x&&x.point!=null?l+"は前年差"+formatPointForComment(x)+"です。":l+"は比較できるデータがありません。"}window.buildAIQuestionAnswer=function(q){q=String(q||"").trim();if(!q)return"質問を入力してください。";var c=C();if(!c)return"前年比較に必要なデータが不足しているため、この質問にはまだ回答できません。";if(/廃棄|ロス/.test(q))return[A("廃棄額",c.wasteYen),P("廃棄率",c.wasteRate),c.wasteRate&&c.wasteRate.direction==="up"?"廃棄カテゴリの内訳を確認してください。":"現在の傾向を継続して確認してください。"].join("\\n");if(/客数|来店/.test(q))return[A("客数",c.customers),A("売上",c.salesYen),c.customers&&c.customers.direction==="down"?"曜日や天気との関係を確認してください。":""].filter(Boolean).join("\\n");if(/客単価/.test(q))return[A("客単価",c.customerUnitPrice),A("1人当たり買上点数",c.itemsPerCustomer),A("1点当たり売上",c.salesPerItem)].join("\\n");if(/買上|点数/.test(q))return[A("買上点数",c.items),A("1人当たり買上点数",c.itemsPerCustomer),A("1点当たり売上",c.salesPerItem)].join("\\n");if(/売上/.test(q))return[A("売上",c.salesYen),A("客数",c.customers),A("客単価",c.customerUnitPrice),c.salesYen&&c.salesYen.direction==="down"?"売上低下に対して、客数と客単価のどちらの影響が大きいか確認してください。":""].filter(Boolean).join("\\n");var arr=[],ms=[["売上",c.salesYen],["客数",c.customers],["客単価",c.customerUnitPrice],["買上点数",c.items],["1人当たり買上点数",c.itemsPerCustomer],["1点当たり売上",c.salesPerItem]];if(/良い|改善|伸び|上が/.test(q)){ms.forEach(function(v){if(v[1]&&v[1].direction==="up")arr.push(A(v[0],v[1]))});if(c.wasteYen&&c.wasteYen.direction==="down")arr.push(A("廃棄額",c.wasteYen));if(c.wasteRate&&c.wasteRate.direction==="down")arr.push(P("廃棄率",c.wasteRate));return arr.length?arr.join("\\n"):"前年と比べて明確に改善している主要項目は、現在の比較データからは確認できません。"}if(/問題|悪い|注意|課題|下が/.test(q)){ms.forEach(function(v){if(v[1]&&v[1].direction==="down")arr.push(A(v[0],v[1]))});if(c.wasteYen&&c.wasteYen.direction==="up")arr.push(A("廃棄額",c.wasteYen));if(c.wasteRate&&c.wasteRate.direction==="up")arr.push(P("廃棄率",c.wasteRate));return arr.length?arr.join("\\n"):"前年と比べて明確に悪化している主要項目は、現在の比較データからは確認できません。"}if(/確認|何を|見る|すべき/.test(q)){if(c.salesYen&&c.salesYen.direction==="down")arr.push("売上低下に対して、客数と客単価のどちらの影響が大きいか確認してください。");if(c.customers&&c.customers.direction==="down")arr.push("客数の前年差について、曜日や天気との関係を確認してください。");if(c.customerUnitPrice&&c.customerUnitPrice.direction==="down")arr.push("客単価について、1人当たり買上点数と1点当たり売上の変化を確認してください。");if(c.wasteRate&&c.wasteRate.direction==="up")arr.push("廃棄率について、廃棄カテゴリの内訳を確認してください。");return arr.length?arr.join("\\n"):"現在の比較結果を継続して確認してください。"}if(/前年|去年|比較|今月|全体|状況|どう/.test(q))return[A("売上",c.salesYen),A("客数",c.customers),A("客単価",c.customerUnitPrice),A("買上点数",c.items),A("廃棄額",c.wasteYen),P("廃棄率",c.wasteRate)].join("\\n");return"現在のローカル分析では、売上・客数・客単価・買上点数・廃棄・前年比較に関する質問に回答できます。\\n例：『今月の問題点は？』『廃棄は改善している？』『客数はどう？』"};window.askAIAnalysisQuestion=function(){var i=document.getElementById("aiAnalysisQuestion"),a=document.getElementById("aiAnalysisAnswer");if(!i||!a)return;a.textContent=window.buildAIQuestionAnswer(i.value);a.hidden=false};var old=window.renderAIAnalysisPanel;window.renderAIAnalysisPanel=function(){var period=document.getElementById("aiAnalysisPeriod"),s=document.getElementById("aiAnalysisSummary"),g=document.getElementById("aiAnalysisGood"),n=document.getElementById("aiAnalysisCaution"),k=document.getElementById("aiAnalysisChecks");if(!period||!s||!g||!n||!k){if(old)old();return}var m=typeof selMonth==="string"?selMonth:"",y=typeof baseYear!=="undefined"?baseYear:null,p=typeof cmpYear!=="undefined"?cmpYear:null,d=getAIAnalysisThroughDay(y,m),r=null,z=null;try{if(window.ManagementCommentEngine&&y!=null&&m)r=window.ManagementCommentEngine.getPeriod(y,m,d,p);if(window.YearComparisonEngine&&y!=null&&m)z=window.YearComparisonEngine.getPeriod(y,m,d,p)}catch(e){}period.textContent=[y?y+"年度":null,m||null,d?d+"日まで":null,p?"（前年差："+p+"年度）":null].filter(Boolean).join(" ")||"対象期間を取得できません";[s,g,n,k].forEach(function(e){e.innerHTML=""});function add(e,t,emp){var x=document.createElement("p");x.className=emp?"ai-analysis-empty":"ai-analysis-comment";x.textContent=t;e.appendChild(x)}var c=z&&z.comparison?z.comparison:null,cs=r&&Array.isArray(r.comments)?r.comments:[];if(!c){add(s,"前年比較に必要なデータが不足しているため、経営コメントを表示できません。",1);add(g,"比較できるデータがありません。",1);add(n,"比較できるデータがありません。",1);add(k,"入力済みデータと比較対象年度を確認してください。",1);return}cs.length?cs.forEach(function(t){add(s,t)}):add(s,"前年比較に必要なデータが不足しています。",1);var good=[],bad=[],chk=[],ms=[["売上",c.salesYen],["客数",c.customers],["客単価",c.customerUnitPrice],["買上点数",c.items],["1人当たり買上点数",c.itemsPerCustomer],["1点当たり売上",c.salesPerItem]];ms.forEach(function(v){if(!v[1]||v[1].pct==null)return;(v[1].direction==="up"?good:bad).push(A(v[0],v[1]))});if(c.wasteYen&&c.wasteYen.pct!=null)(c.wasteYen.direction==="down"?good:bad).push(A("廃棄額",c.wasteYen));if(c.wasteRate&&c.wasteRate.point!=null)(c.wasteRate.direction==="down"?good:bad).push(P("廃棄率",c.wasteRate));good.forEach(function(t){add(g,t)});bad.forEach(function(t){add(n,t)});if(!good.length)add(g,"前年を上回る改善項目は現在の比較データからは確認できません。",1);if(!bad.length)add(n,"前年を下回る主要項目は現在の比較データからは確認できません。",1);if(c.salesYen&&c.salesYen.direction==="down")chk.push("売上低下に対して、客数と客単価のどちらの影響が大きいか確認してください。");if(c.customers&&c.customers.direction==="down")chk.push("客数の前年差について、曜日や天気との関係を確認してください。");if(c.customerUnitPrice&&c.customerUnitPrice.direction==="down")chk.push("客単価について、1人当たり買上点数と1点当たり売上の変化を確認してください。");if(c.wasteRate&&c.wasteRate.direction==="up")chk.push("廃棄率について、廃棄カテゴリの内訳を確認してください。");if(!chk.length)chk.push("現在の比較結果を継続して確認してください。");chk.forEach(function(t){add(k,t)})};document.addEventListener("keydown",function(e){if(e.key==="Enter"&&!e.shiftKey&&e.target&&e.target.id==="aiAnalysisQuestion"){e.preventDefault();window.askAIAnalysisQuestion()}})})();<\/script>';
+html=html.replace('</body>',extra+'</body>');document.open();document.write(html);document.close();
+}).catch(fail);
 })();
 </script>
 </body>
