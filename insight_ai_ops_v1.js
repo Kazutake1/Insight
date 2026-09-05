@@ -37,6 +37,12 @@
     var limit=throughDay?Math.min(Number(throughDay)||0,rows.length):rows.length;
     return rows.slice(0,limit||rows.length);
   }
+  function getCurrentKPI(a){
+    try{
+      if(window.KPIEngine&&typeof window.KPIEngine.getPeriod==='function')return window.KPIEngine.getPeriod(a.context.year,a.context.month,a.context.throughDay);
+    }catch(e){}
+    return null;
+  }
   function getSalesYen(year,month,throughDay,rows){
     try{
       if(window.KPIEngine&&typeof window.KPIEngine.getPeriod==='function'){
@@ -145,6 +151,36 @@
     }
     return out;
   }
+  function currentOnlyLines(a){
+    var out=[];
+    var k=getCurrentKPI(a);
+    if(k){
+      if(num(k.salesYen)>0)out.push('売上は'+yen(k.salesYen)+'です。');
+      if(num(k.customers)>0)out.push('客数は'+Math.round(num(k.customers)).toLocaleString()+'人です。');
+      if(num(k.customerUnitPrice)>0)out.push('客単価は'+yen(k.customerUnitPrice)+'です。');
+      if(num(k.items)>0)out.push('買上点数は'+Math.round(num(k.items)).toLocaleString()+'点です。');
+      if(num(k.wasteYen)>0)out.push('廃棄額は'+yen(k.wasteYen)+'です。');
+      if(num(k.wasteRate)>0)out.push('廃棄率は'+pct(k.wasteRate)+'です。');
+    }
+    return out.concat(summaryLines(a));
+  }
+  function renderNoComparisonPanel(a){
+    var period=document.getElementById('aiAnalysisPeriod');
+    var summary=document.getElementById('aiAnalysisSummary');
+    var good=document.getElementById('aiAnalysisGood');
+    var caution=document.getElementById('aiAnalysisCaution');
+    var checks=document.getElementById('aiAnalysisChecks');
+    if(period)period.textContent=[a.context.year!=null?a.context.year+'年度':null,a.context.month||null,a.context.throughDay?a.context.throughDay+'日まで':null,'（前年比較なし）'].filter(Boolean).join(' ');
+    [summary,good,caution,checks].forEach(function(el){if(el)el.innerHTML='';});
+    var lines=currentOnlyLines(a);
+    if(lines.length)lines.forEach(function(t){addLine(summary,t,false);});
+    else addLine(summary,'この期間の入力済みデータはまだありません。',true);
+    addLine(good,'前年比較なしのため、前年との差による改善判定は行っていません。',true);
+    addLine(caution,'前年比較なしのため、前年との差による注意判定は行っていません。',true);
+    var k=checkLines(a);
+    if(k.length)k.forEach(function(t){addLine(checks,t,false);});
+    else addLine(checks,'現在の入力データを確認してください。',true);
+  }
   function integratePanel(){
     var a=buildAnalysis();
     var summary=document.getElementById('aiAnalysisSummary');
@@ -194,6 +230,22 @@
     out.push('メモの内容と数値変化の因果関係は断定せず、該当日の売上・客数などと照合してください。');
     return out.join('\n');
   }
+  function currentOnlyAnswer(q,a){
+    var k=getCurrentKPI(a);
+    if(/前年|去年|比較|前年差|前年比/.test(q))return '前年比較は「なし」に設定されています。現在のAIは前年データを使用していません。比較する場合は比較対象年度を選択してください。';
+    if(!k){
+      var fallback=currentOnlyLines(a);
+      return fallback.length?fallback.join('\n'):'この期間の入力済みデータはまだありません。';
+    }
+    if(/廃棄|ロス/.test(q))return num(k.wasteYen)>0?'廃棄額は'+yen(k.wasteYen)+(num(k.wasteRate)>0?'、廃棄率は'+pct(k.wasteRate):'')+'です。':'この期間の廃棄データはまだありません。';
+    if(/客数|来店/.test(q))return num(k.customers)>0?'客数は'+Math.round(num(k.customers)).toLocaleString()+'人です。':'この期間の客数データはまだありません。';
+    if(/客単価/.test(q))return num(k.customerUnitPrice)>0?'客単価は'+yen(k.customerUnitPrice)+'です。':'この期間の客単価を計算できるデータがありません。';
+    if(/買上|点数/.test(q))return num(k.items)>0?'買上点数は'+Math.round(num(k.items)).toLocaleString()+'点です。':'この期間の買上点数データはまだありません。';
+    if(/売上/.test(q))return num(k.salesYen)>0?'売上は'+yen(k.salesYen)+'です。':'この期間の売上データはまだありません。';
+    var lines=currentOnlyLines(a);
+    if(lines.length)lines.push('前年比較は「なし」のため、前年比・前年差による評価は行っていません。');
+    return lines.length?lines.join('\n'):'この期間の入力済みデータはまだありません。';
+  }
   function extraByIntent(q,a){
     var lines=[];
     if(/良い|改善|伸び|上が/.test(q))lines=goodLines(a);
@@ -204,6 +256,8 @@
   }
   var oldRender=window.renderAIAnalysisPanel;
   window.renderAIAnalysisPanel=function(){
+    var a=buildAnalysis();
+    if(a.context.prevYear==null){renderNoComparisonPanel(a);return;}
     if(typeof oldRender==='function')oldRender.apply(this,arguments);
     integratePanel();
   };
@@ -212,10 +266,12 @@
     q=String(q||'').trim();
     if(!q)return '質問を入力してください。';
     var a=buildAnalysis();
+    if(a.context.prevYear==null&&/前年|去年|比較|前年差|前年比/.test(q))return currentOnlyAnswer(q,a);
     if(/人件費|人件費率|労務費|労働コスト/.test(q))return laborAnswer(a);
     if(/粗利|荒利|利益率/.test(q))return grossMarginAnswer(a);
     if(/欠品|品切れ/.test(q))return stockoutAnswer(a);
     if(/店舗メモ|メモ|出来事|イベント|故障|大量注文/.test(q))return memoAnswer(a);
+    if(a.context.prevYear==null)return currentOnlyAnswer(q,a);
     var base=typeof oldBuild==='function'?oldBuild(q):'';
     var extra=extraByIntent(q,a);
     if(extra.length)return (base?base+'\n\n':'')+'追加データ：\n'+extra.join('\n');
