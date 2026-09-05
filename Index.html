@@ -76,6 +76,34 @@ html,body{margin:0;width:100%;height:100%;background:#eef0f5;font-family:-apple-
       '  .ai-analysis-panel{width:calc(100vw - 24px);max-width:none;top:12px;right:12px;bottom:12px;border-radius:22px;}'
     );
 
+    /* 経営分析AIパネル内を4区分に整理（既存比較データのみ使用） */
+    html=html.replace(
+      '<div class="ai-analysis-card">\n      <div class="ai-analysis-card-title">経営コメント</div>\n      <div id="aiAnalysisComments"></div>\n    </div>',
+      '<div class="ai-analysis-card">\n      <div class="ai-analysis-card-title">今月の要点</div>\n      <div id="aiAnalysisSummary"></div>\n    </div>\n    <div class="ai-analysis-card">\n      <div class="ai-analysis-card-title">良い点</div>\n      <div id="aiAnalysisGood"></div>\n    </div>\n    <div class="ai-analysis-card">\n      <div class="ai-analysis-card-title">注意点</div>\n      <div id="aiAnalysisCaution"></div>\n    </div>\n    <div class="ai-analysis-card">\n      <div class="ai-analysis-card-title">確認事項</div>\n      <div id="aiAnalysisChecks"></div>\n    </div>'
+    );
+
+    var organizedScript = '<script>(function(){'+
+      'window.renderAIAnalysisPanel=function(){'+
+      'var periodEl=document.getElementById("aiAnalysisPeriod"),summaryEl=document.getElementById("aiAnalysisSummary"),goodEl=document.getElementById("aiAnalysisGood"),cautionEl=document.getElementById("aiAnalysisCaution"),checksEl=document.getElementById("aiAnalysisChecks");'+
+      'if(!periodEl||!summaryEl||!goodEl||!cautionEl||!checksEl)return;'+
+      'var month=typeof selMonth==="string"?selMonth:"",year=typeof baseYear!=="undefined"?baseYear:null,compare=typeof cmpYear!=="undefined"?cmpYear:null,throughDay=getAIAnalysisThroughDay(year,month),result=null,yoy=null;'+
+      'try{if(window.ManagementCommentEngine&&year!=null&&month)result=window.ManagementCommentEngine.getPeriod(year,month,throughDay,compare);if(window.YearComparisonEngine&&year!=null&&month)yoy=window.YearComparisonEngine.getPeriod(year,month,throughDay,compare);}catch(e){result=null;yoy=null;}'+
+      'periodEl.textContent=[year?year+"年度":null,month||null,throughDay?throughDay+"日まで":null,compare?"（前年差："+compare+"年度）":null].filter(Boolean).join(" ")||"対象期間を取得できません";'+
+      '[summaryEl,goodEl,cautionEl,checksEl].forEach(function(el){el.innerHTML="";});'+
+      'function addLine(el,text,empty){var p=document.createElement("p");p.className=empty?"ai-analysis-empty":"ai-analysis-comment";p.textContent=text;el.appendChild(p);}'+
+      'var comments=result&&Array.isArray(result.comments)?result.comments:[],c=yoy&&yoy.comparison?yoy.comparison:null;'+
+      'if(!c){addLine(summaryEl,"前年比較に必要なデータが不足しているため、経営コメントを表示できません。",true);addLine(goodEl,"比較できるデータがありません。",true);addLine(cautionEl,"比較できるデータがありません。",true);addLine(checksEl,"入力済みデータと比較対象年度を確認してください。",true);return;}'+
+      'if(comments.length)comments.forEach(function(t){addLine(summaryEl,t,false);});else addLine(summaryEl,"前年比較に必要なデータが不足しています。",true);'+
+      'var good=[],caution=[],checks=[],metrics=[["売上",c.salesYen],["客数",c.customers],["客単価",c.customerUnitPrice],["買上点数",c.items],["1人当たり買上点数",c.itemsPerCustomer],["1点当たり売上",c.salesPerItem]];'+
+      'metrics.forEach(function(m){var label=m[0],change=m[1];if(!change||change.pct==null)return;var value=formatPctForComment(change);if(change.direction==="up")good.push(label+"は前年比"+value+"です。");else if(change.direction==="down")caution.push(label+"は前年比"+value+"です。");});'+
+      'if(c.wasteYen&&c.wasteYen.pct!=null){var wv=formatPctForComment(c.wasteYen);if(c.wasteYen.direction==="down")good.push("廃棄額は前年比"+wv+"です。");else if(c.wasteYen.direction==="up")caution.push("廃棄額は前年比"+wv+"です。");}'+
+      'if(c.wasteRate&&c.wasteRate.point!=null){var wr=formatPointForComment(c.wasteRate);if(c.wasteRate.direction==="down")good.push("廃棄率は前年差"+wr+"です。");else if(c.wasteRate.direction==="up")caution.push("廃棄率は前年差"+wr+"です。");}'+
+      'good.forEach(function(t){addLine(goodEl,t,false);});caution.forEach(function(t){addLine(cautionEl,t,false);});'+
+      'if(!good.length)addLine(goodEl,"前年を上回る改善項目は現在の比較データからは確認できません。",true);if(!caution.length)addLine(cautionEl,"前年を下回る主要項目は現在の比較データからは確認できません。",true);'+
+      'if(c.salesYen&&c.salesYen.direction==="down")checks.push("売上低下に対して、客数と客単価のどちらの影響が大きいか確認してください。");if(c.customers&&c.customers.direction==="down")checks.push("客数の前年差について、曜日や天気との関係を確認してください。");if(c.customerUnitPrice&&c.customerUnitPrice.direction==="down")checks.push("客単価について、1人当たり買上点数と1点当たり売上の変化を確認してください。");if(c.wasteRate&&c.wasteRate.direction==="up")checks.push("廃棄率について、廃棄カテゴリの内訳を確認してください。");if(!checks.length)checks.push("現在の比較結果を継続して確認してください。");checks.forEach(function(t){addLine(checksEl,t,false);});'+
+      '};})();<\/script>';
+    html=html.replace('</body>',organizedScript+'</body>');
+
     document.open();
     document.write(html);
     document.close();
