@@ -1,4 +1,12 @@
 (function(){
+  var aiButtonStyle=document.getElementById('aiCircularButtonStyle');
+  if(!aiButtonStyle){
+    aiButtonStyle=document.createElement('style');
+    aiButtonStyle.id='aiCircularButtonStyle';
+    aiButtonStyle.textContent='.ai-analysis-toggle{width:64px!important;min-width:64px!important;max-width:64px!important;height:64px!important;padding:0 4px!important;border-radius:50%!important;display:flex!important;align-items:center!important;justify-content:center!important;gap:0!important;text-align:center!important;white-space:normal!important;line-height:1.15!important;font-size:10px!important;font-weight:800!important;overflow:hidden!important;}';
+    document.head.appendChild(aiButtonStyle);
+  }
+
   function getMonthlyOps(year,month){
     var y=String(year!=null?year:(typeof baseYear!=='undefined'?baseYear:''));
     var m=month||(typeof selMonth!=='undefined'?selMonth:'');
