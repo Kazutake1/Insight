@@ -102,3 +102,12 @@
   script.async=false;
   document.head.appendChild(script);
 })();
+
+(function(){
+  if(document.getElementById('insightBackupGuardV1'))return;
+  var script=document.createElement('script');
+  script.id='insightBackupGuardV1';
+  script.src='./insight_backup_guard_v1.js?v=20260905-1';
+  script.async=false;
+  document.head.appendChild(script);
+})();
