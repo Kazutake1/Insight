@@ -67,8 +67,8 @@
     }
     var labor=Number(current.laborCostYen)||0;
     var gm=Number(current.grossMarginRate)||0;
-    var laborCmp=prev?comparisonPct(labor,prev.laborCostYen):null;
-    var gmCmp=prev?grossMarginPoint(gm,prev.grossMarginRate):null;
+    var laborCmp=labor>0&&prev?comparisonPct(labor,prev.laborCostYen):null;
+    var gmCmp=gm>0&&prev?grossMarginPoint(gm,prev.grossMarginRate):null;
     var prevLabel=(typeof cmpYear!=='undefined'&&cmpYear!=null)?String(cmpYear)+'年比':'前年比';
     row.appendChild(makeCard('labor','人件費',labor?Math.round(labor/1000).toLocaleString()+'<span class="kpi-unit">千円</span>':'—',laborCmp,prevLabel));
     row.appendChild(makeCard('grossMargin','粗利率',gm?gm.toFixed(1)+'<span class="kpi-unit">%</span>':'—',gmCmp,prevLabel));
