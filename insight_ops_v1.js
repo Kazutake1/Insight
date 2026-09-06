@@ -92,15 +92,31 @@
     var d=ensureMonthlyOps(baseYear,selMonth);
     if(type==="labor"){
       var current=Number(d.laborCostYen)||0;
-      var entered=window.prompt(baseYear+'年 '+selMonth+'の人件費（円）を入力してください。',current?String(current):'');
+      var entered=window.prompt(baseYear+'年 '+selMonth+'の人件費（円）を入力してください。\n削除する場合は入力欄を空にして「OK」を押してください。',current?String(current):'');
       if(entered===null)return;
+      if(String(entered).trim()===''){
+        if(!current)return;
+        if(!window.confirm(baseYear+'年 '+selMonth+'の人件費データを削除します。\nこの操作は元に戻せません。よろしいですか？'))return;
+        delete d.laborCostYen;
+        persist();
+        renderMonthlyOpsKpis();
+        return;
+      }
       var labor=parseInt(String(entered).replace(/[,，\s]/g,''),10);
       if(!Number.isFinite(labor)||labor<0){window.alert('人件費は0以上の数字で入力してください。');return;}
       d.laborCostYen=labor;
     }else if(type==="grossMargin"){
       var currentRate=Number(d.grossMarginRate)||0;
-      var enteredRate=window.prompt(baseYear+'年 '+selMonth+'の粗利率（%）を入力してください。',currentRate?String(currentRate):'');
+      var enteredRate=window.prompt(baseYear+'年 '+selMonth+'の粗利率（%）を入力してください。\n削除する場合は入力欄を空にして「OK」を押してください。',currentRate?String(currentRate):'');
       if(enteredRate===null)return;
+      if(String(enteredRate).trim()===''){
+        if(!currentRate)return;
+        if(!window.confirm(baseYear+'年 '+selMonth+'の粗利率データを削除します。\nこの操作は元に戻せません。よろしいですか？'))return;
+        delete d.grossMarginRate;
+        persist();
+        renderMonthlyOpsKpis();
+        return;
+      }
       var gm=parseFloat(String(enteredRate).replace(/[%％\s]/g,''));
       if(!Number.isFinite(gm)||gm<0||gm>100){window.alert('粗利率は0〜100の数字で入力してください。');return;}
       d.grossMarginRate=gm;
