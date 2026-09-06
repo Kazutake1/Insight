@@ -84,7 +84,7 @@
     var laborCmp=prev?comparisonPct(labor,prev.laborCostYen):null;
     var gmCmp=prev?grossMarginPoint(gm,prev.grossMarginRate):null;
     var prevLabel=(typeof cmpYear!=="undefined"&&cmpYear!=null)?String(cmpYear)+"年比":"前年比";
-    row.appendChild(createMonthlyKpiCard("labor","人件費",labor?'¥'+labor.toLocaleString():'—',laborCmp,prevLabel));
+    row.appendChild(createMonthlyKpiCard("labor","人件費",labor?Math.round(labor/1000).toLocaleString()+'<span class="kpi-unit">千円</span>':'—',laborCmp,prevLabel));
     row.appendChild(createMonthlyKpiCard("grossMargin","粗利率",gm?gm.toFixed(1)+'<span class="kpi-unit">%</span>':'—',gmCmp,prevLabel));
   }
 
