@@ -22,11 +22,8 @@
     wrap.id="opsDailyWrap";
     wrap.className="quick-section wide";
     var memo=String(r.storeMemo||"").replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/"/g,"&quot;");
-    var so=r.stockout||"なし";
-    wrap.innerHTML='<div class="qs-title">店舗状況</div><div class="ops-daily-wrap"><div class="ops-field-card"><div class="ops-field-title">店舗メモ</div><textarea id="qi_storeMemo" class="ops-memo" placeholder="例：近隣イベント、大量注文、機器故障など">'+memo+'</textarea></div><div class="ops-field-card"><div class="ops-field-title">欠品</div><select id="qi_stockout" class="ops-stockout"><option value="なし">なし</option><option value="少ない">少ない</option><option value="多い">多い</option></select></div></div>';
+    wrap.innerHTML='<div class="qs-title">店舗状況</div><div class="ops-daily-wrap"><div class="ops-field-card" style="grid-column:1/-1"><div class="ops-field-title">店舗メモ</div><textarea id="qi_storeMemo" class="ops-memo" placeholder="例：近隣イベント、大量注文、機器故障など">'+memo+'</textarea></div></div>';
     grid.appendChild(wrap);
-    var sel=document.getElementById("qi_stockout");
-    if(sel)sel.value=so;
   }
 
   var oldRenderQuick=window.renderQuickPage||renderQuickPage;
@@ -34,13 +31,12 @@
 
   var oldSaveQuick=window.saveQuick||saveQuick;
   window.saveQuick=function(){
-    var memoEl=document.getElementById("qi_storeMemo"),stockEl=document.getElementById("qi_stockout");
-    var memo=memoEl?memoEl.value:"",stock=stockEl?stockEl.value:"なし";
+    var memoEl=document.getElementById("qi_storeMemo");
+    var memo=memoEl?memoEl.value:"";
     oldSaveQuick.apply(this,arguments);
     var fy=todayInfo.fy,m=todayInfo.month,rows=store.data[fy][m],ri=quickEditDay-1;
     if(!rows[ri])rows[ri]=blankRow(quickEditDay);
     rows[ri].storeMemo=memo;
-    rows[ri].stockout=stock;
     persist();
   };
 

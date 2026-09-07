@@ -52,18 +52,11 @@
     }catch(e){}
     return (rows||[]).reduce(function(sum,row){return sum+num(row&&row['売上'])*1000;},0);
   }
-  function statusSummary(rows){
-    var out={recorded:0,none:0,few:0,many:0,manyDays:[],memos:[]};
+  function memoSummary(rows){
+    var out={memos:[]};
     (rows||[]).forEach(function(row,index){
       if(!row)return;
       var day=num(row['日'])||index+1;
-      var s=String(row.stockout||'');
-      if(s==='なし'||s==='少ない'||s==='多い'){
-        out.recorded++;
-        if(s==='なし')out.none++;
-        if(s==='少ない')out.few++;
-        if(s==='多い'){out.many++;out.manyDays.push(day);}
-      }
       var memo=String(row.storeMemo||'').trim();
       if(memo)out.memos.push({day:day,text:memo});
     });
@@ -90,7 +83,7 @@
       laborCostChange:completed&&prevLabor>0&&labor>0?(labor-prevLabor)/prevLabor*100:null,
       laborRatePoint:laborRate!=null&&prevLaborRate!=null?laborRate-prevLaborRate:null,
       grossMarginRate:gm,prevGrossMarginRate:prevGm,grossMarginPoint:completed&&gm>0&&prevGm>0?gm-prevGm:null,
-      status:statusSummary(rows),prevStatus:statusSummary(prevRows)
+      status:memoSummary(rows),prevStatus:memoSummary(prevRows)
     };
   }
   function addLine(el,text,empty){
@@ -115,7 +108,6 @@
       if(a.grossMarginPoint!=null)g+='、前年差'+signedPt(a.grossMarginPoint);
       out.push(g+'です。');
     }
-    if(a.status.recorded>0)out.push('欠品記録は'+a.status.recorded+'日分で、「多い」'+a.status.many+'日、「少ない」'+a.status.few+'日です。');
     if(a.status.memos.length>0)out.push('店舗メモは'+a.status.memos.length+'件記録されています。');
     return out;
   }
@@ -123,28 +115,18 @@
     var out=[];
     if(a.laborRatePoint!=null&&a.laborRatePoint<0)out.push('人件費率は前年差'+signedPt(a.laborRatePoint)+'で低下しています。');
     if(a.grossMarginPoint!=null&&a.grossMarginPoint>0)out.push('粗利率は前年差'+signedPt(a.grossMarginPoint)+'で改善しています。');
-    if(a.prevStatus.recorded>0&&a.status.recorded>0&&a.status.many<a.prevStatus.many)out.push('欠品「多い」の記録は前年同期間より'+(a.prevStatus.many-a.status.many)+'日減っています。');
     return out;
   }
   function cautionLines(a){
     var out=[];
     if(a.laborRatePoint!=null&&a.laborRatePoint>0)out.push('人件費率は前年差'+signedPt(a.laborRatePoint)+'で上昇しています。');
     if(a.grossMarginPoint!=null&&a.grossMarginPoint<0)out.push('粗利率は前年差'+signedPt(a.grossMarginPoint)+'で低下しています。');
-    if(a.status.many>0){
-      var s='欠品「多い」が'+a.status.many+'日記録されています。';
-      if(a.prevStatus.recorded>0){
-        var diff=a.status.many-a.prevStatus.many;
-        if(diff!==0)s+=' 前年同期間比'+(diff>0?'+':'')+diff+'日です。';
-      }
-      out.push(s);
-    }
     return out;
   }
   function checkLines(a){
     var out=[];
     if(a.laborRatePoint!=null&&a.laborRatePoint>0)out.push('人件費率の上昇について、人件費の増加と売上の変化のどちらの影響が大きいか確認してください。');
     if(a.grossMarginPoint!=null&&a.grossMarginPoint<0)out.push('粗利率低下の要因を確認してください。');
-    if(a.status.manyDays.length>0)out.push('欠品「多い」の記録日（'+a.status.manyDays.join('日、')+'日）について、売上・客数との関係を確認してください。');
     if(a.status.memos.length>0){
       var memoText=a.status.memos.slice(0,3).map(function(m){var t=m.text.length>38?m.text.slice(0,38)+'…':m.text;return m.day+'日「'+t+'」';}).join(' / ');
       out.push('店舗メモ：'+memoText+(a.status.memos.length>3?' ほか'+(a.status.memos.length-3)+'件':'')+'。数値変化の背景確認に利用してください。');
@@ -214,14 +196,6 @@
     if(a.grossMarginPoint!=null)out.push('前年差は'+signedPt(a.grossMarginPoint)+'です。');
     return out.join('\n');
   }
-  function stockoutAnswer(a){
-    if(a.status.recorded<=0)return 'この期間の欠品記録はまだありません。';
-    var out=['欠品記録は'+a.status.recorded+'日分で、「多い」'+a.status.many+'日、「少ない」'+a.status.few+'日です。'];
-    if(a.prevStatus.recorded>0)out.push('「多い」の記録は前年同期間'+a.prevStatus.many+'日に対して、今年は'+a.status.many+'日です。');
-    if(a.status.manyDays.length)out.push('「多い」の記録日：'+a.status.manyDays.join('日、')+'日。');
-    out.push('欠品が売上に与えた影響は、この記録だけでは断定できません。該当日の売上・客数と併せて確認してください。');
-    return out.join('\n');
-  }
   function memoAnswer(a){
     if(!a.status.memos.length)return 'この期間の店舗メモはまだありません。';
     var out=['店舗メモは'+a.status.memos.length+'件あります。'];
@@ -269,7 +243,6 @@
     if(a.context.prevYear==null&&/前年|去年|比較|前年差|前年比/.test(q))return currentOnlyAnswer(q,a);
     if(/人件費|人件費率|労務費|労働コスト/.test(q))return laborAnswer(a);
     if(/粗利|荒利|利益率/.test(q))return grossMarginAnswer(a);
-    if(/欠品|品切れ/.test(q))return stockoutAnswer(a);
     if(/店舗メモ|メモ|出来事|イベント|故障|大量注文/.test(q))return memoAnswer(a);
     if(a.context.prevYear==null)return currentOnlyAnswer(q,a);
     var base=typeof oldBuild==='function'?oldBuild(q):'';
@@ -278,6 +251,6 @@
     return base||'現在入力されているデータの範囲で回答します。';
   };
   var help=document.querySelector('.ai-analysis-question-help');
-  if(help)help.textContent='現在入力されているKPI・前年比較・廃棄・人件費・粗利率・欠品・店舗メモの範囲で回答します。';
+  if(help)help.textContent='現在入力されているKPI・前年比較・廃棄・人件費・粗利率・店舗メモの範囲で回答します。';
   window.ManagementOpsAnalysis={getCurrent:buildAnalysis};
 })();

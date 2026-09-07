@@ -54,7 +54,7 @@
   window.clearKyakuMonth=function(){
     var y=editYear.kyaku,m=editMonth.kyaku;
     var storeName=store.name;
-    if(!confirm(storeName+' の '+m+'（'+y+'年）の客数データだけを全て削除します。\n売上・買上点数・廃棄・店舗メモ・欠品・天気は残ります。\n\nこの操作は元に戻せません。よろしいですか？'))return;
+    if(!confirm(storeName+' の '+m+'（'+y+'年）の客数データだけを全て削除します。\n売上・買上点数・廃棄・店舗メモ・天気は残ります。\n\nこの操作は元に戻せません。よろしいですか？'))return;
     if(!store.data[y]||!store.data[y][m])return;
     store.data[y][m].forEach(function(row){if(row)row.客数=0;});
     persist();
@@ -68,7 +68,7 @@
     var day=Number(typeof quickEditDay!=='undefined'?quickEditDay:t.day)||t.day;
     var storeName=store.name;
     var targetLabel=day===t.day?'本日（'+t.month+day+'日）':t.month+day+'日';
-    if(!confirm(storeName+' の '+targetLabel+'の入力データを削除します。\n売上・客数・買上点数・廃棄・店舗メモ・欠品をクリアし、天気は保持します。\n\nこの操作は元に戻せません。よろしいですか？'))return;
+    if(!confirm(storeName+' の '+targetLabel+'の入力データを削除します。\n売上・客数・買上点数・廃棄・店舗メモをクリアし、天気は保持します。\n\nこの操作は元に戻せません。よろしいですか？'))return;
     if(!store.data[t.fy]||!store.data[t.fy][t.month])return;
     var ri=day-1,row=store.data[t.fy][t.month][ri];
     if(row){
@@ -78,7 +78,6 @@
       row.廃棄金額=0;
       row.haiki=blankHaiki();
       delete row.storeMemo;
-      delete row.stockout;
     }
     persist();
     initQuickPage();

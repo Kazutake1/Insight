@@ -98,7 +98,7 @@
   if(document.getElementById('insightAiOpsV1'))return;
   var script=document.createElement('script');
   script.id='insightAiOpsV1';
-  script.src='./insight_ai_ops_v1.js?v=20260905-4';
+  script.src='./insight_ai_ops_v1.js?v=20260907-1';
   script.async=false;
   document.head.appendChild(script);
 })();
@@ -108,15 +108,6 @@
   var script=document.createElement('script');
   script.id='insightBackupGuardV1';
   script.src='./insight_backup_guard_v1.js?v=20260905-1';
-  script.async=false;
-  document.head.appendChild(script);
-})();
-
-(function(){
-  if(document.getElementById('insightStockoutFixV1'))return;
-  var script=document.createElement('script');
-  script.id='insightStockoutFixV1';
-  script.src='./insight_stockout_fix_v1.js?v=20260905-1';
   script.async=false;
   document.head.appendChild(script);
 })();
