@@ -227,3 +227,13 @@
   script.async=false;
   document.head.appendChild(script);
 })();
+
+(function(){
+  'use strict';
+  if(document.getElementById('insightSalesInsightsV1Script'))return;
+  var script=document.createElement('script');
+  script.id='insightSalesInsightsV1Script';
+  script.src='./insight_sales_insights_v1.js?v=20260922-1';
+  script.async=false;
+  document.head.appendChild(script);
+})();
