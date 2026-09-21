@@ -213,7 +213,7 @@
   if(document.getElementById('insightDashboardYearFixV1Script'))return;
   var script=document.createElement('script');
   script.id='insightDashboardYearFixV1Script';
-  script.src='./insight_dashboard_year_fix_v1.js?v=20260921-1';
+  script.src='./insight_dashboard_year_fix_v1.js?v=20260921-2';
   script.async=false;
   document.head.appendChild(script);
 })();
