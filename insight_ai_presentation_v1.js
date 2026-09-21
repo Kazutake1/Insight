@@ -50,3 +50,13 @@
 
   applyPresentation();
 })();
+
+/* 廃棄入力ページ専用の追加表示。既存の分析AIの挙動は変更しない。 */
+(function(){
+  if(document.getElementById('insightHaikiInputAnalysisV1'))return;
+  var script=document.createElement('script');
+  script.id='insightHaikiInputAnalysisV1';
+  script.src='./insight_haiki_input_analysis_v1.js?v=20260921-1';
+  script.async=false;
+  document.head.appendChild(script);
+})();
