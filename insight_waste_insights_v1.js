@@ -3,7 +3,7 @@
   'use strict';
   if(window.__insightWasteInsightsV1)return;
   window.__insightWasteInsightsV1=true;
-  var chart=null,mode='amount';
+  var chart=null,mode='amount',increaseMode='amount';
   var style=document.createElement('style');
   style.id='insightWasteInsightsStyle';
   style.textContent=`
@@ -33,6 +33,9 @@
     #iwcRow .iwc-rank-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:9px;flex:1;min-height:0;}
     #iwcRow .iwc-rank{min-width:0;min-height:0;overflow:hidden;border:1px solid var(--border);border-radius:8px;padding:4px 6px;}
     #iwcRow .iwc-rank-title{font-size:9px;font-weight:750;white-space:nowrap;color:var(--text);margin-bottom:2px;}
+    #iwcRow .iwc-increase-head{display:flex;align-items:center;justify-content:space-between;gap:4px;min-width:0;}
+    #iwcRow .iwc-increase-head>span{min-width:0;overflow:hidden;text-overflow:ellipsis;}
+    #iwcRow .iwc-increase-head .iwc-switch button{padding:2px 4px;font-size:8px;}
     #iwcRow .iwc-rank-line{display:flex;align-items:center;gap:4px;justify-content:space-between;font-size:9px;line-height:1.25;min-width:0;padding:2px 0;border-top:1px solid var(--border2);}
     #iwcRow .iwc-rank-name{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:var(--text3);}
     #iwcRow .iwc-rank-value{flex-shrink:0;font-weight:750;color:var(--text);white-space:nowrap;}
@@ -117,9 +120,9 @@
       var cur=c.compareCurrent[i],old=c.comparePrevious[i],diff=cur-old;
       return {name:name,index:i,increase:true,diff:diff,
         title:'前年 '+yen(old)+' → 今年 '+yen(cur)+' / 増加額 '+yen(diff)+(old>0?' / 増加率 +'+(diff/old*100).toFixed(1)+'%':' / 前年0円：増加率算出不可'),
-        display:'+'+yen(diff)+(old>0?' (+'+(diff/old*100).toFixed(1)+'%)':' (前年0円)')};
+        displayAmount:'+'+yen(diff),displayPercent:old>0?'+'+(diff/old*100).toFixed(1)+'%':'前年0円'};
     }).filter(function(item){return item.diff>0;}).sort(function(a,b){return b.diff-a.diff||a.index-b.index;});}
-    ranks('iwcIncrease',rising,function(item){return item.display;},prevOK?(curOK?'増加カテゴリなし':'当年データなし'):'前年の比較データなし');
+    ranks('iwcIncrease',rising,function(item){return increaseMode==='amount'?item.displayAmount:item.displayPercent;},prevOK?(curOK?'増加カテゴリなし':'当年データなし'):'前年の比較データなし');
   }
   function syncHeight(){
     var bar=document.getElementById('haikiChartCard'),row=document.getElementById('iwcRow');if(!bar||!row)return;
@@ -132,12 +135,19 @@
     if(document.getElementById('iwcRow'))return true;
     var row=el('div');row.id='iwcRow';
     row.innerHTML=`<section class="iwc-card" aria-label="廃棄内訳"><div class="iwc-head"><div><div class="iwc-title">廃棄内訳</div><div class="iwc-sub" id="iwcMonth">月合計（保存済み）</div></div><div class="iwc-switch"><button type="button" data-iwc-mode="amount" class="active">金額</button><button type="button" data-iwc-mode="percent">割合</button></div></div><div class="iwc-donut-inner"><div class="iwc-donut-wrap"><canvas id="iwcDonut" role="img" aria-label="カテゴリ別廃棄内訳"></canvas></div><div id="iwcLegend" class="iwc-legends"></div></div></section>
-    <section class="iwc-card" aria-label="廃棄分析"><div class="iwc-head"><div class="iwc-title">廃棄分析</div><div class="iwc-sub" id="iwcAnalysisSub"></div></div><div class="iwc-kpis"><div class="iwc-kpi"><div class="iwc-kpi-label">廃棄額</div><div id="iwcWasteAmount" class="iwc-kpi-value">—</div></div><div class="iwc-kpi"><div class="iwc-kpi-label">廃棄率</div><div id="iwcWasteRate" class="iwc-kpi-value">—</div></div><div class="iwc-kpi"><div class="iwc-kpi-label">前年比</div><div id="iwcWasteYoy" class="iwc-kpi-value">—</div></div></div><div class="iwc-rank-grid"><div class="iwc-rank"><div class="iwc-rank-title">構成比カテゴリ上位3項目</div><div id="iwcShare"></div></div><div class="iwc-rank"><div class="iwc-rank-title">廃棄額増加 上位3カテゴリ</div><div id="iwcIncrease"></div></div></div></section>`;
+    <section class="iwc-card" aria-label="廃棄分析"><div class="iwc-head"><div class="iwc-title">廃棄分析</div><div class="iwc-sub" id="iwcAnalysisSub"></div></div><div class="iwc-kpis"><div class="iwc-kpi"><div class="iwc-kpi-label">廃棄額</div><div id="iwcWasteAmount" class="iwc-kpi-value">—</div></div><div class="iwc-kpi"><div class="iwc-kpi-label">廃棄率</div><div id="iwcWasteRate" class="iwc-kpi-value">—</div></div><div class="iwc-kpi"><div class="iwc-kpi-label">前年比</div><div id="iwcWasteYoy" class="iwc-kpi-value">—</div></div></div><div class="iwc-rank-grid"><div class="iwc-rank"><div class="iwc-rank-title">構成比カテゴリ上位3項目</div><div id="iwcShare"></div></div><div class="iwc-rank"><div class="iwc-rank-title iwc-increase-head"><span>廃棄額増加 上位3カテゴリ</span><div class="iwc-switch" role="group" aria-label="増加カテゴリの表示切り替え"><button type="button" data-iwc-increase-mode="amount" class="active" aria-pressed="true">金額</button><button type="button" data-iwc-increase-mode="percent" aria-pressed="false">割合</button></div></div><div id="iwcIncrease"></div></div></div></section>`;
     form.parentNode.insertBefore(row,form);
     row.querySelectorAll('[data-iwc-mode]').forEach(function(button){button.addEventListener('click',function(){
       mode=button.dataset.iwcMode;
       row.querySelectorAll('[data-iwc-mode]').forEach(function(other){other.classList.toggle('active',other===button);});
       if(typeof editYear!=='undefined'&&editYear.haiki)legend(context());
+    });});
+    row.querySelectorAll('[data-iwc-increase-mode]').forEach(function(button){button.addEventListener('click',function(){
+      increaseMode=button.dataset.iwcIncreaseMode;
+      row.querySelectorAll('[data-iwc-increase-mode]').forEach(function(other){
+        var active=other===button;other.classList.toggle('active',active);other.setAttribute('aria-pressed',String(active));
+      });
+      if(typeof editYear!=='undefined'&&editYear.haiki)analysis(context());
     });});
     var bar=document.getElementById('haikiChartCard');if(bar&&typeof ResizeObserver!=='undefined')new ResizeObserver(syncHeight).observe(bar);
     return true;
