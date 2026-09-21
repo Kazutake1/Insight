@@ -19,7 +19,9 @@
     '#pageKyaku #ikyRow .iky-stat strong.up{color:#b91c1c}',
     '#pageKyaku #ikyRow .iky-stat strong.down{color:#b91c1c}',
     '#pageKyaku #ikyRow .iky-note{font-size:9px;color:var(--text4);line-height:1.3;margin-top:9px;padding-top:6px;border-top:1px solid var(--border2)}',
-    '@media(max-width:600px){#pageKyaku #ikyRow .iky-stat{padding:2px 6px;font-size:10px}#pageKyaku #ikyRow .iky-stat strong{font-size:15px}}'
+    '@media(max-width:600px){#pageKyaku #ikyRow .iky-stat{padding:2px 6px;font-size:10px}#pageKyaku #ikyRow .iky-stat strong{font-size:15px}}',
+    '#pageKyaku #kyakuMonthTotal{display:none!important}',
+    '#pageKyaku #ikyDailyAverage{font-size:10px;font-weight:500;color:var(--text4);line-height:1.3;margin-top:2px;white-space:nowrap}'
   ].join('');
   document.head.appendChild(css);
 
@@ -32,6 +34,25 @@
     row.innerHTML='<section class="iky-card" aria-label="前年同月比較"><div class="iky-title">前年同月比較</div><div class="iky-stats"><div class="iky-stat"><span>客数前年比</span><strong id="ikyYoy">—</strong></div><div class="iky-stat"><span>入力済日数</span><strong id="ikyDays">—</strong></div><div class="iky-stat"><span>平均客数差</span><strong id="ikyAvgDiff">—</strong></div></div><div class="iky-note" id="ikyCompareNote"></div></section>';
     calendar.parentNode.insertBefore(row,calendar);
     return true;
+  }
+  function syncChartSummary(){
+    var chartTotal=document.getElementById('kyakuChartTotal');
+    if(!chartTotal||typeof drafts==='undefined'||!Array.isArray(drafts.kyaku))return;
+    var total=0,filled=0;
+    drafts.kyaku.forEach(function(row){
+      var value=Number(row&&row.客数)||0;
+      total+=value;
+      if(value>0)filled++;
+    });
+    var totalValue=chartTotal.querySelector('.haiki-chart-total-val');
+    if(totalValue)totalValue.textContent=total.toLocaleString('ja-JP')+'人';
+    var average=chartTotal.querySelector('#ikyDailyAverage');
+    if(!average){
+      average=document.createElement('div');
+      average.id='ikyDailyAverage';
+      chartTotal.appendChild(average);
+    }
+    average.textContent='入力済日の平均 '+(total>0&&filled?(total/filled).toFixed(0):'-')+'人/日';
   }
   function refresh(){
     if(!mount()||typeof store==='undefined'||typeof editYear==='undefined'||typeof editMonth==='undefined'||typeof drafts==='undefined')return;
@@ -60,13 +81,21 @@
       label('ikyYoy','—');label('ikyAvgDiff','—');
       label('ikyCompareNote',Array.isArray(prior)?'前年と比較できる入力済み日がありません':'前年同月のデータがありません');
     }
+    syncChartSummary();
   }
   if(typeof window.renderTable==='function'){
     var original=window.renderTable;
-    window.renderTable=function(type){var result=original.apply(this,arguments);if(type==='kyaku')refresh();return result;};
+    window.renderTable=function(type){
+      var result=original.apply(this,arguments);
+      if(type==='kyaku'){
+        refresh();
+        requestAnimationFrame(syncChartSummary);
+      }
+      return result;
+    };
   }
   page.addEventListener('input',function(event){
     if(event.target&&event.target.matches&&event.target.matches('#kyakuGrid input.kyaku-input'))refresh();
   });
-  if(typeof currentNav!=='undefined'&&currentNav===3)refresh();
+  if(typeof currentNav!=='undefined'&&currentNav===3){refresh();requestAnimationFrame(syncChartSummary);}
 })();
