@@ -127,3 +127,43 @@
   });
   document.head.appendChild(script);
 })();
+
+(function(){
+  'use strict';
+  if(document.getElementById('insightWasteSpacingV1Style'))return;
+  var style=document.createElement('style');
+  style.id='insightWasteSpacingV1Style';
+  style.textContent=[
+    '#pageHaiki #iwcRow .iwc-card{height:calc(var(--iwc-height) + 50px)}',
+    '#pageHaiki #iwcRow .iwc-kpi{padding:5px 7px}',
+    '#pageHaiki #iwcRow .iwc-kpi-label{font-size:9px;line-height:1.2}',
+    '#pageHaiki #iwcRow .iwc-kpi-value{font-size:15px;line-height:1.3}',
+    '#pageHaiki #iwcRow .iwc-rank-tabs button{font-size:10px;line-height:1.2;padding:5px 3px}',
+    '#pageHaiki #iwcRow .iwc-rank-line{font-size:10px;line-height:1.25;padding:3px 0}',
+    '#pageHaiki #iwcRow .iwc-rank{padding:5px 8px}',
+    '#pageHaiki #iwcSharePanel>.iwc-rank-title,#pageHaiki #iwcIncreasePanel .iwc-increase-head>span{display:none}',
+    '#pageHaiki #iwcIncreasePanel .iwc-increase-head{justify-content:flex-end}',
+    '#pageHaiki .haiki-day-btn{padding:8px 11px}',
+    '#pageHaiki .haiki-form{padding:10px 22px}',
+    '#pageHaiki .hf-title{margin-bottom:10px}',
+    '#pageHaiki .hf-field{padding:7px 0}',
+    '#pageHaiki .hf-input-wrap input{padding:7px 14px}',
+    '#pageHaiki .hf-total{margin-top:10px;padding:10px 16px}'
+  ].join('');
+  document.head.appendChild(style);
+  function relabel(){
+    var row=document.getElementById('iwcRow');if(!row)return false;
+    var share=row.querySelector('#iwcShareTab'),increase=row.querySelector('#iwcIncreaseTab');
+    if(!share||!increase)return false;
+    share.textContent='構成比 上位3カテゴリ';
+    increase.textContent='廃棄増加 上位3カテゴリ';
+    return true;
+  }
+  if(!relabel()){
+    var page=document.getElementById('pageHaiki');
+    if(page&&typeof MutationObserver!=='undefined'){
+      var observer=new MutationObserver(function(){if(relabel())observer.disconnect();});
+      observer.observe(page,{childList:true,subtree:true});
+    }
+  }
+})();
