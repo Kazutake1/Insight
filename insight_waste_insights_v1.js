@@ -116,8 +116,8 @@
     if(prevOK&&curOK){rising=cats().map(function(name,i){
       var cur=c.compareCurrent[i],old=c.comparePrevious[i],diff=cur-old;
       return {name:name,index:i,increase:true,diff:diff,
-        title:'前年 '+yen(old)+' → 今年 '+yen(cur)+' / 増加額 '+yen(diff),
-        display:'+'+yen(diff)};
+        title:'前年 '+yen(old)+' → 今年 '+yen(cur)+' / 増加額 '+yen(diff)+(old>0?' / 増加率 +'+(diff/old*100).toFixed(1)+'%':' / 前年0円：増加率算出不可'),
+        display:'+'+yen(diff)+(old>0?' (+'+(diff/old*100).toFixed(1)+'%)':' (前年0円)')};
     }).filter(function(item){return item.diff>0;}).sort(function(a,b){return b.diff-a.diff||a.index-b.index;});}
     ranks('iwcIncrease',rising,function(item){return item.display;},prevOK?(curOK?'増加カテゴリなし':'当年データなし'):'前年の比較データなし');
   }
