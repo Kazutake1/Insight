@@ -167,3 +167,43 @@
     }
   }
 })();
+
+(function(){
+  'use strict';
+  if(document.getElementById('insightWasteHeaderMetricsStyle'))return;
+  var style=document.createElement('style');
+  style.id='insightWasteHeaderMetricsStyle';
+  style.textContent=[
+    '#pageHaiki #iwcRow .iwc-analysis-head{align-items:center;gap:10px;margin-bottom:8px}',
+    '#pageHaiki #iwcRow .iwc-analysis-head>.iwc-analysis-heading{display:flex;flex-direction:column;align-items:flex-start;flex:1;min-width:0;gap:2px;white-space:normal}',
+    '#pageHaiki #iwcRow .iwc-analysis-heading .iwc-title{font-size:13px;line-height:1.25}',
+    '#pageHaiki #iwcRow .iwc-analysis-heading #iwcAnalysisSub{font-size:9px;line-height:1.3;margin:0;white-space:normal;overflow:visible;text-overflow:clip}',
+    '#pageHaiki #iwcRow .iwc-analysis-metrics{display:flex;align-items:center;gap:10px;flex:0 0 auto}',
+    '#pageHaiki #iwcRow .iwc-analysis-metrics .iwc-kpi{border:0;border-left:1px solid var(--border);border-radius:0;padding:0 0 0 10px;min-width:0;text-align:right}',
+    '#pageHaiki #iwcRow .iwc-analysis-metrics .iwc-kpi-label{font-size:9px;line-height:1.2}',
+    '#pageHaiki #iwcRow .iwc-analysis-metrics .iwc-kpi-value{font-size:15px;line-height:1.25}'
+  ].join('');
+  document.head.appendChild(style);
+  function moveMetrics(){
+    var row=document.getElementById('iwcRow');if(!row)return false;
+    var card=row.querySelector('section[aria-label="廃棄分析"]');if(!card)return false;
+    if(card.querySelector('.iwc-analysis-metrics'))return true;
+    var head=card.querySelector('.iwc-head'),kpis=card.querySelector('.iwc-kpis');
+    var rate=kpis&&kpis.querySelector('#iwcWasteRate'),yoy=kpis&&kpis.querySelector('#iwcWasteYoy');
+    if(!head||!rate||!yoy)return false;
+    var heading=document.createElement('div');heading.className='iwc-analysis-heading';
+    while(head.firstChild)heading.appendChild(head.firstChild);
+    var metrics=document.createElement('div');metrics.className='iwc-analysis-metrics';
+    metrics.setAttribute('aria-label','廃棄率と前年比');
+    metrics.appendChild(rate.parentElement);metrics.appendChild(yoy.parentElement);
+    kpis.remove();head.classList.add('iwc-analysis-head');head.appendChild(heading);head.appendChild(metrics);
+    return true;
+  }
+  if(!moveMetrics()){
+    var page=document.getElementById('pageHaiki');
+    if(page&&typeof MutationObserver!=='undefined'){
+      var observer=new MutationObserver(function(){if(moveMetrics())observer.disconnect();});
+      observer.observe(page,{childList:true,subtree:true});
+    }
+  }
+})();
