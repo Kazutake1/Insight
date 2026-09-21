@@ -116,8 +116,8 @@
     if(prevOK&&curOK){rising=cats().map(function(name,i){
       var cur=c.compareCurrent[i],old=c.comparePrevious[i],diff=cur-old;
       return {name:name,index:i,increase:true,diff:diff,
-        title:'増加額 '+yen(diff)+(old>0?' / 前年比 +'+(diff/old*100).toFixed(1)+'%':' / 前年0円'),
-        display:old>0?'+'+(diff/old*100).toFixed(1)+'%':'前年0円 → '+yen(cur)};
+        title:'前年 '+yen(old)+' → 今年 '+yen(cur)+' / 増加額 '+yen(diff),
+        display:'+'+yen(diff)};
     }).filter(function(item){return item.diff>0;}).sort(function(a,b){return b.diff-a.diff||a.index-b.index;});}
     ranks('iwcIncrease',rising,function(item){return item.display;},prevOK?(curOK?'増加カテゴリなし':'当年データなし'):'前年の比較データなし');
   }
@@ -132,7 +132,7 @@
     if(document.getElementById('iwcRow'))return true;
     var row=el('div');row.id='iwcRow';
     row.innerHTML=`<section class="iwc-card" aria-label="廃棄内訳"><div class="iwc-head"><div><div class="iwc-title">廃棄内訳</div><div class="iwc-sub" id="iwcMonth">月合計（保存済み）</div></div><div class="iwc-switch"><button type="button" data-iwc-mode="amount" class="active">金額</button><button type="button" data-iwc-mode="percent">割合</button></div></div><div class="iwc-donut-inner"><div class="iwc-donut-wrap"><canvas id="iwcDonut" role="img" aria-label="カテゴリ別廃棄内訳"></canvas></div><div id="iwcLegend" class="iwc-legends"></div></div></section>
-    <section class="iwc-card" aria-label="廃棄分析"><div class="iwc-head"><div class="iwc-title">廃棄分析</div><div class="iwc-sub" id="iwcAnalysisSub"></div></div><div class="iwc-kpis"><div class="iwc-kpi"><div class="iwc-kpi-label">廃棄額</div><div id="iwcWasteAmount" class="iwc-kpi-value">—</div></div><div class="iwc-kpi"><div class="iwc-kpi-label">廃棄率</div><div id="iwcWasteRate" class="iwc-kpi-value">—</div></div><div class="iwc-kpi"><div class="iwc-kpi-label">前年比</div><div id="iwcWasteYoy" class="iwc-kpi-value">—</div></div></div><div class="iwc-rank-grid"><div class="iwc-rank"><div class="iwc-rank-title">構成比カテゴリ上位3項目</div><div id="iwcShare"></div></div><div class="iwc-rank"><div class="iwc-rank-title">前年比増カテゴリ3項目</div><div id="iwcIncrease"></div></div></div></section>`;
+    <section class="iwc-card" aria-label="廃棄分析"><div class="iwc-head"><div class="iwc-title">廃棄分析</div><div class="iwc-sub" id="iwcAnalysisSub"></div></div><div class="iwc-kpis"><div class="iwc-kpi"><div class="iwc-kpi-label">廃棄額</div><div id="iwcWasteAmount" class="iwc-kpi-value">—</div></div><div class="iwc-kpi"><div class="iwc-kpi-label">廃棄率</div><div id="iwcWasteRate" class="iwc-kpi-value">—</div></div><div class="iwc-kpi"><div class="iwc-kpi-label">前年比</div><div id="iwcWasteYoy" class="iwc-kpi-value">—</div></div></div><div class="iwc-rank-grid"><div class="iwc-rank"><div class="iwc-rank-title">構成比カテゴリ上位3項目</div><div id="iwcShare"></div></div><div class="iwc-rank"><div class="iwc-rank-title">廃棄額増加 上位3カテゴリ</div><div id="iwcIncrease"></div></div></div></section>`;
     form.parentNode.insertBefore(row,form);
     row.querySelectorAll('[data-iwc-mode]').forEach(function(button){button.addEventListener('click',function(){
       mode=button.dataset.iwcMode;
