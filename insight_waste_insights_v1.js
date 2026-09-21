@@ -3,7 +3,7 @@
   'use strict';
   if(window.__insightWasteInsightsV1)return;
   window.__insightWasteInsightsV1=true;
-  var chart=null,mode='amount',increaseMode='amount';
+  var chart=null,mode='amount',increaseMode='amount',rankTab='share';
   var style=document.createElement('style');
   style.id='insightWasteInsightsStyle';
   style.textContent=`
@@ -25,18 +25,23 @@
     #iwcRow .iwc-legends .donut-val{white-space:nowrap;margin-left:4px;font-size:10px;}
     #iwcRow .iwc-total{display:flex;justify-content:space-between;align-items:center;padding:2px 0 4px;border-bottom:2px solid var(--border);font-size:10px;font-weight:750;color:var(--text3);}
     #iwcRow .iwc-total strong{color:#b91c1c;font-size:11px;}
-    #iwcRow .iwc-kpis{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:6px;margin-bottom:6px;flex:0 0 auto;}
-    #iwcRow .iwc-kpi{border:1px solid var(--border);border-radius:8px;padding:5px 7px;min-width:0;}
-    #iwcRow .iwc-kpi-label{font-size:9px;font-weight:700;color:var(--text3);}
-    #iwcRow .iwc-kpi-value{font-size:15px;font-weight:800;white-space:nowrap;color:var(--text);line-height:1.35;}
+    #iwcRow .iwc-kpis{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:6px;margin-bottom:3px;flex:0 0 auto;}
+    #iwcRow .iwc-kpi{border:1px solid var(--border);border-radius:8px;padding:3px 5px;min-width:0;}
+    #iwcRow .iwc-kpi-label{font-size:9px;font-weight:700;color:var(--text3);line-height:1.1;}
+    #iwcRow .iwc-kpi-value{font-size:13px;font-weight:800;white-space:nowrap;color:var(--text);line-height:1.2;}
     #iwcRow .iwc-kpi-value.up{color:#b91c1c;}#iwcRow .iwc-kpi-value.down{color:#15803d;}
-    #iwcRow .iwc-rank-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:9px;flex:1;min-height:0;}
-    #iwcRow .iwc-rank{min-width:0;min-height:0;overflow:hidden;border:1px solid var(--border);border-radius:8px;padding:4px 6px;}
-    #iwcRow .iwc-rank-title{font-size:9px;font-weight:750;white-space:nowrap;color:var(--text);margin-bottom:2px;}
+    #iwcRow .iwc-rank-grid{display:flex;flex-direction:column;gap:3px;flex:1;min-height:0;}
+    #iwcRow .iwc-rank-tabs{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:4px;flex:0 0 auto;}
+    #iwcRow .iwc-rank-tabs button{min-width:0;border:1px solid var(--border);border-radius:6px;padding:3px 4px;background:var(--surface);color:var(--text3);font:700 9px/1.1 inherit;cursor:pointer;white-space:nowrap;}
+    #iwcRow .iwc-rank-tabs button.active{background:var(--text);border-color:var(--text);color:var(--surface);}
+    #iwcRow .iwc-rank{display:flex;flex-direction:column;flex:1;min-width:0;min-height:0;overflow:hidden;border:1px solid var(--border);border-radius:8px;padding:4px 6px;}
+    #iwcRow .iwc-rank[hidden]{display:none!important;}
+    #iwcRow .iwc-rank-title{font-size:9px;font-weight:750;white-space:nowrap;color:var(--text);margin-bottom:2px;flex-shrink:0;}
     #iwcRow .iwc-increase-head{display:flex;align-items:center;justify-content:space-between;gap:4px;min-width:0;}
     #iwcRow .iwc-increase-head>span{min-width:0;overflow:hidden;text-overflow:ellipsis;}
     #iwcRow .iwc-increase-head .iwc-switch button{padding:2px 4px;font-size:8px;}
-    #iwcRow .iwc-rank-line{display:flex;align-items:center;gap:4px;justify-content:space-between;font-size:9px;line-height:1.25;min-width:0;padding:2px 0;border-top:1px solid var(--border2);}
+    #iwcRow .iwc-rank-lines{display:flex;flex-direction:column;flex:1;min-height:0;}
+    #iwcRow .iwc-rank-line{display:flex;align-items:center;gap:4px;justify-content:space-between;font-size:9px;line-height:1.25;min-width:0;padding:1px 0;border-top:1px solid var(--border2);flex:1;min-height:0;}
     #iwcRow .iwc-rank-name{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:var(--text3);}
     #iwcRow .iwc-rank-value{flex-shrink:0;font-weight:750;color:var(--text);white-space:nowrap;}
     #iwcRow .iwc-rank-value.up{color:#b91c1c;}
@@ -135,12 +140,19 @@
     if(document.getElementById('iwcRow'))return true;
     var row=el('div');row.id='iwcRow';
     row.innerHTML=`<section class="iwc-card" aria-label="廃棄内訳"><div class="iwc-head"><div><div class="iwc-title">廃棄内訳</div><div class="iwc-sub" id="iwcMonth">月合計（保存済み）</div></div><div class="iwc-switch"><button type="button" data-iwc-mode="amount" class="active">金額</button><button type="button" data-iwc-mode="percent">割合</button></div></div><div class="iwc-donut-inner"><div class="iwc-donut-wrap"><canvas id="iwcDonut" role="img" aria-label="カテゴリ別廃棄内訳"></canvas></div><div id="iwcLegend" class="iwc-legends"></div></div></section>
-    <section class="iwc-card" aria-label="廃棄分析"><div class="iwc-head"><div class="iwc-title">廃棄分析</div><div class="iwc-sub" id="iwcAnalysisSub"></div></div><div class="iwc-kpis"><div class="iwc-kpi"><div class="iwc-kpi-label">廃棄額</div><div id="iwcWasteAmount" class="iwc-kpi-value">—</div></div><div class="iwc-kpi"><div class="iwc-kpi-label">廃棄率</div><div id="iwcWasteRate" class="iwc-kpi-value">—</div></div><div class="iwc-kpi"><div class="iwc-kpi-label">前年比</div><div id="iwcWasteYoy" class="iwc-kpi-value">—</div></div></div><div class="iwc-rank-grid"><div class="iwc-rank"><div class="iwc-rank-title">構成比カテゴリ上位3項目</div><div id="iwcShare"></div></div><div class="iwc-rank"><div class="iwc-rank-title iwc-increase-head"><span>廃棄額増加 上位3カテゴリ</span><div class="iwc-switch" role="group" aria-label="増加カテゴリの表示切り替え"><button type="button" data-iwc-increase-mode="amount" class="active" aria-pressed="true">金額</button><button type="button" data-iwc-increase-mode="percent" aria-pressed="false">割合</button></div></div><div id="iwcIncrease"></div></div></div></section>`;
+    <section class="iwc-card" aria-label="廃棄分析"><div class="iwc-head"><div class="iwc-title">廃棄分析</div><div class="iwc-sub" id="iwcAnalysisSub"></div></div><div class="iwc-kpis"><div class="iwc-kpi"><div class="iwc-kpi-label">廃棄額</div><div id="iwcWasteAmount" class="iwc-kpi-value">—</div></div><div class="iwc-kpi"><div class="iwc-kpi-label">廃棄率</div><div id="iwcWasteRate" class="iwc-kpi-value">—</div></div><div class="iwc-kpi"><div class="iwc-kpi-label">前年比</div><div id="iwcWasteYoy" class="iwc-kpi-value">—</div></div></div><div class="iwc-rank-grid"><div class="iwc-rank-tabs" role="tablist" aria-label="廃棄カテゴリのランキング"><button type="button" id="iwcShareTab" data-iwc-rank-tab="share" role="tab" aria-selected="true" aria-controls="iwcSharePanel" class="active">構成比 上位3</button><button type="button" id="iwcIncreaseTab" data-iwc-rank-tab="increase" role="tab" aria-selected="false" aria-controls="iwcIncreasePanel">廃棄額増加 上位3</button></div><div class="iwc-rank" id="iwcSharePanel" data-iwc-rank-panel="share" role="tabpanel" aria-labelledby="iwcShareTab"><div class="iwc-rank-title">構成比カテゴリ上位3項目</div><div id="iwcShare" class="iwc-rank-lines"></div></div><div class="iwc-rank" id="iwcIncreasePanel" data-iwc-rank-panel="increase" role="tabpanel" aria-labelledby="iwcIncreaseTab" hidden><div class="iwc-rank-title iwc-increase-head"><span>廃棄額増加 上位3カテゴリ</span><div class="iwc-switch" role="group" aria-label="増加カテゴリの表示切り替え"><button type="button" data-iwc-increase-mode="amount" class="active" aria-pressed="true">金額</button><button type="button" data-iwc-increase-mode="percent" aria-pressed="false">割合</button></div></div><div id="iwcIncrease" class="iwc-rank-lines"></div></div></div></section>`;
     form.parentNode.insertBefore(row,form);
     row.querySelectorAll('[data-iwc-mode]').forEach(function(button){button.addEventListener('click',function(){
       mode=button.dataset.iwcMode;
       row.querySelectorAll('[data-iwc-mode]').forEach(function(other){other.classList.toggle('active',other===button);});
       if(typeof editYear!=='undefined'&&editYear.haiki)legend(context());
+    });});
+    row.querySelectorAll('[data-iwc-rank-tab]').forEach(function(button){button.addEventListener('click',function(){
+      rankTab=button.dataset.iwcRankTab;
+      row.querySelectorAll('[data-iwc-rank-tab]').forEach(function(other){
+        var active=other===button;other.classList.toggle('active',active);other.setAttribute('aria-selected',String(active));
+      });
+      row.querySelectorAll('[data-iwc-rank-panel]').forEach(function(panel){panel.hidden=panel.dataset.iwcRankPanel!==rankTab;});
     });});
     row.querySelectorAll('[data-iwc-increase-mode]').forEach(function(button){button.addEventListener('click',function(){
       increaseMode=button.dataset.iwcIncreaseMode;
