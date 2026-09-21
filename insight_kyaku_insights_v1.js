@@ -10,13 +10,16 @@
   css.textContent=[
     '#pageKyaku #ikyRow{display:grid;grid-template-columns:minmax(0,1fr);gap:10px;flex:0 0 auto;min-width:0;margin-bottom:10px}',
     '#pageKyaku #ikyRow .iky-card{box-sizing:border-box;min-width:0;border-radius:14px;padding:11px 14px;background:var(--surface);box-shadow:0 2px 10px var(--shadow)}',
-    '#pageKyaku #ikyRow .iky-title{font-size:13px;font-weight:750;color:var(--text);margin-bottom:6px}',
-    '#pageKyaku #ikyRow .iky-stat{display:flex;align-items:center;justify-content:space-between;gap:8px;padding:5px 0;border-bottom:1px solid var(--border2);font-size:11px;color:var(--text3)}',
-    '#pageKyaku #ikyRow .iky-stat:last-of-type{border-bottom:0}',
-    '#pageKyaku #ikyRow .iky-stat strong{font-size:14px;font-weight:800;color:var(--text);white-space:nowrap}',
+    '#pageKyaku #ikyRow .iky-title{font-size:13px;font-weight:750;color:var(--text);margin-bottom:8px}',
+    '#pageKyaku #ikyRow .iky-stats{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));min-width:0}',
+    '#pageKyaku #ikyRow .iky-stat{display:flex;flex-direction:column;align-items:flex-start;gap:4px;min-width:0;padding:2px 12px;font-size:11px;color:var(--text3)}',
+    '#pageKyaku #ikyRow .iky-stat:first-child{padding-left:0}',
+    '#pageKyaku #ikyRow .iky-stat+.iky-stat{border-left:1px solid var(--border)}',
+    '#pageKyaku #ikyRow .iky-stat strong{font-size:19px;line-height:1.2;font-weight:800;color:var(--text);white-space:nowrap}',
     '#pageKyaku #ikyRow .iky-stat strong.up{color:#b91c1c}',
-    '#pageKyaku #ikyRow .iky-stat strong.down{color:#15803d}',
-    '#pageKyaku #ikyRow .iky-note{font-size:9px;color:var(--text4);line-height:1.3;margin-top:4px}'
+    '#pageKyaku #ikyRow .iky-stat strong.down{color:#b91c1c}',
+    '#pageKyaku #ikyRow .iky-note{font-size:9px;color:var(--text4);line-height:1.3;margin-top:9px;padding-top:6px;border-top:1px solid var(--border2)}',
+    '@media(max-width:600px){#pageKyaku #ikyRow .iky-stat{padding:2px 6px;font-size:10px}#pageKyaku #ikyRow .iky-stat strong{font-size:15px}}'
   ].join('');
   document.head.appendChild(css);
 
@@ -26,7 +29,7 @@
     var calendar=document.getElementById('kyakuGridWrap');if(!calendar)return false;
     if(document.getElementById('ikyRow'))return true;
     var row=document.createElement('div');row.id='ikyRow';
-    row.innerHTML='<section class="iky-card" aria-label="前年同月比較"><div class="iky-title">前年同月比較</div><div class="iky-stat"><span>客数前年比</span><strong id="ikyYoy">—</strong></div><div class="iky-stat"><span>入力済日数</span><strong id="ikyDays">—</strong></div><div class="iky-stat"><span>平均客数差</span><strong id="ikyAvgDiff">—</strong></div><div class="iky-note" id="ikyCompareNote"></div></section>';
+    row.innerHTML='<section class="iky-card" aria-label="前年同月比較"><div class="iky-title">前年同月比較</div><div class="iky-stats"><div class="iky-stat"><span>客数前年比</span><strong id="ikyYoy">—</strong></div><div class="iky-stat"><span>入力済日数</span><strong id="ikyDays">—</strong></div><div class="iky-stat"><span>平均客数差</span><strong id="ikyAvgDiff">—</strong></div></div><div class="iky-note" id="ikyCompareNote"></div></section>';
     calendar.parentNode.insertBefore(row,calendar);
     return true;
   }
