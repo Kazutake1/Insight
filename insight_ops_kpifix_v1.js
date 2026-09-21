@@ -118,5 +118,12 @@
   script.id='insightWasteInsightsV1Script';
   script.src='./insight_waste_insights_v1.js?v=20260921-1';
   script.async=false;
+  script.addEventListener('load',function(){
+    if(document.getElementById('insightWasteCompactStyle'))return;
+    var compact=document.createElement('style');
+    compact.id='insightWasteCompactStyle';
+    compact.textContent='#iwcRow .iwc-head>div:first-child{display:flex;align-items:baseline;gap:6px;min-width:0;white-space:nowrap}#iwcRow .iwc-head .iwc-sub{margin-top:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}#iwcRow .iwc-card{padding:7px 10px}#iwcRow .iwc-head{margin-bottom:3px}#iwcRow .iwc-kpis{gap:5px;margin-bottom:4px}#iwcRow .iwc-kpi{padding:3px 5px}#iwcRow .iwc-kpi-label{font-size:8px;line-height:1.1}#iwcRow .iwc-kpi-value{font-size:13px;line-height:1.25}#iwcRow .iwc-rank-grid{gap:6px}#iwcRow .iwc-rank{padding:3px 5px}#iwcRow .iwc-rank-title{font-size:8px;line-height:1.1;margin-bottom:2px}#iwcRow .iwc-rank-line{font-size:8px;line-height:1.1;padding:1px 0}#iwcRow .iwc-legends .donut-leg{padding:2px 0}';
+    document.head.appendChild(compact);
+  });
   document.head.appendChild(script);
 })();
