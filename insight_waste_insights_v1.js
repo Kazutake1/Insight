@@ -68,7 +68,7 @@
     }
     function kpi(y){return window.KPIEngine&&window.KPIEngine.getPeriod?window.KPIEngine.getPeriod(y,month,throughDay):null;}
     return {year:year,month:month,values:sums(rows),previousYear:previousYear,
-      current:kpi(year),previous:prevRows?kpi(previousYear):null,
+      current:kpi(year),previous:prevRows? kpi(previousYear):null,
       compareCurrent:sums(throughDay==null?rows:rows.slice(0,throughDay)),
       comparePrevious:prevRows?sums(throughDay==null?prevRows:prevRows.slice(0,throughDay)):null,
       throughDay:throughDay};
@@ -89,10 +89,10 @@
   }
   function graph(c){
     var canvas=document.getElementById('iwcDonut');if(!canvas||typeof Chart==='undefined')return;
-    if(chart){chart.data.datasets[0].data=c.values;chart.update('none');return;}
+    if(chart){chart.destroy();chart=null;}
     chart=new Chart(canvas,{type:'doughnut',
       data:{labels:cats(),datasets:[{data:c.values,backgroundColor:colors(),borderColor:'#fff',borderWidth:2,hoverOffset:4}]},
-      options:{responsive:true,maintainAspectRatio:false,cutout:'68%',animation:{duration:300},plugins:{legend:{display:false},tooltip:{backgroundColor:'#fff',titleColor:'#111',bodyColor:'#666',borderColor:'#e8e8e8',borderWidth:1,padding:7,
+      options:{responsive:true,maintainAspectRatio:false,cutout:'68%',animation:{duration:300,animateRotate:true,animateScale:false},plugins:{legend:{display:false},tooltip:{backgroundColor:'#fff',titleColor:'#111',bodyColor:'#666',borderColor:'#e8e8e8',borderWidth:1,padding:7,
         callbacks:{label:function(t){var total=t.chart.data.datasets[0].data.reduce(function(a,b){return a+b;},0);return t.label+': '+yen(t.parsed)+' ('+(total?t.parsed/total*100:0).toFixed(1)+'%)';}}}}}
     });
   }
