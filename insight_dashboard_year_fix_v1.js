@@ -8,7 +8,7 @@
   css.id='insightDashboardYearFixStyle';
   css.textContent=[
     '#kpiRow{padding-left:5px!important;scroll-padding-left:5px}',
-    '#insightDeleteYearButton{color:#b42318!important;border-color:#e6b7b5!important;background:var(--surface)!important}',
+    '#insightDeleteYearButton{color:#b42318!important;border-color:#b42318!important}',
     '#insightDeleteYearButton:disabled{opacity:.4;cursor:not-allowed}',
     '#insightYearDeleteOverlay{position:fixed;inset:0;z-index:25000;background:rgba(0,0,0,.46);display:flex;align-items:center;justify-content:center;padding:20px;box-sizing:border-box}',
     '#insightYearDeleteOverlay[hidden]{display:none!important}',
