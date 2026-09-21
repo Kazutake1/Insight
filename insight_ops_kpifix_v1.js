@@ -217,3 +217,13 @@
   script.async=false;
   document.head.appendChild(script);
 })();
+
+(function(){
+  'use strict';
+  if(document.getElementById('insightKyakuInsightsV1Script'))return;
+  var script=document.createElement('script');
+  script.id='insightKyakuInsightsV1Script';
+  script.src='./insight_kyaku_insights_v1.js?v=20260922-1';
+  script.async=false;
+  document.head.appendChild(script);
+})();
