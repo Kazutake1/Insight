@@ -142,7 +142,7 @@
     '#pageHaiki #iwcRow .iwc-rank-line{font-size:10px;line-height:1.25;padding:3px 0}',
     '#pageHaiki #iwcRow .iwc-rank{padding:5px 8px}',
     '#pageHaiki #iwcSharePanel>.iwc-rank-title,#pageHaiki #iwcIncreasePanel .iwc-increase-head>span{display:none}',
-    '#pageHaiki #iwcIncreasePanel .iwc-increase-head{justify-content:flex-end}',
+    '#pageHaiki #iwcRow #iwcIncreasePanel .iwc-increase-head{justify-content:flex-end}',
     '#pageHaiki .haiki-day-btn{padding:8px 11px}',
     '#pageHaiki .haiki-form{padding:10px 22px}',
     '#pageHaiki .hf-title{margin-bottom:10px}',
@@ -223,7 +223,7 @@
   if(document.getElementById('insightKyakuInsightsV1Script'))return;
   var script=document.createElement('script');
   script.id='insightKyakuInsightsV1Script';
-  script.src='./insight_kyaku_insights_v1.js?v=20260922-1';
+  script.src='./insight_kyaku_insights_v1.js?v=20260922-2';
   script.async=false;
   document.head.appendChild(script);
 })();
