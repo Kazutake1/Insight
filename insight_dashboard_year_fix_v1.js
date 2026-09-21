@@ -9,7 +9,7 @@
   css.textContent=[
     '#kpiRow{padding-left:5px!important;scroll-padding-left:5px}',
     '#insightDeleteYearButton{color:#b42318!important;border-color:#b42318!important}',
-    '#insightDeleteYearButton:disabled{opacity:.4;cursor:not-allowed}',
+    '#insightDeleteYearButton:disabled{cursor:not-allowed}',
     '#insightYearDeleteOverlay{position:fixed;inset:0;z-index:25000;background:rgba(0,0,0,.46);display:flex;align-items:center;justify-content:center;padding:20px;box-sizing:border-box}',
     '#insightYearDeleteOverlay[hidden]{display:none!important}',
     '#insightYearDeleteDialog{box-sizing:border-box;width:min(100%,410px);padding:22px;border-radius:16px;background:var(--surface,#fff);color:var(--text,#222);box-shadow:0 18px 60px rgba(0,0,0,.25);font-family:inherit}',
@@ -89,6 +89,7 @@
     if(!deleteButton){
       deleteButton=document.createElement('button');deleteButton.type='button';
       deleteButton.id='insightDeleteYearButton';deleteButton.className=addButton.className;
+      deleteButton.style.cssText=addButton.style.cssText;
       deleteButton.textContent='− 年度削除';deleteButton.title='対象年度を選び、確認して削除します';
       deleteButton.addEventListener('click',openDialog);
       addButton.insertAdjacentElement('afterend',deleteButton);
