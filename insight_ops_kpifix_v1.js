@@ -116,7 +116,7 @@
   if(document.getElementById('insightWasteInsightsV1Script'))return;
   var script=document.createElement('script');
   script.id='insightWasteInsightsV1Script';
-  script.src='./insight_waste_insights_v1.js?v=20260921-1';
+  script.src='./insight_waste_insights_v1.js?v=20260921-2';
   script.async=false;
   script.addEventListener('load',function(){
     if(document.getElementById('insightWasteCompactStyle'))return;
