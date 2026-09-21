@@ -116,13 +116,13 @@
   if(document.getElementById('insightWasteInsightsV1Script'))return;
   var script=document.createElement('script');
   script.id='insightWasteInsightsV1Script';
-  script.src='./insight_waste_insights_v1.js?v=20260921-4';
+  script.src='./insight_waste_insights_v1.js?v=20260921-5';
   script.async=false;
   script.addEventListener('load',function(){
     if(document.getElementById('insightWasteCompactStyle'))return;
     var compact=document.createElement('style');
     compact.id='insightWasteCompactStyle';
-    compact.textContent='#iwcRow .iwc-head>div:first-child{display:flex;align-items:baseline;gap:6px;min-width:0;white-space:nowrap}#iwcRow .iwc-head .iwc-sub{margin-top:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}#iwcRow .iwc-card{padding:7px 10px}#iwcRow .iwc-head{margin-bottom:3px}#iwcRow .iwc-kpis{gap:5px;margin-bottom:4px}#iwcRow .iwc-kpi{padding:3px 5px}#iwcRow .iwc-kpi-label{font-size:8px;line-height:1.1}#iwcRow .iwc-kpi-value{font-size:13px;line-height:1.25}#iwcRow .iwc-rank-grid{gap:6px}#iwcRow .iwc-rank{padding:3px 5px;display:flex;flex-direction:column}#iwcRow .iwc-rank-title{font-size:8px;line-height:1.1;margin-bottom:2px;flex-shrink:0}#iwcRow #iwcShare,#iwcRow #iwcIncrease{display:flex;flex-direction:column;flex:1;min-height:0}#iwcRow .iwc-rank-line{font-size:8px;line-height:1.1;padding:1px 0;flex:1;min-height:0}#iwcRow .iwc-legends .donut-leg{padding:2px 0}';
+    compact.textContent='#iwcRow .iwc-head>div:first-child{display:flex;align-items:baseline;gap:6px;min-width:0;white-space:nowrap}#iwcRow .iwc-head .iwc-sub{margin-top:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}#iwcRow .iwc-card{padding:7px 10px}#iwcRow .iwc-head{margin-bottom:3px}#iwcRow .iwc-kpis{gap:5px;margin-bottom:3px}#iwcRow .iwc-kpi{padding:2px 5px}#iwcRow .iwc-kpi-label{font-size:8px;line-height:1}#iwcRow .iwc-kpi-value{font-size:13px;line-height:1.1}#iwcRow .iwc-rank-grid{gap:3px}#iwcRow .iwc-rank-tabs button{font:700 9px/1.1 -apple-system,BlinkMacSystemFont,sans-serif;font-family:inherit}#iwcRow .iwc-rank{padding:3px 5px;display:flex;flex-direction:column}#iwcRow .iwc-rank-title{font-size:8px;line-height:1.1;margin-bottom:2px;flex-shrink:0}#iwcRow #iwcShare,#iwcRow #iwcIncrease{display:flex;flex-direction:column;flex:1;min-height:0}#iwcRow .iwc-rank-line{font-size:8px;line-height:1.1;padding:1px 0;flex:1;min-height:0}#iwcRow .iwc-legends .donut-leg{padding:2px 0}';
     document.head.appendChild(compact);
   });
   document.head.appendChild(script);
