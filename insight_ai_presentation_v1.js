@@ -50,3 +50,29 @@
 
   applyPresentation();
 })();
+
+/* 起動ボタンだけを既存ナビへ移動。分析パネル・分析処理には変更を加えない。 */
+(function(){
+  var button=document.getElementById('aiAnalysisToggle');
+  var lastNav=document.getElementById('nav4');
+  if(!button||!lastNav)return;
+
+  button.className='nav-btn';
+  button.innerHTML='<svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 3v18h18M7 14l4-4 4 3 6-8"/></svg><span>分析AI</span>';
+  lastNav.insertAdjacentElement('afterend',button);
+
+  function syncSelection(){
+    var open=document.body.classList.contains('ai-analysis-open');
+    if(button.classList.contains('active')!==open)button.classList.toggle('active',open);
+    button.setAttribute('aria-expanded',String(open));
+    for(var i=0;i<5;i++){
+      var nav=document.getElementById('nav'+i);
+      var selected=!open&&currentNav===i;
+      if(nav&&nav.classList.contains('active')!==selected)nav.classList.toggle('active',selected);
+    }
+  }
+  var selectionObserver=new MutationObserver(syncSelection);
+  selectionObserver.observe(document.body,{attributes:true,attributeFilter:['class']});
+  selectionObserver.observe(lastNav.parentElement,{subtree:true,attributes:true,attributeFilter:['class']});
+  syncSelection();
+})();
