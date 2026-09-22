@@ -114,7 +114,7 @@
   window.clearTodayData=function(){
     var t=info(selectedDate),rows=store.data[t.fy]&&store.data[t.fy][t.month];
     var target=t.fy+'年'+t.month+t.day+'日';
-    if(!window.confirm(store.name+' の '+target+'の入力データを削除します。\n売上・客数・買上点数・廃棄・店舗メモをクリアし、天気は保持します。\n\nこの操作は元に戻せません。よろしいですか？'))return;
+    if(!window.confirm(store.name+' の '+target+'の入力データを削除します。\n売上・客数・買上点数・廃棄・店舗メモをクリアし、天気・店舗イベント（共通セールを含む）は保持します。\n\nこの操作は元に戻せません。よろしいですか？'))return;
     if(!rows||!rows[t.day-1])return;
     var row=rows[t.day-1];
     row.売上=0;row.客数=0;row.買上点数=0;row.廃棄金額=0;

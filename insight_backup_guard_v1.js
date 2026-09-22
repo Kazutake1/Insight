@@ -36,6 +36,8 @@ function normalizeBackup(raw){
     if(st.haikibudget!==undefined){if(!isPlainObject(st.haikibudget)||!isPlainObject(st.haikibudget.cats))throw new Error("廃棄予算が不正です");st.haikibudget.total=nonNegativeNumber(st.haikibudget.total,"廃棄予算");HAIKI_CATS.forEach(function(c){st.haikibudget.cats[c]=nonNegativeNumber(st.haikibudget.cats[c],c+"予算");});}
   });
   if(next.sharedWeather!==undefined){if(!isPlainObject(next.sharedWeather))throw new Error("共有天気データが不正です");Object.keys(next.sharedWeather).forEach(function(k){if(typeof next.sharedWeather[k]!=="string")throw new Error("共有天気データが不正です");});}
+  if(window.InsightEvents)window.InsightEvents.validate(next);
+  else if(next.eventManagement!==undefined||Object.keys(next.stores).some(function(id){return next.stores[id].events!==undefined;}))throw new Error("店舗イベント機能の読み込み後に復元してください");
   return next;
 }
 restoreData=function(e){
