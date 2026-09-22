@@ -109,6 +109,7 @@
       #insightEvents .ie-list{display:flex;flex-wrap:wrap;gap:6px}.ie-chip{display:flex;align-items:center;gap:6px;max-width:100%;background:var(--surface2);border:1px solid var(--border);border-radius:9px;padding:4px 7px}.ie-chip span{overflow-wrap:anywhere}.ie-chip small{color:var(--text4);white-space:nowrap}#insightEvents .ie-chip button{padding:0 5px;border:0;font-size:17px}#insightEvents .ie-chip .ie-summary{font-size:12px;text-align:left;overflow-wrap:anywhere;min-width:0;padding:0}
       .ie-dialog{box-sizing:border-box;width:min(520px,calc(100vw - 24px));max-height:88vh;overflow:auto;border:1px solid var(--border);border-radius:18px;padding:20px;background:var(--surface);color:var(--text);font:12px/1.55 -apple-system,BlinkMacSystemFont,'Noto Sans JP',sans-serif;box-shadow:0 12px 40px #0003}.ie-dialog::backdrop{background:#0005}.ie-dialog h2{font-size:16px;margin:0}.ie-dialog header{display:flex;align-items:center;justify-content:space-between;margin-bottom:12px}.ie-dialog label{display:flex;flex-direction:column;gap:4px;margin:10px 0}.ie-dialog input,.ie-dialog select,.ie-dialog textarea{width:100%;box-sizing:border-box;border:1px solid var(--border);border-radius:9px;padding:9px;background:var(--input-bg,var(--surface2));color:var(--text);font:inherit}.ie-dialog textarea{min-height:64px;resize:vertical}.ie-dates{display:grid;grid-template-columns:1fr 1fr;gap:10px}.ie-actions{display:flex;justify-content:flex-end;gap:8px;margin-top:16px}.ie-dialog .ie-primary{background:var(--text);color:var(--surface)}.ie-muted{font-size:11px;color:var(--text4);margin:5px 0}.ie-presets{display:flex;flex-wrap:wrap;gap:6px}.ie-preset-row{border-bottom:1px solid var(--border);padding:10px 0}.ie-preset-row div{display:flex;gap:6px;flex-wrap:wrap;margin-top:6px}.ie-dialog button:disabled{opacity:.4;cursor:default}
       .ie-dialog.ie-event-add{position:fixed;inset:0;margin:auto}
+      .ie-dialog.ie-preset-editor{position:fixed;inset:0;margin:auto}
     `;doc.head.appendChild(style);
     function dialog(title){
       var d=el('dialog',undefined,'ie-dialog'),head=el('header');
@@ -192,7 +193,7 @@
       form.onsubmit=function(e){e.preventDefault();try{save(read());}catch(err){alert(err.message);}};
     }
     function managePresets(onChange){
-      var d=dialog('よく使うセールを編集'),body=el('div');d.append(body);d.addEventListener('close',onChange);
+      var d=dialog('よく使うセールを編集'),body=el('div');d.classList.add('ie-preset-editor');d.append(body);d.addEventListener('close',onChange);
       function editor(p){
         body.replaceChildren();var form=el('form');body.append(form);var read=saleEditor(form,p&&p.snapshot);
         var actions=el('div',undefined,'ie-actions'),save=el('button','保存する','ie-primary');save.type='submit';actions.append(button('戻る',draw),save);form.append(actions);
