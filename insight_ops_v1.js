@@ -136,6 +136,13 @@
         if(!currentRate)return;
         if(!window.confirm(baseYear+'年 '+selMonth+'の粗利率データを削除します。\nこの操作は元に戻せません。よろしいですか？'))return;
         delete d.grossMarginRate;
+        persist();
+        renderMonthlyOpsKpis();
+        return;
+      }
+      var gm=parseFloat(String(enteredRate).replace(/[%％\s]/g,''));
+      if(!Number.isFinite(gm)||gm<0||gm>100){window.alert('粗利率は0〜100の数字で入力してください。');return;}
+      d.grossMarginRate=gm;
     }else{return;}
     persist();
     renderMonthlyOpsKpis();
