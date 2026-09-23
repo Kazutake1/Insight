@@ -15,9 +15,28 @@
     return rows[quickEditDay-1]||null;
   }
 
+  function formatQuickItems(){
+    var input=document.getElementById("qi_買上点数");
+    if(!input||input.dataset.insightItemsDecimalBound)return;
+    input.dataset.insightItemsDecimalBound="1";
+    input.dataset.insightItemsRaw=input.value;
+    input.inputMode="decimal";
+    input.step="any";
+    function format(){
+      var raw=input.dataset.insightItemsRaw;
+      if(raw===""){input.value="";return;}
+      var value=Number(raw);
+      if(Number.isFinite(value))input.value=value.toFixed(2);
+    }
+    input.addEventListener("input",function(){input.dataset.insightItemsRaw=input.value;});
+    input.addEventListener("blur",format);
+    format();
+  }
+
   function renderDailyOps(){
     var grid=document.getElementById("quickGrid");
     if(!grid||document.getElementById("opsDailyWrap"))return;
+    formatQuickItems();
     var r=dailyRow()||{},wrap=document.createElement("div");
     wrap.id="opsDailyWrap";
     wrap.className="quick-section wide";
@@ -33,7 +52,15 @@
   window.saveQuick=function(){
     var memoEl=document.getElementById("qi_storeMemo");
     var memo=memoEl?memoEl.value:"";
+    var itemsInput=document.getElementById("qi_買上点数");
+    if(itemsInput&&itemsInput.dataset.insightItemsDecimalBound){
+      itemsInput.value=itemsInput.dataset.insightItemsRaw;
+    }
     oldSaveQuick.apply(this,arguments);
+    if(itemsInput&&itemsInput.dataset.insightItemsDecimalBound){
+      var raw=itemsInput.dataset.insightItemsRaw;
+      if(raw!==""&&Number.isFinite(Number(raw)))itemsInput.value=Number(raw).toFixed(2);
+    }
     var fy=todayInfo.fy,m=todayInfo.month,rows=store.data[fy][m],ri=quickEditDay-1;
     if(!rows[ri])rows[ri]=blankRow(quickEditDay);
     rows[ri].storeMemo=memo;
@@ -109,13 +136,6 @@
         if(!currentRate)return;
         if(!window.confirm(baseYear+'年 '+selMonth+'の粗利率データを削除します。\nこの操作は元に戻せません。よろしいですか？'))return;
         delete d.grossMarginRate;
-        persist();
-        renderMonthlyOpsKpis();
-        return;
-      }
-      var gm=parseFloat(String(enteredRate).replace(/[%％\s]/g,''));
-      if(!Number.isFinite(gm)||gm<0||gm>100){window.alert('粗利率は0〜100の数字で入力してください。');return;}
-      d.grossMarginRate=gm;
     }else{return;}
     persist();
     renderMonthlyOpsKpis();
