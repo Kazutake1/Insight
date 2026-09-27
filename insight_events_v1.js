@@ -19,6 +19,7 @@
     if(s.sale!==undefined){
       var sale=s.sale;requireValue(object(sale)&&object(sale.params),'セール条件が不正です。');
       str(sale.category,'対象カテゴリ');str(sale.method,'セール方式');
+      if(sale.categoryId!==undefined)str(sale.categoryId,'対象カテゴリ識別番号');
       (FIELDS[sale.method]||[]).forEach(function(f){
         var v=sale.params[f[0]];
         if(f.length===2){str(v,f[1]);return;}
@@ -119,8 +120,12 @@
     function field(parent,label,type,value){var l=el('label',label),input=el(type==='textarea'?'textarea':'input');if(type!=='textarea')input.type=type;input.value=value==null?'':String(value);input.setAttribute('aria-label',label);l.append(input);parent.append(l);return input;}
     function select(parent,label,options,value){var l=el('label',label),s=el('select');Object.keys(options).forEach(function(k){var o=el('option',options[k]);o.value=k;s.append(o);});s.value=value;s.setAttribute('aria-label',label);l.append(s);parent.append(l);return s;}
     function saleEditor(parent,snapshot){
-      var initial=snapshot&&snapshot.sale,catOptions={};CATEGORIES.forEach(function(c){catOptions[c]=c;});if(initial)catOptions[initial.category]=initial.category;
-      var cat=select(parent,'対象カテゴリ',catOptions,initial?initial.category:CATEGORIES[0]);
+      var initial=snapshot&&snapshot.sale,catOptions={},master=allStores.salesCountManagement&&Array.isArray(allStores.salesCountManagement.categories)?allStores.salesCountManagement.categories:[],selectedCategory='';
+      master.filter(function(c){return !c.hidden;}).forEach(function(c){catOptions[c.id]=c.name;});
+      if(initial){var linked=master.find(function(c){return c.id===initial.categoryId||c.name===initial.category||(c.aliases||[]).indexOf(initial.category)>=0;});if(linked){catOptions[linked.id]=linked.name;selectedCategory=linked.id;}else{selectedCategory='legacy:'+initial.category;catOptions[selectedCategory]=initial.category;}}
+      if(!Object.keys(catOptions).length)CATEGORIES.forEach(function(c){catOptions['legacy:'+c]=c;});
+      if(!selectedCategory)selectedCategory=Object.keys(catOptions)[0];
+      var cat=select(parent,'対象カテゴリ',catOptions,selectedCategory);
       var methods=Object.assign({},METHODS);if(initial&&!methods[initial.method])methods[initial.method]=initial.method+'（既存方式）';
       var method=select(parent,'セール方式',methods,initial?initial.method:'amount');var params=el('div');parent.append(params);var inputs={};
       function draw(){params.replaceChildren();inputs={};(FIELDS[method.value]||[]).forEach(function(f){
@@ -133,7 +138,9 @@
       return function(){
         var p=initial&&method.value===initial.method?copy(initial.params):{};
         (FIELDS[method.value]||[]).forEach(function(f){requireValue(inputs[f[0]].value.trim()!=='',f[1]+'を入力してください。');p[f[0]]=f.length===2?inputs[f[0]].value.trim():Number(inputs[f[0]].value);});
-        var s={version:1,title:cat.value,note:note.value.trim(),sale:{category:cat.value,method:method.value,params:p}};
+        var chosen=master.find(function(c){return c.id===cat.value;}),categoryName=chosen?chosen.name:cat.value.replace(/^legacy:/,'');
+        var sale={category:categoryName,method:method.value,params:p};if(chosen)sale.categoryId=chosen.id;
+        var s={version:1,title:categoryName,note:note.value.trim(),sale:sale};
         validateSnapshot(s);return s;
       };
     }
