@@ -38,6 +38,20 @@ test('future methods and additional fields are retained without reinterpretation
   events.add(a,'a',sale(s));const restored=JSON.parse(JSON.stringify(a));events.validate(restored);
   assert.deepEqual(events.list(restored,'a','2026-09-22')[0].snapshot,s);
 });
+test('multiple target categories survive validation and backup roundtrip',()=>{
+  const a=data(),s=snapshot();
+  s.title='麺類セール';s.sale.category='調理麺・カップ麺・麺類その他';s.sale.categoryId='cat_cold_noodles';
+  s.sale.targets=[
+    {categoryId:'cat_cold_noodles',category:'調理麺'},
+    {categoryId:'cat_cup_noodles',category:'カップ麺'},
+    {categoryId:'cat_other_noodles',category:'麺類その他'}
+  ];
+  events.add(a,'a',sale(s));const restored=JSON.parse(JSON.stringify(a));events.validate(restored);
+  assert.deepEqual(restored,a);
+  assert.equal(events.summary(restored.eventManagement.events[0].snapshot),'調理麺・カップ麺・麺類その他 50円引き');
+  restored.eventManagement.events[0].snapshot.sale.targets.push({categoryId:'cat_cup_noodles',category:'重複'});
+  assert.throws(()=>events.validate(restored));
+});
 test('malformed periods, scope, duplicates and conditions are rejected',()=>{
   const mutations=[e=>e.endDate='2026-02-30',e=>e.endDate='2026-09-21',e=>e.scope='store',e=>e.snapshot.sale.params.amount=-1,e=>e.snapshot.sale.params.amount='50',e=>e.snapshot.version=2];
   for(const mutate of mutations){const a=data();events.add(a,'a',sale());mutate(a.eventManagement.events[0]);assert.throws(()=>events.validate(a));}

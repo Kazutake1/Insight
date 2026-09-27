@@ -36,6 +36,23 @@ test('legacy sale name remains linked after category rename through aliases',()=
   assert.equal(sales.categoryForSale(all,{category:'何でも',categoryId:'cat_onigiri'}).name,'おむすび');
 });
 
+test('multiple sale targets link independently by stable category id',()=>{
+  const all=base();sales.ensure(all);
+  all.salesCountManagement.categories.push(
+    {id:'cat_cold_noodles',name:'調理麺',hidden:false,aliases:[]},
+    {id:'cat_cup_noodles',name:'カップ麺',hidden:false,aliases:[]},
+    {id:'cat_other_noodles',name:'麺類その他',hidden:false,aliases:[]}
+  );
+  const sale={category:'調理麺・カップ麺・麺類その他',categoryId:'cat_cold_noodles',targets:[
+    {categoryId:'cat_cold_noodles',category:'調理麺'},
+    {categoryId:'cat_cup_noodles',category:'カップ麺'},
+    {categoryId:'cat_other_noodles',category:'麺類その他'}
+  ]};
+  assert.deepEqual(sales.categoriesForSale(all,sale).map(c=>c.id),['cat_cold_noodles','cat_cup_noodles','cat_other_noodles']);
+  all.salesCountManagement.categories.find(c=>c.id==='cat_cup_noodles').name='温かい麺';
+  assert.deepEqual(sales.categoriesForSale(all,sale).map(c=>c.id),['cat_cold_noodles','cat_cup_noodles','cat_other_noodles']);
+});
+
 test('validation allows 1000 and sales greater than delivery while rejecting negative values',()=>{
   const all=base();sales.ensure(all);all.stores.a.salesCounts['2026-09-01']={cat_onigiri:{trips:[{delivery:1,sales:1000},{delivery:0,sales:3},{delivery:null,sales:null}]}};
   assert.doesNotThrow(()=>sales.validate(all));

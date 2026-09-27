@@ -20,6 +20,14 @@
       var sale=s.sale;requireValue(object(sale)&&object(sale.params),'セール条件が不正です。');
       str(sale.category,'対象カテゴリ');str(sale.method,'セール方式');
       if(sale.categoryId!==undefined)str(sale.categoryId,'対象カテゴリ識別番号');
+      if(sale.targets!==undefined){
+        requireValue(Array.isArray(sale.targets)&&sale.targets.length>0,'対象カテゴリを1件以上選択してください。');
+        var targetKeys=new Set();sale.targets.forEach(function(target){
+          requireValue(object(target),'対象カテゴリが不正です。');str(target.category,'対象カテゴリ');
+          if(target.categoryId!==undefined)str(target.categoryId,'対象カテゴリ識別番号');
+          var key=target.categoryId||'name:'+target.category;requireValue(!targetKeys.has(key),'対象カテゴリが重複しています。');targetKeys.add(key);
+        });
+      }
       (FIELDS[sale.method]||[]).forEach(function(f){
         var v=sale.params[f[0]];
         if(f.length===2){str(v,f[1]);return;}
@@ -54,6 +62,7 @@
     Object.keys(all.stores||{}).forEach(function(id){var st=all.stores[id];if(st.events!==undefined)events(st.events,'store');});
     return all;
   }
+  function categorySummary(sale){return Array.isArray(sale.targets)&&sale.targets.length?sale.targets.map(function(target){return target.category;}).join('・'):sale.category;}
   function summary(s){
     if(!s.sale)return s.title;
     var a=s.sale,p=a.params,t='';
@@ -66,7 +75,7 @@
       case 'other':t=p.text;break;
       default:t=s.title;
     }
-    return a.category+' '+t;
+    return categorySummary(a)+' '+t;
   }
   function presets(all){return all.eventManagement?all.eventManagement.presets:[];}
   function list(all,storeId,start,end){
@@ -108,7 +117,7 @@
       #insightEvents{margin-top:10px;font-size:12px}#insightEvents .ie-head{display:flex;align-items:center;justify-content:space-between;gap:8px;margin-bottom:6px}
       #insightEvents button,.ie-dialog button{border:1px solid var(--border);border-radius:9px;background:var(--surface2);color:var(--text);padding:7px 10px;font:inherit;cursor:pointer}
       #insightEvents .ie-list{display:flex;flex-wrap:wrap;gap:6px}.ie-chip{display:flex;align-items:center;gap:6px;max-width:100%;background:var(--surface2);border:1px solid var(--border);border-radius:9px;padding:4px 7px}.ie-chip span{overflow-wrap:anywhere}.ie-chip small{color:var(--text4);white-space:nowrap}#insightEvents .ie-chip button{padding:0 5px;border:0;font-size:17px}#insightEvents .ie-chip .ie-summary{font-size:12px;text-align:left;overflow-wrap:anywhere;min-width:0;padding:0}
-      .ie-dialog{position:fixed;inset:0;margin:auto;box-sizing:border-box;width:min(520px,calc(100vw - 24px));max-height:88vh;overflow:auto;border:1px solid var(--border);border-radius:18px;padding:20px;background:var(--surface);color:var(--text);font:12px/1.55 -apple-system,BlinkMacSystemFont,'Noto Sans JP',sans-serif;box-shadow:0 12px 40px #0003}.ie-dialog::backdrop{background:#0005}.ie-dialog h2{font-size:16px;margin:0}.ie-dialog header{display:flex;align-items:center;justify-content:space-between;margin-bottom:12px}.ie-dialog label{display:flex;flex-direction:column;gap:4px;margin:10px 0}.ie-dialog input,.ie-dialog select,.ie-dialog textarea{width:100%;box-sizing:border-box;border:1px solid var(--border);border-radius:9px;padding:9px;background:var(--input-bg,var(--surface2));color:var(--text);font:inherit}.ie-dialog textarea{min-height:64px;resize:vertical}.ie-dates{display:grid;grid-template-columns:1fr 1fr;gap:10px}.ie-actions{display:flex;justify-content:flex-end;gap:8px;margin-top:16px}.ie-dialog .ie-primary{background:var(--text);color:var(--surface)}.ie-muted{font-size:11px;color:var(--text4);margin:5px 0}.ie-presets{display:flex;flex-wrap:wrap;gap:6px}.ie-preset-row{border-bottom:1px solid var(--border);padding:10px 0}.ie-preset-row div{display:flex;gap:6px;flex-wrap:wrap;margin-top:6px}.ie-dialog button:disabled{opacity:.4;cursor:default}
+      .ie-dialog{position:fixed;inset:0;margin:auto;box-sizing:border-box;width:min(520px,calc(100vw - 24px));max-height:88vh;overflow:auto;border:1px solid var(--border);border-radius:18px;padding:20px;background:var(--surface);color:var(--text);font:12px/1.55 -apple-system,BlinkMacSystemFont,'Noto Sans JP',sans-serif;box-shadow:0 12px 40px #0003}.ie-dialog::backdrop{background:#0005}.ie-dialog h2{font-size:16px;margin:0}.ie-dialog header{display:flex;align-items:center;justify-content:space-between;margin-bottom:12px}.ie-dialog label{display:flex;flex-direction:column;gap:4px;margin:10px 0}.ie-dialog input,.ie-dialog select,.ie-dialog textarea{width:100%;box-sizing:border-box;border:1px solid var(--border);border-radius:9px;padding:9px;background:var(--input-bg,var(--surface2));color:var(--text);font:inherit}.ie-dialog textarea{min-height:64px;resize:vertical}.ie-category-options{border:1px solid var(--border);border-radius:11px;padding:8px 10px;margin:10px 0}.ie-category-options legend{font-weight:700;padding:0 4px}.ie-category-list{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:3px 10px}.ie-dialog .ie-category-option{display:flex;flex-direction:row;align-items:center;gap:7px;margin:0;padding:5px 2px}.ie-dialog .ie-category-option input{width:auto;margin:0;accent-color:#15803d}.ie-dates{display:grid;grid-template-columns:1fr 1fr;gap:10px}.ie-actions{display:flex;justify-content:flex-end;gap:8px;margin-top:16px}.ie-dialog .ie-primary{background:var(--text);color:var(--surface)}.ie-muted{font-size:11px;color:var(--text4);margin:5px 0}.ie-presets{display:flex;flex-wrap:wrap;gap:6px}.ie-preset-row{border-bottom:1px solid var(--border);padding:10px 0}.ie-preset-row div{display:flex;gap:6px;flex-wrap:wrap;margin-top:6px}.ie-dialog button:disabled{opacity:.4;cursor:default}@media(max-width:520px){.ie-category-list{grid-template-columns:1fr}}
       .ie-dialog.ie-event-add{position:fixed;inset:0;margin:auto}
       .ie-dialog.ie-preset-editor{position:fixed;inset:0;margin:auto}
     `;doc.head.appendChild(style);
@@ -120,12 +129,19 @@
     function field(parent,label,type,value){var l=el('label',label),input=el(type==='textarea'?'textarea':'input');if(type!=='textarea')input.type=type;input.value=value==null?'':String(value);input.setAttribute('aria-label',label);l.append(input);parent.append(l);return input;}
     function select(parent,label,options,value){var l=el('label',label),s=el('select');Object.keys(options).forEach(function(k){var o=el('option',options[k]);o.value=k;s.append(o);});s.value=value;s.setAttribute('aria-label',label);l.append(s);parent.append(l);return s;}
     function saleEditor(parent,snapshot){
-      var initial=snapshot&&snapshot.sale,catOptions={},master=allStores.salesCountManagement&&Array.isArray(allStores.salesCountManagement.categories)?allStores.salesCountManagement.categories:[],selectedCategory='';
-      master.filter(function(c){return !c.hidden;}).forEach(function(c){catOptions[c.id]=c.name;});
-      if(initial){var linked=master.find(function(c){return c.id===initial.categoryId||c.name===initial.category||(c.aliases||[]).indexOf(initial.category)>=0;});if(linked){catOptions[linked.id]=linked.name;selectedCategory=linked.id;}else{selectedCategory='legacy:'+initial.category;catOptions[selectedCategory]=initial.category;}}
-      if(!Object.keys(catOptions).length)CATEGORIES.forEach(function(c){catOptions['legacy:'+c]=c;});
-      if(!selectedCategory)selectedCategory=Object.keys(catOptions)[0];
-      var cat=select(parent,'対象カテゴリ',catOptions,selectedCategory);
+      var initial=snapshot&&snapshot.sale,master=allStores.salesCountManagement&&Array.isArray(allStores.salesCountManagement.categories)?allStores.salesCountManagement.categories:[],options=[],optionKeys=new Set(),selectedKeys=new Set();
+      function addOption(key,name,categoryId){if(optionKeys.has(key))return;optionKeys.add(key);options.push({key:key,name:name,categoryId:categoryId});}
+      master.filter(function(c){return !c.hidden;}).forEach(function(c){addOption(c.id,c.name,c.id);});
+      var initialTargets=initial?(Array.isArray(initial.targets)&&initial.targets.length?initial.targets:[{categoryId:initial.categoryId,category:initial.category}]):[];
+      initialTargets.forEach(function(target){
+        var linked=master.find(function(c){return c.id===target.categoryId||c.name===target.category||(c.aliases||[]).indexOf(target.category)>=0;});
+        if(linked){addOption(linked.id,linked.name,linked.id);selectedKeys.add(linked.id);}
+        else{var legacyKey='legacy:'+target.category;addOption(legacyKey,target.category);selectedKeys.add(legacyKey);}
+      });
+      if(!options.length)CATEGORIES.forEach(function(c){addOption('legacy:'+c,c);});
+      if(!selectedKeys.size&&options.length)selectedKeys.add(options[0].key);
+      var categoriesBox=el('fieldset',undefined,'ie-category-options'),legend=el('legend','対象カテゴリー（複数選択可）'),categoryList=el('div',undefined,'ie-category-list'),categoryInputs=[];categoriesBox.append(legend,categoryList);parent.append(categoriesBox);
+      options.forEach(function(option){var label=el('label',undefined,'ie-category-option'),input=el('input');input.type='checkbox';input.value=option.key;input.checked=selectedKeys.has(option.key);input.setAttribute('aria-label','対象カテゴリー '+option.name);label.append(input,el('span',option.name));categoryList.append(label);categoryInputs.push({input:input,option:option});});
       var methods=Object.assign({},METHODS);if(initial&&!methods[initial.method])methods[initial.method]=initial.method+'（既存方式）';
       var method=select(parent,'セール方式',methods,initial?initial.method:'amount');var params=el('div');parent.append(params);var inputs={};
       function draw(){params.replaceChildren();inputs={};(FIELDS[method.value]||[]).forEach(function(f){
@@ -138,9 +154,10 @@
       return function(){
         var p=initial&&method.value===initial.method?copy(initial.params):{};
         (FIELDS[method.value]||[]).forEach(function(f){requireValue(inputs[f[0]].value.trim()!=='',f[1]+'を入力してください。');p[f[0]]=f.length===2?inputs[f[0]].value.trim():Number(inputs[f[0]].value);});
-        var chosen=master.find(function(c){return c.id===cat.value;}),categoryName=chosen?chosen.name:cat.value.replace(/^legacy:/,'');
-        var sale={category:categoryName,method:method.value,params:p};if(chosen)sale.categoryId=chosen.id;
-        var s={version:1,title:categoryName,note:note.value.trim(),sale:sale};
+        var chosen=categoryInputs.filter(function(item){return item.input.checked;}).map(function(item){return item.option;});requireValue(chosen.length>0,'対象カテゴリーを1件以上選択してください。');
+        var categoryNames=chosen.map(function(item){return item.name;}),targets=chosen.map(function(item){var target={category:item.name};if(item.categoryId)target.categoryId=item.categoryId;return target;});
+        var sale={category:categoryNames.join('・'),method:method.value,params:p,targets:targets};if(targets[0].categoryId)sale.categoryId=targets[0].categoryId;
+        var s={version:1,title:categoryNames.join('・'),note:note.value.trim(),sale:sale};
         validateSnapshot(s);return s;
       };
     }
