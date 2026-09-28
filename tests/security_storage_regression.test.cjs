@@ -52,3 +52,29 @@ test('セール実績の店舗名はHTMLではなく文字列として描画す�
   assert.match(render,/tr\.append\(el\('td',String\(value\)\)\)/);
   assert.doesNotMatch(render,/innerHTML=[^;]*x\.store/);
 });
+
+test('販売数入力は不正値の保存と同じページの再読込を防ぐ',()=>{
+  const source=fs.readFileSync(path.join(root,'insight_sales_count_v1.js'),'utf8');
+  assert.match(source,/querySelector\('#pageSalesCount input:invalid'\)/);
+  assert.match(source,/invalid\.reportValidity\(\)/);
+  assert.match(source,/if\(currentNav==='salesCounts'\)return/);
+});
+
+test('カテゴリー保存後も選択中カテゴリーの未保存入力を保持する',()=>{
+  const source=fs.readFileSync(path.join(root,'insight_sales_count_v1.js'),'utf8');
+  const start=source.indexOf("d.querySelector('[data-save]').onclick");
+  const end=source.indexOf("d.addEventListener('close'",start);
+  const handler=source.slice(start,end);
+  assert.match(handler,/previousDraft=state\.draft/);
+  assert.match(handler,/state\.draft=previousDraft/);
+  assert.match(handler,/setDirty\(wasDirty\)/);
+  assert.match(handler,/未保存の変更があります/);
+});
+
+test('バックアップ復元は実在日と有効なカテゴリーマスターを検査する',()=>{
+  const source=fs.readFileSync(path.join(root,'insight_backup_guard_v1.js'),'utf8');
+  assert.match(source,/function validSalesCountDate/);
+  assert.match(source,/categories\.length/);
+  assert.match(source,/categories\.some\(function\(c\)/);
+  assert.match(source,/!validSalesCountDate\(date\)/);
+});

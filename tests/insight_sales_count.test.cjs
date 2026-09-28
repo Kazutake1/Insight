@@ -59,3 +59,28 @@ test('validation allows 1000 and sales greater than delivery while rejecting neg
   all.stores.a.salesCounts['2026-09-01'].cat_onigiri.trips[0].delivery=-1;
   assert.throws(()=>sales.validate(all));
 });
+
+test('validation rejects empty or fully hidden category masters and impossible dates',()=>{
+  const empty=base();sales.ensure(empty);empty.salesCountManagement.categories=[];
+  assert.throws(()=>sales.validate(empty),/カテゴリーマスター/);
+
+  const hidden=base();sales.ensure(hidden);hidden.salesCountManagement.categories.forEach(c=>{c.hidden=true;});
+  assert.throws(()=>sales.validate(hidden),/カテゴリーマスター/);
+
+  const invalidDate=base();sales.ensure(invalidDate);
+  invalidDate.stores.a.salesCounts['2026-09-31']={cat_onigiri:sales.emptyRecord()};
+  assert.throws(()=>sales.validate(invalidDate),/日付データ/);
+  assert.equal(sales.validDateKey('2024-02-29'),true);
+  assert.equal(sales.validDateKey('2026-02-29'),false);
+});
+
+test('sale averages use each store date only once when events overlap',()=>{
+  const first=sales.emptyRecord(),second=sales.emptyRecord();
+  first.trips.forEach(t=>{t.sales=10;});second.trips.forEach(t=>{t.sales=30;});
+  const rows=[
+    {date:'2026-09-01',record:first},
+    {date:'2026-09-01',record:first},
+    {date:'2026-09-08',record:second}
+  ];
+  assert.equal(sales.average(sales.uniqueSaleRecords(rows),'sales').total,60);
+});
