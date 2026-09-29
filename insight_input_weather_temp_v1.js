@@ -53,7 +53,7 @@
 
   function decorateSalesList(){
     var list=document.getElementById('salesDayList');
-    if(!list||!root.drafts||!drafts.sales)return;
+    if(!list||typeof drafts==='undefined'||!drafts.sales)return;
     Array.prototype.forEach.call(list.querySelectorAll('.haiki-day-btn'),function(btn,ri){
       var row=drafts.sales[ri]||{};
       var num=btn.querySelector('.hdb-num');
@@ -68,7 +68,7 @@
 
   function decorateSalesForm(day){
     var form=document.getElementById('salesForm');
-    if(!form||!root.drafts||!drafts.sales)return;
+    if(!form||typeof drafts==='undefined'||!drafts.sales)return;
     var ri=Math.max(0,(Number(day)||Number(root.salesSelDay)||1)-1);
     var row=drafts.sales[ri]||{};
     var firstWeatherButton=form.querySelector('[id^="swx_"]');
@@ -84,7 +84,7 @@
 
   function decorateKyakuGrid(){
     var grid=document.getElementById('kyakuGrid');
-    if(!grid||!root.drafts||!drafts.kyaku)return;
+    if(!grid||typeof drafts==='undefined'||!drafts.kyaku)return;
     Array.prototype.forEach.call(grid.querySelectorAll('.kyaku-day-card:not(.empty)'),function(card){
       var input=card.querySelector('input.kyaku-input');
       if(!input)return;
