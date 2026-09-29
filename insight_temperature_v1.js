@@ -26,6 +26,49 @@
     return Number.isFinite(n)?String(n):'';
   }
 
+  function normalizedLocationPart(value){
+    return String(value==null?'':value).trim().replace(/\s+/g,'');
+  }
+
+  function municipalityKey(targetStore){
+    var loc=targetStore&&targetStore.weatherLocation;
+    if(!loc)return '';
+    var name=normalizedLocationPart(loc.name||loc.query);
+    var admin1=normalizedLocationPart(loc.admin1);
+    if(name)return admin1+'|'+name;
+    var lat=Number(loc.latitude),lon=Number(loc.longitude);
+    return Number.isFinite(lat)&&Number.isFinite(lon)?'coord|'+lat.toFixed(4)+'|'+lon.toFixed(4):'';
+  }
+
+  function ensureDailyRow(targetStore,fy,month,day){
+    if(!targetStore.data||typeof targetStore.data!=='object')targetStore.data={};
+    if(!targetStore.data[fy]||typeof targetStore.data[fy]!=='object')targetStore.data[fy]={};
+    if(!Array.isArray(targetStore.data[fy][month]))targetStore.data[fy][month]=[];
+    var rows=targetStore.data[fy][month],ri=day-1;
+    if(!rows[ri]){
+      rows[ri]=typeof blankRow==='function'?blankRow(day):{d:day,weather:''};
+    }
+    return rows[ri];
+  }
+
+  function syncWeatherAndTemperatureForMunicipality(fy,month,day,sourceRow){
+    var key=municipalityKey(store);
+    if(!key||!sourceRow||!allStores||!allStores.stores)return 0;
+    var synced=0;
+    Object.keys(allStores.stores).forEach(function(storeId){
+      var targetStore=allStores.stores[storeId];
+      if(!targetStore||targetStore===store||municipalityKey(targetStore)!==key)return;
+      var targetRow=ensureDailyRow(targetStore,fy,month,day);
+      targetRow.weather=sourceRow.weather==null?'':sourceRow.weather;
+      if(sourceRow.tempMaxC===undefined)delete targetRow.tempMaxC;
+      else targetRow.tempMaxC=sourceRow.tempMaxC;
+      if(sourceRow.tempMinC===undefined)delete targetRow.tempMinC;
+      else targetRow.tempMinC=sourceRow.tempMinC;
+      synced++;
+    });
+    return synced;
+  }
+
   function updateAverage(){
     var maxInput=document.getElementById('qi_tempMaxC');
     var minInput=document.getElementById('qi_tempMinC');
@@ -105,6 +148,7 @@
         if(!rows[ri])rows[ri]=blankRow(quickEditDay);
         if(values.max===null)delete rows[ri].tempMaxC;else rows[ri].tempMaxC=values.max;
         if(values.min===null)delete rows[ri].tempMinC;else rows[ri].tempMinC=values.min;
+        syncWeatherAndTemperatureForMunicipality(fy,month,quickEditDay,rows[ri]);
         persist();
       }catch(err){
         alert('気温データを保存できませんでした。\n'+err.message);
