@@ -4,12 +4,36 @@
   if(root.__insightTemperatureV1)return;
   root.__insightTemperatureV1=true;
 
+  function selectedQuickDateInfo(){
+    try{
+      var picker=document.getElementById('iqdDateInput');
+      var match=picker&&/^(\d{4})-(\d{2})-(\d{2})$/.exec(String(picker.value||''));
+      if(match){
+        var year=Number(match[1]),monthIndex=Number(match[2])-1,day=Number(match[3]);
+        var date=new Date(0);date.setFullYear(year,monthIndex,day);date.setHours(0,0,0,0);
+        if(date.getFullYear()===year&&date.getMonth()===monthIndex&&date.getDate()===day){
+          return {fy:String(year),month:(typeof MONTHS!=='undefined'&&MONTHS[monthIndex])||String(monthIndex+1)+'月',mIdx:monthIndex,day:day,date:date};
+        }
+      }
+      var fy=todayInfo&&todayInfo.fy?String(todayInfo.fy):'';
+      var mIdx=Number(todayInfo&&todayInfo.mIdx);
+      var month=todayInfo&&todayInfo.month?todayInfo.month:((Number.isFinite(mIdx)?mIdx+1:'')+'月');
+      var selectedDay=Number(quickEditDay);
+      return {fy:fy,month:month,mIdx:mIdx,day:selectedDay,date:new Date(Number(fy),mIdx,selectedDay)};
+    }catch(_){return null;}
+  }
+
+  function isFutureQuickDate(info){
+    if(!info||!(info.date instanceof Date)||!Number.isFinite(info.date.getTime()))return false;
+    var now=new Date(),today=new Date(now.getFullYear(),now.getMonth(),now.getDate());
+    return info.date>today;
+  }
+
   function rowForQuickDay(){
     try{
-      var fy=todayInfo&&todayInfo.fy?todayInfo.fy:'';
-      var month=todayInfo&&todayInfo.month?todayInfo.month:'';
-      var rows=store&&store.data&&store.data[fy]&&store.data[fy][month];
-      return rows&&rows[quickEditDay-1]?rows[quickEditDay-1]:null;
+      var info=selectedQuickDateInfo();if(!info||isFutureQuickDate(info))return null;
+      var rows=store&&store.data&&store.data[info.fy]&&store.data[info.fy][info.month];
+      return rows&&rows[info.day-1]?rows[info.day-1]:null;
     }catch(_){return null;}
   }
 
@@ -140,10 +164,10 @@
       bindTemperatureDisplay(maxInput);
       bindTemperatureDisplay(minInput);
     }
-    var row=rowForQuickDay()||{};
+    var info=selectedQuickDateInfo(),future=isFutureQuickDate(info),row=rowForQuickDay()||{};
     var max=document.getElementById('qi_tempMaxC'),min=document.getElementById('qi_tempMinC');
-    if(max)showTemperature(max,row.tempMaxC);
-    if(min)showTemperature(min,row.tempMinC);
+    if(max){showTemperature(max,future?null:row.tempMaxC);max.disabled=future;}
+    if(min){showTemperature(min,future?null:row.tempMinC);min.disabled=future;}
     updateAverage();
   }
 
@@ -168,15 +192,27 @@
   var oldSave=root.saveQuick;
   if(typeof oldSave==='function'){
     root.saveQuick=function(){
-      var values;
-      try{values=readAndValidate();}catch(err){alert(err.message);return;}
+      var target=selectedQuickDateInfo(),future=isFutureQuickDate(target),values={max:null,min:null};
+      if(!future){
+        try{values=readAndValidate();}catch(err){alert(err.message);return;}
+      }
       var result=oldSave.apply(this,arguments);
       try{
-        var fy=todayInfo.fy,month=todayInfo.month,rows=store.data[fy][month],ri=quickEditDay-1;
-        if(!rows[ri])rows[ri]=blankRow(quickEditDay);
-        if(values.max===null)delete rows[ri].tempMaxC;else rows[ri].tempMaxC=values.max;
-        if(values.min===null)delete rows[ri].tempMinC;else rows[ri].tempMinC=values.min;
-        syncWeatherAndTemperatureForMunicipality(fy,month,quickEditDay,rows[ri]);
+        if(!target)throw new Error('対象日を取得できませんでした。');
+        var fy=target.fy,month=target.month,day=target.day;
+        if(!store.data[fy])store.data[fy]={};
+        if(!Array.isArray(store.data[fy][month]))store.data[fy][month]=[];
+        var rows=store.data[fy][month],ri=day-1;
+        if(!rows[ri])rows[ri]=blankRow(day);
+        if(future){
+          rows[ri].weather='';
+          delete rows[ri].tempMaxC;
+          delete rows[ri].tempMinC;
+        }else{
+          if(values.max===null)delete rows[ri].tempMaxC;else rows[ri].tempMaxC=values.max;
+          if(values.min===null)delete rows[ri].tempMinC;else rows[ri].tempMinC=values.min;
+          syncWeatherAndTemperatureForMunicipality(fy,month,day,rows[ri]);
+        }
         persist();
       }catch(err){
         alert('気温データを保存できませんでした。\n'+err.message);
@@ -188,6 +224,8 @@
 
   root.InsightTemperature={
     parse:parseTemperature,
+    selectedQuickDateInfo:selectedQuickDateInfo,
+    isFutureQuickDate:isFutureQuickDate,
     average:function(max,min){
       max=parseTemperature(max);min=parseTemperature(min);
       return Number.isFinite(max)&&Number.isFinite(min)?(max+min)/2:null;
