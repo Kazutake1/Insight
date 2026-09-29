@@ -67,15 +67,11 @@
   function metricRows(list,key){
     return list.filter(function(r){return key==='wasteYen'?root.KPIEngine.getRowWasteYen(r)>0||num(r.売上)>0:num(r[key==='salesYen'?'売上':'客数'])>0;});
   }
-  function paired(c,list,key){
+  function periodComparison(c){
     if(c.prev==null)return null;
-    var previous=metricRows(rows(c,c.prev),key),byDay={};
-    previous.forEach(function(r,i){byDay[dayOf(r,i)]=r;});
-    var now=[],old=[];
-    metricRows(list,key).forEach(function(r,i){var prev=byDay[dayOf(r,i)];if(prev){now.push(r);old.push(prev);}});
-    if(!now.length)return null;
-    return {days:now.length,now:root.KPIEngine.calc(now),previous:root.KPIEngine.calc(old),
-      changes:root.YearComparisonEngine.compare(root.KPIEngine.calc(now),root.KPIEngine.calc(old))};
+    var result=root.InsightYearComparison.getPeriod(c.year,c.month,c.through,c.prev);
+    if(!result.current.inputDays||!result.previous.inputDays)return null;
+    return {now:result.current,previous:result.previous,changes:result.comparison,basis:result.basis};
   }
   function comparisonLine(label,change,unit){
     if(!change)return label+'は前年値が0またはデータ不足のため前年比を比較できません。';
@@ -132,14 +128,14 @@
     var key=m==='sales'?'salesYen':m==='customers'?'customers':'wasteYen';
     var label=m==='sales'?'売上':m==='customers'?'客数':'廃棄額';
     var format=m==='customers'?function(v){return amount(v)+'人';}:yen;
-    var currentRows=metricRows(list,key),comparison=paired(c,list,key);
+    var currentRows=metricRows(list,key),comparison=periodComparison(c);
     if(currentRows.length)p.summary.push(label+'は'+format(k[key])+'です。');
     else p.caution.push(label+'はデータ不足のため評価できません。');
     if(c.prev==null){
       p.checks.push('前年比較は「なし」のため、前年との比較は行っていません。');
     }else if(comparison){
       p.summary.push(comparisonLine(label,comparison.changes[key],format));
-      p.checks.push('前年比・前年差は両年の同じ日付に記録がある'+comparison.days+'日で比較しています。');
+      p.checks.push(comparison.basis==='dailyAverage'?'前年比・前年差は各年の入力済み1日平均同士で比較しています。':'前年比・前年差は月合計同士で比較しています。');
     }else p.caution.push('前年と比較できる入力済み日がありません。現在値を中心に表示しています。');
     if(m==='waste'){
       if(k.salesYen>0){

@@ -17,8 +17,8 @@
     var current=root.KPIEngine.getPeriod(year,month,throughDay);
     var previous=compare!=null?root.KPIEngine.getPeriod(compare,month,throughDay):null;
     var comparison=null;
-    if(compare!=null&&root.YearComparisonEngine&&typeof root.YearComparisonEngine.getPeriod==='function'){
-      var result=root.YearComparisonEngine.getPeriod(year,month,throughDay,compare);
+    if(compare!=null&&root.InsightYearComparison&&typeof root.InsightYearComparison.getPeriod==='function'){
+      var result=root.InsightYearComparison.getPeriod(year,month,throughDay,compare);
       comparison=result&&result.comparison?result.comparison:null;
     }
     return {year:year,month:month,compare:compare,throughDay:throughDay,current:current,previous:previous,comparison:comparison};
@@ -90,6 +90,10 @@
 
   function patchDerivedCards(c){
     if(!c)return;
+    var monthly=root.InsightYearComparison.monthly(c.year,c.month,c.compare);
+    var laborCard=cardByLabel('人件費'),grossCard=cardByLabel('粗利率');
+    if(laborCard)replaceBadge(laborCard,pctText(monthly.laborCostYen),false,c.compare);
+    if(grossCard)replaceBadge(grossCard,pointText(monthly.grossMarginRate),true,c.compare);
     var unitCard=cardByLabel('客単価');
     if(unitCard){
       var unitValue=unitCard.querySelector('.kpi-value');
@@ -115,7 +119,9 @@
     var oldRenderKPI=root.renderKPI;
     root.renderKPI=function(){
       var result=oldRenderKPI.apply(this,arguments);
-      patchPrimaryCards(context());
+      var c=context();
+      patchPrimaryCards(c);
+      patchDerivedCards(c);
       return result;
     };
   }

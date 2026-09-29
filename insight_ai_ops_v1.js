@@ -12,16 +12,6 @@
     try{if(typeof getAIAnalysisThroughDay==='function'&&year!=null&&month)throughDay=getAIAnalysisThroughDay(year,month);}catch(e){}
     return {year:year,month:month,prevYear:prevYear,throughDay:throughDay};
   }
-  function isCompletedMonth(year,month){
-    try{
-      if(typeof todayFY!=='function')return false;
-      var t=todayFY();
-      var y=Number(year),ty=Number(t&&t.fy);
-      var mi=typeof MONTHS!=='undefined'&&Array.isArray(MONTHS)?MONTHS.indexOf(month):-1;
-      if(!Number.isFinite(y)||!Number.isFinite(ty)||mi<0||!t||typeof t.mIdx!=='number')return false;
-      return y<ty||(y===ty&&mi<t.mIdx);
-    }catch(e){return false;}
-  }
   function getMonthlyOps(year,month){
     try{
       if(typeof store==='undefined'||!store||!store.monthlyOps)return null;
@@ -74,15 +64,16 @@
     var prevLabor=prevOps?num(prevOps.laborCostYen):0;
     var gm=ops?num(ops.grossMarginRate):0;
     var prevGm=prevOps?num(prevOps.grossMarginRate):0;
-    var completed=isCompletedMonth(c.year,c.month);
+    var completed=window.InsightYearComparison.isCompletedMonth(c.year,c.month);
+    var monthly=window.InsightYearComparison.monthly(c.year,c.month,c.prevYear);
     var laborRate=completed&&labor>0&&sales>0?labor/sales*100:null;
     var prevLaborRate=completed&&prevLabor>0&&prevSales>0?prevLabor/prevSales*100:null;
     return {
       context:c,completed:completed,rows:rows,prevRows:prevRows,ops:ops,prevOps:prevOps,sales:sales,prevSales:prevSales,
       labor:labor,prevLabor:prevLabor,laborRate:laborRate,prevLaborRate:prevLaborRate,
-      laborCostChange:completed&&prevLabor>0&&labor>0?(labor-prevLabor)/prevLabor*100:null,
+      laborCostChange:monthly.laborCostYen?monthly.laborCostYen.pct:null,
       laborRatePoint:laborRate!=null&&prevLaborRate!=null?laborRate-prevLaborRate:null,
-      grossMarginRate:gm,prevGrossMarginRate:prevGm,grossMarginPoint:completed&&gm>0&&prevGm>0?gm-prevGm:null,
+      grossMarginRate:gm,prevGrossMarginRate:prevGm,grossMarginPoint:monthly.grossMarginRate?monthly.grossMarginRate.point:null,
       status:memoSummary(rows),prevStatus:memoSummary(prevRows)
     };
   }
@@ -103,7 +94,7 @@
       if(a.laborRate!=null)out.push('人件費は'+yen(a.labor)+'、人件費率は'+pct(a.laborRate)+'です。');
       else out.push('人件費は'+yen(a.labor)+'入力されています。');
     }
-    if(a.completed&&a.grossMarginRate>0){
+    if(a.grossMarginRate>0){
       var g='粗利率は'+pct(a.grossMarginRate);
       if(a.grossMarginPoint!=null)g+='、前年差'+signedPt(a.grossMarginPoint);
       out.push(g+'です。');
@@ -190,7 +181,6 @@
     return out.join('\n');
   }
   function grossMarginAnswer(a){
-    if(!a.completed)return 'この月は未確定のため、粗利率は月次未確定として経営評価から除外しています。入力値がある場合も、月終了後に正式評価します。';
     if(a.grossMarginRate<=0)return 'この月の粗利率はまだ入力されていません。';
     var out=['粗利率は'+pct(a.grossMarginRate)+'です。'];
     if(a.grossMarginPoint!=null)out.push('前年差は'+signedPt(a.grossMarginPoint)+'です。');
