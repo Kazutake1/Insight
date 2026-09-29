@@ -116,7 +116,7 @@
     var style=el('style');style.textContent=`
       #insightEvents{margin-top:10px;font-size:12px}#insightEvents .ie-head{display:flex;align-items:center;justify-content:space-between;gap:8px;margin-bottom:6px}
       #insightEvents button,.ie-dialog button{border:1px solid var(--border);border-radius:9px;background:var(--surface2);color:var(--text);padding:7px 10px;font:inherit;cursor:pointer}
-      #insightEvents .ie-list{display:flex;flex-wrap:wrap;gap:6px}.ie-chip{display:flex;align-items:center;gap:6px;max-width:100%;background:var(--surface2);border:1px solid var(--border);border-radius:9px;padding:4px 7px}.ie-chip span{overflow-wrap:anywhere}.ie-chip small{color:var(--text4);white-space:nowrap}#insightEvents .ie-chip button{padding:0 5px;border:0;font-size:17px}#insightEvents .ie-chip .ie-summary{font-size:12px;text-align:left;overflow-wrap:anywhere;min-width:0;padding:0}
+      #insightEvents .ie-list{display:flex;flex-wrap:wrap;gap:6px}.ie-chip{display:flex;align-items:center;gap:6px;max-width:100%;background:var(--surface2);border:1px solid var(--border);border-radius:9px;padding:4px 7px}.ie-chip span{overflow-wrap:anywhere}.ie-chip small{color:var(--text4);white-space:nowrap}#insightEvents .ie-chip button{padding:0 5px;border:0;font-size:17px}#insightEvents .ie-chip .ie-summary{font-size:12px;text-align:left;overflow-wrap:anywhere;min-width:0;padding:0}#insightEvents .ie-chip .ie-edit{font-size:11px;padding:2px 6px;border:1px solid var(--border);border-radius:7px}
       .ie-dialog{position:fixed;inset:0;margin:auto;box-sizing:border-box;width:min(520px,calc(100vw - 24px));max-height:88vh;overflow:auto;border:1px solid var(--border);border-radius:18px;padding:20px;background:var(--surface);color:var(--text);font:12px/1.55 -apple-system,BlinkMacSystemFont,'Noto Sans JP',sans-serif;box-shadow:0 12px 40px #0003}.ie-dialog::backdrop{background:#0005}.ie-dialog h2{font-size:16px;margin:0}.ie-dialog header{display:flex;align-items:center;justify-content:space-between;margin-bottom:12px}.ie-dialog label{display:flex;flex-direction:column;gap:4px;margin:10px 0}.ie-dialog input,.ie-dialog select,.ie-dialog textarea{width:100%;box-sizing:border-box;border:1px solid var(--border);border-radius:9px;padding:9px;background:var(--input-bg,var(--surface2));color:var(--text);font:inherit}.ie-dialog textarea{min-height:64px;resize:vertical}.ie-category-options{border:1px solid var(--border);border-radius:11px;padding:8px 10px;margin:10px 0}.ie-category-options legend{font-weight:700;padding:0 4px}.ie-category-list{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:3px 10px}.ie-dialog .ie-category-option{display:flex;flex-direction:row;align-items:center;gap:7px;margin:0;padding:5px 2px}.ie-dialog .ie-category-option input{width:auto;margin:0;accent-color:#15803d}.ie-dates{display:grid;grid-template-columns:1fr 1fr;gap:10px}.ie-actions{display:flex;justify-content:flex-end;gap:8px;margin-top:16px}.ie-dialog .ie-primary{background:var(--text);color:var(--surface)}.ie-muted{font-size:11px;color:var(--text4);margin:5px 0}.ie-presets{display:flex;flex-wrap:wrap;gap:6px}.ie-preset-row{border-bottom:1px solid var(--border);padding:10px 0}.ie-preset-row div{display:flex;gap:6px;flex-wrap:wrap;margin-top:6px}.ie-dialog button:disabled{opacity:.4;cursor:default}@media(max-width:520px){.ie-category-list{grid-template-columns:1fr}}
       .ie-dialog.ie-event-add{position:fixed;inset:0;margin:auto}
       .ie-dialog.ie-preset-editor{position:fixed;inset:0;margin:auto}
@@ -171,7 +171,8 @@
         var chip=el('div',undefined,'ie-chip');chip.title=e.startDate+' 〜 '+e.endDate+(e.snapshot.note?'\n'+e.snapshot.note:'');
         var desc=summary(e.snapshot);
         var details=button(desc,function(){var d=dialog(TYPES[e.type]||e.type);d.append(el('p',desc),el('p',e.startDate+' 〜 '+e.endDate),el('p',e.scope==='global'?'全店舗共通':'この店舗のみ'));if(e.snapshot.note){var note=el('p',e.snapshot.note);note.style.whiteSpace='pre-wrap';d.append(note);}});details.className='ie-summary';
-        chip.append(el('small',TYPES[e.type]||e.type),details,el('small',e.scope==='global'?'全店舗':'この店舗'));
+        var edit=button('編集',function(){openEvent(e);});edit.className='ie-edit';edit.setAttribute('aria-label',desc+'を編集');
+        chip.append(el('small',TYPES[e.type]||e.type),details,el('small',e.scope==='global'?'全店舗':'この店舗'),edit);
         var remove=button('×',function(){
           if(!confirm(desc+'\n'+e.startDate+' 〜 '+e.endDate+'\n'+(e.scope==='global'?'全店舗':'この店舗')+'の開催記録を期間全体から削除します。過去の日付の表示も消えます。\nよろしいですか？'))return;
           transaction(function(next){var target=e.scope==='global'?next.eventManagement:next.stores[allStores.current];target.events=target.events.filter(function(v){return v.id!==e.id;});});
@@ -179,22 +180,42 @@
       });}catch(e){rows.append(el('span','イベントデータを読み込めません。バックアップを確認してください。'));}
       wrap.append(rows);container.append(wrap);
     }
-    function openEvent(){
+    function openEvent(existing){
       if(activeDialog)return;
-      var storeId=allStores.current,d=dialog('店舗イベントを追加');d.classList.add('ie-event-add');activeDialog=d;
+      var editing=!!existing,source=editing?copy(existing):null,storeId=allStores.current;
+      var d=dialog(editing?'店舗イベントを編集':'店舗イベントを追加');d.classList.add('ie-event-add');activeDialog=d;
       var form=el('form');d.append(form);
-      var type=select(form,'イベント種別',TYPES,'sale');
+      var type=select(form,'イベント種別',TYPES,editing?source.type:'sale');
       var scopeText=el('p',undefined,'ie-muted');form.append(scopeText);
       var dates=el('div',undefined,'ie-dates');form.append(dates);
-      var start=field(dates,'開始日','date',selectedDate()),end=field(dates,'終了日','date',selectedDate());start.required=end.required=true;
+      var start=field(dates,'開始日','date',editing?source.startDate:selectedDate()),end=field(dates,'終了日','date',editing?source.endDate:selectedDate());start.required=end.required=true;
       start.onchange=function(){if(end.value<start.value)end.value=start.value;};
       var content=el('div');form.append(content);var read,scope,showAll=false;
+      function replaceRegisteredEvent(next,event){
+        var oldTarget=source.scope==='global'?management(next):next.stores[storeId];
+        requireValue(oldTarget&&Array.isArray(oldTarget.events),'登録済みイベントが見つかりません。');
+        var oldIndex=oldTarget.events.findIndex(function(v){return v.id===source.id;});
+        requireValue(oldIndex>=0,'登録済みイベントが見つかりません。');
+        oldTarget.events.splice(oldIndex,1);
+        if(event.scope==='global')management(next).events.push(event);
+        else{
+          requireValue(!!next.stores[storeId],'対象店舗がありません。');
+          (next.stores[storeId].events||(next.stores[storeId].events=[])).push(event);
+        }
+      }
       function save(snapshot,presetId){
         try{
           requireValue(storeId===allStores.current,'店舗が変更されています。画面を開き直してください。');
           var e={type:type.value,scope:type.value==='sale'||type.value==='campaign'?'global':type.value==='other'?scope.value:'store',startDate:start.value,endDate:end.value,snapshot:snapshot};
+          if(editing)e.id=source.id;
           if(presetId)e.presetId=presetId;
-          if(transaction(function(next){add(next,storeId,e);}))d.close();
+          else if(editing&&source.presetId&&type.value==='sale')e.presetId=source.presetId;
+          if(editing){
+            if(!confirm('登録済みイベントを変更します。\n期間中の表示や関連する比較にも変更内容が反映されます。よろしいですか？'))return;
+            if(transaction(function(next){replaceRegisteredEvent(next,e);}))d.close();
+          }else{
+            if(transaction(function(next){add(next,storeId,e);}))d.close();
+          }
         }catch(err){alert(err.message);}
       }
       function draw(){
@@ -203,17 +224,18 @@
           var h=el('div',undefined,'ie-head');h.append(el('strong','よく使うセール'),button('編集',function(){managePresets(draw);}));content.append(h);
           var ps=el('div',undefined,'ie-presets'),items=presets(allStores);items.slice(0,showAll?items.length:6).forEach(function(p){ps.append(button(summary(p.snapshot),function(){save(copy(p.snapshot),p.id);}));});
           if(!items.length)ps.append(el('span','「編集」からよく使うセールを追加できます。','ie-muted'));
-          if(items.length>6)ps.append(button(showAll?'折りたたむ':'すべて表示（'+items.length+'件）',function(){showAll=!showAll;draw();}));content.append(ps,el('p','選ぶと上記の期間で登録します。個別の条件は下で入力できます。','ie-muted'));
-          read=saleEditor(content);
+          if(items.length>6)ps.append(button(showAll?'折りたたむ':'すべて表示（'+items.length+'件）',function(){showAll=!showAll;draw();}));content.append(ps,el('p',editing?'プリセットを選ぶと、その内容で登録済みイベントを変更します。下の項目から個別編集もできます。':'選ぶと上記の期間で登録します。個別の条件は下で入力できます。','ie-muted'));
+          read=saleEditor(content,editing&&source.type==='sale'?source.snapshot:null);
         }else{
-          if(type.value==='other')scope=select(content,'適用範囲',{store:'この店舗のみ',global:'全店舗共通'},'store');
-          var title=field(content,'イベント名','text',''),note=field(content,'補足（任意）','textarea','');title.required=true;
+          if(type.value==='other')scope=select(content,'適用範囲',{store:'この店舗のみ',global:'全店舗共通'},editing&&source.type==='other'?source.scope:'store');
+          var initialSnapshot=editing&&source.snapshot?source.snapshot:null;
+          var title=field(content,'イベント名','text',initialSnapshot?initialSnapshot.title:''),note=field(content,'補足（任意）','textarea',initialSnapshot?initialSnapshot.note:'');title.required=true;
           read=function(){return {version:1,title:title.value.trim(),note:note.value.trim()};};
         }
       }
       type.onchange=draw;draw();
-      form.append(el('p','イベントは登録時に保存されます。日次の「クリア」では削除されません。','ie-muted'));
-      var actions=el('div',undefined,'ie-actions'),submit=el('button','登録する','ie-primary');submit.type='submit';actions.append(button('キャンセル',function(){d.close();}),submit);form.append(actions);
+      form.append(el('p',editing?'変更内容は保存後、登録済みの期間全体に反映されます。':'イベントは登録時に保存されます。日次の「クリア」では削除されません。','ie-muted'));
+      var actions=el('div',undefined,'ie-actions'),submit=el('button',editing?'変更を保存':'登録する','ie-primary');submit.type='submit';actions.append(button('キャンセル',function(){d.close();}),submit);form.append(actions);
       form.onsubmit=function(e){e.preventDefault();try{save(read());}catch(err){alert(err.message);}};
     }
     function managePresets(onChange){
