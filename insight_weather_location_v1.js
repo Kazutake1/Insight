@@ -100,7 +100,10 @@
     var btn=document.createElement('button');
     btn.id='weatherLocationMenuItem';
     btn.className='store-menu-item';
-    btn.innerHTML='<span>🌤️</span> 天気地点：'+currentLabel();
+    var icon=document.createElement('span');
+    icon.textContent='🌤️';
+    btn.appendChild(icon);
+    btn.appendChild(document.createTextNode(' 天気地点：'+currentLabel()));
     btn.onclick=async function(e){
       if(e)e.stopPropagation();
       menu.style.display='none';
