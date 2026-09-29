@@ -49,11 +49,11 @@
     if(code===1)return '晴';
     if(code===2)return '晴曇';
     if(code===3||code===45||code===48)return '曇';
-    if([51,53,55,56,57,61,80].indexOf(code)>=0)return '小雨';
-    if([63,66,81].indexOf(code)>=0)return '雨';
-    if([65,67,82,95,96,97,99].indexOf(code)>=0)return '大雨';
-    if([71,73,77,85].indexOf(code)>=0)return 'みぞれ';
-    if([75,86].indexOf(code)>=0)return '雪';
+    if([51,53,55,61,80].indexOf(code)>=0)return '小雨';
+    if([56,57,66,67].indexOf(code)>=0)return 'みぞれ';
+    if([63,81].indexOf(code)>=0)return '雨';
+    if([65,82,95,96,97,99].indexOf(code)>=0)return '大雨';
+    if([71,73,75,77,85,86].indexOf(code)>=0)return '雪';
     return '曇';
   }
 
