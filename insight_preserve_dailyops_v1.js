@@ -3,6 +3,8 @@
     if(!oldRow||!newRow)return newRow;
     if(newRow.storeMemo===undefined&&oldRow.storeMemo!==undefined)newRow.storeMemo=oldRow.storeMemo;
     if(newRow.stockout===undefined&&oldRow.stockout!==undefined)newRow.stockout=oldRow.stockout;
+    if(newRow.tempMaxC===undefined&&oldRow.tempMaxC!==undefined)newRow.tempMaxC=oldRow.tempMaxC;
+    if(newRow.tempMinC===undefined&&oldRow.tempMinC!==undefined)newRow.tempMinC=oldRow.tempMinC;
     return newRow;
   }
 
@@ -14,7 +16,7 @@
       var oldRows=(year&&month&&store.data&&store.data[year]&&Array.isArray(store.data[year][month]))?store.data[year][month]:[];
       var savedOps=oldRows.map(function(row){
         if(!row)return null;
-        return {storeMemo:row.storeMemo,stockout:row.stockout};
+        return {storeMemo:row.storeMemo,stockout:row.stockout,tempMaxC:row.tempMaxC,tempMinC:row.tempMinC};
       });
 
       var result=originalSaveInput.apply(this,arguments);
@@ -54,7 +56,7 @@
   window.clearKyakuMonth=function(){
     var y=editYear.kyaku,m=editMonth.kyaku;
     var storeName=store.name;
-    if(!confirm(storeName+' の '+m+'（'+y+'年）の客数データだけを全て削除します。\n売上・買上点数・廃棄・店舗メモ・天気は残ります。\n\nこの操作は元に戻せません。よろしいですか？'))return;
+    if(!confirm(storeName+' の '+m+'（'+y+'年）の客数データだけを全て削除します。\n売上・買上点数・廃棄・店舗メモ・天気・気温は残ります。\n\nこの操作は元に戻せません。よろしいですか？'))return;
     if(!store.data[y]||!store.data[y][m])return;
     store.data[y][m].forEach(function(row){if(row)row.客数=0;});
     persist();
@@ -68,7 +70,7 @@
     var day=Number(typeof quickEditDay!=='undefined'?quickEditDay:t.day)||t.day;
     var storeName=store.name;
     var targetLabel=day===t.day?'本日（'+t.month+day+'日）':t.month+day+'日';
-    if(!confirm(storeName+' の '+targetLabel+'の入力データを削除します。\n売上・客数・買上点数・廃棄・店舗メモをクリアし、天気は保持します。\n\nこの操作は元に戻せません。よろしいですか？'))return;
+    if(!confirm(storeName+' の '+targetLabel+'の入力データを削除します。\n売上・客数・買上点数・廃棄・店舗メモをクリアし、天気・気温は保持します。\n\nこの操作は元に戻せません。よろしいですか？'))return;
     if(!store.data[t.fy]||!store.data[t.fy][t.month])return;
     var ri=day-1,row=store.data[t.fy][t.month][ri];
     if(row){
