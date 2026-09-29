@@ -41,6 +41,15 @@ function normalizeBackup(raw){
       Object.keys(st.monthlyOps).forEach(function(y){if(!validYear(y)||!isPlainObject(st.monthlyOps[y]))throw new Error("月次年度データが不正です");Object.keys(st.monthlyOps[y]).forEach(function(m){if(MONTHS.indexOf(m)<0||!isPlainObject(st.monthlyOps[y][m]))throw new Error("月次データが不正です");var op=st.monthlyOps[y][m];op.laborCostYen=nonNegativeNumber(op.laborCostYen,"人件費");op.grossMarginRate=nonNegativeNumber(op.grossMarginRate,"粗利率");if(op.grossMarginRate>100)throw new Error("粗利率が不正です");});});
     }
     if(st.haikibudget!==undefined){if(!isPlainObject(st.haikibudget)||!isPlainObject(st.haikibudget.cats))throw new Error("廃棄予算が不正です");st.haikibudget.total=nonNegativeNumber(st.haikibudget.total,"廃棄予算");HAIKI_CATS.forEach(function(c){st.haikibudget.cats[c]=nonNegativeNumber(st.haikibudget.cats[c],c+"予算");});}
+    if(st.weatherLocation!==undefined){
+      var wl=st.weatherLocation;
+      if(!isPlainObject(wl)||typeof wl.name!=="string"||!wl.name.trim())throw new Error("天気地点設定が不正です");
+      var lat=Number(wl.latitude),lon=Number(wl.longitude);
+      if(!Number.isFinite(lat)||lat<-90||lat>90||!Number.isFinite(lon)||lon<-180||lon>180)throw new Error("天気地点の座標が不正です");
+      wl.latitude=lat;wl.longitude=lon;
+      if(wl.label!==undefined&&typeof wl.label!=="string")throw new Error("天気地点名が不正です");
+      if(wl.timezone!==undefined&&typeof wl.timezone!=="string")throw new Error("天気地点のタイムゾーンが不正です");
+    }
   });
   if(next.sharedWeather!==undefined){if(!isPlainObject(next.sharedWeather))throw new Error("共有天気データが不正です");Object.keys(next.sharedWeather).forEach(function(k){if(typeof next.sharedWeather[k]!=="string")throw new Error("共有天気データが不正です");});}
   normalizeSalesCount(next);
