@@ -170,7 +170,7 @@
       var container=doc.getElementById('opsDailyWrap');if(!container)return;
       var old=doc.getElementById('insightEvents');if(old)old.remove();
       var wrap=el('section');wrap.id='insightEvents';wrap.setAttribute('aria-label','店舗イベント');
-      var head=el('div',undefined,'ie-head');head.append(el('strong','店舗イベント'),button('＋イベントを追加',openEvent));wrap.append(head);
+      var head=el('div',undefined,'ie-head');head.append(el('strong','店舗イベント'),button('＋イベントを追加',function(){openEvent(null);}));wrap.append(head);
       var rows=el('div',undefined,'ie-list');
       try{validate(allStores);list(allStores,allStores.current,selectedDate()).forEach(function(e){
         var chip=el('div',undefined,'ie-chip');chip.title=e.startDate+' 〜 '+e.endDate+(e.snapshot.note?'\n'+e.snapshot.note:'');
@@ -191,7 +191,8 @@
     }
     function openEvent(existing){
       if(activeDialog)return;
-      var editing=!!existing,source=editing?copy(existing):null,storeId=allStores.current;
+      var editing=object(existing)&&typeof existing.id==='string'&&existing.id.length>0&&object(existing.snapshot)&&typeof existing.type==='string';
+      var source=editing?copy(existing):null,storeId=allStores.current;
       var d=dialog(editing?'店舗イベントを編集':'店舗イベントを追加');d.classList.add('ie-event-add');activeDialog=d;
       var form=el('form');d.append(form);
       var type=select(form,'イベント種別',TYPES,editing?source.type:'sale');
