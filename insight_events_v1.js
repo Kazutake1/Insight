@@ -4,7 +4,7 @@
   var TYPES={sale:'セール',campaign:'キャンペーン',nearby:'近隣イベント',environment:'周辺環境',equipment:'設備',staff:'人員',bulk:'大口注文',other:'その他'};
   var METHODS={amount:'○円引き',percent:'○%引き',fixed:'○円均一',multi:'複数購入値引き',gift:'購入特典',other:'その他／自由条件'};
   var CATEGORIES=['おにぎり','フライヤー','中華まん','麺類','ブリトー','その他'];
-  var FIELDS={amount:[['amount','値引き額（円）',1]],percent:[['percent','割引率（%）',0.1,100]],fixed:[['minPrice','対象価格下限（円）',0],['maxPrice','対象価格上限（円）',0],['price','均一価格（円）',0]],multi:[['quantity','購入個数',1],['amount','値引き額（円）',1]],gift:[['quantity','購入個数',1],['giftType','特典種類（例：商品無料）'],['giftProduct','特典商品'],['giftQuantity','特典数量',1],['giftUnit','特典の単位（例：本・杯・個）']],other:[['text','自由条件']]};
+  var FIELDS={amount:[['amount','値引き額（円）',1]],percent:[['percent','割引率（%）',0.1,100]],fixed:[['minPrice','対象価格下限（円・任意）',0],['maxPrice','対象価格上限（円・任意）',0],['price','均一価格（円）',0]],multi:[['quantity','購入個数',1],['amount','値引き額（円）',1]],gift:[['quantity','購入個数',1],['giftType','特典種類（例：商品無料）'],['giftProduct','特典商品'],['giftQuantity','特典数量',1],['giftUnit','特典の単位（例：本・杯・個）']],other:[['text','自由条件']]};
   function copy(v){return JSON.parse(JSON.stringify(v));}
   function object(v){return !!v&&typeof v==='object'&&!Array.isArray(v);}
   function requireValue(ok,message){if(!ok)throw new Error(message);}
@@ -29,11 +29,12 @@
         });
       }
       (FIELDS[sale.method]||[]).forEach(function(f){
-        var v=sale.params[f[0]];
+        var v=sale.params[f[0]],optionalFixedBound=sale.method==='fixed'&&(f[0]==='minPrice'||f[0]==='maxPrice');
+        if(optionalFixedBound&&(v===undefined||v===null||v===''))return;
         if(f.length===2){str(v,f[1]);return;}
         requireValue(typeof v==='number'&&Number.isFinite(v)&&v>=f[2]&&(f[3]===undefined||v<=f[3])&&(f[0]==='percent'||Number.isSafeInteger(v)),f[1]+'を確認してください。');
       });
-      if(sale.method==='fixed')requireValue(sale.params.minPrice<=sale.params.maxPrice,'価格の下限は上限以下にしてください。');
+      if(sale.method==='fixed'&&sale.params.minPrice!==undefined&&sale.params.maxPrice!==undefined)requireValue(sale.params.minPrice<=sale.params.maxPrice,'価格の下限は上限以下にしてください。');
     }
     return s;
   }
@@ -69,7 +70,7 @@
     switch(a.method){
       case 'amount':t=p.amount+'円引き';break;
       case 'percent':t=p.percent+'%引き';break;
-      case 'fixed':t=p.minPrice+'〜'+p.maxPrice+'円の商品を'+p.price+'円均一';break;
+      case 'fixed':t=p.minPrice!==undefined&&p.maxPrice!==undefined?p.minPrice+'〜'+p.maxPrice+'円の商品を'+p.price+'円均一':p.minPrice!==undefined?p.minPrice+'円以上の商品を'+p.price+'円均一':p.maxPrice!==undefined?p.maxPrice+'円以下の商品を'+p.price+'円均一':p.price+'円均一';break;
       case 'multi':t=p.quantity+'個購入で'+p.amount+'円引き';break;
       case 'gift':t=p.quantity+'個購入で'+p.giftProduct+p.giftQuantity+p.giftUnit+(p.giftType==='商品無料'?'無料':'（'+p.giftType+'）');break;
       case 'other':t=p.text;break;
@@ -146,14 +147,18 @@
       var method=select(parent,'セール方式',methods,initial?initial.method:'amount');var params=el('div');parent.append(params);var inputs={};
       function draw(){params.replaceChildren();inputs={};(FIELDS[method.value]||[]).forEach(function(f){
         var value=initial&&method.value===initial.method?initial.params[f[0]]:f[0]==='giftType'?'商品無料':f[0]==='giftUnit'?'本':'';
-        var input=field(params,f[1],f.length===2?'text':'number',value);input.required=true;
+        var input=field(params,f[1],f.length===2?'text':'number',value),optionalFixedBound=method.value==='fixed'&&(f[0]==='minPrice'||f[0]==='maxPrice');input.required=!optionalFixedBound;
         if(f.length>2){input.min=f[2];input.step=f[0]==='percent'?'0.1':'1';if(f[3]!==undefined)input.max=f[3];}inputs[f[0]]=input;
       });}
       method.onchange=draw;draw();
       var note=field(parent,'補足（任意）','textarea',snapshot?snapshot.note:'');
       return function(){
         var p=initial&&method.value===initial.method?copy(initial.params):{};
-        (FIELDS[method.value]||[]).forEach(function(f){requireValue(inputs[f[0]].value.trim()!=='',f[1]+'を入力してください。');p[f[0]]=f.length===2?inputs[f[0]].value.trim():Number(inputs[f[0]].value);});
+        (FIELDS[method.value]||[]).forEach(function(f){
+          var raw=inputs[f[0]].value.trim(),optionalFixedBound=method.value==='fixed'&&(f[0]==='minPrice'||f[0]==='maxPrice');
+          if(optionalFixedBound&&raw===''){delete p[f[0]];return;}
+          requireValue(raw!=='',f[1]+'を入力してください。');p[f[0]]=f.length===2?raw:Number(raw);
+        });
         var chosen=categoryInputs.filter(function(item){return item.input.checked;}).map(function(item){return item.option;});requireValue(chosen.length>0,'対象カテゴリーを1件以上選択してください。');
         var categoryNames=chosen.map(function(item){return item.name;}),targets=chosen.map(function(item){var target={category:item.name};if(item.categoryId)target.categoryId=item.categoryId;return target;});
         var sale={category:categoryNames.join('・'),method:method.value,params:p,targets:targets};if(targets[0].categoryId)sale.categoryId=targets[0].categoryId;
