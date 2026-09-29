@@ -61,10 +61,7 @@
       var num=btn.querySelector('.hdb-num');
       if(!num)return;
       var day=(row.d!=null?String(row.d):String(ri+1))+'日';
-      var icon=iconFor(row);
-      num.innerHTML=day+
-        (icon?' <span class="iwt-icon">'+icon+'</span>':'')+
-        ' <span class="iwt-sales-list">'+tempPair(row,false)+'</span>';
+      num.textContent=day;
     });
   }
 
