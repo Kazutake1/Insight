@@ -44,12 +44,13 @@
       '.hf-title.iwt-title-row{display:flex;align-items:center;flex-wrap:wrap;gap:2px}',
       '.iwt-sales-list{font-size:9.5px;font-weight:700;color:var(--text4);white-space:nowrap;margin-left:3px;vertical-align:1px}',
       '.haiki-day-btn.sel .iwt-sales-list{color:rgba(255,255,255,.72)}',
-      '.kyaku-day-card:not(.empty){min-height:104px}',
-      '.kyaku-day-num.iwt-date-row{display:flex;align-items:center;justify-content:flex-start;width:100%;gap:4px;white-space:nowrap}',
-      '.kyaku-day-num.iwt-date-row .iwt-icon{font-size:13px;line-height:1}',
-      '.kyaku-day-num.iwt-date-row .iwt-temp{font-size:9px;font-weight:700;color:var(--text4);font-variant-numeric:tabular-nums}',
-      '.kyaku-day-num.iwt-date-row.sun .iwt-temp,.kyaku-day-num.iwt-date-row.sat .iwt-temp{color:var(--text4)}',
-      '@media(max-width:700px){.iwt-sales-list{font-size:9px}.iwt-date-weather{font-size:11px;margin-left:6px}.kyaku-day-num.iwt-date-row .iwt-temp{font-size:8.5px}}'
+      '.kyaku-day-card:not(.empty){min-height:104px;position:relative;align-items:stretch}',
+      '.kyaku-day-num.iwt-date-row{display:block;width:100%;text-align:left;white-space:nowrap}',
+      '.iwt-kyaku-corner{position:absolute;top:9px;right:8px;display:inline-flex;align-items:center;gap:4px;color:var(--text4);white-space:nowrap;font-weight:700}',
+      '.iwt-kyaku-corner .iwt-icon{font-size:13px;line-height:1}',
+      '.iwt-kyaku-corner .iwt-temp{font-size:9px;font-variant-numeric:tabular-nums}',
+      '.kyaku-day-card:not(.empty) .kyaku-input{margin-top:auto;align-self:center}',
+      '@media(max-width:700px){.iwt-sales-list{font-size:9px}.iwt-date-weather{font-size:11px;margin-left:6px}.iwt-kyaku-corner .iwt-temp{font-size:8.5px}}'
     ].join('');
     document.head.appendChild(style);
   }
@@ -99,10 +100,14 @@
       if(!dayEl)return;
       var icon=iconFor(row);
       dayEl.classList.add('iwt-date-row');
-      dayEl.insertAdjacentHTML('beforeend',
-        (icon?'<span class="iwt-icon">'+icon+'</span>':'')+
-        '<span class="iwt-temp">'+tempPair(row,false)+'</span>');
-      if(wx){wx.innerHTML='&nbsp;';wx.style.visibility='hidden';wx.setAttribute('aria-hidden','true');}
+      if(wx)wx.remove();
+      var corner=document.createElement('div');
+      corner.className='iwt-kyaku-corner';
+      corner.setAttribute('aria-label','最高最低気温と天気');
+      corner.innerHTML=
+        '<span class="iwt-temp">'+tempPair(row,false)+'</span>'+
+        (icon?'<span class="iwt-icon">'+icon+'</span>':'');
+      card.appendChild(corner);
     });
   }
 
