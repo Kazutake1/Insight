@@ -104,7 +104,7 @@
       dayEl.insertAdjacentHTML('beforeend',
         (icon?'<span class="iwt-icon">'+icon+'</span>':'')+
         '<span class="iwt-temp">'+tempPair(row,false)+'</span>');
-      if(wx)wx.remove();
+      if(wx){wx.innerHTML='&nbsp;';wx.style.visibility='hidden';wx.setAttribute('aria-hidden','true');}
     });
   }
 
