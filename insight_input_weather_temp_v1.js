@@ -38,15 +38,17 @@
     var style=document.createElement('style');
     style.id='insightInputWeatherTempV1Style';
     style.textContent=[
-      '.iwt-ref{display:inline-flex;align-items:center;gap:6px;min-height:34px;padding:6px 10px;border:1px solid var(--border);border-radius:9px;background:var(--surface2);color:var(--text2);font-size:13px;font-weight:700;white-space:nowrap}',
-      '.iwt-ref .iwt-icon{font-size:18px;line-height:1}',
-      '.iwt-ref .iwt-temp{font-variant-numeric:tabular-nums}',
+      '.iwt-date-weather{display:inline-flex;align-items:center;gap:5px;margin-left:8px;color:var(--text3);font-size:12px;font-weight:700;white-space:nowrap;vertical-align:1px}',
+      '.iwt-date-weather .iwt-icon{font-size:16px;line-height:1}',
+      '.iwt-date-weather .iwt-temp{font-variant-numeric:tabular-nums}',
+      '.hf-title.iwt-title-row{display:flex;align-items:center;flex-wrap:wrap;gap:2px}',
       '.iwt-sales-list{font-size:9.5px;font-weight:700;color:var(--text4);white-space:nowrap;margin-left:3px;vertical-align:1px}',
       '.haiki-day-btn.sel .iwt-sales-list{color:rgba(255,255,255,.72)}',
-      '.kyaku-wx.iwt-kyaku{display:flex;align-items:center;justify-content:center;gap:3px;font-size:12px;white-space:nowrap}',
-      '.kyaku-wx.iwt-kyaku .iwt-icon{font-size:14px;line-height:1}',
-      '.kyaku-wx.iwt-kyaku .iwt-temp{font-size:9.5px;font-weight:700;color:var(--text4);font-variant-numeric:tabular-nums}',
-      '@media(max-width:700px){.iwt-sales-list{font-size:9px}.kyaku-wx.iwt-kyaku .iwt-temp{font-size:9px}}'
+      '.kyaku-day-num.iwt-date-row{display:flex;align-items:center;justify-content:center;gap:4px;white-space:nowrap}',
+      '.kyaku-day-num.iwt-date-row .iwt-icon{font-size:13px;line-height:1}',
+      '.kyaku-day-num.iwt-date-row .iwt-temp{font-size:9px;font-weight:700;color:var(--text4);font-variant-numeric:tabular-nums}',
+      '.kyaku-day-num.iwt-date-row.sun .iwt-temp,.kyaku-day-num.iwt-date-row.sat .iwt-temp{color:var(--text4)}',
+      '@media(max-width:700px){.iwt-sales-list{font-size:9px}.iwt-date-weather{font-size:11px;margin-left:6px}.kyaku-day-num.iwt-date-row .iwt-temp{font-size:8.5px}}'
     ].join('');
     document.head.appendChild(style);
   }
@@ -71,15 +73,18 @@
     if(!form||typeof drafts==='undefined'||!drafts.sales)return;
     var ri=Math.max(0,(Number(day)||Number(root.salesSelDay)||1)-1);
     var row=drafts.sales[ri]||{};
+    var titleEl=form.querySelector('.hf-title');
     var firstWeatherButton=form.querySelector('[id^="swx_"]');
     var section=firstWeatherButton&&firstWeatherButton.parentElement&&firstWeatherButton.parentElement.parentElement;
-    if(!section)return;
+    if(!titleEl)return;
     var icon=iconFor(row);
-    section.innerHTML=
-      '<div class="iwt-ref" aria-label="天気と最高最低気温">'+
+    titleEl.classList.add('iwt-title-row');
+    titleEl.insertAdjacentHTML('beforeend',
+      '<span class="iwt-date-weather" aria-label="天気と最高最低気温">'+
         (icon?'<span class="iwt-icon">'+icon+'</span>':'')+
         '<span class="iwt-temp">'+tempPair(row,true)+'</span>'+
-      '</div>';
+      '</span>');
+    if(section)section.remove();
   }
 
   function decorateKyakuGrid(){
@@ -91,13 +96,15 @@
       var ri=Number(input.dataset.ri);
       if(!Number.isFinite(ri))return;
       var row=drafts.kyaku[ri]||{};
+      var dayEl=card.querySelector('.kyaku-day-num');
       var wx=card.querySelector('.kyaku-wx');
-      if(!wx)return;
+      if(!dayEl)return;
       var icon=iconFor(row);
-      wx.classList.add('iwt-kyaku');
-      wx.innerHTML=
+      dayEl.classList.add('iwt-date-row');
+      dayEl.insertAdjacentHTML('beforeend',
         (icon?'<span class="iwt-icon">'+icon+'</span>':'')+
-        '<span class="iwt-temp">'+tempPair(row,false)+'</span>';
+        '<span class="iwt-temp">'+tempPair(row,false)+'</span>');
+      if(wx)wx.remove();
     });
   }
 
