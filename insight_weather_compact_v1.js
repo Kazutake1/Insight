@@ -4,8 +4,8 @@
   if(root.__insightWeatherCompactV1)return;
   root.__insightWeatherCompactV1=true;
 
-  var ORDER=['快晴','晴','晴曇','曇','小雨','雨','大雨','みぞれ','雪'];
-  var ICONS={快晴:'☀️',晴:'🌤️',晴曇:'⛅',曇:'☁️',小雨:'🌦️',雨:'🌧️',大雨:'⛈️',みぞれ:'🌨️',雪:'❄️'};
+  var ORDER=['快晴','晴','晴曇','曇','小雨','雨','大雨','みぞれ','雪','霧','凍雨','雷雨'];
+  var ICONS={快晴:'☀️',晴:'🌤️',晴曇:'⛅',曇:'☁️',小雨:'🌦️',雨:'🌧️',大雨:'⛈️',みぞれ:'🌨️',雪:'❄️',霧:'🌫️',凍雨:'🧊',雷雨:'🌩️'};
 
   function ensureStyle(){
     if(document.getElementById('insightWeatherCompactV1Style'))return;
