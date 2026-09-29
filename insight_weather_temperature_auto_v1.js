@@ -15,13 +15,24 @@
   function pad(n){return String(n).padStart(2,'0');}
   function localYmd(date){return date.getFullYear()+'-'+pad(date.getMonth()+1)+'-'+pad(date.getDate());}
   function compactYmd(date){return date.getFullYear()+pad(date.getMonth()+1)+pad(date.getDate());}
+  function parseIsoDate(value){
+    var match=/^(\d{4})-(\d{2})-(\d{2})$/.exec(String(value||''));
+    if(!match)return null;
+    var year=Number(match[1]),month=Number(match[2])-1,day=Number(match[3]);
+    var date=new Date(0);date.setFullYear(year,month,day);date.setHours(0,0,0,0);
+    return date.getFullYear()===year&&date.getMonth()===month&&date.getDate()===day?date:null;
+  }
   function targetDate(){
     try{
+      var picker=document.getElementById('iqdDateInput');
+      var selected=picker&&parseIsoDate(picker.value);
+      if(selected)return selected;
       var year=Number(todayInfo.fy),month=Number(todayInfo.mIdx),day=Number(quickEditDay);
       if(!Number.isFinite(year)||!Number.isFinite(month)||!Number.isFinite(day))return new Date();
       return new Date(year,month,day);
     }catch(_){return new Date();}
   }
+  function isFutureDate(date){return localYmd(date)>localYmd(new Date());}
   function finite(v){
     if(v===null||v===undefined||v==='')return null;
     var n=Number(v);return Number.isFinite(n)?n:null;
@@ -78,7 +89,7 @@
       'daily='+encodeURIComponent('weather_code,temperature_2m_max,temperature_2m_min'),
       'timezone='+encodeURIComponent(timezone)
     ].join('&');
-    params+=historical?'&start_date='+dateKey+'&end_date='+dateKey+'&models=jma_seamless':'&past_days=3&forecast_days=7';
+    params+=historical?'&start_date='+dateKey+'&end_date='+dateKey+'&models=jma_seamless':'&past_days=3&forecast_days=1';
     var res=await fetch((historical?OPEN_METEO_HISTORY:OPEN_METEO_JMA)+'?'+params);
     if(!res.ok)throw new Error('location forecast fetch failed');
     var data=await res.json();
@@ -158,6 +169,36 @@
     return {min:Math.min.apply(null,values),max:Math.max.apply(null,values),source:isToday?'observed-so-far':'observed'};
   }
 
+  function clearFutureWeatherData(){
+    var stores=allStores&&allStores.stores;
+    if(!stores||typeof stores!=='object')return 0;
+    var todayKey=localYmd(new Date()),changed=0;
+    Object.keys(stores).forEach(function(storeId){
+      var targetStore=stores[storeId],data=targetStore&&targetStore.data;
+      if(!data||typeof data!=='object')return;
+      Object.keys(data).forEach(function(yearKey){
+        var year=Number(yearKey);if(!Number.isFinite(year))return;
+        var months=data[yearKey];if(!months||typeof months!=='object')return;
+        Object.keys(months).forEach(function(monthKey){
+          var match=/^(\d{1,2})月$/.exec(String(monthKey));if(!match)return;
+          var month=Number(match[1]);if(month<1||month>12)return;
+          var rows=months[monthKey];if(!Array.isArray(rows))return;
+          rows.forEach(function(row,index){
+            if(!row||typeof row!=='object')return;
+            var day=Number(row.d)||index+1;
+            var key=year+'-'+pad(month)+'-'+pad(day);
+            if(key<=todayKey)return;
+            if(row.weather){row.weather='';changed++;}
+            if(Object.prototype.hasOwnProperty.call(row,'tempMaxC')){delete row.tempMaxC;changed++;}
+            if(Object.prototype.hasOwnProperty.call(row,'tempMinC')){delete row.tempMinC;changed++;}
+          });
+        });
+      });
+    });
+    if(changed&&typeof persist==='function')persist();
+    return changed;
+  }
+
   async function fetchLegacy(date){
     var dateKey=localYmd(date),res=await fetch(FORECAST_URL);
     if(!res.ok)throw new Error('forecast fetch failed');
@@ -172,6 +213,11 @@
     label('取得中…');
     try{
       var date=targetDate(),result;
+      if(isFutureDate(date)){
+        label('自動');
+        title('未来日の天気・気温は取得・保存しません。');
+        return;
+      }
       if(validLocation(store&&store.weatherLocation)){
         result=await fetchByStoreLocation(date);
       }else{
@@ -209,13 +255,56 @@
       title(validLocation(loc)?'設定した天気地点のデータ取得に失敗しました。地点設定を確認するか、手動で入力してください。':
         '気象庁データへの接続または対象日のデータ取得に失敗しました。手動で入力してください。');
       compactIdleLabel();
-    }finally{if(btn)btn.disabled=false;}
+    }finally{if(btn)btn.disabled=isFutureDate(targetDate());}
   };
+
+  function applyFutureWeatherState(){
+    var future=isFutureDate(targetDate());
+    var trigger=document.getElementById('qWeatherCompactTrigger');
+    var autoBtn=document.getElementById('autoWxBtn');
+    var maxInput=document.getElementById('qi_tempMaxC');
+    var minInput=document.getElementById('qi_tempMinC');
+    if(trigger)trigger.disabled=future;
+    if(autoBtn){
+      autoBtn.disabled=future;
+      autoBtn.title=future?'未来日の天気・気温は取得・保存しません。':autoBtn.title;
+    }
+    if(maxInput)maxInput.disabled=future;
+    if(minInput)minInput.disabled=future;
+    var menu=document.getElementById('qWeatherCompactMenu');
+    if(menu)Array.prototype.forEach.call(menu.querySelectorAll('.qwc-option'),function(option){option.disabled=future;});
+    if(future){
+      if(root.InsightWeatherCompact&&typeof root.InsightWeatherCompact.close==='function')root.InsightWeatherCompact.close();
+      if(trigger){
+        var icon=trigger.querySelector('.qwc-icon'),text=trigger.querySelector('.qwc-label');
+        if(icon)icon.textContent='';
+        if(text)text.textContent='—';
+      }
+    }else if(root.InsightWeatherCompact&&typeof root.InsightWeatherCompact.sync==='function'){
+      root.InsightWeatherCompact.sync();
+    }
+  }
+
+  var oldRenderQuick=root.renderQuickPage;
+  if(typeof oldRenderQuick==='function'){
+    root.renderQuickPage=function(){
+      var result=oldRenderQuick.apply(this,arguments);
+      applyFutureWeatherState();
+      return result;
+    };
+  }
+
+  clearFutureWeatherData();
+  applyFutureWeatherState();
 
   root.InsightWeatherTemperatureAuto={
     weatherFromForecast:weatherFromForecast,
     temperatureFromForecast:temperatureFromForecast,
     wmoToWx:wmoToWx,
-    validLocation:validLocation
+    validLocation:validLocation,
+    targetDate:targetDate,
+    isFutureDate:isFutureDate,
+    clearFutureWeatherData:clearFutureWeatherData,
+    applyFutureWeatherState:applyFutureWeatherState
   };
 })(typeof window!=='undefined'?window:globalThis);
