@@ -53,6 +53,66 @@ test('セール実績の店舗名はHTMLではなく文字列として描画す�
   assert.doesNotMatch(render,/innerHTML=[^;]*x\.store/);
 });
 
+test('天気地点名はHTMLとして解釈せず文字列として描画する',()=>{
+  const source=fs.readFileSync(path.join(root,'insight_weather_location_v1.js'),'utf8');
+  const malicious='<img src=x onerror="globalThis.__weatherXss=1">';
+  const createdTags=[];
+  let weatherButton=null;
+  const menu={
+    children:[],style:{},
+    appendChild(node){this.children.push(node);},
+    insertBefore(node,ref){const i=this.children.indexOf(ref);this.children.splice(i<0?this.children.length:i,0,node);}
+  };
+  const document={
+    getElementById(id){
+      if(id==='storeMenu')return menu;
+      if(id==='weatherLocationMenuItem')return weatherButton;
+      return null;
+    },
+    createElement(tag){
+      createdTags.push(tag);
+      const node={
+        tagName:tag,children:[],style:{},
+        appendChild(child){this.children.push(child);},
+        set innerHTML(_value){assert.fail('天気地点名の描画にinnerHTMLを使用しないこと');}
+      };
+      if(tag==='button')weatherButton=node;
+      return node;
+    },
+    createTextNode(value){return {nodeType:3,textContent:String(value)};}
+  };
+  const context={document,store:{weatherLocation:{label:malicious}},showStoreMenu:()=>{},console};
+  vm.createContext(context);
+  vm.runInContext(source,context);
+  context.showStoreMenu();
+  assert.deepEqual(createdTags,['button','span']);
+  assert.equal(menu.children[0],weatherButton);
+  assert.equal(weatherButton.children[1].textContent,' 天気地点：'+malicious);
+  assert.equal(context.__weatherXss,undefined);
+});
+
+test('Index.htmlは必要先だけを許可するCSPを定義する',()=>{
+  const index=fs.readFileSync(path.join(root,'Index.html'),'utf8');
+  const match=index.match(/<meta http-equiv="Content-Security-Policy" content="([^"]+)">/);
+  assert.ok(match,'Content-Security-Policyが定義されていること');
+  const policy=match[1];
+  [
+    "default-src 'self'",
+    "script-src 'self' 'unsafe-inline' https://unpkg.com https://cdnjs.cloudflare.com",
+    "style-src 'self' 'unsafe-inline'",
+    "connect-src 'self' https://geocoding-api.open-meteo.com https://api.open-meteo.com https://historical-forecast-api.open-meteo.com https://www.jma.go.jp",
+    "img-src 'self' data:",
+    "object-src 'none'",
+    "base-uri 'self'",
+    "form-action 'self'",
+    "frame-src 'none'",
+    "worker-src 'none'",
+    "upgrade-insecure-requests"
+  ].forEach(directive=>assert.ok(policy.includes(directive),'CSPに '+directive+' が含まれること'));
+  assert.doesNotMatch(policy,/'unsafe-eval'/);
+  assert.ok(index.indexOf('Content-Security-Policy')<index.indexOf('https://unpkg.com/pako'),'CSPは外部スクリプトより前に定義すること');
+});
+
 test('販売数入力は不正値の保存と同じページの再読込を防ぐ',()=>{
   const source=fs.readFileSync(path.join(root,'insight_sales_count_v1.js'),'utf8');
   assert.match(source,/querySelector\('#pageSalesCount input:invalid'\)/);
