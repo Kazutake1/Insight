@@ -59,6 +59,8 @@
     (rows||[]).forEach(function(row){cats().forEach(function(cat,i){totals[i]+=number(row&&row.haiki&&row.haiki[cat]);});});
     return totals;
   }
+  window.InsightWasteInsights={sumCategories:sums};
+
   function context(){
     var year=String(editYear.haiki||''),month=editMonth.haiki||'',previousYear=String(Number(year)-1);
     var rows=store.data&&store.data[year]&&store.data[year][month]||[];

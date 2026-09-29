@@ -75,6 +75,25 @@
     function eventMatches(e){if(!e||e.type!=='sale'||!e.snapshot||!e.snapshot.sale)return false;return categoriesForSale(allStores,e.snapshot.sale).some(function(c){return c.id===state.categoryId;});}
     function eventsFor(storeId,date){try{return root.InsightEvents?root.InsightEvents.list(allStores,storeId,date).filter(eventMatches):[];}catch(_){return [];}}
     function analysisData(){var saleRows=[],normal=[],saleWeekdays=new Set(),days=daysInMonth(),storeId=allStores.current,st=allStores.stores[storeId];if(!st)return {sales:saleRows,normal:normal};for(var d=1;d<=days;d++){var date=monthPrefix()+'-'+pad(d),evs=eventsFor(storeId,date),r=st.salesCounts&&st.salesCounts[date]&&st.salesCounts[date][state.categoryId]?normalizeRecord(st.salesCounts[date][state.categoryId]):null;if(evs.length){saleWeekdays.add(new Date(date+'T12:00:00').getDay());evs.forEach(function(e){saleRows.push({date:date,store:st.name,event:e,record:r||emptyRecord()});});}}for(var n=1;n<=days;n++){var normalDate=monthPrefix()+'-'+pad(n),wd=new Date(normalDate+'T12:00:00').getDay();if(saleWeekdays.has(wd)&&eventsFor(storeId,normalDate).length===0){var normalRecord=st.salesCounts&&st.salesCounts[normalDate]&&st.salesCounts[normalDate][state.categoryId];if(normalRecord)normal.push(normalizeRecord(normalRecord));}}return {sales:saleRows,normal:normal};}
+
+    // Read-only snapshot for automatic AI comments; reuse the page's calculations.
+    model.getAnalysisContext=function(){
+      var data=analysisData(),records=Object.keys(state.draft).sort().map(function(date){
+        var r=state.draft[date];
+        return {date:date,delivery:total(r,'delivery'),sales:total(r,'sales')};
+      });
+      var saleRecords=uniqueSaleRecords(data.sales);
+      return copy({
+        year:state.year,month:state.month,category:selectedCategory(),dirty:state.dirty,
+        daily:records,delivery:average(Object.values(state.draft),'delivery'),
+        sales:average(Object.values(state.draft),'sales'),
+        weekdays:{delivery:weekdayRecords('delivery'),sales:weekdayRecords('sales')},
+        sale:{delivery:average(saleRecords,'delivery'),sales:average(saleRecords,'sales')},
+        normal:{delivery:average(data.normal,'delivery'),sales:average(data.normal,'sales')},
+        events:data.sales.map(function(row){return {date:row.date,summary:root.InsightEvents.summary(row.event.snapshot)};})
+      });
+    };
+
     function comparisonTable(records,title){var d=average(records,'delivery'),s=average(records,'sales'),box=el('section',undefined,'sc-card'),table=el('table');box.append(el('h3',title));table.innerHTML='<thead><tr><th></th><th>1便</th><th>2便</th><th>3便</th><th>1日</th></tr></thead><tbody><tr><th>平均納品</th><td>'+fmt(d.trips[0])+'</td><td>'+fmt(d.trips[1])+'</td><td>'+fmt(d.trips[2])+'</td><td>'+fmt(d.total)+'</td></tr><tr><th>平均販売</th><td>'+fmt(s.trips[0])+'</td><td>'+fmt(s.trips[1])+'</td><td>'+fmt(s.trips[2])+'</td><td>'+fmt(s.total)+'</td></tr></tbody>';box.append(table);return box;}
     function renderAnalysis(){var area=doc.getElementById('scAnalysis');if(!area)return;area.replaceChildren();var data=analysisData(),section=el('section',undefined,'sc-card sc-sale-list'),h=el('h3','セール実績'),wrap=el('div',undefined,'sc-table-scroll'),table=el('table');table.innerHTML='<thead><tr><th>日付</th><th>曜日</th><th>店舗</th><th>セール内容</th><th>1便 納/販</th><th>2便 納/販</th><th>3便 納/販</th><th>合計納品</th><th>合計販売</th></tr></thead>';var body=el('tbody');data.sales.forEach(function(x){var tr=el('tr'),r=x.record,desc=root.InsightEvents.summary(x.event.snapshot),values=[x.date,WEEKDAYS[new Date(x.date+'T12:00:00').getDay()],x.store,desc,disp(r.trips[0]),disp(r.trips[1]),disp(r.trips[2]),dispValue(total(r,'delivery')),dispValue(total(r,'sales'))];values.forEach(function(value){tr.append(el('td',String(value)));});body.append(tr);});if(!data.sales.length){var tr=el('tr'),td=el('td','この月に対象カテゴリーのセール実績はありません。');td.colSpan=9;tr.append(td);body.append(tr);}table.append(body);wrap.append(table);section.append(h,wrap);var comps=el('div',undefined,'sc-comparisons');comps.append(comparisonTable(uniqueSaleRecords(data.sales),'セール日平均'),comparisonTable(data.normal,'同曜日・通常日平均'));area.append(section,comps);}
     function disp(t){return dispValue(t.delivery)+' / '+dispValue(t.sales);}function dispValue(v){return v===null?'—':String(v);}
