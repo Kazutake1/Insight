@@ -10,6 +10,8 @@
   var AMEDAS_POINT='51106';
   var OPEN_METEO_JMA='https://api.open-meteo.com/v1/jma';
 
+  var OPEN_METEO_HISTORY='https://historical-forecast-api.open-meteo.com/v1/forecast';
+
   function pad(n){return String(n).padStart(2,'0');}
   function localYmd(date){return date.getFullYear()+'-'+pad(date.getMonth()+1)+'-'+pad(date.getDate());}
   function compactYmd(date){return date.getFullYear()+pad(date.getMonth()+1)+pad(date.getDate());}
@@ -60,20 +62,27 @@
   async function fetchByStoreLocation(date){
     var loc=store&&store.weatherLocation;
     if(!validLocation(loc))return null;
+    var dateKey=localYmd(date),timezone=loc.timezone||'Asia/Tokyo';
+    // Compare calendar dates in the requested timezone, avoiding DST-length days.
+    var parts=new Intl.DateTimeFormat('en-US',{timeZone:timezone,year:'numeric',month:'2-digit',day:'2-digit'}).formatToParts(new Date());
+    var todayParts={};
+    parts.forEach(function(part){todayParts[part.type]=part.value;});
+    var cutoff=new Date(Date.UTC(Number(todayParts.year),Number(todayParts.month)-1,Number(todayParts.day)-3));
+    var cutoffKey=cutoff.getUTCFullYear()+'-'+pad(cutoff.getUTCMonth()+1)+'-'+pad(cutoff.getUTCDate());
+    var historical=dateKey<cutoffKey;
     var params=[
       'latitude='+encodeURIComponent(Number(loc.latitude)),
       'longitude='+encodeURIComponent(Number(loc.longitude)),
       'daily='+encodeURIComponent('weather_code,temperature_2m_max,temperature_2m_min'),
-      'timezone='+encodeURIComponent(loc.timezone||'Asia/Tokyo'),
-      'past_days=3',
-      'forecast_days=7'
+      'timezone='+encodeURIComponent(timezone)
     ].join('&');
-    var res=await fetch(OPEN_METEO_JMA+'?'+params);
+    params+=historical?'&start_date='+dateKey+'&end_date='+dateKey+'&models=jma_seamless':'&past_days=3&forecast_days=7';
+    var res=await fetch((historical?OPEN_METEO_HISTORY:OPEN_METEO_JMA)+'?'+params);
     if(!res.ok)throw new Error('location forecast fetch failed');
     var data=await res.json();
     var daily=data&&data.daily;
     if(!daily||!Array.isArray(daily.time))throw new Error('location forecast invalid');
-    var dateKey=localYmd(date),idx=daily.time.indexOf(dateKey);
+    var idx=daily.time.indexOf(dateKey);
     if(idx<0)throw new Error('location forecast date unavailable');
     var max=finite(daily.temperature_2m_max&&daily.temperature_2m_max[idx]);
     var min=finite(daily.temperature_2m_min&&daily.temperature_2m_min[idx]);
