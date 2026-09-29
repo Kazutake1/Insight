@@ -13,7 +13,7 @@
   function fmtTemp(value){
     var n=finite(value);
     if(n===null)return '—';
-    return Number.isInteger(n)?String(n):String(Math.round(n*10)/10);
+    return String(Math.round(n));
   }
 
   function iconFor(row){

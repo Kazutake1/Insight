@@ -26,6 +26,34 @@
     return Number.isFinite(n)?String(n):'';
   }
 
+
+  var temperatureDisplayValues=new WeakMap();
+
+  function temperatureInputValue(input){
+    var value=temperatureDisplayValues.get(input);
+    return value&&input.value===value.display?value.raw:input.value;
+  }
+
+  function showTemperature(input,value){
+    var raw=displayTemperature(value);
+    var display=document.activeElement===input?raw:(raw===''?'':String(Math.round(Number(raw))));
+    temperatureDisplayValues.set(input,{raw:raw,display:display});
+    input.value=display;
+  }
+
+  function bindTemperatureDisplay(input){
+    input.addEventListener('focus',function(){
+      input.value=temperatureInputValue(input);
+    });
+    input.addEventListener('input',function(){
+      showTemperature(input,input.value);
+      updateAverage();
+    });
+    input.addEventListener('blur',function(){
+      showTemperature(input,temperatureInputValue(input));
+    });
+  }
+
   function normalizedLocationPart(value){
     return String(value==null?'':value).trim().replace(/\s+/g,'');
   }
@@ -74,7 +102,7 @@
     var minInput=document.getElementById('qi_tempMinC');
     var avg=document.getElementById('qi_tempAvgC');
     if(!maxInput||!minInput||!avg)return;
-    var max=parseTemperature(maxInput.value),min=parseTemperature(minInput.value);
+    var max=parseTemperature(temperatureInputValue(maxInput)),min=parseTemperature(temperatureInputValue(minInput));
     avg.textContent=Number.isFinite(max)&&Number.isFinite(min)?((max+min)/2).toFixed(1)+'℃':'—';
   }
 
@@ -109,20 +137,20 @@
         '<span class="qt-average">平均 <strong id="qi_tempAvgC">—</strong></span>';
       weather.insertAdjacentElement('afterend',wrap);
       var maxInput=wrap.querySelector('#qi_tempMaxC'),minInput=wrap.querySelector('#qi_tempMinC');
-      maxInput.addEventListener('input',updateAverage);
-      minInput.addEventListener('input',updateAverage);
+      bindTemperatureDisplay(maxInput);
+      bindTemperatureDisplay(minInput);
     }
     var row=rowForQuickDay()||{};
     var max=document.getElementById('qi_tempMaxC'),min=document.getElementById('qi_tempMinC');
-    if(max)max.value=displayTemperature(row.tempMaxC);
-    if(min)min.value=displayTemperature(row.tempMinC);
+    if(max)showTemperature(max,row.tempMaxC);
+    if(min)showTemperature(min,row.tempMinC);
     updateAverage();
   }
 
   function readAndValidate(){
     var maxInput=document.getElementById('qi_tempMaxC'),minInput=document.getElementById('qi_tempMinC');
-    var max=maxInput?parseTemperature(maxInput.value):null;
-    var min=minInput?parseTemperature(minInput.value):null;
+    var max=maxInput?parseTemperature(temperatureInputValue(maxInput)):null;
+    var min=minInput?parseTemperature(temperatureInputValue(minInput)):null;
     if(Number.isNaN(max)||Number.isNaN(min))throw new Error('最高気温・最低気温は数字で入力してください。');
     if(max!==null&&min!==null&&max<min)throw new Error('最高気温は最低気温以上になるように入力してください。');
     return {max:max,min:min};
