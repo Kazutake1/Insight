@@ -5,28 +5,13 @@
   root.__insightTemperatureV1=true;
 
   function selectedQuickDateInfo(){
-    try{
-      var picker=document.getElementById('iqdDateInput');
-      var match=picker&&/^(\d{4})-(\d{2})-(\d{2})$/.exec(String(picker.value||''));
-      if(match){
-        var year=Number(match[1]),monthIndex=Number(match[2])-1,day=Number(match[3]);
-        var date=new Date(0);date.setFullYear(year,monthIndex,day);date.setHours(0,0,0,0);
-        if(date.getFullYear()===year&&date.getMonth()===monthIndex&&date.getDate()===day){
-          return {fy:String(year),month:(typeof MONTHS!=='undefined'&&MONTHS[monthIndex])||String(monthIndex+1)+'月',mIdx:monthIndex,day:day,date:date};
-        }
-      }
-      var fy=todayInfo&&todayInfo.fy?String(todayInfo.fy):'';
-      var mIdx=Number(todayInfo&&todayInfo.mIdx);
-      var month=todayInfo&&todayInfo.month?todayInfo.month:((Number.isFinite(mIdx)?mIdx+1:'')+'月');
-      var selectedDay=Number(quickEditDay);
-      return {fy:fy,month:month,mIdx:mIdx,day:selectedDay,date:new Date(Number(fy),mIdx,selectedDay)};
-    }catch(_){return null;}
+    return root.InsightDateContext&&typeof root.InsightDateContext.getSelectedInfo==='function'
+      ?root.InsightDateContext.getSelectedInfo():null;
   }
 
   function isFutureQuickDate(info){
-    if(!info||!(info.date instanceof Date)||!Number.isFinite(info.date.getTime()))return false;
-    var now=new Date(),today=new Date(now.getFullYear(),now.getMonth(),now.getDate());
-    return info.date>today;
+    return !!(root.InsightDateContext&&typeof root.InsightDateContext.isFuture==='function'&&
+      root.InsightDateContext.isFuture(info&&info.date?info.date:null));
   }
 
   function rowForQuickDay(){
