@@ -59,6 +59,15 @@ test('不正なschemaVersionは拒否する',()=>{
   assert.throws(()=>window.InsightStorage.migrateSnapshot({schemaVersion:-1}),/schema version is invalid/);
 });
 
+test('persistCurrentは現在データを共有writer経由で保存する',()=>{
+  const {window,calls}=setup();
+  const live={current:'a',stores:{a:{name:'A'}}};
+  assert.equal(window.InsightStorage.persistCurrent(live),true);
+  assert.equal(live.schemaVersion,1);
+  assert.equal(calls.length,1);
+  assert.deepEqual(JSON.parse(calls[0][1]),live);
+});
+
 test('transactionは元データを直接変更せず検証後に保存・反映する',()=>{
   const {window,calls}=setup();
   const sourceValue={count:1,nested:{value:2}};
@@ -101,9 +110,10 @@ test('feature moduleはlocalStorageへ直接書き込まず共有storageを使�
   }
 });
 
-test('Indexの共通persistだけはpayload起動前安全化として維持する',()=>{
+test('Indexの共通persistはStorage読込後に共有保存層へ委譲する',()=>{
   const index=fs.readFileSync(path.join(root,'Index.html'),'utf8');
   assert.match(index,/var safePersist=/);
+  assert.match(index,/InsightStorage\.persistCurrent\(allStores\)/);
   assert.match(index,/localStorage\.setItem\(SK,JSON\.stringify\(allStores\)\)/);
-  assert.match(index,/insight_storage_v1\.js\?v=20260930-step6-3/);
+  assert.match(index,/insight_storage_v1\.js\?v=20260930-step6-4/);
 });
