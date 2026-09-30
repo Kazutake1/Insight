@@ -68,6 +68,10 @@
   bridge('renderKPI',null,'dashboard:kpi:after',false);
   bridge('renderDerived',null,'dashboard:derived:after',false);
   bridge('refreshDash',null,'dashboard:refresh:after',false);
+  bridge('renderTable',null,'input:table:after',false);
+  bridge('saveInput','input:save:before','input:save:after',false);
+  bridge('renderAIAnalysisPanel','ai:render:before','ai:render:after',false);
+  bridge('buildAIQuestionAnswer','ai:question:before','ai:question:after',false);
 
   root.InsightHooks={
     on:on,
