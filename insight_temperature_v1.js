@@ -165,23 +165,21 @@
     return {max:max,min:min};
   }
 
-  var oldRender=root.renderQuickPage;
-  if(typeof oldRender==='function'){
-    root.renderQuickPage=function(){
-      var result=oldRender.apply(this,arguments);
-      renderTemperature();
-      return result;
-    };
+  if(root.InsightHooks){
+    root.InsightHooks.on('quick:render:after','temperature-render',function(){renderTemperature();},40);
   }
 
-  var oldSave=root.saveQuick;
-  if(typeof oldSave==='function'){
-    root.saveQuick=function(){
+  if(root.InsightHooks){
+    root.InsightHooks.on('quick:save:before','temperature-validate',function(ctx){
       var target=selectedQuickDateInfo(),future=isFutureQuickDate(target),values={max:null,min:null};
       if(!future){
-        try{values=readAndValidate();}catch(err){alert(err.message);return;}
+        try{values=readAndValidate();}
+        catch(err){alert(err.message);ctx.cancel=true;return false;}
       }
-      var result=oldSave.apply(this,arguments);
+      ctx.state.temperature={target:target,future:future,values:values};
+    },10);
+    root.InsightHooks.on('quick:save:after','temperature-save',function(ctx){
+      var state=ctx.state.temperature||{},target=state.target,future=state.future,values=state.values||{max:null,min:null};
       try{
         if(!target)throw new Error('対象日を取得できませんでした。');
         var fy=target.fy,month=target.month,day=target.day;
@@ -200,11 +198,9 @@
         }
         persist();
       }catch(err){
-        alert('気温データを保存できませんでした。\n'+err.message);
-        return;
+        alert('気温データを保存できませんでした.\n'+err.message);
       }
-      return result;
-    };
+    },40);
   }
 
   root.InsightTemperature={
