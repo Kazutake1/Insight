@@ -14,21 +14,21 @@
       if(typeof getAIAnalysisThroughDay==='function'&&year!=null&&month)throughDay=getAIAnalysisThroughDay(year,month);
     }catch(_){}
     if(!root.KPIEngine||typeof root.KPIEngine.getPeriod!=='function'||year==null||!month)return null;
-    var current=root.KPIEngine.getPeriod(year,month,throughDay);
-    var previous=compare!=null?root.KPIEngine.getPeriod(compare,month,throughDay):null;
-    var comparison=null;
+    var shared=null;
     if(compare!=null&&root.InsightYearComparison&&typeof root.InsightYearComparison.getPeriod==='function'){
-      var result=root.InsightYearComparison.getPeriod(year,month,throughDay,compare);
-      comparison=result&&result.comparison?result.comparison:null;
+      shared=root.InsightYearComparison.getPeriod(year,month,throughDay,compare);
     }
+    var current=shared&&shared.current?shared.current:root.KPIEngine.getPeriod(year,month,throughDay);
+    var previous=shared&&shared.previous?shared.previous:null;
+    var comparison=shared&&shared.comparison?shared.comparison:null;
     return {year:year,month:month,compare:compare,throughDay:throughDay,current:current,previous:previous,comparison:comparison};
   }
 
   var metricMap={
-    '売上':{field:'salesYen',avg:'avgDailySalesYen',goodUp:true,display:function(k){return Math.round(num(k.avgDailySalesYen)/1000);}},
-    '客数':{field:'customers',avg:'avgDailyCustomers',goodUp:true,display:function(k){return Math.round(num(k.avgDailyCustomers));}},
-    '買上点数':{field:'items',avg:'avgDailyItems',goodUp:true,display:function(k){return num(k.avgDailyItems);}},
-    '廃棄金額':{field:'wasteYen',avg:'avgDailyWasteYen',goodUp:false,display:function(k){return Math.round(num(k.avgDailyWasteYen));}}
+    '売上':{field:'salesYen',goodUp:true,display:function(k){return Math.round(num(k.avgDailySalesYen)/1000);}},
+    '客数':{field:'customers',goodUp:true,display:function(k){return Math.round(num(k.avgDailyCustomers));}},
+    '買上点数':{field:'items',goodUp:true,display:function(k){return num(k.avgDailyItems);}},
+    '廃棄金額':{field:'wasteYen',goodUp:false,display:function(k){return Math.round(num(k.avgDailyWasteYen));}}
   };
 
   function metricDefinition(key){
