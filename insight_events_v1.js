@@ -103,7 +103,7 @@
     var doc=root.document,activeDialog=null;
     function el(tag,text,cls){var n=doc.createElement(tag);if(text!==undefined)n.textContent=text;if(cls)n.className=cls;return n;}
     function button(text,fn){var b=el('button',text);b.type='button';b.onclick=fn;return b;}
-    function selectedDate(){var input=doc.getElementById('iqdDateInput');return input?input.value:String(todayInfo.fy)+'-'+String(todayInfo.mIdx+1).padStart(2,'0')+'-'+String(quickEditDay).padStart(2,'0');}
+    function selectedDate(){return root.InsightDateContext&&typeof root.InsightDateContext.getSelectedIso==='function'?root.InsightDateContext.getSelectedIso():'';}
     function transaction(fn){
       try{
         var next=copy(allStores);fn(next);validate(next);
