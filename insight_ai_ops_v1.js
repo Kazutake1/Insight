@@ -224,11 +224,15 @@
       ctx.state.aiOpsAnalysis=a;
       if(a.context.prevYear==null){
         renderNoComparisonPanel(a);
+        ctx.state.aiOpsHandledNoComparison=true;
+        ctx.afterOnCancel=true;
         ctx.cancel=true;
         return false;
       }
     },20);
-    window.InsightHooks.on('ai:render:after','ai-ops-integrate',function(){integratePanel();},20);
+    window.InsightHooks.on('ai:render:after','ai-ops-integrate',function(ctx){
+      if(!ctx.state.aiOpsHandledNoComparison)integratePanel();
+    },20);
   }
   if(window.InsightHooks){
     window.InsightHooks.on('ai:question:before','ai-ops-question-policy',function(ctx){
