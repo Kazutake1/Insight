@@ -48,13 +48,8 @@
     observer.observe(row,{childList:true});
   }
 
-  if(typeof window.refreshDash==='function'){
-    var originalRefreshDash=window.refreshDash;
-    window.refreshDash=function(){
-      var result=originalRefreshDash.apply(this,arguments);
-      scheduleNormalize();
-      return result;
-    };
+  if(window.InsightHooks){
+    window.InsightHooks.on('dashboard:refresh:after','kpi-order-normalize',function(){scheduleNormalize();},60);
   }
 
   scheduleNormalize();
