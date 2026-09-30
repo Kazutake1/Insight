@@ -15,24 +15,13 @@
   function pad(n){return String(n).padStart(2,'0');}
   function localYmd(date){return date.getFullYear()+'-'+pad(date.getMonth()+1)+'-'+pad(date.getDate());}
   function compactYmd(date){return date.getFullYear()+pad(date.getMonth()+1)+pad(date.getDate());}
-  function parseIsoDate(value){
-    var match=/^(\d{4})-(\d{2})-(\d{2})$/.exec(String(value||''));
-    if(!match)return null;
-    var year=Number(match[1]),month=Number(match[2])-1,day=Number(match[3]);
-    var date=new Date(0);date.setFullYear(year,month,day);date.setHours(0,0,0,0);
-    return date.getFullYear()===year&&date.getMonth()===month&&date.getDate()===day?date:null;
-  }
   function targetDate(){
-    try{
-      var picker=document.getElementById('iqdDateInput');
-      var selected=picker&&parseIsoDate(picker.value);
-      if(selected)return selected;
-      var year=Number(todayInfo.fy),month=Number(todayInfo.mIdx),day=Number(quickEditDay);
-      if(!Number.isFinite(year)||!Number.isFinite(month)||!Number.isFinite(day))return new Date();
-      return new Date(year,month,day);
-    }catch(_){return new Date();}
+    return root.InsightDateContext&&typeof root.InsightDateContext.getSelectedDate==='function'
+      ?root.InsightDateContext.getSelectedDate():new Date();
   }
-  function isFutureDate(date){return localYmd(date)>localYmd(new Date());}
+  function isFutureDate(date){
+    return !!(root.InsightDateContext&&typeof root.InsightDateContext.isFuture==='function'&&root.InsightDateContext.isFuture(date));
+  }
   function finite(v){
     if(v===null||v===undefined||v==='')return null;
     var n=Number(v);return Number.isFinite(n)?n:null;
