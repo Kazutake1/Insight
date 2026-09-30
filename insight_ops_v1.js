@@ -8,11 +8,16 @@
     return store.monthlyOps[y][m];
   }
 
+  function quickDateInfo(){
+    return window.InsightDateContext&&typeof window.InsightDateContext.getSelectedInfo==="function"
+      ?window.InsightDateContext.getSelectedInfo():null;
+  }
+
   function dailyRow(){
-    var fy=todayInfo&&todayInfo.fy?todayInfo.fy:"";
-    var m=todayInfo&&todayInfo.month?todayInfo.month:"";
-    var rows=store.data&&store.data[fy]&&store.data[fy][m]?store.data[fy][m]:[];
-    return rows[quickEditDay-1]||null;
+    var info=quickDateInfo();
+    if(!info)return null;
+    var rows=store.data&&store.data[info.fy]&&store.data[info.fy][info.month]?store.data[info.fy][info.month]:[];
+    return rows[info.day-1]||null;
   }
 
   function formatQuickItems(){
@@ -61,8 +66,10 @@
       var raw=itemsInput.dataset.insightItemsRaw;
       if(raw!==""&&Number.isFinite(Number(raw)))itemsInput.value=Number(raw).toFixed(2);
     }
-    var fy=todayInfo.fy,m=todayInfo.month,rows=store.data[fy][m],ri=quickEditDay-1;
-    if(!rows[ri])rows[ri]=blankRow(quickEditDay);
+    var info=quickDateInfo();
+    if(!info)return;
+    var fy=info.fy,m=info.month,rows=store.data[fy][m],ri=info.day-1;
+    if(!rows[ri])rows[ri]=blankRow(info.day);
     rows[ri].storeMemo=memo;
     persist();
   };
