@@ -274,13 +274,8 @@
     }
   }
 
-  var oldRenderQuick=root.renderQuickPage;
-  if(typeof oldRenderQuick==='function'){
-    root.renderQuickPage=function(){
-      var result=oldRenderQuick.apply(this,arguments);
-      applyFutureWeatherState();
-      return result;
-    };
+  if(root.InsightHooks){
+    root.InsightHooks.on('quick:render:after','weather-future-state',function(){applyFutureWeatherState();},60);
   }
 
   clearFutureWeatherData();
