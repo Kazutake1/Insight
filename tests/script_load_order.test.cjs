@@ -34,14 +34,17 @@ const ordered=[
   'insight_ai_page_comments_v1.js'
 ];
 
-test('機能スクリプトの読み込み順はIndex.htmlの1か所で明示される',()=>{
+test('機能スクリプトの読み込み順はIndex.htmlのmanifestで明示される',()=>{
   const index=read('Index.html');
-  assert.match(index,/var orderedFeatureLoads=\[/);
+  const start=index.indexOf('var orderedFeatureLoads=[');
+  const end=index.indexOf('];',start);
+  assert.ok(start>=0&&end>start,'orderedFeatureLoads manifestがありません');
+  const manifest=index.slice(start,end+2);
   let last=-1;
   ordered.forEach(name=>{
-    const first=index.indexOf(name);
+    const first=manifest.indexOf(name);
     assert.ok(first>last,name+' の読み込み順が不正です');
-    assert.equal(index.indexOf(name,first+1),-1,name+' が重複定義されています');
+    assert.equal(manifest.indexOf(name,first+1),-1,name+' がmanifest内で重複定義されています');
     last=first;
   });
 });
