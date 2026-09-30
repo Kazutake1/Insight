@@ -66,13 +66,8 @@
     row.appendChild(makeCard('grossMargin','粗利率',gm?gm.toFixed(1)+'<span class="kpi-unit">%</span>':'—',gmCmp,prevLabel));
   }
 
-  if(typeof window.renderKPI==='function'){
-    var originalRenderKPI=window.renderKPI;
-    window.renderKPI=function(){
-      var result=originalRenderKPI.apply(this,arguments);
-      ensureMonthlyOpsKpis();
-      return result;
-    };
+  if(window.InsightHooks){
+    window.InsightHooks.on('dashboard:kpi:after','monthly-ops-kpi',function(){ensureMonthlyOpsKpis();},20);
   }
 
   var observer=new MutationObserver(function(){
