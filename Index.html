@@ -50,9 +50,10 @@ html=html.replace('</style>', '.ops-daily-wrap{margin-top:10px;display:grid;grid
 var orderedFeatureLoads=[
   './insight_yoy_policy_v1.js?v=20260930-1',
   {inline:extra},
-  './insight_ops_v1.js?v=20260930-dedupe1',
-  './insight_preserve_dailyops_v1.js?v=20260930-loadorder1',
-  './insight_quick_date_nav_v1.js?v=20260922-events1',
+  './insight_date_context_v1.js?v=20260930-1',
+  './insight_ops_v1.js?v=20260930-datectx1',
+  './insight_preserve_dailyops_v1.js?v=20260930-datectx1',
+  './insight_quick_date_nav_v1.js?v=20260930-datectx1',
   './insight_ops_kpifix_v1.js?v=20260930-dedupe1',
   './insight_ai_ops_v1.js?v=20260930-yoy1',
   './insight_backup_guard_v1.js?v=20260928-salesfix1',
@@ -63,14 +64,14 @@ var orderedFeatureLoads=[
   './insight_dashboard_kpi_sync_v1.js?v=20260930-dedupe1',
   './insight_kpi_order_v1.js?v=20260906-1',
   './insight_ai_presentation_v1.js?v=20260922-sidebar1',
-  './insight_events_v1.js?v=20260929-newfix1',
-  './insight_temperature_v1.js?v=20260930-nofuture1',
+  './insight_events_v1.js?v=20260930-datectx1',
+  './insight_temperature_v1.js?v=20260930-datectx1',
   './insight_weather_compact_v1.js?v=20260929-types1',
-  './insight_weather_temperature_auto_v1.js?v=20260930-nofuture1',
+  './insight_weather_temperature_auto_v1.js?v=20260930-datectx1',
   './insight_weather_location_v1.js?v=20260930-security1',
   './insight_input_weather_temp_v1.js?v=20260929-round1',
   './insight_sales_count_v1.js?v=20260929-pageai1',
-  './insight_ai_page_comments_v1.js?v=20260930-yoy1'
+  './insight_ai_page_comments_v1.js?v=20260930-datectx1'
 ];
 var orderedFeatureHtml=orderedFeatureLoads.map(function(entry){
   if(typeof entry==='string')return '<script src="'+entry+'"></scr'+'ipt>';
