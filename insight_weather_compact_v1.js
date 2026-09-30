@@ -137,13 +137,8 @@
     }
   }
 
-  var oldRender=root.renderQuickPage;
-  if(typeof oldRender==='function'){
-    root.renderQuickPage=function(){
-      var result=oldRender.apply(this,arguments);
-      ensureControl();
-      return result;
-    };
+  if(root.InsightHooks){
+    root.InsightHooks.on('quick:render:after','weather-compact-render',function(){ensureControl();},50);
   }
 
   root.InsightWeatherCompact={sync:sync,close:close};
