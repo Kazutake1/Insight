@@ -106,11 +106,11 @@
     function selectedDate(){return root.InsightDateContext&&typeof root.InsightDateContext.getSelectedIso==='function'?root.InsightDateContext.getSelectedIso():'';}
     function transaction(fn){
       try{
-        var next=copy(allStores);fn(next);validate(next);
-        // 保存できた場合のみメモリーへ反映する。既存 persist の容量不足の黙殺を引き継がない。
-        localStorage.setItem(SK,JSON.stringify(next));
-        if(next.eventManagement!==undefined)allStores.eventManagement=next.eventManagement;
-        Object.keys(next.stores).forEach(function(key){if(next.stores[key].events!==undefined)allStores.stores[key].events=next.stores[key].events;});
+        if(!root.InsightStorage)throw new Error('保存機能を初期化できませんでした。');
+        root.InsightStorage.transaction(allStores,fn,validate,function(next){
+          if(next.eventManagement!==undefined)allStores.eventManagement=next.eventManagement;
+          Object.keys(next.stores).forEach(function(key){if(next.stores[key].events!==undefined)allStores.stores[key].events=next.stores[key].events;});
+        });
         render();return true;
       }catch(e){alert('イベントを保存できませんでした。\n'+e.message+'\n入力済みデータは変更していません。');return false;}
     }
