@@ -9,8 +9,6 @@
   if(!page||!nav||!grid||!dateContext||typeof window.renderQuickPage!=='function'||typeof window.saveQuick!=='function')return;
   window.__insightQuickDateNavV1=true;
 
-  var originalRenderQuickPage=window.renderQuickPage;
-  var originalSaveQuick=window.saveQuick;
   var selectedStore=allStores.current;
   var dirty=false;
   var week=['日','月','火','水','木','金','土'];
@@ -36,7 +34,6 @@
 
   function selectedDate(){return dateContext.getSelectedDate();}
   function todaySelected(){return dateContext.isToday();}
-  function withSelectedDate(callback){return dateContext.withLegacyGlobals(callback);}
   function selectDate(date){
     if(!date||typeof date.getTime!=='function'||!Number.isFinite(date.getTime())||dateContext.iso(date)===dateContext.getSelectedIso())return;
     if(dirty&&!window.confirm('未保存の入力があります。\n保存せずに別の日付へ移動しますか？'))return;
@@ -66,10 +63,6 @@
       this.value=dateContext.getSelectedIso();
     });
   };
-  window.renderQuickPage=function(){
-    var self=this,args=arguments;
-    return withSelectedDate(function(){return originalRenderQuickPage.apply(self,args);});
-  };
   window.initQuickPage=function(){
     todayInfo=todayFY();
     if(selectedStore!==allStores.current){
@@ -91,12 +84,9 @@
   page.addEventListener('click',function(event){
     if(event.target&&event.target.closest&&event.target.closest('.wx-btn,#autoWxBtn'))dirty=true;
   });
-  window.saveQuick=function(){
-    var self=this,args=arguments;
-    var result=withSelectedDate(function(){return originalSaveQuick.apply(self,args);});
-    dirty=false;
-    return result;
-  };
+  if(window.InsightHooks){
+    window.InsightHooks.on('quick:save:after','quick-date-clear-dirty',function(){dirty=false;},30);
+  }
   window.clearTodayData=function(){
     var t=dateContext.getSelectedInfo(),rows=store.data[t.fy]&&store.data[t.fy][t.month];
     var target=t.fy+'年'+t.month+t.day+'日';
