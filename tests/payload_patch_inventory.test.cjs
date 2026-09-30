@@ -6,7 +6,7 @@ const path=require('node:path');
 const root=path.join(__dirname,'..');
 const read=name=>fs.readFileSync(path.join(root,name),'utf8');
 
-test('STEP5-3後のpayload文字列置換は11件に縮小されている',()=>{
+test('STEP5最終整理後のpayload文字列置換は11件に固定されている',()=>{
   const index=read('Index.html');
   const count=(index.match(/html=html\.replace/g)||[]).length;
   assert.equal(count,11);
@@ -64,6 +64,20 @@ test('まだpayload前処理が必要な安全・互換パッチは保持する'
   assert.match(index,/integrity=/);
   assert.match(index,/yearToDelete/);
   assert.match(index,/orderedFeatureLoads/);
+});
+
+test('残す11件はSTEP5で意図的に維持する互換・安全パッチだけである',()=>{
+  const index=read('Index.html');
+  assert.match(index,/STEP5 retained: base weather constants/);
+  assert.match(index,/STEP5 retained: persist\(\) must be hardened/);
+  assert.match(index,/STEP5 retained: legacy core control contrast patch/);
+  assert.match(index,/STEP5 retained: Chart\.js SRI\/referrer policy/);
+  assert.match(index,/STEP5 retained: suppress the legacy year-delete UI/);
+  assert.match(index,/STEP5 retained bootstrap boundary/);
+
+  assert.equal((index.match(/const WX_KEYS=/g)||[]).length>=1,true);
+  assert.equal((index.match(/yearToDelete/g)||[]).length>=1,true);
+  assert.equal((index.match(/html=html\.replace/g)||[]).length,11);
 });
 
 test('STEP5-3対象assetはcache bustされている',()=>{
