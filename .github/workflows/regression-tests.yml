@@ -12,8 +12,25 @@ permissions:
 
 jobs:
   test:
+    name: test / ${{ matrix.file }}
     runs-on: ubuntu-latest
     timeout-minutes: 10
+    strategy:
+      fail-fast: false
+      matrix:
+        file:
+          - comparison_single_source.test.cjs
+          - date_context.test.cjs
+          - hook_bridge.test.cjs
+          - insight_events.test.cjs
+          - insight_sales_count.test.cjs
+          - insight_yoy_policy.test.cjs
+          - payload_browser_smoke.test.cjs
+          - payload_patch_inventory.test.cjs
+          - script_load_order.test.cjs
+          - security_storage_regression.test.cjs
+          - storage_layer.test.cjs
+          - weather_future_guard.test.cjs
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
@@ -21,5 +38,5 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: '22'
-      - name: Run regression tests
-        run: node --test tests/*.test.cjs
+      - name: Run test file
+        run: node --test "tests/${{ matrix.file }}"
