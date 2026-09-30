@@ -286,16 +286,20 @@
       var oldGet=root.ManagementOpsAnalysis.getCurrent;
       root.ManagementOpsAnalysis.getCurrent=function(){var a=oldGet.apply(this,arguments);a.events=contextEvents();return a;};
     }
-    var oldAI=root.renderAIAnalysisPanel;
-    root.renderAIAnalysisPanel=function(){
-      var result=oldAI.apply(this,arguments),target=doc.getElementById('aiAnalysisChecks');
-      if(target){var events=contextEvents();if(events.length)target.append(el('p','店舗イベント：'+events.length+'件。'+events.slice(0,3).map(function(e){return summary(e.snapshot);}).join(' / ')+'。数値変化との関係は該当日の入力と照合してください。','ai-analysis-comment'));}return result;
-    };
-    var oldAnswer=root.buildAIQuestionAnswer;
-    root.buildAIQuestionAnswer=function(q){
-      if(/イベント|セール|キャンペーン|祭り|大口注文/.test(String(q))){var events=contextEvents();return events.length?'この期間の店舗イベント：\n'+events.map(function(e){return e.startDate+'〜'+e.endDate+'：'+summary(e.snapshot)+(e.snapshot.note?'（'+e.snapshot.note+'）':'');}).join('\n')+'\n数値変化との因果関係は断定せず、該当日の売上・客数と照合してください。':'この期間の店舗イベントはまだありません。';}
-      return oldAnswer.apply(this,arguments);
-    };
+    if(root.InsightHooks){
+      root.InsightHooks.on('ai:render:after','events-ai-check',function(){
+        var target=doc.getElementById('aiAnalysisChecks');
+        if(target){var events=contextEvents();if(events.length)target.append(el('p','店舗イベント：'+events.length+'件。'+events.slice(0,3).map(function(e){return summary(e.snapshot);}).join(' / ')+'。数値変化との関係は該当日の入力と照合してください。','ai-analysis-comment'));}
+      },30);
+      root.InsightHooks.on('ai:question:before','events-question',function(ctx){
+        var q=String(ctx.args[0]);
+        if(!/イベント|セール|キャンペーン|祭り|大口注文/.test(q))return;
+        var events=contextEvents();
+        ctx.result=events.length?'この期間の店舗イベント：\n'+events.map(function(e){return e.startDate+'〜'+e.endDate+'：'+summary(e.snapshot)+(e.snapshot.note?'（'+e.snapshot.note+'）':'');}).join('\n')+'\n数値変化との因果関係は断定せず、該当日の売上・客数と照合してください。':'この期間の店舗イベントはまだありません。';
+        ctx.cancel=true;
+        return false;
+      },5);
+    }
     render();
   }
   if(document.readyState==='complete')init();else root.addEventListener('load',init,{once:true});
