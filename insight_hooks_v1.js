@@ -52,7 +52,10 @@
       return runScoped(dateScoped,function(){
         var context={name:functionName,thisArg:self,args:args,state:{},cancel:false,result:undefined};
         if(beforeEvent)emit(beforeEvent,context);
-        if(context.cancel)return context.result;
+        if(context.cancel){
+          if(afterEvent&&context.afterOnCancel)emit(afterEvent,context);
+          return context.result;
+        }
         context.result=original.apply(self,context.args);
         if(afterEvent)emit(afterEvent,context);
         return context.result;
