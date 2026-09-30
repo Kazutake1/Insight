@@ -63,28 +63,6 @@
     showToast('🗑 '+m+'の客数データをクリアしました','#dc2626','#fef2f2');
   };
 
-  window.clearTodayData=function(){
-    var dateContext=window.InsightDateContext;
-    var t=dateContext&&typeof dateContext.getSelectedInfo==='function'?dateContext.getSelectedInfo():todayFY();
-    var day=Number(t&&t.day)||1;
-    var storeName=store.name;
-    var targetLabel=dateContext&&dateContext.isToday()?'本日（'+t.month+day+'日）':t.month+day+'日';
-    if(!confirm(storeName+' の '+targetLabel+'の入力データを削除します。\n売上・客数・買上点数・廃棄・店舗メモをクリアし、天気・気温は保持します。\n\nこの操作は元に戻せません。よろしいですか？'))return;
-    if(!store.data[t.fy]||!store.data[t.fy][t.month])return;
-    var ri=day-1,row=store.data[t.fy][t.month][ri];
-    if(row){
-      row.売上=0;
-      row.客数=0;
-      row.買上点数=0;
-      row.廃棄金額=0;
-      row.haiki=blankHaiki();
-      delete row.storeMemo;
-    }
-    persist();
-    initQuickPage();
-    updateMissingBadge();
-    showToast('🗑 '+t.month+day+'日の入力データをクリアしました','#dc2626','#fef2f2');
-  };
 
   if(typeof window.confirmDeleteYear==='function'){
     var originalConfirmDeleteYear=window.confirmDeleteYear;
