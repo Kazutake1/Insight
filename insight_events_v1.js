@@ -270,8 +270,9 @@
       }
       draw();
     }
-    var oldRender=root.renderQuickPage;
-    root.renderQuickPage=function(){var result=oldRender.apply(this,arguments);render();return result;};
+    if(root.InsightHooks){
+      root.InsightHooks.on('quick:render:after','events-render',function(){render();},30);
+    }
     function contextEvents(){
       var month=MONTHS.indexOf(selMonth)+1;if(!month)return [];
       var prefix=String(baseYear)+'-'+String(month).padStart(2,'0')+'-';
