@@ -168,13 +168,9 @@
     legend(data);analysis(data);
     requestAnimationFrame(function(){syncHeight();graph(data);});
   }
-  if(typeof window.renderTable==='function'){
-    var oldRender=window.renderTable;
-    window.renderTable=function(type){var result=oldRender.apply(this,arguments);if(type==='haiki')refresh();return result;};
-  }
-  if(typeof window.saveInput==='function'){
-    var oldSave=window.saveInput;
-    window.saveInput=function(type){var result=oldSave.apply(this,arguments);if(type==='haiki')refresh();return result;};
+  if(window.InsightHooks){
+    window.InsightHooks.on('input:table:after','waste-insights-table',function(ctx){if(ctx.args[0]==='haiki')refresh();},40);
+    window.InsightHooks.on('input:save:after','waste-insights-save',function(ctx){if(ctx.args[0]==='haiki')refresh();},40);
   }
   if(typeof currentNav!=='undefined'&&currentNav===4)refresh();
 })();
