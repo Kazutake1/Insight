@@ -24,17 +24,39 @@ function setup(options={}){
   return {window,calls};
 }
 
-test('snapshot writerは指定キーへ1回だけJSON保存する',()=>{
+test('snapshot writerはschemaVersionを付けて指定キーへ1回だけJSON保存する',()=>{
   const {window,calls}=setup();
   const value={current:'a',stores:{a:{name:'A'}}};
   const serialized=window.InsightStorage.writeSnapshot(value);
-  assert.equal(serialized,JSON.stringify(value));
+  assert.deepEqual(JSON.parse(serialized),{current:'a',stores:{a:{name:'A'}},schemaVersion:1});
   assert.deepEqual(calls,[['insight_v11',serialized]]);
+  assert.equal(value.schemaVersion,undefined);
 });
 
 test('snapshot writerは保存失敗を握りつぶさない',()=>{
   const {window}=setup({failWrite:true});
   assert.throws(()=>window.InsightStorage.writeSnapshot({current:'a'}),/quota/);
+});
+
+test('schemaVersionなしの旧データはversion 1へ移行する',()=>{
+  const {window}=setup();
+  const migrated=window.InsightStorage.migrateSnapshot({current:'a',stores:{}});
+  assert.equal(migrated.schemaVersion,1);
+  assert.equal(window.InsightStorage.CURRENT_SCHEMA_VERSION,1);
+});
+
+test('現在より新しいschemaVersionは読み込まない',()=>{
+  const {window}=setup();
+  assert.throws(
+    ()=>window.InsightStorage.migrateSnapshot({schemaVersion:2,current:'a',stores:{}}),
+    /新しいInsight/
+  );
+});
+
+test('不正なschemaVersionは拒否する',()=>{
+  const {window}=setup();
+  assert.throws(()=>window.InsightStorage.migrateSnapshot({schemaVersion:'abc'}),/schema version is invalid/);
+  assert.throws(()=>window.InsightStorage.migrateSnapshot({schemaVersion:-1}),/schema version is invalid/);
 });
 
 test('transactionは元データを直接変更せず検証後に保存・反映する',()=>{
@@ -83,5 +105,5 @@ test('Indexの共通persistだけはpayload起動前安全化として維持す�
   const index=fs.readFileSync(path.join(root,'Index.html'),'utf8');
   assert.match(index,/var safePersist=/);
   assert.match(index,/localStorage\.setItem\(SK,JSON\.stringify\(allStores\)\)/);
-  assert.match(index,/insight_storage_v1\.js\?v=20260930-step6-2/);
+  assert.match(index,/insight_storage_v1\.js\?v=20260930-step6-3/);
 });
