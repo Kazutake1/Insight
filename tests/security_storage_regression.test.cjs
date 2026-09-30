@@ -27,6 +27,24 @@ test('共通保存処理は成功時だけtrueを返す',()=>{
   assert.deepEqual(calls,[['insight','{"current":"a"}']]);
 });
 
+test('共通保存処理はStorage読込後に共有保存層へ委譲する',()=>{
+  const calls=[];
+  const context={
+    SK:'insight',allStores:{current:'a'},
+    localStorage:{setItem:()=>assert.fail('共有保存層がある場合はfallbackへ書かないこと')},
+    alert:()=>assert.fail('保存成功時に警告を出さないこと'),
+    window:{
+      InsightStorage:{persistCurrent:value=>{calls.push(value);return true;}},
+      addEventListener:()=>{}
+    },
+    Error
+  };
+  vm.runInNewContext(safePersistSource(),context);
+  assert.equal(context.persist(),true);
+  assert.equal(calls.length,1);
+  assert.equal(calls[0],context.allStores);
+});
+
 test('共通保存処理は失敗時に成功表示へ進ませない',()=>{
   const alerts=[];let errorHandler;
   const context={
