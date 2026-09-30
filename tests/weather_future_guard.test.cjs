@@ -18,17 +18,13 @@ function fixedDateClass(){
 }
 
 function loadWeatherAuto(options={}){
+  const dateSource=fs.readFileSync(path.join(root,'insight_date_context_v1.js'),'utf8');
   const source=fs.readFileSync(path.join(root,'insight_weather_temperature_auto_v1.js'),'utf8');
-  const picker={value:options.selectedDate||'2026-09-30'};
-  const document={
-    getElementById(id){
-      if(id==='iqdDateInput')return picker;
-      return null;
-    }
-  };
+  const document={getElementById(){return null;}};
   const window={};
   const context={
     window,globalThis:window,document,
+    MONTHS:Array.from({length:12},(_,i)=>(i+1)+'月'),
     allStores:options.allStores||{stores:{}},
     store:options.store||{},
     persist:options.persist||(()=>{}),
@@ -38,8 +34,10 @@ function loadWeatherAuto(options={}){
     Intl,Number,String,Object,Array,Promise,Math,encodeURIComponent,console
   };
   vm.createContext(context);
+  vm.runInContext(dateSource,context);
+  window.InsightDateContext.setSelectedDate(window.InsightDateContext.parseIso(options.selectedDate||'2026-09-30'));
   vm.runInContext(source,context);
-  return {api:window.InsightWeatherTemperatureAuto,picker,context};
+  return {api:window.InsightWeatherTemperatureAuto,context};
 }
 
 test('天気取得日はtodayInfoではなく日付ナビの選択日を優先する',()=>{
@@ -82,7 +80,7 @@ test('通常APIは未来7日を要求せず当日分だけに制限する',()=>{
 
 test('気温保存も日付ナビの選択日を使い未来日の天気・気温を残さない',()=>{
   const source=fs.readFileSync(path.join(root,'insight_temperature_v1.js'),'utf8');
-  const picker={value:'2026-10-01'};
+  const dateSource=fs.readFileSync(path.join(root,'insight_date_context_v1.js'),'utf8');
   const store={data:{
     '2026':{
       '9月':[{d:1,weather:'晴',tempMaxC:29,tempMinC:20}],
@@ -91,18 +89,11 @@ test('気温保存も日付ナビの選択日を使い未来日の天気・気�
   }};
   let persistCount=0;
   const window={saveQuick:()=>true};
-  const document={
-    activeElement:null,
-    getElementById(id){
-      if(id==='iqdDateInput')return picker;
-      return null;
-    }
-  };
+  const document={activeElement:null,getElementById(){return null;}};
   const context={
     window,globalThis:window,document,
     store,allStores:{stores:{a:store}},
-    todayInfo:{fy:'2026',mIdx:8,month:'9月'},
-    quickEditDay:1,MONTHS:Array.from({length:12},(_,i)=>(i+1)+'月'),
+    MONTHS:Array.from({length:12},(_,i)=>(i+1)+'月'),
     currentNav:1,
     blankRow:day=>({d:day,weather:''}),
     persist:()=>{persistCount++;},
@@ -111,6 +102,8 @@ test('気温保存も日付ナビの選択日を使い未来日の天気・気�
     Number,String,Object,Array,Math,WeakMap,console
   };
   vm.createContext(context);
+  vm.runInContext(dateSource,context);
+  window.InsightDateContext.setSelectedDate(window.InsightDateContext.parseIso('2026-10-01'));
   vm.runInContext(source,context);
   window.saveQuick();
   const september=store.data['2026']['9月'][0];
