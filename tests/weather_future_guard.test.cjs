@@ -19,6 +19,7 @@ function fixedDateClass(){
 
 function loadWeatherAuto(options={}){
   const dateSource=fs.readFileSync(path.join(root,'insight_date_context_v1.js'),'utf8');
+  const hookSource=fs.readFileSync(path.join(root,'insight_hooks_v1.js'),'utf8');
   const source=fs.readFileSync(path.join(root,'insight_weather_temperature_auto_v1.js'),'utf8');
   const document={getElementById(){return null;}};
   const window={};
@@ -36,6 +37,7 @@ function loadWeatherAuto(options={}){
   vm.createContext(context);
   vm.runInContext(dateSource,context);
   window.InsightDateContext.setSelectedDate(window.InsightDateContext.parseIso(options.selectedDate||'2026-09-30'));
+  vm.runInContext(hookSource,context);
   vm.runInContext(source,context);
   return {api:window.InsightWeatherTemperatureAuto,context};
 }
@@ -81,6 +83,7 @@ test('通常APIは未来7日を要求せず当日分だけに制限する',()=>{
 test('気温保存も日付ナビの選択日を使い未来日の天気・気温を残さない',()=>{
   const source=fs.readFileSync(path.join(root,'insight_temperature_v1.js'),'utf8');
   const dateSource=fs.readFileSync(path.join(root,'insight_date_context_v1.js'),'utf8');
+  const hookSource=fs.readFileSync(path.join(root,'insight_hooks_v1.js'),'utf8');
   const store={data:{
     '2026':{
       '9月':[{d:1,weather:'晴',tempMaxC:29,tempMinC:20}],
@@ -104,6 +107,7 @@ test('気温保存も日付ナビの選択日を使い未来日の天気・気�
   vm.createContext(context);
   vm.runInContext(dateSource,context);
   window.InsightDateContext.setSelectedDate(window.InsightDateContext.parseIso('2026-10-01'));
+  vm.runInContext(hookSource,context);
   vm.runInContext(source,context);
   window.saveQuick();
   const september=store.data['2026']['9月'][0];
