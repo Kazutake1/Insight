@@ -5,13 +5,12 @@
   var page=document.getElementById('pageQuick');
   var nav=document.getElementById('qNavRow');
   var grid=document.getElementById('quickGrid');
-  if(!page||!nav||!grid||typeof window.renderQuickPage!=='function'||typeof window.saveQuick!=='function')return;
+  var dateContext=window.InsightDateContext;
+  if(!page||!nav||!grid||!dateContext||typeof window.renderQuickPage!=='function'||typeof window.saveQuick!=='function')return;
   window.__insightQuickDateNavV1=true;
 
   var originalRenderQuickPage=window.renderQuickPage;
   var originalSaveQuick=window.saveQuick;
-  var dateContext=window.InsightDateContext;
-  if(!dateContext)return;
   var selectedStore=allStores.current;
   var dirty=false;
   var week=['日','月','火','水','木','金','土'];
