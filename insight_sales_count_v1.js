@@ -58,7 +58,7 @@
     function record(date){return state.draft[date]||(state.draft[date]=emptyRecord());}
     function total(r,key){var values=r.trips.map(function(t){return t[key];});return values.every(function(v){return v===null;})?null:values.reduce(function(s,v){return s+(v===null?0:v);},0);}
     function fmt(v){return v===null?'—':Number(v).toFixed(1).replace(/\.0$/,'');}
-    function persistTransaction(next){validate(next);localStorage.setItem(SK,JSON.stringify(next));allStores.salesCountManagement=next.salesCountManagement;Object.keys(next.stores).forEach(function(id){allStores.stores[id].salesCounts=next.stores[id].salesCounts;});store=allStores.stores[allStores.current];}
+    function persistTransaction(next){if(!root.InsightStorage)throw new Error('保存機能を初期化できませんでした。');validate(next);root.InsightStorage.writeSnapshot(next);allStores.salesCountManagement=next.salesCountManagement;Object.keys(next.stores).forEach(function(id){allStores.stores[id].salesCounts=next.stores[id].salesCounts;});store=allStores.stores[allStores.current];}
     function save(){
       var invalid=doc.querySelector('#pageSalesCount input:invalid');if(invalid){invalid.reportValidity();invalid.focus();return;}
       var large=[];Object.keys(state.draft).forEach(function(date){state.draft[date].trips.forEach(function(t,i){['delivery','sales'].forEach(function(k){if(t[k]>=1000)large.push(date+' '+(i+1)+'便 '+(k==='delivery'?'納品':'販売')+' '+t[k]);});});});
