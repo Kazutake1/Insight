@@ -9,6 +9,7 @@ const read=name=>fs.readFileSync(path.join(root,name),'utf8');
 const ordered=[
   'insight_yoy_policy_v1.js',
   'insight_date_context_v1.js',
+  'insight_hooks_v1.js',
   'insight_ops_v1.js',
   'insight_preserve_dailyops_v1.js',
   'insight_quick_date_nav_v1.js',
@@ -58,7 +59,8 @@ test('日付ナビは保存保護モジュールから動的ロードされな�
   const source=read('insight_preserve_dailyops_v1.js');
   assert.doesNotMatch(source,/insight_quick_date_nav_v1\.js/);
   const index=read('Index.html');
-  assert.ok(index.indexOf('insight_date_context_v1.js')<index.indexOf('insight_ops_v1.js'));
+  assert.ok(index.indexOf('insight_date_context_v1.js')<index.indexOf('insight_hooks_v1.js'));
+  assert.ok(index.indexOf('insight_hooks_v1.js')<index.indexOf('insight_ops_v1.js'));
   assert.ok(index.indexOf('insight_preserve_dailyops_v1.js')<index.indexOf('insight_quick_date_nav_v1.js'));
 });
 
