@@ -99,12 +99,3 @@
   }
 })();
 
-(function(){
-  'use strict';
-  if(document.getElementById('insightQuickDateNavV1Script'))return;
-  var script=document.createElement('script');
-  script.id='insightQuickDateNavV1Script';
-  script.src='./insight_quick_date_nav_v1.js?v=20260922-events1';
-  script.async=false;
-  document.head.appendChild(script);
-})();
