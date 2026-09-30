@@ -10,8 +10,8 @@
 
   var originalRenderQuickPage=window.renderQuickPage;
   var originalSaveQuick=window.saveQuick;
-  var selectedDate=new Date();
-  selectedDate.setHours(0,0,0,0);
+  var dateContext=window.InsightDateContext;
+  if(!dateContext)return;
   var selectedStore=allStores.current;
   var dirty=false;
   var week=['日','月','火','水','木','金','土'];
@@ -35,49 +35,36 @@
   ].join('');
   document.head.appendChild(style);
 
-  function info(date){return {fy:String(date.getFullYear()),mIdx:date.getMonth(),month:MONTHS[date.getMonth()],day:date.getDate()};}
-  function iso(date){return date.getFullYear()+'-'+String(date.getMonth()+1).padStart(2,'0')+'-'+String(date.getDate()).padStart(2,'0');}
-  function parseDate(value){
-    var match=/^(\d{4})-(\d{2})-(\d{2})$/.exec(value);
-    if(!match)return null;
-    var y=Number(match[1]),m=Number(match[2]),d=Number(match[3]);
-    var date=new Date(0);date.setFullYear(y,m-1,d);date.setHours(0,0,0,0);
-    return date.getFullYear()===y&&date.getMonth()===m-1&&date.getDate()===d?date:null;
-  }
-  function todaySelected(){return iso(selectedDate)===iso(new Date());}
-  function withSelectedDate(callback){
-    var previous=todayInfo;
-    todayInfo=info(selectedDate);
-    quickEditDay=selectedDate.getDate();
-    try{return callback();}finally{todayInfo=previous;}
-  }
+  function selectedDate(){return dateContext.getSelectedDate();}
+  function todaySelected(){return dateContext.isToday();}
+  function withSelectedDate(callback){return dateContext.withLegacyGlobals(callback);}
   function selectDate(date){
-    if(!(date instanceof Date)||!Number.isFinite(date.getTime())||iso(date)===iso(selectedDate))return;
+    if(!date||typeof date.getTime!=='function'||!Number.isFinite(date.getTime())||dateContext.iso(date)===dateContext.getSelectedIso())return;
     if(dirty&&!window.confirm('未保存の入力があります。\n保存せずに別の日付へ移動しますか？'))return;
-    selectedDate=new Date(date.getFullYear(),date.getMonth(),date.getDate());
-    quickEditDay=selectedDate.getDate();
+    dateContext.setSelectedDate(date);
+    quickEditDay=dateContext.getSelectedInfo().day;
     window.renderQuickNav();
     window.renderQuickPage();
     dirty=false;
   }
   window.renderQuickNav=function(){
-    var date=selectedDate;
+    var date=selectedDate();
     var dateLabel=date.getFullYear()+'年'+(date.getMonth()+1)+'月'+date.getDate()+'日（'+week[date.getDay()]+'）';
     nav.innerHTML='<button type="button" class="iqd-btn iqd-arrow" id="iqdPrev" aria-label="前日へ">‹</button>'+
       '<div class="iqd-btn iqd-date">'+
         '<svg class="iqd-date-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><rect x="3" y="5" width="18" height="16" rx="2"/><path d="M7 3v4M17 3v4M3 10h18M7 14h3M14 14h3M7 18h3"/></svg>'+
         '<div class="iqd-date-text"><span class="iqd-date-main">'+dateLabel+'</span><span class="iqd-date-sub">タップして日付を選択</span></div>'+
-        '<input id="iqdDateInput" class="iqd-date-input" type="date" value="'+iso(date)+'" aria-label="入力する日付を選択">'+
+        '<input id="iqdDateInput" class="iqd-date-input" type="date" value="'+dateContext.iso(date)+'" aria-label="入力する日付を選択">'+
       '</div>'+
       '<button type="button" class="iqd-btn iqd-arrow" id="iqdNext" aria-label="翌日へ">›</button>'+
       '<button type="button" class="iqd-btn iqd-today" id="iqdToday">今日に戻る</button>';
-    document.getElementById('iqdPrev').onclick=function(){selectDate(new Date(selectedDate.getFullYear(),selectedDate.getMonth(),selectedDate.getDate()-1));};
-    document.getElementById('iqdNext').onclick=function(){selectDate(new Date(selectedDate.getFullYear(),selectedDate.getMonth(),selectedDate.getDate()+1));};
+    document.getElementById('iqdPrev').onclick=function(){var date=selectedDate();selectDate(new Date(date.getFullYear(),date.getMonth(),date.getDate()-1));};
+    document.getElementById('iqdNext').onclick=function(){var date=selectedDate();selectDate(new Date(date.getFullYear(),date.getMonth(),date.getDate()+1));};
     document.getElementById('iqdToday').onclick=function(){selectDate(new Date());};
     document.getElementById('iqdDateInput').addEventListener('change',function(){
-      var date=parseDate(this.value);
+      var date=dateContext.parseIso(this.value);
       if(date)selectDate(date);
-      this.value=iso(selectedDate);
+      this.value=dateContext.getSelectedIso();
     });
   };
   window.renderQuickPage=function(){
@@ -88,10 +75,10 @@
     todayInfo=todayFY();
     if(selectedStore!==allStores.current){
       selectedStore=allStores.current;
-      selectedDate=new Date();selectedDate.setHours(0,0,0,0);
+      dateContext.resetToToday();
       dirty=false;
     }
-    quickEditDay=selectedDate.getDate();
+    quickEditDay=dateContext.getSelectedInfo().day;
     document.getElementById('todayBadge').textContent='今日';
     window.renderQuickNav();
     window.renderQuickPage();
@@ -112,7 +99,7 @@
     return result;
   };
   window.clearTodayData=function(){
-    var t=info(selectedDate),rows=store.data[t.fy]&&store.data[t.fy][t.month];
+    var t=dateContext.getSelectedInfo(),rows=store.data[t.fy]&&store.data[t.fy][t.month];
     var target=t.fy+'年'+t.month+t.day+'日';
     if(!window.confirm(store.name+' の '+target+'の入力データを削除します。\n売上・客数・買上点数・廃棄・店舗メモをクリアし、天気・店舗イベント（共通セールを含む）は保持します。\n\nこの操作は元に戻せません。よろしいですか？'))return;
     if(!rows||!rows[t.day-1])return;
