@@ -218,28 +218,38 @@
     else if(/前年|去年|比較|今月|全体|状況|どう/.test(q))lines=summaryLines(a);
     return lines;
   }
-  var oldRender=window.renderAIAnalysisPanel;
-  window.renderAIAnalysisPanel=function(){
-    var a=buildAnalysis();
-    if(a.context.prevYear==null){renderNoComparisonPanel(a);return;}
-    if(typeof oldRender==='function')oldRender.apply(this,arguments);
-    integratePanel();
-  };
-  var oldBuild=window.buildAIQuestionAnswer;
-  window.buildAIQuestionAnswer=function(q){
-    q=String(q||'').trim();
-    if(!q)return '質問を入力してください。';
-    var a=buildAnalysis();
-    if(a.context.prevYear==null&&/前年|去年|比較|前年差|前年比/.test(q))return currentOnlyAnswer(q,a);
-    if(/人件費|人件費率|労務費|労働コスト/.test(q))return laborAnswer(a);
-    if(/粗利|荒利|利益率/.test(q))return grossMarginAnswer(a);
-    if(/店舗メモ|メモ|出来事|イベント|故障|大量注文/.test(q))return memoAnswer(a);
-    if(a.context.prevYear==null)return currentOnlyAnswer(q,a);
-    var base=typeof oldBuild==='function'?oldBuild(q):'';
-    var extra=extraByIntent(q,a);
-    if(extra.length)return (base?base+'\n\n':'')+'追加データ：\n'+extra.join('\n');
-    return base||'現在入力されているデータの範囲で回答します。';
-  };
+  if(window.InsightHooks){
+    window.InsightHooks.on('ai:render:before','ai-ops-render-policy',function(ctx){
+      var a=buildAnalysis();
+      ctx.state.aiOpsAnalysis=a;
+      if(a.context.prevYear==null){
+        renderNoComparisonPanel(a);
+        ctx.cancel=true;
+        return false;
+      }
+    },20);
+    window.InsightHooks.on('ai:render:after','ai-ops-integrate',function(){integratePanel();},20);
+  }
+  if(window.InsightHooks){
+    window.InsightHooks.on('ai:question:before','ai-ops-question-policy',function(ctx){
+      var q=String(ctx.args[0]||'').trim();
+      if(!q){ctx.result='質問を入力してください。';ctx.cancel=true;return false;}
+      var a=buildAnalysis();
+      ctx.state.aiOpsQuestion={q:q,analysis:a};
+      if(a.context.prevYear==null&&/前年|去年|比較|前年差|前年比/.test(q)){ctx.result=currentOnlyAnswer(q,a);ctx.cancel=true;return false;}
+      if(/人件費|人件費率|労務費|労働コスト/.test(q)){ctx.result=laborAnswer(a);ctx.cancel=true;return false;}
+      if(/粗利|荒利|利益率/.test(q)){ctx.result=grossMarginAnswer(a);ctx.cancel=true;return false;}
+      if(/店舗メモ|メモ|出来事|イベント|故障|大量注文/.test(q)){ctx.result=memoAnswer(a);ctx.cancel=true;return false;}
+      if(a.context.prevYear==null){ctx.result=currentOnlyAnswer(q,a);ctx.cancel=true;return false;}
+    },20);
+    window.InsightHooks.on('ai:question:after','ai-ops-question-extra',function(ctx){
+      var state=ctx.state.aiOpsQuestion;
+      if(!state)return;
+      var base=ctx.result||'',extra=extraByIntent(state.q,state.analysis);
+      if(extra.length)ctx.result=(base?base+'\n\n':'')+'追加データ：\n'+extra.join('\n');
+      else ctx.result=base||'現在入力されているデータの範囲で回答します。';
+    },20);
+  }
   var help=document.querySelector('.ai-analysis-question-help');
   if(help)help.textContent='現在入力されているKPI・前年比較・廃棄・人件費・粗利率・店舗メモの範囲で回答します。';
   window.ManagementOpsAnalysis={getCurrent:buildAnalysis};
