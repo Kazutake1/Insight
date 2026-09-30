@@ -28,6 +28,8 @@ function setup(){
   assert.ok(start>=10&&end>start,'Index.html の分析AIインラインスクリプトを抽出できません');
   const extra=vm.runInNewContext(index.slice(start,end));
   vm.runInContext(extra.replace(/^<script>/,'').replace(/<\/script>$/,''),c);
+  vm.runInContext(read('insight_date_context_v1.js'),c);
+  vm.runInContext(read('insight_hooks_v1.js'),c);
   vm.runInContext(read('insight_dashboard_kpi_sync_v1.js'),c);
   vm.runInContext(read('insight_ai_ops_v1.js'),c);
   vm.runInContext(read('insight_ai_page_comments_v1.js'),c);
