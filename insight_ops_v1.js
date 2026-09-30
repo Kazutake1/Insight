@@ -50,29 +50,35 @@
     grid.appendChild(wrap);
   }
 
-  var oldRenderQuick=window.renderQuickPage||renderQuickPage;
-  window.renderQuickPage=function(){oldRenderQuick.apply(this,arguments);renderDailyOps();};
+  if(window.InsightHooks){
+    window.InsightHooks.on('quick:render:after','ops-render-daily',function(){renderDailyOps();},20);
+  }
 
-  var oldSaveQuick=window.saveQuick||saveQuick;
-  window.saveQuick=function(){
-    var memoEl=document.getElementById("qi_storeMemo");
-    var memo=memoEl?memoEl.value:"";
-    var itemsInput=document.getElementById("qi_買上点数");
-    if(itemsInput&&itemsInput.dataset.insightItemsDecimalBound){
-      itemsInput.value=itemsInput.dataset.insightItemsRaw;
-    }
-    oldSaveQuick.apply(this,arguments);
-    if(itemsInput&&itemsInput.dataset.insightItemsDecimalBound){
-      var raw=itemsInput.dataset.insightItemsRaw;
-      if(raw!==""&&Number.isFinite(Number(raw)))itemsInput.value=Number(raw).toFixed(2);
-    }
-    var info=quickDateInfo();
-    if(!info)return;
-    var fy=info.fy,m=info.month,rows=store.data[fy][m],ri=info.day-1;
-    if(!rows[ri])rows[ri]=blankRow(info.day);
-    rows[ri].storeMemo=memo;
-    persist();
-  };
+  if(window.InsightHooks){
+    window.InsightHooks.on('quick:save:before','ops-save-prepare',function(ctx){
+      var memoEl=document.getElementById("qi_storeMemo");
+      var itemsInput=document.getElementById("qi_買上点数");
+      ctx.state.ops={
+        memo:memoEl?memoEl.value:"",
+        itemsInput:itemsInput,
+        rawItems:itemsInput&&itemsInput.dataset.insightItemsDecimalBound?itemsInput.dataset.insightItemsRaw:null
+      };
+      if(itemsInput&&itemsInput.dataset.insightItemsDecimalBound)itemsInput.value=itemsInput.dataset.insightItemsRaw;
+    },20);
+    window.InsightHooks.on('quick:save:after','ops-save-finalize',function(ctx){
+      var state=ctx.state.ops||{},itemsInput=state.itemsInput;
+      if(itemsInput&&itemsInput.dataset.insightItemsDecimalBound){
+        var raw=state.rawItems;
+        if(raw!==""&&Number.isFinite(Number(raw)))itemsInput.value=Number(raw).toFixed(2);
+      }
+      var info=quickDateInfo();
+      if(!info)return;
+      var fy=info.fy,m=info.month,rows=store.data[fy][m],ri=info.day-1;
+      if(!rows[ri])rows[ri]=blankRow(info.day);
+      rows[ri].storeMemo=state.memo||"";
+      persist();
+    },20);
+  }
 
   function monthlyComparisonDisplay(change,kind){
     if(!change)return null;
@@ -150,8 +156,9 @@
     renderMonthlyOpsKpis();
   };
 
-  var oldRefreshDash=window.refreshDash||refreshDash;
-  window.refreshDash=function(){oldRefreshDash.apply(this,arguments);renderMonthlyOpsKpis();};
+  if(window.InsightHooks){
+    window.InsightHooks.on('dashboard:refresh:after','ops-render-monthly',function(){renderMonthlyOpsKpis();},20);
+  }
 
   var oldRenderMonthlyOps=window.renderMonthlyOps;
   window.renderMonthlyOps=function(){renderMonthlyOpsKpis();};
