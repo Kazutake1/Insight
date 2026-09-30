@@ -8,26 +8,24 @@
     return newRow;
   }
 
-  if(typeof window.saveInput==='function'){
-    var originalSaveInput=window.saveInput;
-    window.saveInput=function(type){
-      var year=editYear&&editYear[type];
-      var month=editMonth&&editMonth[type];
+  if(window.InsightHooks){
+    window.InsightHooks.on('input:save:before','preserve-daily-ops',function(ctx){
+      var type=ctx.args[0],year=editYear&&editYear[type],month=editMonth&&editMonth[type];
       var oldRows=(year&&month&&store.data&&store.data[year]&&Array.isArray(store.data[year][month]))?store.data[year][month]:[];
-      var savedOps=oldRows.map(function(row){
-        if(!row)return null;
-        return {storeMemo:row.storeMemo,stockout:row.stockout,tempMaxC:row.tempMaxC,tempMinC:row.tempMinC};
-      });
-
-      var result=originalSaveInput.apply(this,arguments);
-
+      ctx.state.preserveDailyOps={
+        year:year,month:month,
+        saved:oldRows.map(function(row){
+          if(!row)return null;
+          return {storeMemo:row.storeMemo,stockout:row.stockout,tempMaxC:row.tempMaxC,tempMinC:row.tempMinC};
+        })
+      };
+    },10);
+    window.InsightHooks.on('input:save:after','restore-daily-ops',function(ctx){
+      var state=ctx.state.preserveDailyOps||{},year=state.year,month=state.month,saved=state.saved||[];
       var newRows=(year&&month&&store.data&&store.data[year]&&Array.isArray(store.data[year][month]))?store.data[year][month]:[];
-      newRows.forEach(function(row,index){
-        if(savedOps[index])preserveDailyOps(savedOps[index],row);
-      });
+      newRows.forEach(function(row,index){if(saved[index])preserveDailyOps(saved[index],row);});
       persist();
-      return result;
-    };
+    },20);
   }
 
   window.clearDayData=function(type){
