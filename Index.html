@@ -24,7 +24,7 @@ html=html.replace("\"雪\":\"❄️\",\"\":\"\"","\"雪\":\"❄️\",\"霧\":\"�
 html=html.replace("const wxGroups={\"晴れ\":[\"快晴\",\"晴\",\"晴曇\"],\"曇り\":[\"曇\"],\"雨\":[\"小雨\",\"雨\",\"大雨\"],\"雪\":[\"みぞれ\",\"雪\"]};","const wxGroups={\"晴れ\":[\"快晴\",\"晴\",\"晴曇\"],\"曇り\":[\"曇\"],\"雨\":[\"小雨\",\"雨\",\"大雨\"],\"雪\":[\"みぞれ\",\"雪\"],\"霧\":[\"霧\"],\"凍雨\":[\"凍雨\"],\"雷雨\":[\"雷雨\"]};");
 // STEP5 retained: persist() must be hardened before the core app executes.
 var originalPersist='function persist(){\n  try{localStorage.setItem(SK,JSON.stringify(allStores));}catch(e){}\n}';
-var safePersist='function persist(){\n  try{localStorage.setItem(SK,JSON.stringify(allStores));return true;}catch(e){\n    alert("データを保存できませんでした。\\nブラウザの保存領域を確認して、もう一度お試しください。\\n現在の変更は保存されていません。");\n    const saveError=new Error("Insight data save failed");saveError.name="InsightPersistError";saveError.cause=e;throw saveError;\n  }\n}\nwindow.addEventListener("error",e=>{if(e.error&&e.error.name==="InsightPersistError")e.preventDefault();});';
+var safePersist='function persist(){\n  try{\n    if(window.InsightStorage&&typeof window.InsightStorage.persistCurrent==="function")return window.InsightStorage.persistCurrent(allStores);\n    localStorage.setItem(SK,JSON.stringify(allStores));return true;\n  }catch(e){\n    alert("データを保存できませんでした。\\nブラウザの保存領域を確認して、もう一度お試しください。\\n現在の変更は保存されていません。");\n    const saveError=new Error("Insight data save failed");saveError.name="InsightPersistError";saveError.cause=e;throw saveError;\n  }\n}\nwindow.addEventListener("error",e=>{if(e.error&&e.error.name==="InsightPersistError")e.preventDefault();});';
 if(html.indexOf(originalPersist)<0)throw new Error('保存処理の安全化に失敗しました');
 html=html.replace(originalPersist,safePersist);
 // STEP5 retained: legacy core control contrast patch; keep until the corresponding base style is moved out of the payload.
@@ -43,7 +43,7 @@ var orderedFeatureLoads=[
   {inline:extra},
   './insight_date_context_v1.js?v=20260930-1',
   './insight_hooks_v1.js?v=20260930-hooks2',
-  './insight_storage_v1.js?v=20260930-step6-3',
+  './insight_storage_v1.js?v=20260930-step6-4',
   './insight_ops_v1.js?v=20260930-step5-2',
   './insight_preserve_dailyops_v1.js?v=20260930-hooks3',
   './insight_quick_date_nav_v1.js?v=20260930-hooks1',
