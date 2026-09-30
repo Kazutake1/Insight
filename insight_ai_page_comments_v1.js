@@ -206,10 +206,10 @@
     if(title)title.textContent=text;
   }
   function install(){
-    var oldRender=root.renderAIAnalysisPanel;
-    root.renderAIAnalysisPanel=function(){
+    if(!root.InsightHooks)return;
+    root.InsightHooks.on('ai:render:before','page-ai-route',function(ctx){
       var m=mode();
-      if(m==='dashboard'){heading('今月の要点');return oldRender.apply(this,arguments);}
+      if(m==='dashboard'){heading('今月の要点');return;}
       var p;
       try{p=build(m);}catch(e){p={period:'対象データを取得できません',summary:[],good:[],caution:['データ不足のため分析できません。対象期間の入力を確認してください。'],checks:[]};}
       heading(m==='daily'?'選択日の要点':'対象期間の要点');
@@ -218,7 +218,9 @@
       append('aiAnalysisGood',p.good,'改善を判断できる比較結果はありません。');
       append('aiAnalysisCaution',p.caution,'入力済みデータから追加の注意点は確認できません。');
       append('aiAnalysisChecks',p.checks,'対象期間の入力データを確認してください。');
-    };
+      ctx.cancel=true;
+      return false;
+    },1);
   }
   root.InsightAIPageComments={mode:mode,build:build};
   if(document.readyState==='complete')install();else root.addEventListener('load',install,{once:true});
