@@ -24,7 +24,8 @@ function setup(){
   const rows=(count,factor)=>Array.from({length:30},(_,i)=>({d:i+1,売上:i<count?100*factor:0,客数:i<count?100*factor:0,買上点数:i<count?200*factor:0,廃棄金額:i<count?1000*factor:0}));
   c.store.data={'2026':{'9月':rows(10,1.2)},'2025':{'9月':rows(12,1)}};
   vm.createContext(c);vm.runInContext(engineSource,c);vm.runInContext(read('insight_yoy_policy_v1.js'),c);
-  const index=read('Index.html'),start=index.indexOf('var extra=')+10,end=index.indexOf(";\nhtml=html.replace('</body>',",start);
+  const index=read('Index.html'),start=index.indexOf('var extra=')+10,end=index.indexOf(";\nhtml=html.replace('</style>',",start);
+  assert.ok(start>=10&&end>start,'Index.html の分析AIインラインスクリプトを抽出できません');
   const extra=vm.runInNewContext(index.slice(start,end));
   vm.runInContext(extra.replace(/^<script>/,'').replace(/<\/script>$/,''),c);
   vm.runInContext(read('insight_dashboard_kpi_sync_v1.js'),c);
