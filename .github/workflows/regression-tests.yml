@@ -39,4 +39,14 @@ jobs:
         with:
           node-version: '22'
       - name: Run test file
-        run: node --test "tests/${{ matrix.file }}"
+        shell: bash
+        run: |
+          set -o pipefail
+          node --test "tests/${{ matrix.file }}" 2>&1 | tee test-output.txt
+      - name: Upload failed test output
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: test-output-${{ matrix.file }}
+          path: test-output.txt
+          retention-days: 3
