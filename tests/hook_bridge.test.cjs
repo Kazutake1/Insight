@@ -58,6 +58,14 @@ test('after hookはAI質問結果を拡張できる',()=>{
   assert.deepEqual(calls,['base:question:売上']);
 });
 
+test('処理済みAIパネルはbaseを呼ばず必要なafter hookだけ継続できる',()=>{
+  const {window,calls}=setup();
+  window.InsightHooks.on('ai:render:before','handled',ctx=>{calls.push('handled');ctx.result='handled';ctx.afterOnCancel=true;ctx.cancel=true;return false;},10);
+  window.InsightHooks.on('ai:render:after','append',()=>calls.push('append'),20);
+  assert.equal(window.renderAIAnalysisPanel(),'handled');
+  assert.deepEqual(calls,['handled','append']);
+});
+
 test('対象コア関数をfeature moduleが直接上書きしない',()=>{
   const watched=['renderQuickPage','saveQuick','renderKPI','renderDerived','refreshDash','renderTable','saveInput','renderAIAnalysisPanel','buildAIQuestionAnswer'];
   const files=fs.readdirSync(root).filter(name=>/^insight_.*\.js$/.test(name)&&name!=='insight_hooks_v1.js');
