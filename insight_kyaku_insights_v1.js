@@ -83,16 +83,10 @@
     }
     syncChartSummary();
   }
-  if(typeof window.renderTable==='function'){
-    var original=window.renderTable;
-    window.renderTable=function(type){
-      var result=original.apply(this,arguments);
-      if(type==='kyaku'){
-        refresh();
-        requestAnimationFrame(syncChartSummary);
-      }
-      return result;
-    };
+  if(window.InsightHooks){
+    window.InsightHooks.on('input:table:after','kyaku-insights-table',function(ctx){
+      if(ctx.args[0]==='kyaku'){refresh();requestAnimationFrame(syncChartSummary);}
+    },30);
   }
   page.addEventListener('input',function(event){
     if(event.target&&event.target.matches&&event.target.matches('#kyakuGrid input.kyaku-input'))refresh();
