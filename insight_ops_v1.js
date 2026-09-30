@@ -1,4 +1,13 @@
 (function(){
+  function ensureOpsStyle(){
+    if(document.getElementById("insightOpsV1Style"))return;
+    var style=document.createElement("style");
+    style.id="insightOpsV1Style";
+    style.textContent='.ops-daily-wrap{margin-top:10px;display:grid;grid-template-columns:minmax(0,1fr) 180px;gap:10px}.ops-field-card{background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:10px}.ops-field-title{font-size:11px;font-weight:750;color:var(--text3);margin-bottom:6px}.ops-memo{width:100%;min-height:58px;resize:vertical;box-sizing:border-box;border:1px solid var(--border);border-radius:9px;background:var(--input-bg);color:var(--text);padding:8px 9px;font-size:12px;line-height:1.45;font-family:inherit;outline:none}.ops-stockout{width:100%;height:38px;border:1px solid var(--border);border-radius:9px;background:var(--input-bg);color:var(--text);padding:0 8px;font-size:12px;font-weight:700;font-family:inherit;outline:none}.monthly-ops-card{margin:10px 0 12px;padding:12px 14px;border-radius:14px;background:var(--surface);border:1px solid var(--border);display:flex;align-items:flex-end;gap:12px;flex-wrap:wrap}.monthly-ops-title{font-size:12px;font-weight:750;color:var(--text);margin-right:4px;align-self:center}.monthly-ops-field{display:flex;flex-direction:column;gap:5px}.monthly-ops-label{font-size:10px;font-weight:700;color:var(--text4)}.monthly-ops-input{width:140px;height:36px;box-sizing:border-box;border:1px solid var(--border);border-radius:9px;background:var(--input-bg);color:var(--text);padding:0 9px;font-size:12px;font-weight:700;font-family:inherit;outline:none}.monthly-ops-save{height:36px;border:0;border-radius:9px;background:var(--text);color:var(--surface);padding:0 14px;font-size:11px;font-weight:700;font-family:inherit;cursor:pointer}.monthly-ops-saved{font-size:10px;color:#16a34a;min-width:70px;padding-bottom:8px}@media(max-width:700px){.ops-daily-wrap{grid-template-columns:1fr}.monthly-ops-input{width:120px}}';
+    document.head.appendChild(style);
+  }
+  ensureOpsStyle();
+
   function ensureMonthlyOps(year,month){
     var y=String(year!=null?year:(baseYear||""));
     var m=month||selMonth;
