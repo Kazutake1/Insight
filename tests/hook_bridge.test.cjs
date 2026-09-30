@@ -80,6 +80,11 @@ test('対象コア関数をfeature moduleが直接上書きしない',()=>{
   assert.deepEqual(offenders,[]);
 });
 
+test('選択日クリア処理はquick date navigationだけが所有する',()=>{
+  assert.doesNotMatch(read('insight_preserve_dailyops_v1.js'),/window\.clearTodayData\s*=/);
+  assert.match(read('insight_quick_date_nav_v1.js'),/window\.clearTodayData\s*=/);
+});
+
 test('STEP4対象機能はhooksへ登録されている',()=>{
   const expected={
     'insight_ops_v1.js':['quick:render:after','quick:save:before','quick:save:after','dashboard:refresh:after'],
