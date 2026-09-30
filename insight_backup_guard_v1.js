@@ -12,6 +12,9 @@ function normalizeSalesCount(next){
 }
 function normalizeBackup(raw){
   var next;if(isPlainObject(raw)&&isPlainObject(raw.stores)&&typeof raw.current==="string"){next=raw;}else if(isPlainObject(raw)&&Array.isArray(raw.years)&&isPlainObject(raw.data)){next=migrateOldData(raw);}else{throw new Error("バックアップ形式が正しくありません");}
+  if(!window.InsightStorage)throw new Error("保存機能を初期化できませんでした");
+  next=window.InsightStorage.migrateSnapshot(next);
+  if(next.schemaVersion!==window.InsightStorage.CURRENT_SCHEMA_VERSION)throw new Error("バックアップのデータ形式に対応していません");
   if(!isPlainObject(next.stores)||Object.keys(next.stores).length===0)throw new Error("店舗データがありません");
   if(typeof next.current!=="string"||!next.current||!next.stores[next.current])throw new Error("現在店舗の情報が不正です");
   Object.keys(next.stores).forEach(function(id){
