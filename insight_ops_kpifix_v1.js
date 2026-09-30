@@ -17,18 +17,11 @@
     return store.monthlyOps[y][m];
   }
 
-  function comparisonPct(now,prev){
-    now=Number(now)||0;prev=Number(prev)||0;
-    if(prev<=0)return null;
-    var pct=(now-prev)/prev*100;
-    return {up:pct>=0,str:Math.abs(pct).toFixed(1)+'%'};
-  }
-
-  function grossMarginPoint(now,prev){
-    now=Number(now)||0;prev=Number(prev)||0;
-    if(prev<=0)return null;
-    var pt=now-prev;
-    return {up:pt>=0,str:Math.abs(pt).toFixed(1)+'pt'};
+  function monthlyComparisonDisplay(change,kind){
+    if(!change)return null;
+    var value=kind==='point'?Number(change.point):Number(change.pct);
+    if(!Number.isFinite(value))return null;
+    return {up:value>=0,str:Math.abs(value).toFixed(1)+(kind==='point'?'pt':'%')};
   }
 
   function makeCard(type,label,valueHtml,comparison,prevLabel){
@@ -61,14 +54,13 @@
 
     Array.prototype.forEach.call(existing,function(el){el.remove();});
     var current=getMonthlyOps(baseYear,selMonth);
-    var prev=null;
-    if(typeof cmpYear!=='undefined'&&cmpYear!=null&&store.monthlyOps&&store.monthlyOps[String(cmpYear)]&&store.monthlyOps[String(cmpYear)][selMonth]){
-      prev=store.monthlyOps[String(cmpYear)][selMonth];
-    }
     var labor=Number(current.laborCostYen)||0;
     var gm=Number(current.grossMarginRate)||0;
-    var laborCmp=labor>0&&prev?comparisonPct(labor,prev.laborCostYen):null;
-    var gmCmp=gm>0&&prev?grossMarginPoint(gm,prev.grossMarginRate):null;
+    var comparison=(window.InsightYearComparison&&typeof window.InsightYearComparison.monthly==='function')
+      ?window.InsightYearComparison.monthly(baseYear,selMonth,typeof cmpYear!=='undefined'?cmpYear:null)
+      :{laborCostYen:null,grossMarginRate:null};
+    var laborCmp=monthlyComparisonDisplay(comparison.laborCostYen,'pct');
+    var gmCmp=monthlyComparisonDisplay(comparison.grossMarginRate,'point');
     var prevLabel=(typeof cmpYear!=='undefined'&&cmpYear!=null)?String(cmpYear)+'年比':'前年比';
     row.appendChild(makeCard('labor','人件費',labor?Math.round(labor/1000).toLocaleString()+'<span class="kpi-unit">千円</span>':'—',laborCmp,prevLabel));
     row.appendChild(makeCard('grossMargin','粗利率',gm?gm.toFixed(1)+'<span class="kpi-unit">%</span>':'—',gmCmp,prevLabel));
