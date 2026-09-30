@@ -19,7 +19,10 @@
     var type={sales:'sales',customers:'kyaku',waste:'haiki'}[m];
     var year=type?editYear[type]:baseYear,month=type?editMonth[type]:selMonth;
     var day=null;
-    if(m==='daily'){year=todayInfo.fy;month=todayInfo.month;day=Number(quickEditDay);}
+    if(m==='daily'){
+      var selected=root.InsightDateContext&&typeof root.InsightDateContext.getSelectedInfo==='function'?root.InsightDateContext.getSelectedInfo():null;
+      if(selected){year=selected.fy;month=selected.month;day=selected.day;}
+    }
     var mi=MONTHS.indexOf(month),through=m==='daily'?day:getAIAnalysisThroughDay(year,month);
     return {year:String(year),month:month,mi:mi,day:day,through:through,
       prev:typeof cmpYear!=='undefined'&&cmpYear!=null?String(cmpYear):null};
