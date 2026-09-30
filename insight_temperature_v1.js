@@ -198,7 +198,7 @@
         }
         persist();
       }catch(err){
-        alert('気温データを保存できませんでした.\n'+err.message);
+        alert('気温データを保存できませんでした。\n'+err.message);
       }
     },40);
   }
