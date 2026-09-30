@@ -37,9 +37,15 @@ test('未使用の平均フィールド指定はダッシュボード定義か�
   for(const field of ['salesYen','customers','items','wasteYen'])assert.match(source,new RegExp("field:'"+field+"'"));
 });
 
-test('変更対象のキャッシュバスターは最新版を指す',()=>{
+test('比較共通化moduleはmanifestでcache bustされ一意に読み込まれる',()=>{
   const index=read('Index.html');
-  assert.match(index,/insight_ops_v1\.js\?v=20260930-dedupe1/);
-  assert.match(index,/insight_ops_kpifix_v1\.js\?v=20260930-dedupe1/);
-  assert.match(index,/insight_dashboard_kpi_sync_v1\.js\?v=20260930-dedupe1/);
+  const start=index.indexOf('var orderedFeatureLoads=[');
+  const end=index.indexOf('];',start);
+  assert.ok(start>=0&&end>start);
+  const manifest=index.slice(start,end+2);
+  for(const name of ['insight_ops_v1.js','insight_ops_kpifix_v1.js','insight_dashboard_kpi_sync_v1.js']){
+    assert.ok(manifest.includes('./'+name+'?v='),name+' にcache busterがありません');
+    const first=manifest.indexOf(name);
+    assert.equal(manifest.indexOf(name,first+1),-1,name+' が重複しています');
+  }
 });
