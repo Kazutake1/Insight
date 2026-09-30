@@ -2,6 +2,98 @@
   var SECTION_IDS=['aiAnalysisSummary','aiAnalysisGood','aiAnalysisCaution'];
   var queued=false;
 
+  function createCard(title,id){
+    var card=document.createElement('div');
+    card.className='ai-analysis-card';
+    var heading=document.createElement('div');
+    heading.className='ai-analysis-card-title';
+    heading.textContent=title;
+    var body=document.createElement('div');
+    body.id=id;
+    card.append(heading,body);
+    return card;
+  }
+
+  function ensureAnalysisDom(){
+    if(document.getElementById('aiAnalysisSummary'))return;
+    var legacy=document.getElementById('aiAnalysisComments');
+    var legacyCard=legacy&&legacy.closest?legacy.closest('.ai-analysis-card'):null;
+    if(!legacyCard||!legacyCard.parentNode)return;
+
+    var frag=document.createDocumentFragment();
+    frag.append(
+      createCard('今月の要点','aiAnalysisSummary'),
+      createCard('良い点','aiAnalysisGood'),
+      createCard('注意点','aiAnalysisCaution'),
+      createCard('確認事項','aiAnalysisChecks')
+    );
+
+    var questionCard=document.createElement('div');
+    questionCard.className='ai-analysis-card';
+    var questionTitle=document.createElement('div');
+    questionTitle.className='ai-analysis-card-title';
+    questionTitle.textContent='自由質問';
+    var row=document.createElement('div');
+    row.className='ai-analysis-question-row';
+    var input=document.createElement('textarea');
+    input.id='aiAnalysisQuestion';
+    input.className='ai-analysis-question-input';
+    input.rows=1;
+    input.placeholder='例：今月の問題点は？';
+    var send=document.createElement('button');
+    send.className='ai-analysis-question-send';
+    send.type='button';
+    send.textContent='質問';
+    send.addEventListener('click',function(){
+      if(typeof window.askAIAnalysisQuestion==='function')window.askAIAnalysisQuestion();
+    });
+    row.append(input,send);
+    var answer=document.createElement('div');
+    answer.id='aiAnalysisAnswer';
+    answer.className='ai-analysis-question-answer';
+    answer.hidden=true;
+    var help=document.createElement('div');
+    help.className='ai-analysis-question-help';
+    help.textContent='現在入力されているKPI・前年比較・廃棄・人件費・粗利率・店舗メモの範囲で回答します。';
+    questionCard.append(questionTitle,row,answer,help);
+    frag.appendChild(questionCard);
+
+    legacyCard.parentNode.insertBefore(frag,legacyCard);
+    legacyCard.remove();
+  }
+
+  function ensureBackdrop(){
+    var panel=document.getElementById('aiAnalysisPanel');
+    if(!panel)return null;
+    var backdrop=document.getElementById('aiAnalysisBackdrop');
+    if(!backdrop){
+      backdrop=document.createElement('div');
+      backdrop.id='aiAnalysisBackdrop';
+      backdrop.className='ai-analysis-backdrop';
+      backdrop.hidden=true;
+      backdrop.setAttribute('aria-hidden','true');
+      backdrop.addEventListener('click',function(){
+        if(typeof window.closeAIAnalysisPanel==='function')window.closeAIAnalysisPanel();
+      });
+      panel.parentNode.insertBefore(backdrop,panel);
+    }
+    return backdrop;
+  }
+
+  function syncBackdrop(){
+    var backdrop=ensureBackdrop();
+    if(!backdrop)return;
+    var open=document.body.classList.contains('ai-analysis-open');
+    backdrop.hidden=!open;
+    backdrop.setAttribute('aria-hidden',open?'false':'true');
+  }
+
+  ensureAnalysisDom();
+  ensureBackdrop();
+  var backdropObserver=new MutationObserver(syncBackdrop);
+  backdropObserver.observe(document.body,{attributes:true,attributeFilter:['class']});
+  syncBackdrop();
+
   function ensurePresentationStyle(){
     if(document.getElementById('insightAiPresentationStyle'))return;
     var style=document.createElement('style');
