@@ -137,4 +137,6 @@ test('バックアップ復元は実在日と有効なカテゴリーマスタ�
   assert.match(source,/categories\.length/);
   assert.match(source,/categories\.some\(function\(c\)/);
   assert.match(source,/!validSalesCountDate\(date\)/);
+  assert.match(source,/InsightStorage\.migrateSnapshot\(next\)/);
+  assert.match(source,/CURRENT_SCHEMA_VERSION/);
 });
