@@ -115,33 +115,12 @@
     patchDerivedCards(c);
   }
 
-  if(typeof root.renderKPI==='function'){
-    var oldRenderKPI=root.renderKPI;
-    root.renderKPI=function(){
-      var result=oldRenderKPI.apply(this,arguments);
-      var c=context();
-      patchPrimaryCards(c);
-      patchDerivedCards(c);
-      return result;
-    };
-  }
-
-  if(typeof root.renderDerived==='function'){
-    var oldRenderDerived=root.renderDerived;
-    root.renderDerived=function(){
-      var result=oldRenderDerived.apply(this,arguments);
-      patchDerivedCards(context());
-      return result;
-    };
-  }
-
-  if(typeof root.refreshDash==='function'){
-    var oldRefreshDash=root.refreshDash;
-    root.refreshDash=function(){
-      var result=oldRefreshDash.apply(this,arguments);
-      patch();
-      return result;
-    };
+  if(root.InsightHooks){
+    root.InsightHooks.on('dashboard:kpi:after','dashboard-kpi-sync',function(){
+      var c=context();patchPrimaryCards(c);patchDerivedCards(c);
+    },40);
+    root.InsightHooks.on('dashboard:derived:after','dashboard-derived-sync',function(){patchDerivedCards(context());},40);
+    root.InsightHooks.on('dashboard:refresh:after','dashboard-refresh-sync',function(){patch();},40);
   }
 
   root.InsightDashboardKPISync={
