@@ -47,13 +47,16 @@
     return serialized;
   }
 
-  function persistCurrent(){
-    try{
-      if(typeof allStores!=='undefined'&&allStores&&typeof allStores==='object')allStores.schemaVersion=CURRENT_SCHEMA_VERSION;
-    }catch(_){}
-    if(typeof persist==='function')return persist();
-    if(typeof root.persist==='function')return root.persist();
-    throw new Error('Insight persist function is unavailable.');
+  function persistCurrent(snapshot){
+    var target=snapshot;
+    if(target===undefined){
+      try{if(typeof allStores!=='undefined')target=allStores;}catch(_){}
+    }
+    if(target===undefined)target=root.allStores;
+    if(!target||typeof target!=='object'||Array.isArray(target))throw new Error('Insight current data is unavailable.');
+    target.schemaVersion=CURRENT_SCHEMA_VERSION;
+    writeSnapshot(target);
+    return true;
   }
 
   function transaction(source,mutate,validate,apply){
