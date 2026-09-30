@@ -102,13 +102,8 @@
       return result;
     };
   }
-  if(typeof window.renderTable==='function'){
-    var originalTable=window.renderTable;
-    window.renderTable=function(type){
-      var result=originalTable.apply(this,arguments);
-      if(type==='sales')refresh();
-      return result;
-    };
+  if(window.InsightHooks){
+    window.InsightHooks.on('input:table:after','sales-insights-table',function(ctx){if(ctx.args[0]==='sales')refresh();},30);
   }
   page.addEventListener('input',function(event){
     if(event.target&&event.target.matches&&event.target.matches('#salesForm input[data-k="売上"]'))refresh();
