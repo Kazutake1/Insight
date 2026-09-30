@@ -6,10 +6,10 @@ const path=require('node:path');
 const root=path.join(__dirname,'..');
 const read=name=>fs.readFileSync(path.join(root,name),'utf8');
 
-test('STEP5-2後のpayload文字列置換は16件に縮小されている',()=>{
+test('STEP5-3後のpayload文字列置換は11件に縮小されている',()=>{
   const index=read('Index.html');
   const count=(index.match(/html=html\.replace/g)||[]).length;
-  assert.equal(count,16);
+  assert.equal(count,11);
 });
 
 test('AI表示CSSはIndexの文字列置換ではなくpresentation moduleが所有する',()=>{
@@ -26,6 +26,24 @@ test('AI表示CSSはIndexの文字列置換ではなくpresentation moduleが所
   assert.match(presentation,/body\.ai-analysis-open #main\{margin-right:0!important\}/);
   assert.match(presentation,/\.ai-analysis-question-row/);
   assert.match(presentation,/@media\(max-width:520px\)/);
+});
+
+test('AIのDOM・背景・開閉同期はpresentation moduleが所有する',()=>{
+  const index=read('Index.html');
+  const presentation=read('insight_ai_presentation_v1.js');
+  for(const marker of [
+    '(<button id="aiAnalysisToggle"',
+    '<aside id="aiAnalysisPanel" class="ai-analysis-panel"',
+    'function openAIAnalysisPanel(){',
+    'function closeAIAnalysisPanel(){',
+    '<div class="ai-analysis-card">\\n      <div class="ai-analysis-card-title">経営コメント</div>'
+  ]) assert.ok(!index.includes(marker),marker+' がIndexのpayload patchに残っています');
+  assert.match(presentation,/function ensureAnalysisDom\(/);
+  assert.match(presentation,/function ensureBackdrop\(/);
+  assert.match(presentation,/function syncBackdrop\(/);
+  assert.match(presentation,/aiAnalysisSummary/);
+  assert.match(presentation,/aiAnalysisQuestion/);
+  assert.match(presentation,/closeAIAnalysisPanel/);
 });
 
 test('店舗運営UIのCSSはops moduleが所有する',()=>{
@@ -48,8 +66,8 @@ test('まだpayload前処理が必要な安全・互換パッチは保持する'
   assert.match(index,/orderedFeatureLoads/);
 });
 
-test('STEP5-2対象assetはcache bustされている',()=>{
+test('STEP5-3対象assetはcache bustされている',()=>{
   const index=read('Index.html');
-  assert.match(index,/insight_ai_presentation_v1\.js\?v=20260930-step5-2/);
+  assert.match(index,/insight_ai_presentation_v1\.js\?v=20260930-step5-3/);
   assert.match(index,/insight_ops_v1\.js\?v=20260930-step5-2/);
 });
