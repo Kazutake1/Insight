@@ -67,3 +67,22 @@ test('ページ同期が画面再描画の単一責務を持つ',()=>{
   assert.doesNotMatch(lockSource,/function syncInput\(/);
   assert.match(presentation,/!window\.InsightPagePeriodSync&&window\.InsightAnalysisPeriodLock/);
 });
+
+test('店舗切替先に年度があれば年月を維持し無ければ最新年度へフォールバックする',()=>{
+  assert.deepEqual(sync.resolveForStore({year:2025,month:9},{years:['2024','2025','2026']}),{
+    year:2025,month:9,monthLabel:'9月',day:null,source:null
+  });
+  assert.deepEqual(sync.resolveForStore({year:2023,month:9},{years:['2024','2025','2026']}),{
+    year:2026,month:9,monthLabel:'9月',day:null,source:'storeFallback'
+  });
+});
+
+test('店舗切替はPagePeriodSyncがラップして期間整合性を再確認する',()=>{
+  const source=fs.readFileSync(path.join(__dirname,'..','insight_page_period_sync_v1.js'),'utf8');
+  assert.match(source,/function installStoreSwitchBridge\(/);
+  assert.match(source,/function reconcileCurrentStore\(/);
+  assert.match(source,/root\.switchStore=wrapped/);
+  assert.match(source,/resolveForStore\(value\|\|effectiveTarget\(\)\|\|target,currentStore\)/);
+  assert.match(source,/InsightAnalysisPeriodLock\.setTarget/);
+  assert.match(source,/storeTransition/);
+});
