@@ -138,11 +138,13 @@ test('対象外便のUIは対象外表示となり入力対象から外れる',(
   assert.match(source,/activeTrips:activeTrips/);
 });
 
-test('曜日別平均の対象外便はダッシュ表示にする',()=>{
+test('曜日別平均の対象外便はダッシュ表示かつグレー表示にする',()=>{
   const source=fs.readFileSync(path.join(__dirname,'..','insight_sales_count_v1.js'),'utf8');
   const start=source.indexOf('function renderAverages()');
   assert.ok(start>=0);
-  const block=source.slice(start,start+2200);
-  assert.match(block,/function v\(value,index\)\{return mask\[index\]===false\?'ー':fmt\(value\);\}/);
+  const block=source.slice(start,start+2600);
+  assert.match(block,/class="sc-not-applicable"/);
+  assert.match(block,/\?'ー':fmt\(value\)/);
   assert.doesNotMatch(block,/対象外/);
+  assert.match(source,/\.sc-average-row b\.sc-not-applicable\{background:var\(--surface2\)!important;border-color:var\(--border\)!important;color:var\(--text4\)!important\}/);
 });
