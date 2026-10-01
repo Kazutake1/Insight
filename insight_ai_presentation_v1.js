@@ -128,7 +128,11 @@
     var title=document.createElement('div');
     title.className='ai-workspace-title';
     title.textContent='分析AI';
-    brand.appendChild(title);
+    var targetLabel=document.createElement('div');
+    targetLabel.id='aiAnalysisTarget';
+    targetLabel.className='ai-workspace-target-label';
+    targetLabel.hidden=true;
+    brand.append(title,targetLabel);
     if(period){
       period.classList.add('ai-workspace-period-label');
       brand.appendChild(period);
@@ -259,6 +263,7 @@
       else if(activePeriod==='history')heading.textContent=(viewState.historyKind==='month'?'月次履歴':'週次履歴');
       else heading.textContent=base;
     }
+    if(window.InsightAnalysisPeriodLock&&typeof window.InsightAnalysisPeriodLock.refreshLabel==='function')window.InsightAnalysisPeriodLock.refreshLabel();
     syncWorkspacePosition();
   }
 
@@ -296,6 +301,8 @@
       '.ai-workspace-brand{min-width:0}',
       '.ai-workspace-title{font-size:20px;line-height:1.1;font-weight:800;color:var(--navy);letter-spacing:.01em}',
       '.ai-workspace-period-label{margin-top:4px;font-size:10px;line-height:1.2;color:var(--text4);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}',
+      '.ai-workspace-target-label{margin-top:3px;font-size:10px;line-height:1.2;font-weight:800;color:var(--navy);white-space:nowrap}',
+      '.ai-workspace-target-label[hidden]{display:none!important}',
       '.ai-workspace-period-tabs{display:flex;align-items:center;gap:4px;padding:4px;border:1px solid var(--border);border-radius:10px;background:#f7f8fa}',
       '.ai-workspace-period-btn{border:0;border-radius:7px;background:transparent;color:var(--text3);padding:7px 14px;font:700 11px/1 -apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;cursor:default}',
       '.ai-workspace-period-btn.active{background:var(--navy);color:#fff}',
@@ -428,12 +435,14 @@
       if(!document.body.classList.contains('ai-analysis-open'))return;
       var target=event.target&&event.target.closest?event.target.closest('#nav0,#nav1,#nav2,#nav3,#nav4,#navSalesCount'):null;
       if(!target)return;
-      if(typeof queueMicrotask==='function')queueMicrotask(function(){
+      function syncAndRender(){
+        if(window.InsightAnalysisPeriodLock&&typeof window.InsightAnalysisPeriodLock.syncCurrentPage==='function'){
+          window.InsightAnalysisPeriodLock.syncCurrentPage();
+        }
         if(typeof window.renderAIAnalysisPanel==='function')window.renderAIAnalysisPanel();
-      });
-      else setTimeout(function(){
-        if(typeof window.renderAIAnalysisPanel==='function')window.renderAIAnalysisPanel();
-      },0);
+      }
+      if(typeof queueMicrotask==='function')queueMicrotask(syncAndRender);
+      else setTimeout(syncAndRender,0);
     });
   }
 
