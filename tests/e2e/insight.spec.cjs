@@ -329,8 +329,29 @@ test('カテゴリーごとの対象便設定で対象外便を入力漏れ扱�
   expect(saved.delivery[0].className).toContain('sc-not-applicable');
   expect(saved.delivery[1].type).toBe('number');
   expect(saved.delivery[2].type).toBe('number');
-  await expect(page.locator('#scAverages .sc-average-day').first().locator('.sc-average-delivery b').nth(0)).toHaveText('ー');
-  await expect(page.locator('#scAverages .sc-average-day').first().locator('.sc-average-sales b').nth(0)).toHaveText('ー');
+  const weekdayDelivery=page.locator('#scAverages .sc-average-day').first().locator('.sc-average-delivery b').nth(0);
+  const weekdaySales=page.locator('#scAverages .sc-average-day').first().locator('.sc-average-sales b').nth(0);
+  await expect(weekdayDelivery).toHaveText('ー');
+  await expect(weekdaySales).toHaveText('ー');
+  await expect(weekdayDelivery).toHaveClass(/sc-not-applicable/);
+  await expect(weekdaySales).toHaveClass(/sc-not-applicable/);
+
+  const grayMatch=await page.evaluate(()=>{
+    const calendar=document.querySelector('#scCalendar .sc-day:not(.empty) .sc-delivery-row input.sc-not-applicable');
+    const average=document.querySelector('#scAverages .sc-average-day .sc-average-delivery b.sc-not-applicable');
+    const calendarStyle=getComputedStyle(calendar),averageStyle=getComputedStyle(average);
+    return {
+      calendarBackground:calendarStyle.backgroundColor,
+      averageBackground:averageStyle.backgroundColor,
+      calendarBorder:calendarStyle.borderColor,
+      averageBorder:averageStyle.borderColor,
+      calendarColor:calendarStyle.color,
+      averageColor:averageStyle.color
+    };
+  });
+  expect(grayMatch.averageBackground).toBe(grayMatch.calendarBackground);
+  expect(grayMatch.averageBorder).toBe(grayMatch.calendarBorder);
+  expect(grayMatch.averageColor).toBe(grayMatch.calendarColor);
 
   await page.locator('#aiAnalysisToggle').click();
   await expect(page.locator('body')).toHaveClass(/ai-analysis-open/);
