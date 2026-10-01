@@ -185,7 +185,8 @@
     p.period=c.year+'年 '+c.month+'月 / '+c.category.name;
     function fmt(v){return v==null?'データ不足':Number(v).toFixed(1).replace(/\.0$/,'');}
     p.summary.push(c.category.name+'の入力済み平均（便ごとに集計）：');
-    for(var i=0;i<3;i++)p.summary.push((i+1)+'便 納品 '+fmt(c.delivery.trips[i])+' / 販売 '+fmt(c.sales.trips[i])+'。');
+    var active=Array.isArray(c.activeTrips)&&c.activeTrips.length===3?c.activeTrips:[true,true,true];
+    for(var i=0;i<3;i++)if(active[i]!==false)p.summary.push((i+1)+'便 納品 '+fmt(c.delivery.trips[i])+' / 販売 '+fmt(c.sales.trips[i])+'。');
     p.summary.push('日合計平均：納品 '+fmt(c.delivery.total)+' / 販売 '+fmt(c.sales.total)+'（3便すべて入力済みの日）。');
     var days=c.daily.filter(function(d){return d.delivery!=null||d.sales!=null;});
     if(days.length)p.summary.push('日合計（直近の入力済み日）：'+days.slice(-3).map(function(d){return d.date.slice(8)+'日 納品 '+fmt(d.delivery)+' / 販売 '+fmt(d.sales);}).join(' / ')+'。');
@@ -194,10 +195,11 @@
     if(weekdays.length)p.summary.push('曜日別の日合計平均：'+weekdays.join(' / ')+'。');
     p.checks.push('セール日平均 / 同曜日通常日平均（保存済み）：');
     for(var t=0;t<3;t++){
+      if(active[t]===false)continue;
       p.checks.push((t+1)+'便 納品 '+fmt(c.sale.delivery.trips[t])+' / '+fmt(c.normal.delivery.trips[t])+'、販売 '+fmt(c.sale.sales.trips[t])+' / '+fmt(c.normal.sales.trips[t])+'。');
     }
     p.checks.push('日合計 納品 '+fmt(c.sale.delivery.total)+' / '+fmt(c.normal.delivery.total)+'、販売 '+fmt(c.sale.sales.total)+' / '+fmt(c.normal.sales.total)+'。');
-    var diffs=[0,1,2].map(function(t){return c.sale.sales.trips[t]!=null&&c.normal.sales.trips[t]!=null?{trip:t+1,value:c.sale.sales.trips[t]-c.normal.sales.trips[t]}:null;}).filter(Boolean).sort(function(a,b){return Math.abs(b.value)-Math.abs(a.value);});
+    var diffs=[0,1,2].map(function(t){if(active[t]===false)return null;return c.sale.sales.trips[t]!=null&&c.normal.sales.trips[t]!=null?{trip:t+1,value:c.sale.sales.trips[t]-c.normal.sales.trips[t]}:null;}).filter(Boolean).sort(function(a,b){return Math.abs(b.value)-Math.abs(a.value);});
     if(diffs.length&&diffs[0].value!==0)p.summary.push('販売数の比較差は'+diffs[0].trip+'便が最大（セール日平均−同曜日通常日平均 '+signed(diffs[0].value,fmt)+'）です。');
     else if(!diffs.length)p.caution.push('セール日と同曜日通常日の比較データが不足しています。');
     var descriptions=Array.from(new Set(c.events.map(function(e){return e.summary;})));
