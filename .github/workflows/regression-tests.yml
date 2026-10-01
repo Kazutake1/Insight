@@ -27,6 +27,7 @@ jobs:
           - insight_events.test.cjs
           - insight_sales_count.test.cjs
           - insight_yoy_policy.test.cjs
+          - monthly_review.test.cjs
           - payload_browser_smoke.test.cjs
           - payload_patch_inventory.test.cjs
           - script_load_order.test.cjs
