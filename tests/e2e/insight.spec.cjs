@@ -329,6 +329,8 @@ test('カテゴリーごとの対象便設定で対象外便を入力漏れ扱�
   expect(saved.delivery[0].className).toContain('sc-not-applicable');
   expect(saved.delivery[1].type).toBe('number');
   expect(saved.delivery[2].type).toBe('number');
+  await expect(page.locator('#scAverages .sc-average-day').first().locator('.sc-average-delivery b').nth(0)).toHaveText('ー');
+  await expect(page.locator('#scAverages .sc-average-day').first().locator('.sc-average-sales b').nth(0)).toHaveText('ー');
 
   await page.locator('#aiAnalysisToggle').click();
   await expect(page.locator('body')).toHaveClass(/ai-analysis-open/);
