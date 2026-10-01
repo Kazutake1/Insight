@@ -168,3 +168,8 @@ test('販売数入力を開いたままバックアップ復元しても復元�
   assert.match(backup,/InsightSalesCount\.reloadFromStore/);
   assert.doesNotMatch(backup,/currentNav==='salesCounts'\)gotoNav\('salesCounts'\)/);
 });
+
+test('バックアップ復元後も共有年月を復元先店舗の年度構成へ整合させる',()=>{
+  const source=fs.readFileSync(path.join(root,'insight_backup_guard_v1.js'),'utf8');
+  assert.match(source,/InsightPagePeriodSync\.reconcileCurrentStore/);
+});
