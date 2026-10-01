@@ -10,7 +10,7 @@ async function openInsight(page){
   page.on('pageerror',error=>errors.push(error.message));
   await page.goto('/Index.html',{waitUntil:'domcontentloaded'});
   await expect(page.locator('#nav1')).toBeVisible();
-  await page.waitForFunction(()=>window.InsightPagePeriodSync&&window.InsightSalesCount&&window.InsightSaleResults&&window.InsightAIVisual&&window.InsightAnalysisPeriodLock);
+  await page.waitForFunction(()=>window.InsightPagePeriodSync&&window.InsightSalesCount&&window.InsightSaleResults&&window.InsightAIVisual&&window.InsightAIInterpretation&&window.InsightAnalysisPeriodLock);
   return errors;
 }
 
@@ -357,5 +357,65 @@ test('カテゴリーごとの対象便設定で対象外便を入力漏れ扱�
   await expect(page.locator('body')).toHaveClass(/ai-analysis-open/);
   await expect(page.locator('#aiAnalysisSummary .ai-sales-count-overall .sc-delivery-row input').nth(0)).toHaveValue('ー');
   await expect(page.locator('#aiAnalysisSummary .ai-sales-count-overall .sc-sales-row input').nth(0)).toHaveValue('ー');
+  expect(errors).toEqual([]);
+});
+
+test('分析AIは結論・重要ポイント・関連性・次に確認することの4ブロックで表示する',async({page})=>{
+  const errors=await openInsight(page);
+  await page.locator('#aiAnalysisToggle').click();
+  await expect(page.locator('body')).toHaveClass(/ai-analysis-open/);
+
+  const titles=await page.evaluate(()=>({
+    conclusion:document.getElementById('aiAnalysisSummary').parentElement.querySelector('.ai-analysis-card-title').textContent,
+    priority:document.getElementById('aiAnalysisCaution').parentElement.querySelector('.ai-analysis-card-title').textContent,
+    relation:document.getElementById('aiAnalysisGood').parentElement.querySelector('.ai-analysis-card-title').textContent,
+    checks:document.getElementById('aiAnalysisChecks').parentElement.querySelector('.ai-analysis-card-title').textContent
+  }));
+  expect(titles).toEqual({
+    conclusion:'結論',
+    priority:'重要ポイント',
+    relation:'関連性',
+    checks:'次に確認すること'
+  });
+
+  const interpreted=await page.evaluate(()=>{
+    const current={
+      metrics:{salesYen:950000,customers:900,customerUnitPrice:1055.56,items:1800,wasteYen:12000},
+      salesCount:{categories:[{id:'cat',name:'商品',hidden:false,delivery:{total:{average:110}},sales:{total:{average:100}}}]},
+      conditions:{daily:[{weather:'雨'},{weather:'晴'}],events:[{id:'e1'}]}
+    };
+    const previous={
+      metrics:{salesYen:1000000,customers:1000,customerUnitPrice:1000,items:2000,wasteYen:10000},
+      salesCount:{categories:[{id:'cat',name:'商品',hidden:false,delivery:{total:{average:100}},sales:{total:{average:100}}}]},
+      conditions:{daily:[],events:[]}
+    };
+    const items=[
+      {type:'customers',theme:'customers',title:'客数低下',summary:'客数 -10.0%',positive:false,level:'important',score:82,persistenceMonths:3,impactYen:100000},
+      {type:'waste',theme:'waste',title:'廃棄増加',summary:'廃棄金額 +20.0%',positive:false,level:'attention',score:68,persistenceMonths:2,impactYen:2000}
+    ];
+    const review={
+      period:{yoyLabel:'前年同月比'},
+      current,comparisonYear:previous,previousMonth:previous,items,
+      forTheme(theme){return this.items.filter(item=>item.theme===theme);}
+    };
+    return window.InsightAIInterpretation.monthly(review,'dashboard');
+  });
+
+  expect(interpreted.conclusion[0]).toContain('確認を優先');
+  expect(interpreted.priorities.length).toBeLessThanOrEqual(5);
+  expect(interpreted.relations.some(line=>line.includes('主因候補は客数'))).toBe(true);
+  expect(interpreted.relations.some(line=>line.includes('納品 × 販売 × 廃棄'))).toBe(true);
+
+  await page.evaluate((result)=>{
+    window.InsightAIVisual.renderLines('aiAnalysisSummary',result.conclusion,'',document);
+    window.InsightAIVisual.renderLines('aiAnalysisCaution',result.priorities,'',document);
+    window.InsightAIVisual.renderLines('aiAnalysisGood',result.relations,'',document);
+    window.InsightAIVisual.renderLines('aiAnalysisChecks',result.checks,'',document);
+  },interpreted);
+
+  await expect(page.locator('#aiAnalysisSummary .ai-insight-item').first()).toHaveClass(/is-neutral/);
+  await expect(page.locator('#aiAnalysisCaution .ai-insight-item').first()).toHaveClass(/is-danger/);
+  await expect(page.locator('#aiAnalysisGood .ai-insight-item').first()).toHaveClass(/is-neutral/);
+  await expect(page.locator('#aiAnalysisChecks .ai-check-line')).not.toHaveCount(0);
   expect(errors).toEqual([]);
 });
