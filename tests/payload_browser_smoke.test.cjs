@@ -84,6 +84,7 @@ test('feature manifestの主要構造モジュールは一意かつ依存順に�
     'insight_daily_anomaly_v1.js',
     'insight_weekly_review_v1.js',
     'insight_monthly_review_v1.js',
+    'insight_analysis_history_v1.js',
     'insight_ai_page_comments_v1.js'
   ];
   let last=-1;
@@ -106,6 +107,7 @@ test('画面フローの主要module contractを維持する',()=>{
   const anomaly=read('insight_daily_anomaly_v1.js');
   const weekly=read('insight_weekly_review_v1.js');
   const monthly=read('insight_monthly_review_v1.js');
+  const history=read('insight_analysis_history_v1.js');
 
   assert.match(date,/getSelectedDate/);
   assert.match(date,/withLegacyGlobals/);
@@ -129,4 +131,7 @@ test('画面フローの主要module contractを維持する',()=>{
   assert.match(monthly,/InsightMonthlyReview/);
   assert.match(monthly,/trendLabel/);
   assert.match(monthly,/selectDisplay/);
+  assert.match(history,/InsightAnalysisHistory/);
+  assert.match(history,/buildTimeline/);
+  assert.match(history,/保存/);
 });
