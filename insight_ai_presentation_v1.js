@@ -2,6 +2,8 @@
   var SECTION_IDS=['aiAnalysisSummary','aiAnalysisGood','aiAnalysisCaution','aiAnalysisChecks'];
   var queued=false;
   var viewState=window.InsightAIViewState||(window.InsightAIViewState={period:null});
+  if(!viewState.historyKind)viewState.historyKind='week';
+  if(!viewState.historySelected)viewState.historySelected={week:null,month:null};
   function selectedPeriod(){
     var mode=currentMode();
     if(viewState.period==='today'&&mode!=='daily')return 'month';
@@ -141,15 +143,10 @@
       ['履歴','history']
     ].forEach(function(item){
       var button=createPeriodButton(item[0],item[1]);
-      if(item[1]==='history'){
-        button.disabled=true;
-        button.title='後続STEPで利用可能になります';
-      }else{
-        button.addEventListener('click',function(){
-          if(button.disabled)return;
-          setPeriod(item[1]);
-        });
-      }
+      button.addEventListener('click',function(){
+        if(button.disabled)return;
+        setPeriod(item[1]);
+      });
       periodTabs.appendChild(button);
     });
 
@@ -180,9 +177,36 @@
     mainHint.textContent='数値と要点を優先して表示';
     mainHead.append(mainTitle,mainHint);
 
+    var historyToolbar=document.createElement('section');
+    historyToolbar.id='aiHistoryToolbar';
+    historyToolbar.className='ai-history-toolbar';
+    historyToolbar.hidden=true;
+
+    var historyModes=document.createElement('div');
+    historyModes.className='ai-history-modes';
+    [['週次','week'],['月次','month']].forEach(function(item){
+      var historyButton=document.createElement('button');
+      historyButton.type='button';
+      historyButton.className='ai-history-mode-btn';
+      historyButton.dataset.historyKind=item[1];
+      historyButton.textContent=item[0];
+      historyButton.addEventListener('click',function(){
+        if(viewState.historyKind===item[1])return;
+        viewState.historyKind=item[1];
+        viewState.historySelected[item[1]]=null;
+        if(typeof window.renderAIAnalysisPanel==='function')window.renderAIAnalysisPanel();
+        syncWorkspaceState();
+      });
+      historyModes.appendChild(historyButton);
+    });
+    var historyList=document.createElement('div');
+    historyList.id='aiHistoryPeriodList';
+    historyList.className='ai-history-period-list';
+    historyToolbar.append(historyModes,historyList);
+
     summaryCard.classList.add('ai-workspace-summary-card');
     questionCard.classList.add('ai-workspace-question-dock');
-    main.append(mainHead,summaryCard,questionCard);
+    main.append(mainHead,historyToolbar,summaryCard,questionCard);
 
     var right=document.createElement('aside');
     right.className='ai-workspace-right';
@@ -217,8 +241,13 @@
     var activePeriod=selectedPeriod();
     Array.prototype.forEach.call(document.querySelectorAll('.ai-workspace-period-btn'),function(button){
       if(button.dataset.analysisPeriod==='today')button.disabled=mode!=='daily';
-      if(button.dataset.analysisPeriod==='history')button.disabled=true;
       button.classList.toggle('active',button.dataset.analysisPeriod===activePeriod);
+    });
+
+    var historyToolbar=document.getElementById('aiHistoryToolbar');
+    if(historyToolbar)historyToolbar.hidden=activePeriod!=='history';
+    Array.prototype.forEach.call(document.querySelectorAll('.ai-history-mode-btn'),function(button){
+      button.classList.toggle('active',button.dataset.historyKind===viewState.historyKind);
     });
 
     var heading=document.querySelector('.ai-workspace-section-title');
@@ -227,6 +256,7 @@
       var base=labels[mode]||'分析サマリー';
       if(activePeriod==='week')heading.textContent='今週の'+base;
       else if(activePeriod==='month')heading.textContent=mode==='daily'?'今月の総合分析':'今月の'+base;
+      else if(activePeriod==='history')heading.textContent='分析履歴';
       else heading.textContent=base;
     }
     syncWorkspacePosition();
@@ -281,6 +311,14 @@
       '.ai-analysis-workspace .ai-analysis-card{box-sizing:border-box;margin:0 0 12px;padding:14px 15px;border:1px solid var(--border)!important;border-radius:12px!important;background:#fff!important;box-shadow:none!important;color:var(--text)!important}',
       '.ai-analysis-workspace .ai-analysis-card-title{margin:0 0 9px;font-size:11px!important;line-height:1.2;font-weight:800!important;color:var(--text3)!important}',
       '.ai-analysis-workspace .ai-analysis-comment,.ai-analysis-workspace .ai-analysis-empty{margin:5px 0!important;font-size:12px!important;line-height:1.55!important;color:var(--text2)!important}',
+      '.ai-history-toolbar[hidden]{display:none!important}',
+      '.ai-history-toolbar{display:flex;align-items:flex-start;gap:10px;margin:0 0 12px;padding:10px 12px;border:1px solid var(--border);border-radius:12px;background:#fff}',
+      '.ai-history-modes{display:flex;flex:0 0 auto;gap:3px;padding:3px;border:1px solid var(--border);border-radius:9px;background:#f7f8fa}',
+      '.ai-history-mode-btn{border:0;border-radius:6px;background:transparent;color:var(--text3);padding:7px 10px;font:800 10px/1 -apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;cursor:pointer}',
+      '.ai-history-mode-btn.active{background:var(--navy);color:#fff}',
+      '.ai-history-period-list{display:flex;flex:1;gap:6px;overflow:auto;padding-bottom:2px;scrollbar-width:thin}',
+      '.ai-history-period-btn{flex:0 0 auto;border:1px solid var(--border);border-radius:8px;background:#fff;color:var(--text2);padding:7px 10px;font:700 10px/1.2 -apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;cursor:pointer;white-space:nowrap}',
+      '.ai-history-period-btn.active{border-color:var(--navy);background:#edf1f5;color:var(--navy)}',
       '.ai-workspace-summary-card{min-height:126px}',
       '.ai-workspace-status-card{position:relative;padding-left:16px!important}',
       '.ai-workspace-status-card:before{content:"";position:absolute;left:0;top:10px;bottom:10px;width:3px;border-radius:0 3px 3px 0;background:#9aa4b2}',
@@ -296,7 +334,7 @@
       '.ai-analysis-question-answer{margin-top:9px;padding:9px 10px;border-radius:9px;background:#f8f9fb;border:1px solid var(--border);font-size:11px;line-height:1.55;color:var(--text2);white-space:pre-wrap;max-height:126px;overflow:auto}',
       '.ai-analysis-question-help{display:none}',
       '@media(max-width:1180px){.ai-workspace-grid{grid-template-columns:minmax(0,1fr) 218px}.ai-workspace-main{padding-left:16px;padding-right:16px}.ai-workspace-question-dock{left:16px;right:16px}.ai-workspace-period-btn{padding-left:10px;padding-right:10px}}',
-      '@media(max-width:920px){.ai-analysis-panel.ai-analysis-workspace{left:8px!important;right:8px!important;top:8px!important;bottom:0!important}.ai-workspace-grid{grid-template-columns:minmax(0,1fr) 190px}.ai-workspace-header{padding:0 14px;gap:10px}.ai-workspace-period-btn{padding:7px 8px}.ai-workspace-section-hint{display:none}}'
+      '@media(max-width:920px){.ai-analysis-panel.ai-analysis-workspace{left:8px!important;right:8px!important;top:8px!important;bottom:0!important}.ai-workspace-grid{grid-template-columns:minmax(0,1fr) 190px}.ai-workspace-header{padding:0 14px;gap:10px}.ai-workspace-period-btn{padding:7px 8px}.ai-workspace-section-hint{display:none}.ai-history-toolbar{gap:7px;padding:8px}.ai-history-mode-btn,.ai-history-period-btn{padding:6px 8px}}'
     ].join('');
     document.head.appendChild(style);
   }
