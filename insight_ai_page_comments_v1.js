@@ -21,6 +21,8 @@
   function pad(v){return String(v).padStart(2,'0');}
   function dateKey(c,day){return c.year+'-'+pad(c.mi+1)+'-'+pad(day);}
   function context(m){
+    var locked=root.InsightAnalysisPeriodLock&&typeof root.InsightAnalysisPeriodLock.getContext==='function'?root.InsightAnalysisPeriodLock.getContext(m):null;
+    if(locked)return locked;
     var type={sales:'sales',customers:'kyaku',waste:'haiki'}[m];
     var year=type?editYear[type]:baseYear,month=type?editMonth[type]:selMonth;
     var day=null;
@@ -224,7 +226,8 @@
   function weeklyPanel(m){
     if(!root.InsightWeeklyReview)throw new Error('週次レビューを利用できません。');
     var theme=m==='daily'?'dashboard':m;
-    var reference=root.InsightWeeklyReview.referenceDate();
+    var lockedReference=root.InsightAnalysisPeriodLock&&typeof root.InsightAnalysisPeriodLock.referenceDate==='function'?root.InsightAnalysisPeriodLock.referenceDate():null;
+    var reference=lockedReference||root.InsightWeeklyReview.referenceDate();
     var review=root.InsightWeeklyReview.review(reference,allStores.current);
     var items=review.forTheme(theme),p={
       mode:m,
@@ -394,6 +397,8 @@
     return Array.from(new Set(out)).join('\n');
   }
   function historyReferenceDate(m){
+    var locked=root.InsightAnalysisPeriodLock&&typeof root.InsightAnalysisPeriodLock.referenceDate==='function'?root.InsightAnalysisPeriodLock.referenceDate():null;
+    if(locked)return locked;
     try{
       if(m==='daily'&&root.InsightDateContext&&typeof root.InsightDateContext.getSelectedIso==='function'){
         return root.InsightDateContext.getSelectedIso();
