@@ -35,6 +35,7 @@ const ordered=[
   'insight_daily_anomaly_v1.js',
   'insight_weekly_review_v1.js',
   'insight_monthly_review_v1.js',
+  'insight_analysis_history_v1.js',
   'insight_ai_page_comments_v1.js'
 ];
 
@@ -84,7 +85,8 @@ test('AIと分析補助モジュールはページ別AIより先に確定順で�
     'insight_analysis_context_v1.js',
     'insight_daily_anomaly_v1.js',
     'insight_weekly_review_v1.js',
-    'insight_monthly_review_v1.js'
+    'insight_monthly_review_v1.js',
+    'insight_analysis_history_v1.js'
   ]){
     assert.ok(index.indexOf(dependency)<index.indexOf('insight_ai_page_comments_v1.js'),dependency+' がページ別AIより後です');
   }
