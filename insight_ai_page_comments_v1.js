@@ -8,6 +8,11 @@
     var nav=typeof currentNav==='undefined'?1:currentNav;
     return ({0:'daily',1:'dashboard',2:'sales',3:'customers',4:'waste',salesCounts:'salesCounts'})[nav]||'dashboard';
   }
+  function analysisPeriod(m){
+    var selected=root.InsightAIViewState&&root.InsightAIViewState.period;
+    if(selected==='today'&&m!=='daily')return 'month';
+    return selected||(m==='daily'?'today':'month');
+  }
   function num(v){var n=Number(v);return Number.isFinite(n)?n:0;}
   function amount(v){return Math.round(num(v)).toLocaleString('ja-JP');}
   function yen(v){return '¥'+amount(v);}
@@ -199,6 +204,79 @@
     if(c.dirty)p.checks.push('入力済み平均・日合計には未保存の入力を含みます。セール比較は保存済みの値です。');
     return p;
   }
+  function weekDateLabel(value){
+    var m=/^(\d{4})-(\d{2})-(\d{2})$/.exec(String(value||''));
+    return m?Number(m[2])+'/'+Number(m[3]):value;
+  }
+  function weeklyThemeLabel(theme){
+    return {dashboard:'総合',sales:'売上',customers:'客数',waste:'廃棄',salesCounts:'販売・納品'}[theme]||'総合';
+  }
+  function weeklyMetricSummary(review,theme){
+    var now=review.current.metrics||{},prev=review.previous.metrics||{};
+    function change(a,b){return b?((a-b)/b*100):null;}
+    function pctText(v){return v==null?'比較不可':(v>0?'+':'')+v.toFixed(1)+'%';}
+    if(theme==='sales')return '売上 '+yen(now.salesYen)+' / 前週同期間比 '+pctText(change(now.salesYen,prev.salesYen))+'。';
+    if(theme==='customers')return '客数 '+amount(now.customers)+'人 / 前週同期間比 '+pctText(change(now.customers,prev.customers))+'。';
+    if(theme==='waste')return '廃棄金額 '+yen(now.wasteYen)+' / 前週同期間比 '+pctText(change(now.wasteYen,prev.wasteYen))+'。';
+    if(theme==='salesCounts')return '販売・納品はカテゴリー別の前週同期間比と乖離を確認しています。';
+    return review.conclusion[0]||'週次KPIを確認しています。';
+  }
+  function weeklyPanel(m){
+    if(!root.InsightWeeklyReview)throw new Error('週次レビューを利用できません。');
+    var theme=m==='daily'?'dashboard':m;
+    var reference=root.InsightWeeklyReview.referenceDate();
+    var review=root.InsightWeeklyReview.review(reference,allStores.current);
+    var items=review.forTheme(theme),p={
+      mode:m,
+      period:review.period.referenceDate.slice(0,4)+'/'+weekDateLabel(review.period.startDate)+'〜'+weekDateLabel(review.period.endDate)+'（前週同期間比・保存済み）',
+      summary:[],good:[],caution:[],checks:[]
+    };
+    p.summary.push(weeklyMetricSummary(review,theme));
+    if(theme==='dashboard'&&review.conclusion[1])p.summary.push(review.conclusion[1]);
+    items.slice(0,5).forEach(function(item){
+      p.summary.push('【'+item.stateLabel+'】'+item.title+'：'+item.summary);
+    });
+    var bad=items.filter(function(item){return !item.positive&&item.state!=='resolved';}).slice(0,3);
+    bad.forEach(function(item){
+      p.caution.push('【'+item.stateLabel+'】'+item.title+'：'+item.summary);
+    });
+    var positive=items.filter(function(item){return item.positive||item.state==='improving'||item.state==='resolved';}).slice(0,2);
+    positive.forEach(function(item){
+      p.good.push('【'+item.stateLabel+'】'+item.title+'：'+item.summary);
+    });
+    if(!items.length)p.good.push(weeklyThemeLabel(theme)+'に大きな週次異常はありません。');
+    (review.context||[]).forEach(function(line){p.checks.push(line+'。');});
+    p.checks.push('今週は月曜から基準日までを、前週の同じ曜日数と比較しています。');
+    p.checks.push('週次の増減だけで因果関係は断定せず、天気・イベント・販売/納品も合わせて確認してください。');
+    savedNote(p);
+    return p;
+  }
+  function weeklyQuestionAnswer(q,m){
+    if(!root.InsightWeeklyReview)return '週次レビューを利用できません。';
+    var theme=m==='daily'?'dashboard':m,review=root.InsightWeeklyReview.review(root.InsightWeeklyReview.referenceDate(),allStores.current);
+    var items=review.forTheme(theme),explicit=null;
+    if(/売上/.test(q))explicit='sales';
+    else if(/客数|来店/.test(q))explicit='customers';
+    else if(/廃棄|ロス/.test(q))explicit='waste';
+    else if(/販売|納品|発注/.test(q))explicit='salesCounts';
+    if(explicit)items=review.forTheme(explicit);
+    if(/良い|改善|伸び|増え|機会/.test(q))items=items.filter(function(i){return i.positive||i.state==='improving'||i.state==='resolved';});
+    else if(/問題|悪い|注意|課題|下が|減っ/.test(q))items=items.filter(function(i){return !i.positive&&i.state!=='resolved';});
+    var out=[];
+    if(!explicit&&theme==='dashboard')out=out.concat(review.conclusion);
+    if(items.length){
+      items.slice(0,5).forEach(function(item){
+        out.push('【'+item.stateLabel+'】'+item.title+'：'+item.summary);
+        if(/なぜ|原因|理由/.test(q)&&item.details&&item.details.cause&&item.details.cause.label){
+          var cause=item.details.cause;
+          if(cause.changePct!=null)out.push('主因候補は'+cause.label+' '+(cause.changePct>0?'+':'')+cause.changePct.toFixed(1)+'%です。');
+        }
+      });
+    }else out.push(weeklyThemeLabel(explicit||theme)+'に表示対象となる大きな週次異常はありません。');
+    if(review.context&&review.context.length)out.push('関連情報：'+review.context.join(' / ')+'。');
+    out.push('比較は今週と前週の同じ曜日数です。因果関係は断定していません。');
+    return out.join('\n');
+  }
   function build(m){
     m=m||mode();
     if(m==='salesCounts')return salesCounts();
@@ -222,7 +300,20 @@
   function install(){
     if(!root.InsightHooks)return;
     root.InsightHooks.on('ai:render:before','page-ai-route',function(ctx){
-      var m=mode();
+      var m=mode(),periodMode=analysisPeriod(m);
+      if(periodMode==='week'){
+        var weekly;
+        try{weekly=weeklyPanel(m);}catch(e){weekly={period:'週次データを取得できません',summary:[],good:[],caution:['週次レビューに必要なデータを取得できません。'],checks:[]};}
+        heading('今週の'+weeklyThemeLabel(m==='daily'?'dashboard':m));
+        var weeklyPeriod=document.getElementById('aiAnalysisPeriod');if(weeklyPeriod)weeklyPeriod.textContent=weekly.period;
+        append('aiAnalysisSummary',weekly.summary,'今週のデータが不足しています。');
+        append('aiAnalysisGood',weekly.good,'今週の改善・機会は確認されていません。');
+        append('aiAnalysisCaution',weekly.caution,'今週の重要な注意点は確認されていません。');
+        append('aiAnalysisChecks',weekly.checks,'週次データを確認してください。');
+        ctx.cancel=true;
+        return false;
+      }
+      if(periodMode==='month'&&m==='daily'){heading('今月の要点');return;}
       if(m==='dashboard'){heading('今月の要点');return;}
       var p;
       try{p=build(m);}catch(e){p={period:'対象データを取得できません',summary:[],good:[],caution:['データ不足のため分析できません。対象期間の入力を確認してください。'],checks:[]};}
@@ -235,7 +326,18 @@
       ctx.cancel=true;
       return false;
     },1);
+
+    root.InsightHooks.on('ai:question:before','page-ai-week-question',function(ctx){
+      var m=mode();
+      if(analysisPeriod(m)!=='week')return;
+      var q=String(ctx.args[0]||'').trim();
+      if(!q){ctx.result='質問を入力してください。';ctx.cancel=true;return false;}
+      try{ctx.result=weeklyQuestionAnswer(q,m);}
+      catch(e){ctx.result='週次レビューに必要なデータを取得できません。';}
+      ctx.cancel=true;
+      return false;
+    },1);
   }
-  root.InsightAIPageComments={mode:mode,build:build};
+  root.InsightAIPageComments={mode:mode,analysisPeriod:analysisPeriod,build:build,weeklyPanel:weeklyPanel};
   if(document.readyState==='complete')install();else root.addEventListener('load',install,{once:true});
 })(window);
