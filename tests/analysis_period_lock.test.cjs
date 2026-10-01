@@ -40,11 +40,11 @@ test('販売数ページは期間取得・期間同期APIを公開する',()=>{
   assert.match(source,/insight:sales-count-period-change/);
 });
 
-test('サイドバー遷移中は遷移先の初期月でロックを上書きしない',()=>{
+test('分析期間ロックはページ遷移状態をPagePeriodSyncから参照し描画責務を重複させない',()=>{
   const source=fs.readFileSync(path.join(__dirname,'..','insight_analysis_period_lock_v1.js'),'utf8');
-  assert.match(source,/var routeTransition=false/);
-  assert.match(source,/closest\('#nav0,#nav1,#nav2,#nav3,#nav4,#navSalesCount'\)/);
-  assert.match(source,/if\(node\)routeTransition=true/);
-  assert.match(source,/if\(!isOpen\(\)\|\|syncing\|\|routeTransition\)return/);
-  assert.match(source,/routeTransition=false;[\s\S]*refreshLabel\(\)/);
+  assert.match(source,/InsightPagePeriodSync\.isTransitioning/);
+  assert.match(source,/InsightPagePeriodSync\.syncCurrentPage/);
+  assert.doesNotMatch(source,/function syncDashboard\(/);
+  assert.doesNotMatch(source,/function syncInput\(/);
+  assert.doesNotMatch(source,/closest\('#nav0,#nav1,#nav2,#nav3,#nav4,#navSalesCount'\)/);
 });
