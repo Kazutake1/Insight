@@ -86,3 +86,13 @@ test('店舗切替はPagePeriodSyncがラップして期間整合性を再確認
   assert.match(source,/InsightAnalysisPeriodLock\.setTarget/);
   assert.match(source,/storeTransition/);
 });
+
+test('期間同期は既存ナビ処理後のバブル段階で予約する',()=>{
+  const source=fs.readFileSync(path.join(__dirname,'..','insight_page_period_sync_v1.js'),'utf8');
+  const capture=source.indexOf("routeTransition=true;");
+  const schedule=source.indexOf("scheduleRouteSync();",capture);
+  assert.ok(capture>=0&&schedule>capture);
+  assert.match(source,/\},true\);[\s\S]*root\.document\.addEventListener\('click'/);
+  const presentation=fs.readFileSync(path.join(__dirname,'..','insight_ai_presentation_v1.js'),'utf8');
+  assert.match(presentation,/if\(window\.InsightPagePeriodSync\)setTimeout\(syncAndRender,0\)/);
+});
