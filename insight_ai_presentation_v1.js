@@ -417,7 +417,7 @@
     button.setAttribute('aria-expanded',String(open));
     for(var i=0;i<5;i++){
       var nav=document.getElementById('nav'+i);
-      var selected=!open&&currentNav===i;
+      var selected=currentNav===i;
       if(nav&&nav.classList.contains('active')!==selected)nav.classList.toggle('active',selected);
     }
   }
