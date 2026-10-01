@@ -87,9 +87,9 @@ test('sale averages use each store date only once when events overlap',()=>{
   assert.equal(sales.average(sales.uniqueSaleRecords(rows),'sales').total,60);
 });
 
-test('曜日別平均は販売数入力カードと同じDOMクラス構造を再利用する',()=>{
+test('分析AI向け平均カードは販売数入力カードと同じDOMクラス構造を再利用する',()=>{
   const source=fs.readFileSync(path.join(__dirname,'..','insight_sales_count_v1.js'),'utf8');
-  assert.match(source,/function buildAverageInput\(/);
+  assert.match(source,/function createAverageCard\(/);
   assert.match(source,/sc-day sc-average-card/);
   assert.match(source,/sc-day-title/);
   assert.match(source,/sc-day-num/);
@@ -98,5 +98,5 @@ test('曜日別平均は販売数入力カードと同じDOMクラス構造を�
   assert.match(source,/sc-trip sc-sales-row/);
   assert.match(source,/class="sc-total-delivery"/);
   assert.match(source,/class="sc-total-sales"/);
-  assert.doesNotMatch(source,/var card=el\('section',undefined,'sc-average-day/);
+  assert.match(source,/model\.createAverageCard=createAverageCard/);
 });
