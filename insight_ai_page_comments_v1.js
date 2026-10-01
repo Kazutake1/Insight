@@ -86,7 +86,9 @@
     }
     if(missing.length)p.caution.push(missing.join('・')+'はデータ不足のため評価できません。');
     if(!anomaly||!anomaly.display||!anomaly.display.length)p.good.push('日次の即時警告対象はありません。');
-    eventLines(p,c,c.day);savedNote(p);return p;
+    eventLines(p,c,c.day);
+    if(root.InsightAIInterpretation&&typeof root.InsightAIInterpretation.daily==='function')p.structured=root.InsightAIInterpretation.daily(anomaly,p);
+    savedNote(p);return p;
   }
   function metricRows(list,key){
     return list.filter(function(r){return key==='wasteYen'?root.KPIEngine.getRowWasteYen(r)>0||num(r.売上)>0:num(r[key==='salesYen'?'売上':'客数'])>0;});
@@ -253,6 +255,7 @@
     (review.context||[]).forEach(function(line){p.checks.push(line+'。');});
     p.checks.push('今週は月曜から基準日までを、前週の同じ曜日数と比較しています。');
     p.checks.push('週次の増減だけで因果関係は断定せず、天気・イベント・販売/納品も合わせて確認してください。');
+    if(m!=='salesCounts'&&root.InsightAIInterpretation&&typeof root.InsightAIInterpretation.weekly==='function')p.structured=root.InsightAIInterpretation.weekly(review,theme);
     savedNote(p);
     return p;
   }
@@ -351,6 +354,7 @@
     else p.checks.push('3か月トレンドは各月を比較年同月と照合し、±1.5pt程度の変化は横ばいとして扱います。');
     var events=review.current.conditions&&review.current.conditions.events||[];
     if(events.length)p.checks.push('登録イベント '+events.length+'件。数値変化との因果関係は断定せず照合してください。');
+    if(m!=='salesCounts'&&root.InsightAIInterpretation&&typeof root.InsightAIInterpretation.monthly==='function')p.structured=root.InsightAIInterpretation.monthly(review,theme);
     savedNote(p);
     return p;
   }
@@ -503,6 +507,11 @@
     traces.forEach(function(trace){p.checks.push(history.traceLine(trace)+'。');});
     if(!traces.length)p.checks.push('この期間に追跡対象となる継続異常はありません。');
     p.checks.push('履歴は別データとして保存せず、保存済み実績を現在の判定ロジックで再計算しています。');
+    if(theme!=='salesCounts'&&root.InsightAIInterpretation){
+      if(bundle.kind==='week'&&typeof root.InsightAIInterpretation.weekly==='function')p.structured=root.InsightAIInterpretation.weekly(review,theme);
+      else if(bundle.kind==='month'&&typeof root.InsightAIInterpretation.monthly==='function')p.structured=root.InsightAIInterpretation.monthly(review,theme);
+      if(p.structured)p.structured.checks=(p.structured.checks||[]).concat('履歴は保存済み実績を現在の判定ロジックで再計算しています。').slice(0,4);
+    }
     savedNote(p);
     return p;
   }
@@ -618,6 +627,32 @@
     var summary=document.getElementById('aiAnalysisSummary');
     var title=summary&&summary.parentElement&&summary.parentElement.querySelector('.ai-analysis-card-title');
     if(title)title.textContent=text;
+  }
+  function setSectionTitle(id,text){
+    var body=document.getElementById(id),title=body&&body.parentElement&&body.parentElement.querySelector('.ai-analysis-card-title');
+    if(title)title.textContent=text;
+  }
+  function decisionTitles(){
+    setSectionTitle('aiAnalysisSummary','結論');
+    setSectionTitle('aiAnalysisCaution','重要ポイント');
+    setSectionTitle('aiAnalysisGood','関連性');
+    setSectionTitle('aiAnalysisChecks','次に確認すること');
+  }
+  function legacyTitles(summary){
+    setSectionTitle('aiAnalysisSummary',summary||'分析結果');
+    setSectionTitle('aiAnalysisGood','改善・機会');
+    setSectionTitle('aiAnalysisCaution','注意点');
+    setSectionTitle('aiAnalysisChecks','確認事項');
+  }
+  function renderStructured(panel,fallback){
+    var d=panel&&panel.structured;
+    if(!d)return false;
+    decisionTitles();
+    append('aiAnalysisSummary',d.conclusion||[],fallback||'結論を判断できるデータが不足しています。');
+    append('aiAnalysisCaution',d.priorities||[],'優先して確認する異常・改善項目はありません。');
+    append('aiAnalysisGood',d.relations||[],'現時点で追加の関連性は確認できません。');
+    append('aiAnalysisChecks',d.checks||[],'追加で確認すべき項目はありません。');
+    return true;
   }
   function install(){
     if(!root.InsightHooks)return;
