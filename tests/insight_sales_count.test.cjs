@@ -135,5 +135,5 @@ test('対象外便のUIは対象外表示となり入力対象から外れる',(
   assert.match(source,/sc-not-applicable/);
   assert.match(source,/対象便を1つ以上選択してください/);
   assert.match(source,/sc-category-trips/);
-  assert.match(source,/model\.activeTrips/);
+  assert.match(source,/activeTrips:activeTrips/);
 });
