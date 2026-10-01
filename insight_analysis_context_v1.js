@@ -214,7 +214,7 @@
 
   function monthlyOps(env,store,scope,metrics){
     var empty={available:false,evaluationReady:false,laborCostYen:null,grossMarginRate:null,laborRate:null,reason:'月次以外の期間では評価しません。'};
-    if(!scope.isSingleMonth||scope.kind==='range')return empty;
+    if(scope.kind!=='month')return empty;
     var label=monthLabel(scope.month,env.MONTHS);
     var yearOps=store.monthlyOps&&(store.monthlyOps[String(scope.year)]||store.monthlyOps[scope.year]);
     var ops=yearOps&&yearOps[label];
