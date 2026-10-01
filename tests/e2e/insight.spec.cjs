@@ -10,7 +10,7 @@ async function openInsight(page){
   page.on('pageerror',error=>errors.push(error.message));
   await page.goto('/Index.html',{waitUntil:'domcontentloaded'});
   await expect(page.locator('#nav1')).toBeVisible();
-  await page.waitForFunction(()=>window.InsightPagePeriodSync&&window.InsightSalesCount&&window.InsightSaleResults&&window.InsightAnalysisPeriodLock);
+  await page.waitForFunction(()=>window.InsightPagePeriodSync&&window.InsightSalesCount&&window.InsightSaleResults&&window.InsightAIVisual&&window.InsightAnalysisPeriodLock);
   return errors;
 }
 
@@ -200,5 +200,42 @@ test('セール実績は内容別に表示し販売数入力と同じカード�
   }));
   expect(order.afterSales).toBe('navSaleResults');
   expect(order.afterResults).toBe('aiAnalysisToggle');
+  expect(errors).toEqual([]);
+});
+
+test('分析AIコメントは数値カードと簡潔な確認事項として表示する',async({page})=>{
+  const errors=await openInsight(page);
+  await page.locator('#aiAnalysisToggle').click();
+  await expect(page.locator('body')).toHaveClass(/ai-analysis-open/);
+
+  await page.evaluate(()=>{
+    window.InsightAIVisual.renderLines('aiAnalysisSummary',[
+      '売上 1,184,000円 / 前年同月比 -5.2% / 前月比 +1.0%。',
+      '【継続】客数低下：前年同月比 -6.1%。3か月連続で前年を下回っています。'
+    ],'データなし',document);
+    window.InsightAIVisual.renderLines('aiAnalysisCaution',[
+      '【継続】客数低下：前年同月比 -6.1%。'
+    ],'注意点なし',document);
+    window.InsightAIVisual.renderLines('aiAnalysisGood',[
+      '【改善】廃棄改善：前年同月比 -12.4%。'
+    ],'改善なし',document);
+    window.InsightAIVisual.renderLines('aiAnalysisChecks',[
+      '曜日別客数を確認してください。',
+      '販売数との関係を確認してください。'
+    ],'確認事項なし',document);
+  });
+
+  await expect(page.locator('#aiAnalysisSummary .ai-insight-item')).toHaveCount(2);
+  await expect(page.locator('#aiAnalysisSummary .ai-insight-value').first()).toHaveText('-5.2%');
+  await expect(page.locator('#aiAnalysisCaution .ai-insight-item')).toHaveClass(/is-danger/);
+  await expect(page.locator('#aiAnalysisGood .ai-insight-item')).toHaveClass(/is-success/);
+  await expect(page.locator('#aiAnalysisChecks .ai-check-line')).toHaveCount(2);
+
+  const palette=await page.evaluate(()=>({
+    danger:getComputedStyle(document.querySelector('#aiAnalysisCaution .ai-insight-value')).color,
+    success:getComputedStyle(document.querySelector('#aiAnalysisGood .ai-insight-value')).color,
+    neutral:getComputedStyle(document.querySelector('#aiAnalysisSummary .ai-insight-value')).color
+  }));
+  expect(new Set(Object.values(palette)).size).toBe(3);
   expect(errors).toEqual([]);
 });
