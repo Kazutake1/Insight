@@ -205,6 +205,15 @@ test('互換パッチ10件はfail-fast bootstrapに集約しfeature挿入境界�
 
 test('分析AI workspace assetはcache bustされている',()=>{
   const index=read('Index.html');
-  assert.match(index,/insight_ai_presentation_v1\.js\?v=20261001-route-order/);
+  assert.match(index,/insight_ai_presentation_v1\.js\?v=20261001-top-align/);
   assert.match(index,/insight_ops_v1\.js\?v=20260930-step5-2/);
+});
+
+test('分析AIの上端は実際のサイドバー上端へ追従する',()=>{
+  const presentation=read('insight_ai_presentation_v1.js');
+  assert.match(presentation,/function sidebarRect\(button\)/);
+  assert.match(presentation,/button\.closest&&button\.closest\('\.sidebar'\)/);
+  assert.match(presentation,/--ai-workspace-top/);
+  assert.match(presentation,/top:var\(--ai-workspace-top,12px\)!important/);
+  assert.match(presentation,/top:var\(--ai-workspace-top,8px\)!important/);
 });
