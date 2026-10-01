@@ -661,50 +661,68 @@
       if(periodMode==='history'){
         var history;
         try{history=historyPanel(m);}catch(e){history={period:'分析履歴を取得できません',summary:[],good:[],caution:['履歴の再計算に必要なデータを取得できません。'],checks:[]};}
-        heading((historyState().historyKind==='month'?'月次':'週次')+'履歴');
         var historyPeriod=document.getElementById('aiAnalysisPeriod');if(historyPeriod)historyPeriod.textContent=history.period;
-        append('aiAnalysisSummary',history.summary,'選択した履歴のデータが不足しています。');
-        append('aiAnalysisGood',history.good,'選択した履歴に改善・機会は確認されていません。');
-        append('aiAnalysisCaution',history.caution,'選択した履歴に重要な注意点は確認されていません。');
-        append('aiAnalysisChecks',history.checks,'追跡できる履歴がありません。');
+        if(!renderStructured(history,'選択した履歴の結論を判断できません。')){
+          legacyTitles((historyState().historyKind==='month'?'月次':'週次')+'履歴');
+          append('aiAnalysisSummary',history.summary,'選択した履歴のデータが不足しています。');
+          append('aiAnalysisGood',history.good,'選択した履歴に改善・機会は確認されていません。');
+          append('aiAnalysisCaution',history.caution,'選択した履歴に重要な注意点は確認されていません。');
+          append('aiAnalysisChecks',history.checks,'追跡できる履歴がありません。');
+        }
         ctx.cancel=true;
         return false;
       }
       if(periodMode==='week'){
         var weekly;
         try{weekly=weeklyPanel(m);}catch(e){weekly={period:'週次データを取得できません',summary:[],good:[],caution:['週次レビューに必要なデータを取得できません。'],checks:[]};}
-        heading('今週の'+weeklyThemeLabel(m==='daily'?'dashboard':m));
         var weeklyPeriod=document.getElementById('aiAnalysisPeriod');if(weeklyPeriod)weeklyPeriod.textContent=weekly.period;
-        append('aiAnalysisSummary',weekly.summary,'今週のデータが不足しています。');
-        append('aiAnalysisGood',weekly.good,'今週の改善・機会は確認されていません。');
-        append('aiAnalysisCaution',weekly.caution,'今週の重要な注意点は確認されていません。');
-        append('aiAnalysisChecks',weekly.checks,'週次データを確認してください。');
+        if(!renderStructured(weekly,'今週の結論を判断できるデータが不足しています。')){
+          legacyTitles('今週の'+weeklyThemeLabel(m==='daily'?'dashboard':m));
+          append('aiAnalysisSummary',weekly.summary,'今週のデータが不足しています。');
+          append('aiAnalysisGood',weekly.good,'今週の改善・機会は確認されていません。');
+          append('aiAnalysisCaution',weekly.caution,'今週の重要な注意点は確認されていません。');
+          append('aiAnalysisChecks',weekly.checks,'週次データを確認してください。');
+        }
         ctx.cancel=true;
         return false;
       }
       if(periodMode==='month'){
         var monthly;
         try{monthly=monthlyPanel(m);}catch(e){monthly={period:'月次データを取得できません',summary:[],good:[],caution:['月次レビューに必要なデータを取得できません。'],checks:[]};}
-        heading('今月の'+monthlyThemeLabel(m==='daily'?'dashboard':m));
         var monthlyPeriod=document.getElementById('aiAnalysisPeriod');if(monthlyPeriod)monthlyPeriod.textContent=monthly.period;
-        if(m==='salesCounts')renderSalesCountCards(monthly,'今月の販売・納品データが不足しています。');
-        else append('aiAnalysisSummary',monthly.summary,'今月のデータが不足しています。');
-        append('aiAnalysisGood',monthly.good,'今月の改善・機会は確認されていません。');
-        append('aiAnalysisCaution',monthly.caution,'今月の重要な注意点は確認されていません。');
-        append('aiAnalysisChecks',monthly.checks,'月次データを確認してください。');
+        if(m==='salesCounts'){
+          legacyTitles('今月の販売・納品');
+          renderSalesCountCards(monthly,'今月の販売・納品データが不足しています。');
+          append('aiAnalysisGood',monthly.good,'今月の改善・機会は確認されていません。');
+          append('aiAnalysisCaution',monthly.caution,'今月の重要な注意点は確認されていません。');
+          append('aiAnalysisChecks',monthly.checks,'月次データを確認してください。');
+        }else if(!renderStructured(monthly,'今月の結論を判断できるデータが不足しています。')){
+          legacyTitles('今月の'+monthlyThemeLabel(m==='daily'?'dashboard':m));
+          append('aiAnalysisSummary',monthly.summary,'今月のデータが不足しています。');
+          append('aiAnalysisGood',monthly.good,'今月の改善・機会は確認されていません。');
+          append('aiAnalysisCaution',monthly.caution,'今月の重要な注意点は確認されていません。');
+          append('aiAnalysisChecks',monthly.checks,'月次データを確認してください。');
+        }
         ctx.cancel=true;
         return false;
       }
-      if(m==='dashboard'){heading('今月の要点');return;}
+      if(m==='dashboard'){decisionTitles();return;}
       var p;
       try{p=build(m);}catch(e){p={period:'対象データを取得できません',summary:[],good:[],caution:['データ不足のため分析できません。対象期間の入力を確認してください。'],checks:[]};}
-      heading(m==='daily'?'選択日の要点':'対象期間の要点');
       var period=document.getElementById('aiAnalysisPeriod');if(period)period.textContent=p.period;
-      if(m==='salesCounts')renderSalesCountCards(p,'販売・納品データが不足しています。');
-      else append('aiAnalysisSummary',p.summary,'この対象のデータが不足しています。');
-      append('aiAnalysisGood',p.good,'改善を判断できる比較結果はありません。');
-      append('aiAnalysisCaution',p.caution,'入力済みデータから追加の注意点は確認できません。');
-      append('aiAnalysisChecks',p.checks,'対象期間の入力データを確認してください。');
+      if(m==='salesCounts'){
+        legacyTitles('販売・納品分析');
+        renderSalesCountCards(p,'販売・納品データが不足しています。');
+        append('aiAnalysisGood',p.good,'改善を判断できる比較結果はありません。');
+        append('aiAnalysisCaution',p.caution,'入力済みデータから追加の注意点は確認できません。');
+        append('aiAnalysisChecks',p.checks,'対象期間の入力データを確認してください。');
+      }else if(!renderStructured(p,'この対象の結論を判断できるデータが不足しています。')){
+        legacyTitles(m==='daily'?'選択日の要点':'対象期間の要点');
+        append('aiAnalysisSummary',p.summary,'この対象のデータが不足しています。');
+        append('aiAnalysisGood',p.good,'改善を判断できる比較結果はありません。');
+        append('aiAnalysisCaution',p.caution,'入力済みデータから追加の注意点は確認できません。');
+        append('aiAnalysisChecks',p.checks,'対象期間の入力データを確認してください。');
+      }
       ctx.cancel=true;
       return false;
     },1);
