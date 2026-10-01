@@ -8,9 +8,10 @@ const root=path.join(__dirname,'..');
 
 function safePersistSource(){
   const bootstrap=fs.readFileSync(path.join(root,'insight_bootstrap_patches_v1.js'),'utf8');
-  const match=bootstrap.match(/var safePersist=('[\\s\\S]*?');\\n\\s*if\\(html\\.indexOf\\(originalPersist\\)/);
-  assert.ok(match,'安全な保存処理がbootstrap moduleに定義されていること');
-  return vm.runInNewContext(match[1]);
+  const marker='var safePersist=',start=bootstrap.indexOf(marker);
+  const end=bootstrap.indexOf(';\nif(html.indexOf(originalPersist)',start);
+  assert.ok(start>=0&&end>start,'安全な保存処理がbootstrap moduleに定義されていること');
+  return vm.runInNewContext(bootstrap.slice(start+marker.length,end));
 }
 
 test('共通保存処理は成功時だけtrueを返す',()=>{
