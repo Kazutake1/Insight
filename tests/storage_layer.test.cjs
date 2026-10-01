@@ -97,7 +97,7 @@ test('transactionは検証失敗時に保存・反映しない',()=>{
 });
 
 test('feature moduleはlocalStorageへ直接書き込まず共有storageを使う',()=>{
-  const files=fs.readdirSync(root).filter(name=>/^insight_.*\.js$/.test(name)&&name!=='insight_storage_v1.js');
+  const files=fs.readdirSync(root).filter(name=>/^insight_.*\.js$/.test(name)&&name!=='insight_storage_v1.js'&&name!=='insight_bootstrap_patches_v1.js');
   const offenders=[];
   files.forEach(name=>{
     const text=fs.readFileSync(path.join(root,name),'utf8');
@@ -110,10 +110,11 @@ test('feature moduleはlocalStorageへ直接書き込まず共有storageを使�
   }
 });
 
-test('Indexの共通persistはStorage読込後に共有保存層へ委譲する',()=>{
+test('bootstrapの共通persistはStorage読込後に共有保存層へ委譲する',()=>{
   const index=fs.readFileSync(path.join(root,'Index.html'),'utf8');
-  assert.match(index,/var safePersist=/);
-  assert.match(index,/InsightStorage\.persistCurrent\(allStores\)/);
-  assert.match(index,/localStorage\.setItem\(SK,JSON\.stringify\(allStores\)\)/);
+  const bootstrap=fs.readFileSync(path.join(root,'insight_bootstrap_patches_v1.js'),'utf8');
+  assert.match(bootstrap,/var safePersist=/);
+  assert.match(bootstrap,/InsightStorage\.persistCurrent\(allStores\)/);
+  assert.match(bootstrap,/localStorage\.setItem\(SK,JSON\.stringify\(allStores\)\)/);
   assert.match(index,/insight_storage_v1\.js\?v=20260930-step6-4/);
 });
