@@ -114,7 +114,7 @@ test('分析AIの対象年月をサイドバー切替後も固定し各ページ
   const pageAI=read('insight_ai_page_comments_v1.js');
   const lock=read('insight_analysis_period_lock_v1.js');
   const salesCount=read('insight_sales_count_v1.js');
-  assert.match(index,/insight_analysis_period_lock_v1\.js\?v=20261001-period-lock/);
+  assert.match(index,/insight_analysis_period_lock_v1\.js\?v=20261001-period-lock2/);
   assert.match(index,/insight_sales_count_v1\.js\?v=20261001-period-lock/);
   assert.match(presentation,/aiAnalysisTarget/);
   assert.match(presentation,/InsightAnalysisPeriodLock\.syncCurrentPage/);
