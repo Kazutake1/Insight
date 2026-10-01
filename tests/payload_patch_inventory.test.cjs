@@ -76,7 +76,7 @@ test('STEP5で今月タブを月次レビューへ接続する',()=>{
   const pageAI=read('insight_ai_page_comments_v1.js');
   const monthly=read('insight_monthly_review_v1.js');
   assert.match(index,/insight_monthly_review_v1\.js\?v=20261001-step5/);
-  assert.match(index,/insight_ai_page_comments_v1\.js\?v=20261001-step6/);
+  assert.match(index,/insight_ai_page_comments_v1\.js\?v=20261001-period-lock/);
   assert.match(pageAI,/function monthlyPanel\(/);
   assert.match(pageAI,/function monthlyQuestionAnswer\(/);
   assert.match(pageAI,/periodMode==='month'/);
@@ -106,6 +106,31 @@ test('STEP6で履歴タブ・週次月次切替・過去レビュー再表示を
   assert.doesNotThrow(()=>new vm.Script(presentation),'history presentation must be valid JavaScript');
   assert.doesNotThrow(()=>new vm.Script(pageAI),'history page AI must be valid JavaScript');
   assert.doesNotThrow(()=>new vm.Script(history),'history module must be valid JavaScript');
+});
+
+test('分析AIの対象年月をサイドバー切替後も固定し各ページへ同期する',()=>{
+  const index=read('Index.html');
+  const presentation=read('insight_ai_presentation_v1.js');
+  const pageAI=read('insight_ai_page_comments_v1.js');
+  const lock=read('insight_analysis_period_lock_v1.js');
+  const salesCount=read('insight_sales_count_v1.js');
+  assert.match(index,/insight_analysis_period_lock_v1\.js\?v=20261001-period-lock/);
+  assert.match(index,/insight_sales_count_v1\.js\?v=20261001-period-lock/);
+  assert.match(presentation,/aiAnalysisTarget/);
+  assert.match(presentation,/InsightAnalysisPeriodLock\.syncCurrentPage/);
+  assert.match(pageAI,/InsightAnalysisPeriodLock\.getContext/);
+  assert.match(pageAI,/InsightAnalysisPeriodLock\.referenceDate/);
+  assert.match(lock,/function captureCurrent\(/);
+  assert.match(lock,/function syncCurrentPage\(/);
+  assert.match(lock,/function syncDashboard\(/);
+  assert.match(lock,/function syncInput\(/);
+  assert.match(lock,/function syncSalesCount\(/);
+  assert.match(salesCount,/model\.getPeriod=function/);
+  assert.match(salesCount,/model\.setPeriod=function/);
+  assert.doesNotMatch(lock,/localStorage|InsightStorage/);
+  assert.doesNotThrow(()=>new vm.Script(presentation),'period lock presentation must be valid JavaScript');
+  assert.doesNotThrow(()=>new vm.Script(pageAI),'period lock page AI must be valid JavaScript');
+  assert.doesNotThrow(()=>new vm.Script(lock),'period lock module must be valid JavaScript');
 });
 
 test('店舗運営UIのCSSはops moduleが所有する',()=>{
@@ -144,6 +169,6 @@ test('残す11件はSTEP5で意図的に維持する互換・安全パッチだ�
 
 test('分析AI workspace assetはcache bustされている',()=>{
   const index=read('Index.html');
-  assert.match(index,/insight_ai_presentation_v1\.js\?v=20261001-step6/);
+  assert.match(index,/insight_ai_presentation_v1\.js\?v=20261001-period-lock/);
   assert.match(index,/insight_ops_v1\.js\?v=20260930-step5-2/);
 });
