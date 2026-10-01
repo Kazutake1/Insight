@@ -24,6 +24,7 @@ const ordered=[
   'insight_dashboard_kpi_sync_v1.js',
   'insight_kpi_order_v1.js',
   'insight_ai_presentation_v1.js',
+  'insight_ai_visual_v1.js',
   'insight_events_v1.js',
   'insight_temperature_v1.js',
   'insight_weather_compact_v1.js',
@@ -82,6 +83,7 @@ test('AIと分析補助モジュールはページ別AIより先に確定順で�
   const index=read('Index.html');
   for(const dependency of [
     'insight_ai_ops_v1.js',
+    'insight_ai_visual_v1.js',
     'insight_waste_insights_v1.js',
     'insight_sales_insights_v1.js',
     'insight_kyaku_insights_v1.js',
