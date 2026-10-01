@@ -225,7 +225,9 @@
     if(heading){
       var labels={daily:'本日の分析',dashboard:'総合分析',sales:'売上分析',customers:'客数分析',waste:'廃棄分析',salesCounts:'販売・納品分析'};
       var base=labels[mode]||'分析サマリー';
-      heading.textContent=activePeriod==='week'?'今週の'+base:activePeriod==='month'&&mode==='daily'?'今月の総合分析':base;
+      if(activePeriod==='week')heading.textContent='今週の'+base;
+      else if(activePeriod==='month')heading.textContent=mode==='daily'?'今月の総合分析':'今月の'+base;
+      else heading.textContent=base;
     }
     syncWorkspacePosition();
   }
