@@ -349,6 +349,8 @@
       '.ai-insight-value{margin-top:6px;font-size:21px;line-height:1;font-weight:850;letter-spacing:-.02em;color:var(--navy)}.ai-insight-item.is-danger .ai-insight-value{color:var(--danger)}.ai-insight-item.is-success .ai-insight-value{color:var(--success)}',
       '.ai-insight-detail{margin-top:6px;font-size:11px;line-height:1.5;color:var(--text3);overflow-wrap:anywhere}.ai-insight-item.is-primary .ai-insight-title{font-size:12px}.ai-insight-item.is-primary .ai-insight-detail{font-size:12px;color:var(--text2)}',
       '.ai-check-list{display:grid;gap:7px}.ai-check-line{display:grid;grid-template-columns:10px minmax(0,1fr);gap:5px;align-items:start}.ai-check-dot{color:var(--navy);font-weight:900;line-height:1.45}.ai-check-text{font-size:10.5px;line-height:1.5;color:var(--text3)}',
+      '.ai-sales-count-visual{display:grid;gap:14px}.ai-sales-count-block{min-width:0}.ai-sales-count-block-title{margin:0 0 7px;font-size:11px;line-height:1.3;font-weight:800;color:var(--text3)}',
+      '.ai-sales-count-overall{display:grid;grid-template-columns:minmax(165px,220px);gap:9px;overflow:auto;padding-bottom:2px}.ai-sales-count-weekdays{margin:0!important;padding-bottom:2px}.ai-sales-count-extra{margin-top:2px}',
       '.ai-workspace-status-card{padding-left:14px!important}.ai-workspace-status-card:before{display:none!important}',
       '.ai-history-toolbar[hidden]{display:none!important}',
       '.ai-history-toolbar{display:flex;align-items:flex-start;gap:10px;margin:0 0 12px;padding:10px 12px;border:1px solid var(--border);border-radius:12px;background:#fff}',
