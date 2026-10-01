@@ -7,11 +7,10 @@ const vm=require('node:vm');
 const root=path.join(__dirname,'..');
 
 function safePersistSource(){
-  const index=fs.readFileSync(path.join(root,'Index.html'),'utf8');
-  const marker='var safePersist=',start=index.indexOf(marker);
-  const end=index.indexOf(';\nif(html.indexOf(originalPersist)',start);
-  assert.ok(start>=0&&end>start,'安全な保存処理がIndex.htmlに定義されていること');
-  return vm.runInNewContext(index.slice(start+marker.length,end));
+  const bootstrap=fs.readFileSync(path.join(root,'insight_bootstrap_patches_v1.js'),'utf8');
+  const match=bootstrap.match(/var safePersist=('[\\s\\S]*?');\\n\\s*if\\(html\\.indexOf\\(originalPersist\\)/);
+  assert.ok(match,'安全な保存処理がbootstrap moduleに定義されていること');
+  return vm.runInNewContext(match[1]);
 }
 
 test('共通保存処理は成功時だけtrueを返す',()=>{
