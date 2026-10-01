@@ -158,3 +158,13 @@ test('バックアップ復元は実在日と有効なカテゴリーマスタ�
   assert.match(source,/InsightStorage\.migrateSnapshot\(next\)/);
   assert.match(source,/CURRENT_SCHEMA_VERSION/);
 });
+
+test('販売数入力を開いたままバックアップ復元しても復元後データを再読込する',()=>{
+  const sales=fs.readFileSync(path.join(root,'insight_sales_count_v1.js'),'utf8');
+  const backup=fs.readFileSync(path.join(root,'insight_backup_guard_v1.js'),'utf8');
+  assert.match(sales,/function reloadFromStore\(\)/);
+  assert.match(sales,/model\.reloadFromStore=reloadFromStore/);
+  assert.match(sales,/if\(!selectedCategory\(\)\|\|selectedCategory\(\)\.hidden\)state\.categoryId=/);
+  assert.match(backup,/InsightSalesCount\.reloadFromStore/);
+  assert.doesNotMatch(backup,/currentNav==='salesCounts'\)gotoNav\('salesCounts'\)/);
+});
