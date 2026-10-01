@@ -4,8 +4,6 @@
   if(root.InsightAnalysisPeriodLock)return;
 
   var target=null;
-  var syncing=false;
-  var routeTransition=false;
   var lastOpen=false;
 
   function pad(v){return String(v).padStart(2,'0');}
@@ -46,8 +44,12 @@
   function compareYear(){
     try{return typeof cmpYear!=='undefined'&&cmpYear!=null?cmpYear:null;}catch(_){return null;}
   }
+  function pageTransitioning(){
+    try{return !!(root.InsightPagePeriodSync&&typeof root.InsightPagePeriodSync.isTransitioning==='function'&&root.InsightPagePeriodSync.isTransitioning());}
+    catch(_){return false;}
+  }
   function captureCurrent(){
-    if(syncing)return target;
+    if(pageTransitioning())return target;
     var nav=currentNavValue(),spec=null;
     try{
       if(nav==='salesCounts'&&root.InsightSalesCount&&typeof root.InsightSalesCount.getPeriod==='function'){
@@ -118,68 +120,12 @@
     };
   }
 
-  function setGlobalYear(name,value){
-    try{
-      if(name==='baseYear'){
-        baseYear=typeof baseYear==='number'?Number(value):String(value);
-        return;
-      }
-    }catch(_){}
-  }
-  function syncDashboard(){
-    try{
-      baseYear=typeof baseYear==='number'?target.year:String(target.year);
-      selMonth=target.monthLabel;
-      if(target.compareYear!=null)cmpYear=typeof cmpYear==='number'?target.compareYear:String(target.compareYear);
-      if(typeof refreshDash==='function')refreshDash();
-      return true;
-    }catch(_){return false;}
-  }
-  function syncInput(type){
-    try{
-      if(!editYear||!editMonth)return false;
-      editYear[type]=typeof editYear[type]==='number'?target.year:String(target.year);
-      editMonth[type]=target.monthLabel;
-      if(target.compareYear!=null)cmpYear=typeof cmpYear==='number'?target.compareYear:String(target.compareYear);
-      if(typeof initInputPage==='function')initInputPage(type);
-      return true;
-    }catch(_){return false;}
-  }
-  function syncDaily(){
-    try{
-      if(!root.InsightDateContext||typeof root.InsightDateContext.setSelectedDate!=='function')return false;
-      var ref=referenceDate();
-      var date=root.InsightDateContext.parseIso?root.InsightDateContext.parseIso(ref):new Date(ref+'T00:00:00');
-      root.InsightDateContext.setSelectedDate(date);
-      if(typeof renderQuickPage==='function')renderQuickPage();
-      return true;
-    }catch(_){return false;}
-  }
-  function syncSalesCount(){
-    try{
-      return !!(root.InsightSalesCount&&typeof root.InsightSalesCount.setPeriod==='function'&&root.InsightSalesCount.setPeriod(target.year,target.month));
-    }catch(_){return false;}
-  }
   function syncCurrentPage(){
-    if(!isActive()||syncing){
-      if(!syncing)routeTransition=false;
-      return false;
+    if(!isActive())return false;
+    if(root.InsightPagePeriodSync&&typeof root.InsightPagePeriodSync.syncCurrentPage==='function'){
+      return root.InsightPagePeriodSync.syncCurrentPage();
     }
-    syncing=true;
-    var ok=false,nav=currentNavValue();
-    try{
-      if(nav===0)ok=syncDaily();
-      else if(nav===1)ok=syncDashboard();
-      else if(nav===2)ok=syncInput('sales');
-      else if(nav===3)ok=syncInput('kyaku');
-      else if(nav===4)ok=syncInput('haiki');
-      else if(nav==='salesCounts')ok=syncSalesCount();
-    }finally{
-      syncing=false;
-      routeTransition=false;
-      refreshLabel();
-    }
-    return ok;
+    return false;
   }
 
   function refreshLabel(){
@@ -191,19 +137,12 @@
   }
 
   function recaptureIfUserChanged(){
-    if(!isOpen()||syncing||routeTransition)return;
+    if(!isOpen()||pageTransitioning())return;
     captureCurrent();
     if(typeof root.renderAIAnalysisPanel==='function')root.renderAIAnalysisPanel();
   }
 
   function installHooks(){
-    if(root.document&&typeof root.document.addEventListener==='function'){
-      root.document.addEventListener('click',function(event){
-        if(!isOpen())return;
-        var node=event.target&&event.target.closest?event.target.closest('#nav0,#nav1,#nav2,#nav3,#nav4,#navSalesCount'):null;
-        if(node)routeTransition=true;
-      },true);
-    }
     if(root.InsightHooks){
       root.InsightHooks.on('dashboard:refresh:after','analysis-period-lock-dashboard',function(){
         if(currentNavValue()===1)recaptureIfUserChanged();
