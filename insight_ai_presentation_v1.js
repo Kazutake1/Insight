@@ -227,17 +227,42 @@
     syncWorkspaceState();
   }
 
+  function sidebarRect(button){
+    if(!button)return null;
+    var sidebar=button.closest&&button.closest('.sidebar');
+    if(sidebar){
+      var direct=sidebar.getBoundingClientRect();
+      if(direct.width>40&&direct.height>200)return direct;
+    }
+    var node=button.parentElement,best=null;
+    while(node&&node!==document.body&&node!==document.documentElement){
+      var rect=node.getBoundingClientRect();
+      if(
+        rect.width>=120&&rect.width<=360&&
+        rect.height>=Math.max(320,window.innerHeight*.55)&&
+        rect.left>=0&&rect.left<80&&rect.top>=0&&rect.top<160
+      ){
+        if(!best||rect.height>best.height)best=rect;
+      }
+      node=node.parentElement;
+    }
+    return best;
+  }
+
   function syncWorkspacePosition(){
     var panel=document.getElementById('aiAnalysisPanel');
     var button=document.getElementById('aiAnalysisToggle');
     if(!panel)return;
     var navHost=button&&button.parentElement;
-    var left=12;
+    var left=12,top=12;
     if(navHost){
       var rect=navHost.getBoundingClientRect();
       if(rect.width>40&&rect.right>0&&rect.right<window.innerWidth-280)left=Math.round(rect.right+12);
     }
+    var side=sidebarRect(button);
+    if(side&&side.top>=0&&side.top<window.innerHeight-120)top=Math.round(side.top);
     panel.style.setProperty('--ai-workspace-left',left+'px');
+    panel.style.setProperty('--ai-workspace-top',top+'px');
   }
 
   function syncWorkspaceState(){
@@ -296,7 +321,7 @@
     style.textContent=[
       'body.ai-analysis-open #main{margin-right:0!important}',
       '.ai-analysis-backdrop{display:none!important}',
-      '.ai-analysis-panel.ai-analysis-workspace{position:fixed!important;left:var(--ai-workspace-left,12px)!important;right:12px!important;top:12px!important;bottom:0!important;width:auto!important;max-width:none!important;height:auto!important;padding:0!important;overflow:hidden!important;background:#f4f6f8!important;color:#172235!important;--surface:#f4f6f8;--surface2:#fff;--border:#dfe4ea;--text:#172235;--text2:#344054;--text3:#667085;--text4:#8b95a5;--navy:#16283f;--danger:#b42318;--success:#397a56;border:1px solid #d9dee5!important;border-radius:18px!important;box-shadow:0 18px 54px rgba(18,31,49,.18)!important;z-index:10001!important}',
+      '.ai-analysis-panel.ai-analysis-workspace{position:fixed!important;left:var(--ai-workspace-left,12px)!important;right:12px!important;top:var(--ai-workspace-top,12px)!important;bottom:0!important;width:auto!important;max-width:none!important;height:auto!important;padding:0!important;overflow:hidden!important;background:#f4f6f8!important;color:#172235!important;--surface:#f4f6f8;--surface2:#fff;--border:#dfe4ea;--text:#172235;--text2:#344054;--text3:#667085;--text4:#8b95a5;--navy:#16283f;--danger:#b42318;--success:#397a56;border:1px solid #d9dee5!important;border-radius:18px!important;box-shadow:0 18px 54px rgba(18,31,49,.18)!important;z-index:10001!important}',
       '.ai-workspace-header{height:68px;box-sizing:border-box;display:grid;grid-template-columns:minmax(180px,1fr) auto minmax(44px,1fr);align-items:center;gap:18px;padding:0 20px;border-bottom:1px solid var(--border);background:#fff}',
       '.ai-workspace-brand{min-width:0}',
       '.ai-workspace-title{font-size:20px;line-height:1.1;font-weight:800;color:var(--navy);letter-spacing:.01em}',
@@ -341,7 +366,7 @@
       '.ai-analysis-question-answer{margin-top:9px;padding:9px 10px;border-radius:9px;background:#f8f9fb;border:1px solid var(--border);font-size:11px;line-height:1.55;color:var(--text2);white-space:pre-wrap;max-height:126px;overflow:auto}',
       '.ai-analysis-question-help{display:none}',
       '@media(max-width:1180px){.ai-workspace-grid{grid-template-columns:minmax(0,1fr) 218px}.ai-workspace-main{padding-left:16px;padding-right:16px}.ai-workspace-question-dock{left:16px;right:16px}.ai-workspace-period-btn{padding-left:10px;padding-right:10px}}',
-      '@media(max-width:920px){.ai-analysis-panel.ai-analysis-workspace{left:8px!important;right:8px!important;top:8px!important;bottom:0!important}.ai-workspace-grid{grid-template-columns:minmax(0,1fr) 190px}.ai-workspace-header{padding:0 14px;gap:10px}.ai-workspace-period-btn{padding:7px 8px}.ai-workspace-section-hint{display:none}.ai-history-toolbar{gap:7px;padding:8px}.ai-history-mode-btn,.ai-history-period-btn{padding:6px 8px}}'
+      '@media(max-width:920px){.ai-analysis-panel.ai-analysis-workspace{left:8px!important;right:8px!important;top:var(--ai-workspace-top,8px)!important;bottom:0!important}.ai-workspace-grid{grid-template-columns:minmax(0,1fr) 190px}.ai-workspace-header{padding:0 14px;gap:10px}.ai-workspace-period-btn{padding:7px 8px}.ai-workspace-section-hint{display:none}.ai-history-toolbar{gap:7px;padding:8px}.ai-history-mode-btn,.ai-history-period-btn{padding:6px 8px}}'
     ].join('');
     document.head.appendChild(style);
   }
