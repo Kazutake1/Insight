@@ -436,7 +436,7 @@
       var target=event.target&&event.target.closest?event.target.closest('#nav0,#nav1,#nav2,#nav3,#nav4,#navSalesCount'):null;
       if(!target)return;
       function syncAndRender(){
-        if(window.InsightAnalysisPeriodLock&&typeof window.InsightAnalysisPeriodLock.syncCurrentPage==='function'){
+        if(!window.InsightPagePeriodSync&&window.InsightAnalysisPeriodLock&&typeof window.InsightAnalysisPeriodLock.syncCurrentPage==='function'){
           window.InsightAnalysisPeriodLock.syncCurrentPage();
         }
         if(typeof window.renderAIAnalysisPanel==='function')window.renderAIAnalysisPanel();
