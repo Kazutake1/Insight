@@ -56,3 +56,14 @@ test('通常画面の期間同期は保存層を使用しない',()=>{
   const source=fs.readFileSync(path.join(__dirname,'..','insight_page_period_sync_v1.js'),'utf8');
   assert.doesNotMatch(source,/localStorage|InsightStorage/);
 });
+
+test('ページ同期が画面再描画の単一責務を持つ',()=>{
+  const pageSource=fs.readFileSync(path.join(__dirname,'..','insight_page_period_sync_v1.js'),'utf8');
+  const lockSource=fs.readFileSync(path.join(__dirname,'..','insight_analysis_period_lock_v1.js'),'utf8');
+  const presentation=fs.readFileSync(path.join(__dirname,'..','insight_ai_presentation_v1.js'),'utf8');
+  assert.match(pageSource,/function isTransitioning\(\)/);
+  assert.match(lockSource,/InsightPagePeriodSync\.syncCurrentPage/);
+  assert.doesNotMatch(lockSource,/function syncDashboard\(/);
+  assert.doesNotMatch(lockSource,/function syncInput\(/);
+  assert.match(presentation,/!window\.InsightPagePeriodSync&&window\.InsightAnalysisPeriodLock/);
+});
