@@ -10,6 +10,7 @@ test('old data receives safe defaults without changing existing store fields',()
   const all=base();all.stores.a.keep='value';sales.ensure(all);
   assert.equal(all.stores.a.keep,'value');
   assert.deepEqual(all.salesCountManagement.categories.map(c=>c.name),['おにぎり','サンドイッチ','麺類']);
+  assert.deepEqual(all.salesCountManagement.categories.map(c=>c.activeTrips),[[true,true,true],[true,true,true],[true,true,true]]);
   assert.deepEqual(all.stores.a.salesCounts,{});
 });
 
@@ -99,4 +100,40 @@ test('分析AI向け平均カードは販売数入力カードと同じDOMクラ
   assert.match(source,/class="sc-total-delivery"/);
   assert.match(source,/class="sc-total-sales"/);
   assert.match(source,/model\.createAverageCard=createAverageCard/);
+});
+
+test('対象外便は日合計平均の入力必須条件から除外する',()=>{
+  const first={trips:[{delivery:null,sales:null},{delivery:20,sales:18},{delivery:30,sales:28}]};
+  const second={trips:[{delivery:null,sales:null},{delivery:10,sales:9},{delivery:40,sales:35}]};
+  const mask=[false,true,true];
+  const delivery=sales.average([first,second],'delivery',mask);
+  const sold=sales.average([first,second],'sales',mask);
+  assert.deepEqual(delivery.trips,[null,15,35]);
+  assert.equal(delivery.total,50);
+  assert.deepEqual(sold.trips,[null,13.5,31.5]);
+  assert.equal(sold.total,45);
+});
+
+test('既存カテゴリーは対象便未設定でも全3便対象として安全に移行する',()=>{
+  const all=base();
+  all.salesCountManagement={version:1,categories:[{id:'legacy',name:'旧カテゴリー',hidden:false,aliases:[]}]};
+  sales.ensure(all);
+  assert.deepEqual(all.salesCountManagement.categories[0].activeTrips,[true,true,true]);
+  assert.doesNotThrow(()=>sales.validate(all));
+});
+
+test('カテゴリーは対象便を最低1便必要とする',()=>{
+  const all=base();sales.ensure(all);
+  all.salesCountManagement.categories[0].activeTrips=[false,false,false];
+  assert.throws(()=>sales.validate(all),/販売数カテゴリー/);
+});
+
+test('対象外便のUIは対象外表示となり入力対象から外れる',()=>{
+  const source=fs.readFileSync(path.join(__dirname,'..','insight_sales_count_v1.js'),'utf8');
+  assert.match(source,/activeTrips:\[true,true,true\]/);
+  assert.match(source,/value='対象外'/);
+  assert.match(source,/sc-not-applicable/);
+  assert.match(source,/対象便を1つ以上選択してください/);
+  assert.match(source,/sc-category-trips/);
+  assert.match(source,/model\.activeTrips/);
 });
