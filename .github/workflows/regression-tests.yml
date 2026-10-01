@@ -20,6 +20,7 @@ jobs:
       matrix:
         file:
           - analysis_context.test.cjs
+          - analysis_history.test.cjs
           - comparison_single_source.test.cjs
           - date_context.test.cjs
           - daily_anomaly.test.cjs
