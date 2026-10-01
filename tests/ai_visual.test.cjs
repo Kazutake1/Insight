@@ -29,3 +29,17 @@ test('改善・解消の状態ラベルは改善色として扱う',()=>{
   assert.equal(visual.toneFor('aiAnalysisSummary',visual.parseLine('【改善】廃棄：改善傾向')),'success');
   assert.equal(visual.toneFor('aiAnalysisSummary',visual.parseLine('【解消】客数：正常範囲')),'success');
 });
+
+test('廃棄のプラス変化だけは要約欄でも悪化色にする',()=>{
+  const waste=visual.parseLine('廃棄金額 18,200円 / 前年同月比 +12.4% / 前月比 +3.0%。');
+  const sales=visual.parseLine('売上 1,184,000円 / 前年同月比 +12.4% / 前月比 +3.0%。');
+  assert.equal(waste.metric,'+12.4%');
+  assert.equal(visual.toneFor('aiAnalysisSummary',waste),'danger');
+  assert.equal(visual.toneFor('aiAnalysisSummary',sales),'neutral');
+});
+
+test('廃棄の増減判定は符号付き数値で行う',()=>{
+  assert.equal(visual.metricNumber('+12.4%'),12.4);
+  assert.equal(visual.metricNumber('-12.4%'),-12.4);
+  assert.equal(visual.toneFor('aiAnalysisSummary',visual.parseLine('廃棄額：前年同月比 -12.4%')),'neutral');
+});
