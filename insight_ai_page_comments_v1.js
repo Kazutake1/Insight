@@ -393,6 +393,136 @@
     out.push(review.period.completed?'比較基準は月合計です。':'進行中月の比較基準は入力済み1日平均です。');
     return Array.from(new Set(out)).join('\n');
   }
+  function historyReferenceDate(m){
+    try{
+      if(m==='daily'&&root.InsightDateContext&&typeof root.InsightDateContext.getSelectedIso==='function'){
+        return root.InsightDateContext.getSelectedIso();
+      }
+    }catch(_){}
+    var info=reviewMonthContext(m),c=info.c;
+    return String(c.year)+'-'+String(info.monthNumber).padStart(2,'0')+'-'+String(c.through).padStart(2,'0');
+  }
+  function historyState(){
+    var state=root.InsightAIViewState||(root.InsightAIViewState={period:'history'});
+    if(!state.historyKind)state.historyKind='week';
+    if(!state.historySelected)state.historySelected={week:null,month:null};
+    return state;
+  }
+  function historyBundle(m){
+    if(!root.InsightAnalysisHistory)throw new Error('分析履歴を利用できません。');
+    var state=historyState(),kind=state.historyKind==='month'?'month':'week',history;
+    if(kind==='month'){
+      var info=reviewMonthContext(m),c=info.c;
+      history=root.InsightAnalysisHistory.build({
+        kind:'month',year:Number(c.year),month:info.monthNumber,throughDay:c.through,
+        compareYear:c.prev,storeId:allStores.current,count:12
+      });
+    }else{
+      history=root.InsightAnalysisHistory.build({
+        kind:'week',referenceDate:historyReferenceDate(m),storeId:allStores.current,count:12
+      });
+    }
+    var selected=history.getEntry(state.historySelected[kind]);
+    if(selected)state.historySelected[kind]=selected.id;
+    return {history:history,selected:selected,kind:kind,state:state};
+  }
+  function renderHistoryControls(bundle){
+    var list=document.getElementById('aiHistoryPeriodList');
+    if(!list)return;
+    Array.prototype.forEach.call(document.querySelectorAll('.ai-history-mode-btn'),function(button){
+      button.classList.toggle('active',button.dataset.historyKind===bundle.kind);
+    });
+    list.innerHTML='';
+    if(!bundle.history.entries.length){
+      var empty=document.createElement('span');
+      empty.className='ai-analysis-empty';
+      empty.textContent='表示できる履歴がありません';
+      list.appendChild(empty);
+      return;
+    }
+    bundle.history.entries.forEach(function(entry){
+      var button=document.createElement('button');
+      button.type='button';
+      button.className='ai-history-period-btn';
+      button.classList.toggle('active',!!bundle.selected&&entry.id===bundle.selected.id);
+      button.textContent=entry.label;
+      button.addEventListener('click',function(){
+        bundle.state.historySelected[bundle.kind]=entry.id;
+        if(typeof root.renderAIAnalysisPanel==='function')root.renderAIAnalysisPanel();
+      });
+      list.appendChild(button);
+    });
+  }
+  function historyThemeItems(entry,theme){
+    var review=entry&&entry.review;
+    if(!review)return [];
+    if(!theme||theme==='dashboard'||theme==='daily')return Array.isArray(review.display)?review.display.slice():[];
+    if(typeof review.forTheme==='function')return review.forTheme(theme);
+    return (review.items||[]).filter(function(item){return item.theme===theme;}).slice(0,5);
+  }
+  function historyItemLine(item,kind){
+    var prefix=kind==='week'&&item.stateLabel?'【'+item.stateLabel+'】':'';
+    return prefix+item.title+'：'+item.summary;
+  }
+  function historyPanel(m){
+    var bundle=historyBundle(m),history=bundle.history,entry=bundle.selected,theme=m==='daily'?'dashboard':m;
+    renderHistoryControls(bundle);
+    var p={mode:m,period:'分析履歴',summary:[],good:[],caution:[],checks:[]};
+    if(!entry){
+      p.summary.push('表示できる保存済みレビューがありません。');
+      p.checks.push('日次データが入力されると、週次・月次履歴を保存データから再構築できます。');
+      return p;
+    }
+    p.period=(bundle.kind==='week'?'週次履歴':'月次履歴')+'｜'+entry.label+'（保存済みデータから再計算）';
+    var review=entry.review,items=historyThemeItems(entry,theme);
+    if(theme==='dashboard')p.summary=p.summary.concat(entry.conclusion||[]);
+    else if(bundle.kind==='week')p.summary.push(weeklyMetricSummary(review,theme));
+    else if(theme==='salesCounts'){
+      var cats=review.current&&review.current.salesCount&&review.current.salesCount.categories||[];
+      var active=cats.filter(function(c){return Number(c.inputDays)>0&&!c.hidden;});
+      p.summary.push('販売・納品の入力カテゴリー '+active.length+'件を確認しています。');
+    }else p.summary.push(monthlyMetricSummary(review,theme));
+
+    items.slice(0,5).forEach(function(item){p.summary.push(historyItemLine(item,bundle.kind));});
+    items.filter(function(item){return !item.positive&&item.state!=='resolved';}).slice(0,3).forEach(function(item){
+      p.caution.push(historyItemLine(item,bundle.kind));
+    });
+    items.filter(function(item){return item.positive||item.state==='improving'||item.state==='resolved';}).slice(0,2).forEach(function(item){
+      p.good.push(historyItemLine(item,bundle.kind));
+    });
+    if(!items.length)p.good.push('この期間に表示対象となる大きな変化はありません。');
+
+    var traces=history.tracesForEntry(entry);
+    traces.forEach(function(trace){p.checks.push(history.traceLine(trace)+'。');});
+    if(!traces.length)p.checks.push('この期間に追跡対象となる継続異常はありません。');
+    p.checks.push('履歴は別データとして保存せず、保存済み実績を現在の判定ロジックで再計算しています。');
+    savedNote(p);
+    return p;
+  }
+  function historyQuestionAnswer(q,m){
+    var bundle=historyBundle(m),entry=bundle.selected;
+    if(!entry)return '表示できる分析履歴がありません。';
+    var theme=m==='daily'?'dashboard':m,explicit=null;
+    if(/売上/.test(q))explicit='sales';
+    else if(/客数|来店/.test(q))explicit='customers';
+    else if(/廃棄|ロス/.test(q))explicit='waste';
+    else if(/販売|納品|発注/.test(q))explicit='salesCounts';
+    var items=historyThemeItems(entry,explicit||theme),out=[];
+    if(/いつ|開始|継続|解消|何週|何か月|どのくらい/.test(q)){
+      var traces=bundle.history.tracesForEntry(entry);
+      if(explicit)traces=traces.filter(function(trace){return trace.theme===explicit||trace.type===explicit;});
+      if(traces.length)traces.slice(0,5).forEach(function(trace){out.push(bundle.history.traceLine(trace)+'。');});
+      else out.push('この期間に該当する継続異常の履歴はありません。');
+    }else{
+      if(!explicit&&theme==='dashboard')out=out.concat(entry.conclusion||[]);
+      if(/良い|改善|機会/.test(q))items=items.filter(function(item){return item.positive||item.state==='improving'||item.state==='resolved';});
+      else if(/問題|悪い|注意|課題/.test(q))items=items.filter(function(item){return !item.positive&&item.state!=='resolved';});
+      items.slice(0,5).forEach(function(item){out.push(historyItemLine(item,bundle.kind));});
+      if(!out.length)out.push('選択した履歴に該当する重要項目はありません。');
+    }
+    out.push('対象：'+entry.label+'。履歴は保存済み実績から再計算しています。');
+    return out.join('\n');
+  }
   function build(m){
     m=m||mode();
     if(m==='salesCounts')return salesCounts();
@@ -417,6 +547,18 @@
     if(!root.InsightHooks)return;
     root.InsightHooks.on('ai:render:before','page-ai-route',function(ctx){
       var m=mode(),periodMode=analysisPeriod(m);
+      if(periodMode==='history'){
+        var history;
+        try{history=historyPanel(m);}catch(e){history={period:'分析履歴を取得できません',summary:[],good:[],caution:['履歴の再計算に必要なデータを取得できません。'],checks:[]};}
+        heading((historyState().historyKind==='month'?'月次':'週次')+'履歴');
+        var historyPeriod=document.getElementById('aiAnalysisPeriod');if(historyPeriod)historyPeriod.textContent=history.period;
+        append('aiAnalysisSummary',history.summary,'選択した履歴のデータが不足しています。');
+        append('aiAnalysisGood',history.good,'選択した履歴に改善・機会は確認されていません。');
+        append('aiAnalysisCaution',history.caution,'選択した履歴に重要な注意点は確認されていません。');
+        append('aiAnalysisChecks',history.checks,'追跡できる履歴がありません。');
+        ctx.cancel=true;
+        return false;
+      }
       if(periodMode==='week'){
         var weekly;
         try{weekly=weeklyPanel(m);}catch(e){weekly={period:'週次データを取得できません',summary:[],good:[],caution:['週次レビューに必要なデータを取得できません。'],checks:[]};}
@@ -475,7 +617,18 @@
       ctx.cancel=true;
       return false;
     },1);
+
+    root.InsightHooks.on('ai:question:before','page-ai-history-question',function(ctx){
+      var m=mode();
+      if(analysisPeriod(m)!=='history')return;
+      var q=String(ctx.args[0]||'').trim();
+      if(!q){ctx.result='質問を入力してください。';ctx.cancel=true;return false;}
+      try{ctx.result=historyQuestionAnswer(q,m);}
+      catch(e){ctx.result='分析履歴に必要なデータを取得できません。';}
+      ctx.cancel=true;
+      return false;
+    },1);
   }
-  root.InsightAIPageComments={mode:mode,analysisPeriod:analysisPeriod,build:build,weeklyPanel:weeklyPanel,monthlyPanel:monthlyPanel};
+  root.InsightAIPageComments={mode:mode,analysisPeriod:analysisPeriod,build:build,weeklyPanel:weeklyPanel,monthlyPanel:monthlyPanel,historyPanel:historyPanel};
   if(document.readyState==='complete')install();else root.addEventListener('load',install,{once:true});
 })(window);
