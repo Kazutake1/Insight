@@ -50,13 +50,16 @@
     return match?Number(match[1].replace('−','-')):null;
   }
   function toneFor(id,parts){
-    if(id==='aiAnalysisCaution')return 'danger';
-    if(id==='aiAnalysisGood')return 'success';
+    var state=parts&&parts.state;
+    if(state==='改善'||state==='解消'||state==='機会')return 'success';
+    if(state==='注意'||state==='重要'||state==='悪化'||state==='新規'||state==='継続')return 'danger';
+    if(state==='関連'||state==='主因候補'||state==='情報'||state==='結論')return 'neutral';
     if(parts&&/廃棄/.test(parts.original||'')){
       var value=metricNumber(parts.metric);
       if(value!==null&&value>0)return 'danger';
     }
-    if(parts&&parts.state&&(parts.state==='改善'||parts.state==='解消'))return 'success';
+    if(id==='aiAnalysisCaution')return 'danger';
+    if(id==='aiAnalysisGood')return 'success';
     return 'neutral';
   }
   function emptyNode(document,text){
@@ -94,8 +97,10 @@
     var head=document.createElement('div');
     head.className='ai-insight-head';
     var title=parts.title||(
-      id==='aiAnalysisCaution'?'注意点':
-      id==='aiAnalysisGood'?'改善・機会':'分析結果'
+      parts.state==='結論'?'結論':
+      parts.state==='関連'?'関連性':
+      id==='aiAnalysisCaution'?'重要ポイント':
+      id==='aiAnalysisGood'?'関連性':'分析結果'
     );
     head.appendChild(textNode(document,'div',title,'ai-insight-title'));
     if(parts.state)head.appendChild(textNode(document,'span',parts.state,'ai-insight-state'));
