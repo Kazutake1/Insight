@@ -239,3 +239,59 @@ test('分析AIコメントは数値カードと簡潔な確認事項として表
   expect(new Set(Object.values(palette)).size).toBe(3);
   expect(errors).toEqual([]);
 });
+
+test('販売数AI分析は入力カードと同じデザインで便別平均と曜日別平均を表示する',async({page})=>{
+  const errors=await openInsight(page);
+  await page.locator('#navSalesCount').click();
+  await page.locator('#aiAnalysisToggle').click();
+  await expect(page.locator('body')).toHaveClass(/ai-analysis-open/);
+  await expect(page.locator('#aiAnalysisSummary .ai-sales-count-visual')).toBeVisible();
+  await expect(page.locator('#aiAnalysisSummary .ai-sales-count-overall .sc-day')).toHaveCount(1);
+  await expect(page.locator('#aiAnalysisSummary .ai-sales-count-weekdays .sc-day')).toHaveCount(7);
+
+  const structure=await page.evaluate(()=>{
+    const inputCard=document.querySelector('#scCalendar .sc-day:not(.empty)');
+    const aiCard=document.querySelector('#aiAnalysisSummary .ai-sales-count-overall .sc-day');
+    const weekdayCards=Array.from(document.querySelectorAll('#aiAnalysisSummary .ai-sales-count-weekdays .sc-day'));
+    return {
+      inputChildren:Array.from(inputCard.children).map(node=>node.className),
+      aiChildren:Array.from(aiCard.children).map(node=>node.className),
+      aiClass:aiCard.className,
+      allReadOnly:[aiCard].concat(weekdayCards).every(card=>Array.from(card.querySelectorAll('input')).every(input=>input.readOnly)),
+      weekdayTitles:weekdayCards.map(card=>card.querySelector('.sc-day-num').textContent)
+    };
+  });
+
+  expect(structure.aiChildren).toEqual(structure.inputChildren);
+  expect(structure.aiClass).toContain('sc-day');
+  expect(structure.allReadOnly).toBe(true);
+  expect(structure.weekdayTitles).toEqual(['日曜日','月曜日','火曜日','水曜日','木曜日','金曜日','土曜日']);
+  expect(errors).toEqual([]);
+});
+
+test('廃棄のプラス変化だけは分析要約でも赤表示にする',async({page})=>{
+  const errors=await openInsight(page);
+  await page.locator('#aiAnalysisToggle').click();
+  await expect(page.locator('body')).toHaveClass(/ai-analysis-open/);
+
+  await page.evaluate(()=>{
+    window.InsightAIVisual.renderLines('aiAnalysisSummary',[
+      '廃棄額は前年比+12.4%、前年差+2,000円です。',
+      '売上は前年比+12.4%、前年差+120,000円です。'
+    ],'データなし',document);
+  });
+
+  const items=page.locator('#aiAnalysisSummary .ai-insight-item');
+  await expect(items).toHaveCount(2);
+  await expect(items.nth(0)).toHaveClass(/is-danger/);
+  await expect(items.nth(1)).not.toHaveClass(/is-danger/);
+  await expect(items.nth(0).locator('.ai-insight-value')).toHaveText('+12.4%');
+  await expect(items.nth(1).locator('.ai-insight-value')).toHaveText('+12.4%');
+
+  const colors=await page.evaluate(()=>({
+    waste:getComputedStyle(document.querySelector('#aiAnalysisSummary .ai-insight-item:nth-child(1) .ai-insight-value')).color,
+    sales:getComputedStyle(document.querySelector('#aiAnalysisSummary .ai-insight-item:nth-child(2) .ai-insight-value')).color
+  }));
+  expect(colors.waste).not.toBe(colors.sales);
+  expect(errors).toEqual([]);
+});
