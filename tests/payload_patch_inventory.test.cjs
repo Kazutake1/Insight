@@ -86,6 +86,6 @@ test('残す11件はSTEP5で意図的に維持する互換・安全パッチだ�
 
 test('分析AI workspace assetはcache bustされている',()=>{
   const index=read('Index.html');
-  assert.match(index,/insight_ai_presentation_v1\.js\?v=20261001-step1/);
+  assert.match(index,/insight_ai_presentation_v1\.js\?v=20261001-step1-1/);
   assert.match(index,/insight_ops_v1\.js\?v=20260930-step5-2/);
 });
