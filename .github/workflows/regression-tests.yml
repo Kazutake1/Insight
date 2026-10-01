@@ -22,6 +22,7 @@ jobs:
           - analysis_context.test.cjs
           - comparison_single_source.test.cjs
           - date_context.test.cjs
+          - daily_anomaly.test.cjs
           - hook_bridge.test.cjs
           - insight_events.test.cjs
           - insight_sales_count.test.cjs
