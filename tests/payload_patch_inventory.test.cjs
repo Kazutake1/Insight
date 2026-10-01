@@ -30,6 +30,8 @@ test('AI表示CSSはIndexの文字列置換ではなくpresentation moduleが所
   assert.match(presentation,/\.ai-analysis-question-row/);
   assert.match(presentation,/@media\(max-width:920px\)/);
   assert.doesNotThrow(()=>new vm.Script(presentation), 'presentation module must be valid JavaScript');
+  assert.match(presentation,/var selected=currentNav===i;/);
+  assert.doesNotMatch(presentation,/var selected=!open&&currentNav===i;/);
 });
 
 test('AIのDOM・背景・開閉同期はpresentation moduleが所有する',()=>{
@@ -86,6 +88,6 @@ test('残す11件はSTEP5で意図的に維持する互換・安全パッチだ�
 
 test('分析AI workspace assetはcache bustされている',()=>{
   const index=read('Index.html');
-  assert.match(index,/insight_ai_presentation_v1\.js\?v=20261001-step1-1/);
+  assert.match(index,/insight_ai_presentation_v1\.js\?v=20261001-step1-2/);
   assert.match(index,/insight_ops_v1\.js\?v=20260930-step5-2/);
 });
