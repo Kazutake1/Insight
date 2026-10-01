@@ -88,3 +88,23 @@ test('セール実績ページは販売数入力と同じ日別カードAPIを�
   assert.match(salesSource,/class="sc-total-delivery"/);
   assert.doesNotMatch(source,/localStorage|InsightStorage/);
 });
+
+test('セール実績は対象外便を日合計・通常日比較から除外する',()=>{
+  const all=fixture();
+  sales.ensure(all);
+  const category=all.salesCountManagement.categories.find(c=>c.id==='cat_onigiri');
+  category.activeTrips=[false,true,true];
+  Object.values(all.stores.storeA.salesCounts).forEach(day=>{
+    if(day.cat_onigiri){
+      day.cat_onigiri.trips[0].delivery=null;
+      day.cat_onigiri.trips[0].sales=null;
+    }
+  });
+  const data=saleResults.collect(all,'storeA','cat_onigiri','12','2026-10-01',{events,sales});
+  const sep=data.occurrences.find(o=>o.id==='sale_sep');
+  assert.ok(sep);
+  assert.notEqual(sep.averageDelivery,null);
+  assert.notEqual(sep.averageSales,null);
+  assert.ok(sep.normalCount>=1);
+  assert.notEqual(sep.normalRatio,null);
+});
