@@ -65,7 +65,17 @@
       if(large.length&&!confirm('4桁以上の入力があります。内容を確認して保存しますか？\n\n'+large.slice(0,8).join('\n')+(large.length>8?'\nほか '+(large.length-8)+'件':'')))return;
       try{var next=copy(allStores);ensure(next);var nextStore=next.stores[allStores.current],prefix=monthPrefix();Object.keys(nextStore.salesCounts).forEach(function(date){if(date.slice(0,7)===prefix&&nextStore.salesCounts[date][state.categoryId]){delete nextStore.salesCounts[date][state.categoryId];if(!Object.keys(nextStore.salesCounts[date]).length)delete nextStore.salesCounts[date];}});Object.keys(state.draft).forEach(function(date){var r=normalizeRecord(state.draft[date]);if(r.trips.some(function(t){return t.delivery!==null||t.sales!==null;})){if(!nextStore.salesCounts[date])nextStore.salesCounts[date]={};nextStore.salesCounts[date][state.categoryId]=r;}});persistTransaction(next);setDirty(false);showToast('✓ 販売数を保存しました','#15803d','#f0fdf4');renderAnalysis();}catch(e){alert('販売数を保存できませんでした。\n'+e.message);}
     }
-    function changePeriod(delta){if(!confirmLeave())return;var d=new Date(Number(state.year),state.month-1+delta,1);state.year=String(d.getFullYear());state.month=d.getMonth()+1;readMonth();render();}
+    function notifyPeriodChange(){
+      try{root.dispatchEvent(new CustomEvent('insight:sales-count-period-change',{detail:{year:state.year,month:state.month}}));}catch(_){}
+    }
+    function setPeriod(year,month){
+      var y=Number(year),m=Number(month);
+      if(!Number.isInteger(y)||y<1000||!Number.isInteger(m)||m<1||m>12)return false;
+      if(String(y)===state.year&&m===state.month)return true;
+      if(!confirmLeave())return false;
+      state.year=String(y);state.month=m;readMonth();render();notifyPeriodChange();return true;
+    }
+    function changePeriod(delta){var d=new Date(Number(state.year),state.month-1+delta,1);setPeriod(d.getFullYear(),d.getMonth()+1);}
     function changeCategory(id){if(id===state.categoryId)return;if(!confirmLeave()){doc.getElementById('scCategory').value=state.categoryId;return;}state.categoryId=id;readMonth();render();}
     function buildInput(date,r,trip,key){var i=el('input');i.type='number';i.min='0';i.step='1';i.inputMode='numeric';i.value=r.trips[trip][key]===null?'':String(r.trips[trip][key]);i.classList.toggle('has-val',i.value!=='');i.setAttribute('aria-label',date+' '+(trip+1)+'便 '+(key==='delivery'?'納品数':'販売数'));i.oninput=function(){if(!state.draft[date])state.draft[date]=r;i.setCustomValidity('');if(i.value===''){r.trips[trip][key]=null;}else{var n=Number(i.value);if(!Number.isSafeInteger(n)||n<0){i.setCustomValidity('0以上の整数を入力してください');setDirty(true);return;}r.trips[trip][key]=n;}i.classList.toggle('has-val',i.value!=='');setDirty(true);updateTotals(i.closest('.sc-day'),r);renderAverages();};return i;}
     function updateTotals(card,r){var vals=card.querySelectorAll('[data-total]');vals.forEach(function(n){var v=total(r,n.dataset.total);n.textContent=v===null?'—':String(v);});}
@@ -77,6 +87,9 @@
     function analysisData(){var saleRows=[],normal=[],saleWeekdays=new Set(),days=daysInMonth(),storeId=allStores.current,st=allStores.stores[storeId];if(!st)return {sales:saleRows,normal:normal};for(var d=1;d<=days;d++){var date=monthPrefix()+'-'+pad(d),evs=eventsFor(storeId,date),r=st.salesCounts&&st.salesCounts[date]&&st.salesCounts[date][state.categoryId]?normalizeRecord(st.salesCounts[date][state.categoryId]):null;if(evs.length){saleWeekdays.add(new Date(date+'T12:00:00').getDay());evs.forEach(function(e){saleRows.push({date:date,store:st.name,event:e,record:r||emptyRecord()});});}}for(var n=1;n<=days;n++){var normalDate=monthPrefix()+'-'+pad(n),wd=new Date(normalDate+'T12:00:00').getDay();if(saleWeekdays.has(wd)&&eventsFor(storeId,normalDate).length===0){var normalRecord=st.salesCounts&&st.salesCounts[normalDate]&&st.salesCounts[normalDate][state.categoryId];if(normalRecord)normal.push(normalizeRecord(normalRecord));}}return {sales:saleRows,normal:normal};}
 
     // Read-only snapshot for automatic AI comments; reuse the page's calculations.
+    model.getPeriod=function(){return {year:state.year,month:state.month};};
+    model.setPeriod=function(year,month){return setPeriod(year,month);};
+
     model.getAnalysisContext=function(){
       var data=analysisData(),records=Object.keys(state.draft).sort().map(function(date){
         var r=state.draft[date];
