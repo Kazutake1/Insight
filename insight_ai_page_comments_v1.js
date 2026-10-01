@@ -547,6 +547,71 @@
       node.textContent=text;el.appendChild(node);
     });
   }
+  function salesCountCardLines(lines){
+    return (lines||[]).filter(function(text){
+      text=String(text||'');
+      return !/入力済み平均（便ごとに集計）/.test(text)&&
+        !/^[123]便 納品 /.test(text)&&
+        !/^日合計平均：/.test(text)&&
+        !/^曜日別の日合計平均：/.test(text);
+    });
+  }
+  function renderSalesCountCards(panel,fallback){
+    var host=document.getElementById('aiAnalysisSummary'),model=root.InsightSalesCount;
+    var c=model&&model.getAnalysisContext&&model.getAnalysisContext();
+    if(!host||!model||typeof model.createAverageCard!=='function'||!c||!c.category){
+      append('aiAnalysisSummary',panel&&panel.summary||[],fallback);
+      return;
+    }
+    host.replaceChildren();
+    var visual=document.createElement('div');
+    visual.className='ai-sales-count-visual';
+
+    var overallBlock=document.createElement('section');
+    overallBlock.className='ai-sales-count-block';
+    var overallTitle=document.createElement('div');
+    overallTitle.className='ai-sales-count-block-title';
+    overallTitle.textContent=c.category.name+' 入力済み平均';
+    var overallGrid=document.createElement('div');
+    overallGrid.className='ai-sales-count-overall';
+    overallGrid.appendChild(model.createAverageCard('入力済み平均',c.delivery,c.sales,''));
+    overallBlock.append(overallTitle,overallGrid);
+    visual.appendChild(overallBlock);
+
+    var weekdayBlock=document.createElement('section');
+    weekdayBlock.className='ai-sales-count-block';
+    var weekdayTitle=document.createElement('div');
+    weekdayTitle.className='ai-sales-count-block-title';
+    weekdayTitle.textContent='曜日別平均';
+    var weekdayGrid=document.createElement('div');
+    weekdayGrid.className='sc-average-grid ai-sales-count-weekdays';
+    DAYS.forEach(function(day,i){
+      weekdayGrid.appendChild(model.createAverageCard(
+        day+'曜日',
+        c.weekdays.delivery[i],
+        c.weekdays.sales[i],
+        i===0?'sun':i===6?'sat':''
+      ));
+    });
+    weekdayBlock.append(weekdayTitle,weekdayGrid);
+    visual.appendChild(weekdayBlock);
+    host.appendChild(visual);
+
+    var extra=salesCountCardLines(panel&&panel.summary);
+    if(extra.length){
+      var extraHost=document.createElement('div');
+      extraHost.id='aiSalesCountExtra';
+      extraHost.className='ai-sales-count-extra';
+      host.appendChild(extraHost);
+      if(root.InsightAIVisual&&typeof root.InsightAIVisual.renderLines==='function'){
+        root.InsightAIVisual.renderLines('aiSalesCountExtra',extra,'',document);
+      }else{
+        extra.forEach(function(text){var p=document.createElement('p');p.className='ai-analysis-comment';p.textContent=text;extraHost.appendChild(p);});
+      }
+      extraHost.removeAttribute('id');
+    }
+  }
+
   function heading(text){
     var summary=document.getElementById('aiAnalysisSummary');
     var title=summary&&summary.parentElement&&summary.parentElement.querySelector('.ai-analysis-card-title');
@@ -585,7 +650,8 @@
         try{monthly=monthlyPanel(m);}catch(e){monthly={period:'月次データを取得できません',summary:[],good:[],caution:['月次レビューに必要なデータを取得できません。'],checks:[]};}
         heading('今月の'+monthlyThemeLabel(m==='daily'?'dashboard':m));
         var monthlyPeriod=document.getElementById('aiAnalysisPeriod');if(monthlyPeriod)monthlyPeriod.textContent=monthly.period;
-        append('aiAnalysisSummary',monthly.summary,'今月のデータが不足しています。');
+        if(m==='salesCounts')renderSalesCountCards(monthly,'今月の販売・納品データが不足しています。');
+        else append('aiAnalysisSummary',monthly.summary,'今月のデータが不足しています。');
         append('aiAnalysisGood',monthly.good,'今月の改善・機会は確認されていません。');
         append('aiAnalysisCaution',monthly.caution,'今月の重要な注意点は確認されていません。');
         append('aiAnalysisChecks',monthly.checks,'月次データを確認してください。');
@@ -597,7 +663,8 @@
       try{p=build(m);}catch(e){p={period:'対象データを取得できません',summary:[],good:[],caution:['データ不足のため分析できません。対象期間の入力を確認してください。'],checks:[]};}
       heading(m==='daily'?'選択日の要点':'対象期間の要点');
       var period=document.getElementById('aiAnalysisPeriod');if(period)period.textContent=p.period;
-      append('aiAnalysisSummary',p.summary,'この対象のデータが不足しています。');
+      if(m==='salesCounts')renderSalesCountCards(p,'販売・納品データが不足しています。');
+      else append('aiAnalysisSummary',p.summary,'この対象のデータが不足しています。');
       append('aiAnalysisGood',p.good,'改善を判断できる比較結果はありません。');
       append('aiAnalysisCaution',p.caution,'入力済みデータから追加の注意点は確認できません。');
       append('aiAnalysisChecks',p.checks,'対象期間の入力データを確認してください。');
@@ -638,6 +705,6 @@
       return false;
     },1);
   }
-  root.InsightAIPageComments={mode:mode,analysisPeriod:analysisPeriod,build:build,weeklyPanel:weeklyPanel,monthlyPanel:monthlyPanel,historyPanel:historyPanel};
+  root.InsightAIPageComments={mode:mode,analysisPeriod:analysisPeriod,build:build,weeklyPanel:weeklyPanel,monthlyPanel:monthlyPanel,historyPanel:historyPanel,renderSalesCountCards:renderSalesCountCards};
   if(document.readyState==='complete')install();else root.addEventListener('load',install,{once:true});
 })(window);
