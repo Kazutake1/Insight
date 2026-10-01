@@ -131,7 +131,7 @@ test('カテゴリーは対象便を最低1便必要とする',()=>{
 test('対象外便のUIは対象外表示となり入力対象から外れる',()=>{
   const source=fs.readFileSync(path.join(__dirname,'..','insight_sales_count_v1.js'),'utf8');
   assert.match(source,/activeTrips:\[true,true,true\]/);
-  assert.match(source,/value='対象外'/);
+  assert.match(source,/value='ー'/);
   assert.match(source,/sc-not-applicable/);
   assert.match(source,/対象便を1つ以上選択してください/);
   assert.match(source,/sc-category-trips/);
