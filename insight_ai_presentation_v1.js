@@ -72,15 +72,6 @@
     return ({0:'daily',1:'dashboard',2:'sales',3:'customers',4:'waste'})[nav]||'dashboard';
   }
 
-  function createNavButton(label,key){
-    var button=document.createElement('button');
-    button.type='button';
-    button.className='ai-workspace-nav-btn';
-    button.dataset.analysisView=key;
-    button.textContent=label;
-    return button;
-  }
-
   function createPeriodButton(label,key){
     var button=document.createElement('button');
     button.type='button';
@@ -160,33 +151,6 @@
     var grid=document.createElement('div');
     grid.className='ai-workspace-grid';
 
-    var left=document.createElement('aside');
-    left.className='ai-workspace-left';
-    var leftTitle=document.createElement('div');
-    leftTitle.className='ai-workspace-side-title';
-    leftTitle.textContent='分析';
-    left.appendChild(leftTitle);
-    [
-      ['総合','dashboard'],
-      ['売上','sales'],
-      ['客数','customers'],
-      ['廃棄','waste'],
-      ['販売・納品','salesCounts'],
-      ['利益・コスト','costs']
-    ].forEach(function(item){
-      var button=createNavButton(item[0],item[1]);
-      if(item[1]==='salesCounts'||item[1]==='costs'){
-        button.disabled=true;
-        button.title='後続STEPで利用可能になります';
-      }
-      left.appendChild(button);
-    });
-
-    var leftNote=document.createElement('div');
-    leftNote.className='ai-workspace-side-note';
-    leftNote.textContent='現在表示しているページの分析を表示します';
-    left.appendChild(leftNote);
-
     var main=document.createElement('main');
     main.className='ai-workspace-main';
 
@@ -214,7 +178,7 @@
     checksCard.classList.add('ai-workspace-status-card','is-check');
     right.append(rightTitle,cautionCard,goodCard,checksCard);
 
-    grid.append(left,main,right);
+    grid.append(main,right);
     panel.append(header,grid);
     syncWorkspaceState();
   }
@@ -234,12 +198,6 @@
 
   function syncWorkspaceState(){
     var mode=currentMode();
-    var map={daily:'daily',dashboard:'dashboard',sales:'sales',customers:'customers',waste:'waste',salesCounts:'salesCounts'};
-    var activeView=map[mode]||'dashboard';
-    Array.prototype.forEach.call(document.querySelectorAll('.ai-workspace-nav-btn'),function(button){
-      button.classList.toggle('active',button.dataset.analysisView===activeView);
-    });
-
     var activePeriod=mode==='daily'?'today':'month';
     Array.prototype.forEach.call(document.querySelectorAll('.ai-workspace-period-btn'),function(button){
       button.classList.toggle('active',button.dataset.analysisPeriod===activePeriod);
@@ -292,15 +250,9 @@
       '.ai-workspace-period-btn.active{background:var(--navy);color:#fff}',
       '.ai-workspace-period-btn:disabled{opacity:.38}',
       '.ai-workspace-close{justify-self:end;width:34px;height:34px;border:1px solid var(--border);border-radius:9px;background:#fff;color:var(--text2);font-size:23px;line-height:1;cursor:pointer}',
-      '.ai-workspace-grid{height:calc(100% - 68px);display:grid;grid-template-columns:180px minmax(0,1fr) 250px;gap:0;min-height:0}',
-      '.ai-workspace-left,.ai-workspace-right{min-width:0;overflow:auto;background:#fff}',
-      '.ai-workspace-left{padding:18px 12px;border-right:1px solid var(--border)}',
-      '.ai-workspace-right{padding:18px 14px;border-left:1px solid var(--border)}',
+      '.ai-workspace-grid{height:calc(100% - 68px);display:grid;grid-template-columns:minmax(0,1fr) 250px;gap:0;min-height:0}',
+      '.ai-workspace-right{min-width:0;overflow:auto;background:#fff;padding:18px 14px;border-left:1px solid var(--border)}',
       '.ai-workspace-side-title{margin:0 8px 10px;font-size:10px;line-height:1.2;font-weight:800;letter-spacing:.08em;color:var(--text4)}',
-      '.ai-workspace-nav-btn{display:block;width:100%;margin:2px 0;padding:10px 11px;border:0;border-radius:9px;background:transparent;color:var(--text2);text-align:left;font:700 12px/1.2 -apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;cursor:default}',
-      '.ai-workspace-nav-btn.active{background:#edf1f5;color:var(--navy)}',
-      '.ai-workspace-nav-btn:disabled{opacity:.42}',
-      '.ai-workspace-side-note{margin:18px 8px 0;padding-top:14px;border-top:1px solid var(--border);font-size:9px;line-height:1.6;color:var(--text4)}',
       '.ai-workspace-main{position:relative;min-width:0;overflow:auto;padding:20px 22px 88px;background:#f4f6f8}',
       '.ai-workspace-section-head{display:flex;justify-content:space-between;align-items:flex-end;gap:12px;margin:0 0 12px}',
       '.ai-workspace-section-title{font-size:16px;font-weight:800;color:var(--navy)}',
@@ -322,8 +274,8 @@
       '.ai-analysis-question-send{height:38px;flex:0 0 auto;border:0;border-radius:9px;background:var(--navy);color:#fff;padding:0 15px;font:800 11px/1 -apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;cursor:pointer}',
       '.ai-analysis-question-answer{margin-top:9px;padding:9px 10px;border-radius:9px;background:#f8f9fb;border:1px solid var(--border);font-size:11px;line-height:1.55;color:var(--text2);white-space:pre-wrap;max-height:126px;overflow:auto}',
       '.ai-analysis-question-help{display:none}',
-      '@media(max-width:1180px){.ai-workspace-grid{grid-template-columns:158px minmax(0,1fr) 218px}.ai-workspace-main{padding-left:16px;padding-right:16px}.ai-workspace-question-dock{left:16px;right:16px}.ai-workspace-period-btn{padding-left:10px;padding-right:10px}}',
-      '@media(max-width:920px){.ai-analysis-panel.ai-analysis-workspace{left:8px!important;right:8px!important;top:8px!important;bottom:0!important}.ai-workspace-grid{grid-template-columns:138px minmax(0,1fr) 190px}.ai-workspace-header{padding:0 14px;gap:10px}.ai-workspace-period-btn{padding:7px 8px}.ai-workspace-section-hint{display:none}}'
+      '@media(max-width:1180px){.ai-workspace-grid{grid-template-columns:minmax(0,1fr) 218px}.ai-workspace-main{padding-left:16px;padding-right:16px}.ai-workspace-question-dock{left:16px;right:16px}.ai-workspace-period-btn{padding-left:10px;padding-right:10px}}',
+      '@media(max-width:920px){.ai-analysis-panel.ai-analysis-workspace{left:8px!important;right:8px!important;top:8px!important;bottom:0!important}.ai-workspace-grid{grid-template-columns:minmax(0,1fr) 190px}.ai-workspace-header{padding:0 14px;gap:10px}.ai-workspace-period-btn{padding:7px 8px}.ai-workspace-section-hint{display:none}}'
     ].join('');
     document.head.appendChild(style);
   }
@@ -409,6 +361,21 @@
       event.stopImmediatePropagation();
       if(typeof window.closeAIAnalysisPanel==='function')window.closeAIAnalysisPanel();
     },true);
+  }
+
+  if(document.body.dataset.aiSidebarAnalysisSync!=='1'){
+    document.body.dataset.aiSidebarAnalysisSync='1';
+    document.addEventListener('click',function(event){
+      if(!document.body.classList.contains('ai-analysis-open'))return;
+      var target=event.target&&event.target.closest?event.target.closest('#nav0,#nav1,#nav2,#nav3,#nav4,#navSalesCount'):null;
+      if(!target)return;
+      if(typeof queueMicrotask==='function')queueMicrotask(function(){
+        if(typeof window.renderAIAnalysisPanel==='function')window.renderAIAnalysisPanel();
+      });
+      else setTimeout(function(){
+        if(typeof window.renderAIAnalysisPanel==='function')window.renderAIAnalysisPanel();
+      },0);
+    });
   }
 
   function syncSelection(){
