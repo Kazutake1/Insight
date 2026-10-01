@@ -102,7 +102,7 @@ test('STEP6で履歴タブ・週次月次切替・過去レビュー再表示を
   assert.match(pageAI,/periodMode==='history'/);
   assert.match(pageAI,/page-ai-history-question/);
   assert.match(history,/function buildTimeline\(/);
-  assert.match(history,/保存済み実績/);
+  assert.doesNotMatch(history,/localStorage|InsightStorage/);
   assert.doesNotThrow(()=>new vm.Script(presentation),'history presentation must be valid JavaScript');
   assert.doesNotThrow(()=>new vm.Script(pageAI),'history page AI must be valid JavaScript');
   assert.doesNotThrow(()=>new vm.Script(history),'history module must be valid JavaScript');
