@@ -249,19 +249,24 @@
     return out;
   }
 
-  function totalRecord(record,key){
-    var values=record.trips.map(function(trip){return trip[key];});
+  function totalRecord(record,key,mask){
+    mask=Array.isArray(mask)&&mask.length===3?mask:[true,true,true];
+    var indexes=[0,1,2].filter(function(i){return mask[i]!==false;});
+    var values=indexes.map(function(i){return record.trips[i][key];});
     return values.every(function(value){return value===null;})?null:values.reduce(function(sum,value){return sum+(value===null?0:value);},0);
   }
 
-  function aggregateSalesRecords(records,key){
+  function aggregateSalesRecords(records,key,mask){
+    mask=Array.isArray(mask)&&mask.length===3?mask:[true,true,true];
     var trips=[0,1,2].map(function(index){
+      if(mask[index]===false)return {sum:null,count:0,average:null};
       var values=records.map(function(record){return record.trips[index][key];}).filter(function(value){return value!==null;});
       var sum=values.reduce(function(total,value){return total+value;},0);
       return {sum:values.length?sum:null,count:values.length,average:values.length?sum/values.length:null};
     });
-    var complete=records.filter(function(record){return record.trips.every(function(trip){return trip[key]!==null;});});
-    var totals=complete.map(function(record){return record.trips.reduce(function(sum,trip){return sum+trip[key];},0);});
+    var active=[0,1,2].filter(function(index){return mask[index]!==false;});
+    var complete=records.filter(function(record){return active.every(function(index){return record.trips[index][key]!==null;});});
+    var totals=complete.map(function(record){return active.reduce(function(sum,index){return sum+record.trips[index][key];},0);});
     var total=totals.reduce(function(sum,value){return sum+value;},0);
     return {trips:trips,total:{sum:totals.length?total:null,count:totals.length,average:totals.length?total/totals.length:null}};
   }
@@ -271,6 +276,7 @@
     var saved=object(store.salesCounts)?store.salesCounts:{};
     return {
       categories:master.map(function(category){
+        var mask=env.InsightSalesCount&&typeof env.InsightSalesCount.activeTrips==='function'?env.InsightSalesCount.activeTrips(category):(Array.isArray(category.activeTrips)&&category.activeTrips.length===3?category.activeTrips.map(function(v){return v!==false;}):[true,true,true]);
         var daily=[],records=[];
         Object.keys(saved).sort().forEach(function(date){
           if(date<scope.startDate||date>scope.endDate)return;
@@ -281,17 +287,18 @@
           daily.push({
             date:date,
             trips:copy(record.trips),
-            deliveryTotal:totalRecord(record,'delivery'),
-            salesTotal:totalRecord(record,'sales')
+            deliveryTotal:totalRecord(record,'delivery',mask),
+            salesTotal:totalRecord(record,'sales',mask)
           });
         });
         return {
           id:category.id,
           name:category.name,
           hidden:!!category.hidden,
+          activeTrips:copy(mask),
           inputDays:daily.length,
-          delivery:aggregateSalesRecords(records,'delivery'),
-          sales:aggregateSalesRecords(records,'sales'),
+          delivery:aggregateSalesRecords(records,'delivery',mask),
+          sales:aggregateSalesRecords(records,'sales',mask),
           daily:daily
         };
       })
