@@ -1,6 +1,16 @@
 (function(){
   var SECTION_IDS=['aiAnalysisSummary','aiAnalysisGood','aiAnalysisCaution','aiAnalysisChecks'];
   var queued=false;
+  var viewState=window.InsightAIViewState||(window.InsightAIViewState={period:null});
+  function selectedPeriod(){
+    var mode=currentMode();
+    return viewState.period||(mode==='daily'?'today':'month');
+  }
+  function setPeriod(period){
+    viewState.period=period;
+    syncWorkspaceState();
+    if(typeof window.renderAIAnalysisPanel==='function')window.renderAIAnalysisPanel();
+  }
 
   function createCard(title,id){
     var card=document.createElement('section');
@@ -130,9 +140,14 @@
       ['履歴','history']
     ].forEach(function(item){
       var button=createPeriodButton(item[0],item[1]);
-      if(item[1]==='week'||item[1]==='history'){
+      if(item[1]==='history'){
         button.disabled=true;
         button.title='後続STEPで利用可能になります';
+      }else{
+        button.addEventListener('click',function(){
+          if(button.disabled)return;
+          setPeriod(item[1]);
+        });
       }
       periodTabs.appendChild(button);
     });
@@ -198,15 +213,18 @@
 
   function syncWorkspaceState(){
     var mode=currentMode();
-    var activePeriod=mode==='daily'?'today':'month';
+    var activePeriod=selectedPeriod();
     Array.prototype.forEach.call(document.querySelectorAll('.ai-workspace-period-btn'),function(button){
+      if(button.dataset.analysisPeriod==='today')button.disabled=mode!=='daily';
+      if(button.dataset.analysisPeriod==='history')button.disabled=true;
       button.classList.toggle('active',button.dataset.analysisPeriod===activePeriod);
     });
 
     var heading=document.querySelector('.ai-workspace-section-title');
     if(heading){
       var labels={daily:'本日の分析',dashboard:'総合分析',sales:'売上分析',customers:'客数分析',waste:'廃棄分析',salesCounts:'販売・納品分析'};
-      heading.textContent=labels[mode]||'分析サマリー';
+      var base=labels[mode]||'分析サマリー';
+      heading.textContent=activePeriod==='week'?'今週の'+base:activePeriod==='month'&&mode==='daily'?'今月の総合分析':base;
     }
     syncWorkspacePosition();
   }
