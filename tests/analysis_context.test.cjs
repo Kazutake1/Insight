@@ -207,13 +207,14 @@ test('不正な期間は拒否する',()=>{
 test('対象外便は分析contextの日合計・完全入力判定から除外する',()=>{
   const {allStores,deps}=setup();
   allStores.salesCountManagement.categories[0].activeTrips=[false,true,true];
+  allStores.stores.storeA.salesCounts['2026-10-01'].cat_onigiri.trips[2]={delivery:25,sales:23};
   const ctx=model.buildMonth(2026,10,2,'storeA',deps);
   const onigiri=ctx.salesCount.categories.find(c=>c.id==='cat_onigiri');
   assert.deepEqual(onigiri.activeTrips,[false,true,true]);
   assert.equal(onigiri.delivery.trips[0].count,0);
   assert.equal(onigiri.delivery.trips[0].average,null);
   assert.equal(onigiri.delivery.total.count,2);
-  assert.equal(onigiri.delivery.total.sum,170);
-  assert.equal(onigiri.daily[0].deliveryTotal,50);
+  assert.equal(onigiri.delivery.total.sum,165);
+  assert.equal(onigiri.daily[0].deliveryTotal,75);
   assert.equal(onigiri.daily[1].deliveryTotal,90);
 });
