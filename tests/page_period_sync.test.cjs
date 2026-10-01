@@ -40,7 +40,7 @@ test('サイドバー遷移中は遷移先の現在月を共有年月へ逆上�
   const source=fs.readFileSync(path.join(__dirname,'..','insight_page_period_sync_v1.js'),'utf8');
   assert.match(source,/var routeTransition=false/);
   assert.match(source,/closest\('#nav0,#nav1,#nav2,#nav3,#nav4,#navSalesCount'\)/);
-  assert.match(source,/routeTransition=true/);
+  assert.match(source,/captureCurrent\(\);\n\s*routeTransition=true/);
   assert.match(source,/if\(syncing\|\|routeTransition\|\|storeTransition\)return/);
   assert.match(source,/scheduleRouteSync\(\)/);
 });
