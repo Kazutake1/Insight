@@ -78,7 +78,7 @@ test('STEP5で今月タブを月次レビューへ接続する',()=>{
   const pageAI=read('insight_ai_page_comments_v1.js');
   const monthly=read('insight_monthly_review_v1.js');
   assert.match(index,/insight_monthly_review_v1\.js\?v=20261001-step5/);
-  assert.match(index,/insight_ai_page_comments_v1\.js\?v=20261001-comment-cards/);
+  assert.match(index,/insight_ai_page_comments_v1\.js\?v=20261001-salescount-card/);
   assert.match(pageAI,/function monthlyPanel\(/);
   assert.match(pageAI,/function monthlyQuestionAnswer\(/);
   assert.match(pageAI,/periodMode==='month'/);
@@ -94,7 +94,7 @@ test('STEP6で履歴タブ・週次月次切替・過去レビュー再表示を
   const pageAI=read('insight_ai_page_comments_v1.js');
   const history=read('insight_analysis_history_v1.js');
   assert.match(index,/insight_analysis_history_v1\.js\?v=20261001-step6/);
-  assert.match(index,/insight_ai_page_comments_v1\.js\?v=20261001-comment-cards/);
+  assert.match(index,/insight_ai_page_comments_v1\.js\?v=20261001-salescount-card/);
   assert.match(presentation,/aiHistoryToolbar/);
   assert.match(presentation,/aiHistoryPeriodList/);
   assert.match(presentation,/historySelected/);
@@ -240,7 +240,7 @@ test('互換パッチ10件はfail-fast bootstrapに集約しfeature挿入境界�
 
 test('分析AI workspace assetはcache bustされている',()=>{
   const index=read('Index.html');
-  assert.match(index,/insight_ai_presentation_v1\.js\?v=20261001-comment-cards/);
+  assert.match(index,/insight_ai_presentation_v1\.js\?v=20261001-salescount-card/);
   assert.match(index,/insight_ops_v1\.js\?v=20260930-step5-2/);
 });
 
@@ -261,4 +261,16 @@ test('曜日別平均カードと廃棄悪化色の表示契約を維持する',
   assert.match(sales,/sc-trip sc-sales-row/);
   assert.match(visual,/\/廃棄\/\.test\(parts\.original\|\|''\)/);
   assert.match(visual,/value!==null&&value>0/);
+});
+
+test('販売数AI分析は販売数入力と同じ平均カード生成APIを使用する',()=>{
+  const pageAI=read('insight_ai_page_comments_v1.js');
+  const sales=read('insight_sales_count_v1.js');
+  const presentation=read('insight_ai_presentation_v1.js');
+  assert.match(pageAI,/function renderSalesCountCards\(/);
+  assert.match(pageAI,/model\.createAverageCard\(/);
+  assert.match(pageAI,/sc-average-grid ai-sales-count-weekdays/);
+  assert.match(sales,/model\.createAverageCard=createAverageCard/);
+  assert.match(presentation,/\.ai-sales-count-overall/);
+  assert.match(presentation,/\.ai-sales-count-weekdays/);
 });
