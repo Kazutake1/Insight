@@ -32,8 +32,9 @@ test('互換パッチ対象が欠けたpayloadはsilentに続行しない',()=>{
   assert.throws(()=>patches.apply('<!doctype html><html><body></body></html>'),/互換パッチの適用対象が見つかりません/);
 });
 
-test('bootstrap patch moduleは保存や外部通信を直接実行しない',()=>{
+test('bootstrap patch moduleは外部通信を行わず保存処理はpayloadへ差し込む文字列として保持する',()=>{
   const source=fs.readFileSync(path.join(root,'insight_bootstrap_patches_v1.js'),'utf8');
   assert.doesNotMatch(source,/\bfetch\s*\(|XMLHttpRequest|WebSocket/);
-  assert.doesNotMatch(source,/localStorage\.setItem\(/);
+  assert.match(source,/var safePersist=/);
+  assert.match(source,/patch\(originalPersist,safePersist\)/);
 });
