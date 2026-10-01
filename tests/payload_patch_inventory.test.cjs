@@ -52,6 +52,16 @@ test('AIのDOM・背景・開閉同期はpresentation moduleが所有する',()=
   assert.match(presentation,/closeAIAnalysisPanel/);
 });
 
+test('分析AI内の重複サイドバーを廃止し本体ナビへ統合する',()=>{
+  const presentation=read('insight_ai_presentation_v1.js');
+  assert.doesNotMatch(presentation,/ai-workspace-left/);
+  assert.doesNotMatch(presentation,/createNavButton/);
+  assert.doesNotMatch(presentation,/ai-workspace-nav-btn/);
+  assert.match(presentation,/grid-template-columns:minmax\(0,1fr\) 250px/);
+  assert.match(presentation,/#nav0,#nav1,#nav2,#nav3,#nav4,#navSalesCount/);
+  assert.match(presentation,/renderAIAnalysisPanel/);
+});
+
 test('店舗運営UIのCSSはops moduleが所有する',()=>{
   const index=read('Index.html');
   const ops=read('insight_ops_v1.js');
@@ -88,6 +98,6 @@ test('残す11件はSTEP5で意図的に維持する互換・安全パッチだ�
 
 test('分析AI workspace assetはcache bustされている',()=>{
   const index=read('Index.html');
-  assert.match(index,/insight_ai_presentation_v1\.js\?v=20261001-step1-2/);
+  assert.match(index,/insight_ai_presentation_v1\.js\?v=20261001-nav-unify/);
   assert.match(index,/insight_ops_v1\.js\?v=20260930-step5-2/);
 });
