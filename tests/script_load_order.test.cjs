@@ -32,6 +32,7 @@ const ordered=[
   'insight_input_weather_temp_v1.js',
   'insight_sales_count_v1.js',
   'insight_analysis_context_v1.js',
+  'insight_daily_anomaly_v1.js',
   'insight_ai_page_comments_v1.js'
 ];
 
@@ -78,7 +79,8 @@ test('AIと分析補助モジュールはページ別AIより先に確定順で�
     'insight_sales_insights_v1.js',
     'insight_kyaku_insights_v1.js',
     'insight_dashboard_kpi_sync_v1.js',
-    'insight_analysis_context_v1.js'
+    'insight_analysis_context_v1.js',
+    'insight_daily_anomaly_v1.js'
   ]){
     assert.ok(index.indexOf(dependency)<index.indexOf('insight_ai_page_comments_v1.js'),dependency+' がページ別AIより後です');
   }
