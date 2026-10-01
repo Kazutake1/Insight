@@ -351,7 +351,8 @@
     if(!options.includeFreeText)out=stripFreeText(out);
     if(out&&out.privacy){
       out.privacy.localContext=false;
-      out.privacy.externalTransmission=true;
+      out.privacy.preparedForTransport=true;
+      out.privacy.externalTransmission=false;
       out.privacy.freeTextIncluded=!!options.includeFreeText;
     }
     return out;
