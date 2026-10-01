@@ -63,12 +63,10 @@ test('分析AI内の重複サイドバーを廃止し本体ナビへ統合する
   assert.match(presentation,/renderAIAnalysisPanel/);
 });
 
-test('STEP4で今週タブを有効化し履歴だけを未実装のまま残す',()=>{
+test('STEP4の今週タブは週次レビューへ接続された状態を維持する',()=>{
   const presentation=read('insight_ai_presentation_v1.js');
   const pageAI=read('insight_ai_page_comments_v1.js');
   assert.match(presentation,/setPeriod\(item\[1\]\)/);
-  assert.doesNotMatch(presentation,/item\[1\]==='week'\|\|item\[1\]==='history'/);
-  assert.match(presentation,/item\[1\]==='history'/);
   assert.match(pageAI,/analysisPeriod\(m\)!=='week'/);
   assert.match(pageAI,/weeklyQuestionAnswer/);
 });
@@ -78,7 +76,7 @@ test('STEP5で今月タブを月次レビューへ接続する',()=>{
   const pageAI=read('insight_ai_page_comments_v1.js');
   const monthly=read('insight_monthly_review_v1.js');
   assert.match(index,/insight_monthly_review_v1\.js\?v=20261001-step5/);
-  assert.match(index,/insight_ai_page_comments_v1\.js\?v=20261001-step5/);
+  assert.match(index,/insight_ai_page_comments_v1\.js\?v=20261001-step6/);
   assert.match(pageAI,/function monthlyPanel\(/);
   assert.match(pageAI,/function monthlyQuestionAnswer\(/);
   assert.match(pageAI,/periodMode==='month'/);
@@ -86,6 +84,28 @@ test('STEP5で今月タブを月次レビューへ接続する',()=>{
   assert.match(monthly,/var basis=isDone\?'total':'dailyAverage'/);
   assert.match(monthly,/badStreak/);
   assert.doesNotThrow(()=>new vm.Script(pageAI),'page AI module must be valid JavaScript');
+});
+
+test('STEP6で履歴タブ・週次月次切替・過去レビュー再表示を有効化する',()=>{
+  const index=read('Index.html');
+  const presentation=read('insight_ai_presentation_v1.js');
+  const pageAI=read('insight_ai_page_comments_v1.js');
+  const history=read('insight_analysis_history_v1.js');
+  assert.match(index,/insight_analysis_history_v1\.js\?v=20261001-step6/);
+  assert.match(index,/insight_ai_page_comments_v1\.js\?v=20261001-step6/);
+  assert.match(presentation,/aiHistoryToolbar/);
+  assert.match(presentation,/aiHistoryPeriodList/);
+  assert.match(presentation,/historySelected/);
+  assert.doesNotMatch(presentation,/dataset\.analysisPeriod==='history'\)button\.disabled=true/);
+  assert.match(pageAI,/function historyPanel\(/);
+  assert.match(pageAI,/function historyQuestionAnswer\(/);
+  assert.match(pageAI,/periodMode==='history'/);
+  assert.match(pageAI,/page-ai-history-question/);
+  assert.match(history,/function buildTimeline\(/);
+  assert.match(history,/保存済み実績/);
+  assert.doesNotThrow(()=>new vm.Script(presentation),'history presentation must be valid JavaScript');
+  assert.doesNotThrow(()=>new vm.Script(pageAI),'history page AI must be valid JavaScript');
+  assert.doesNotThrow(()=>new vm.Script(history),'history module must be valid JavaScript');
 });
 
 test('店舗運営UIのCSSはops moduleが所有する',()=>{
@@ -124,6 +144,6 @@ test('残す11件はSTEP5で意図的に維持する互換・安全パッチだ�
 
 test('分析AI workspace assetはcache bustされている',()=>{
   const index=read('Index.html');
-  assert.match(index,/insight_ai_presentation_v1\.js\?v=20261001-step5/);
+  assert.match(index,/insight_ai_presentation_v1\.js\?v=20261001-step6/);
   assert.match(index,/insight_ops_v1\.js\?v=20260930-step5-2/);
 });
