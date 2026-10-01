@@ -282,7 +282,7 @@
     style.textContent=[
       'body.ai-analysis-open #main{margin-right:0!important}',
       '.ai-analysis-backdrop{display:none!important}',
-      '.ai-analysis-panel.ai-analysis-workspace{position:fixed!important;left:var(--ai-workspace-left,12px)!important;right:12px!important;top:12px!important;bottom:12px!important;width:auto!important;max-width:none!important;height:auto!important;padding:0!important;overflow:hidden!important;background:#f4f6f8!important;color:#172235!important;--surface:#f4f6f8;--surface2:#fff;--border:#dfe4ea;--text:#172235;--text2:#344054;--text3:#667085;--text4:#8b95a5;--navy:#16283f;--danger:#b42318;--success:#397a56;border:1px solid #d9dee5!important;border-radius:18px!important;box-shadow:0 18px 54px rgba(18,31,49,.18)!important;z-index:10001!important}',
+      '.ai-analysis-panel.ai-analysis-workspace{position:fixed!important;left:var(--ai-workspace-left,12px)!important;right:12px!important;top:12px!important;bottom:0!important;width:auto!important;max-width:none!important;height:auto!important;padding:0!important;overflow:hidden!important;background:#f4f6f8!important;color:#172235!important;--surface:#f4f6f8;--surface2:#fff;--border:#dfe4ea;--text:#172235;--text2:#344054;--text3:#667085;--text4:#8b95a5;--navy:#16283f;--danger:#b42318;--success:#397a56;border:1px solid #d9dee5!important;border-radius:18px!important;box-shadow:0 18px 54px rgba(18,31,49,.18)!important;z-index:10001!important}',
       '.ai-workspace-header{height:68px;box-sizing:border-box;display:grid;grid-template-columns:minmax(180px,1fr) auto minmax(44px,1fr);align-items:center;gap:18px;padding:0 20px;border-bottom:1px solid var(--border);background:#fff}',
       '.ai-workspace-brand{min-width:0}',
       '.ai-workspace-title{font-size:20px;line-height:1.1;font-weight:800;color:var(--navy);letter-spacing:.01em}',
@@ -323,7 +323,7 @@
       '.ai-analysis-question-answer{margin-top:9px;padding:9px 10px;border-radius:9px;background:#f8f9fb;border:1px solid var(--border);font-size:11px;line-height:1.55;color:var(--text2);white-space:pre-wrap;max-height:126px;overflow:auto}',
       '.ai-analysis-question-help{display:none}',
       '@media(max-width:1180px){.ai-workspace-grid{grid-template-columns:158px minmax(0,1fr) 218px}.ai-workspace-main{padding-left:16px;padding-right:16px}.ai-workspace-question-dock{left:16px;right:16px}.ai-workspace-period-btn{padding-left:10px;padding-right:10px}}',
-      '@media(max-width:920px){.ai-analysis-panel.ai-analysis-workspace{left:8px!important;right:8px!important;top:8px!important;bottom:8px!important}.ai-workspace-grid{grid-template-columns:138px minmax(0,1fr) 190px}.ai-workspace-header{padding:0 14px;gap:10px}.ai-workspace-period-btn{padding:7px 8px}.ai-workspace-section-hint{display:none}}'
+      '@media(max-width:920px){.ai-analysis-panel.ai-analysis-workspace{left:8px!important;right:8px!important;top:8px!important;bottom:0!important}.ai-workspace-grid{grid-template-columns:138px minmax(0,1fr) 190px}.ai-workspace-header{padding:0 14px;gap:10px}.ai-workspace-period-btn{padding:7px 8px}.ai-workspace-section-hint{display:none}}'
     ].join('');
     document.head.appendChild(style);
   }
@@ -400,6 +400,16 @@
   button.className='nav-btn';
   button.innerHTML='<svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 3v18h18M7 14l4-4 4 3 6-8"/></svg><span>分析AI</span>';
   lastNav.insertAdjacentElement('afterend',button);
+
+  if(button.dataset.aiToggleCloseBound!=='1'){
+    button.dataset.aiToggleCloseBound='1';
+    button.addEventListener('click',function(event){
+      if(!document.body.classList.contains('ai-analysis-open'))return;
+      event.preventDefault();
+      event.stopImmediatePropagation();
+      if(typeof window.closeAIAnalysisPanel==='function')window.closeAIAnalysisPanel();
+    },true);
+  }
 
   function syncSelection(){
     var open=document.body.classList.contains('ai-analysis-open');
