@@ -22,6 +22,7 @@ jobs:
           - analysis_context.test.cjs
           - analysis_history.test.cjs
           - ai_context.test.cjs
+          - ai_visual.test.cjs
           - analysis_period_lock.test.cjs
           - bootstrap_patches.test.cjs
           - comparison_single_source.test.cjs
