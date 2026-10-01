@@ -228,7 +228,7 @@
         var node=event.target&&event.target.closest?
           event.target.closest('#nav0,#nav1,#nav2,#nav3,#nav4,#navSalesCount'):null;
         if(!node)return;
-        if(!target)captureCurrent();
+        captureCurrent();
         routeTransition=true;
         scheduleRouteSync();
       },true);
