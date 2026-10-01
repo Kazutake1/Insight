@@ -83,7 +83,7 @@ test('STEP5で今月タブを月次レビューへ接続する',()=>{
   assert.match(pageAI,/function monthlyQuestionAnswer\(/);
   assert.match(pageAI,/periodMode==='month'/);
   assert.match(pageAI,/page-ai-month-question/);
-  assert.match(monthly,/basis:isDone\?'total':'dailyAverage'/);
+  assert.match(monthly,/var basis=isDone\?'total':'dailyAverage'/);
   assert.match(monthly,/badStreak/);
   assert.doesNotThrow(()=>new vm.Script(pageAI),'page AI module must be valid JavaScript');
 });
