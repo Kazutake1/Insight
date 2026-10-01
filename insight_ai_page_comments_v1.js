@@ -277,6 +277,122 @@
     out.push('比較は今週と前週の同じ曜日数です。因果関係は断定していません。');
     return out.join('\n');
   }
+  function monthlyThemeLabel(theme){
+    return {dashboard:'総合',sales:'売上',customers:'客数',waste:'廃棄',salesCounts:'販売・納品'}[theme]||'総合';
+  }
+  function reviewMonthContext(m){
+    var c=context(m),monthNumber=c.mi+1;
+    if(monthNumber<1||monthNumber>12)throw new Error('対象月を取得できません。');
+    return {c:c,monthNumber:monthNumber};
+  }
+  function monthlyPct(v){return v==null?'比較不可':(v>0?'+':'')+v.toFixed(1)+'%';}
+  function monthlyPoint(v){return v==null?'比較不可':(v>0?'+':'')+v.toFixed(1)+'pt';}
+  function monthlyMetricSummary(review,theme){
+    var m=review.metrics||{},now=review.current.metrics||{},yoy=review.period.yoyLabel||'前年同月比';
+    if(theme==='sales')return '売上 '+yen(now.salesYen)+' / '+yoy+' '+monthlyPct(m.sales&&m.sales.yoyPct)+' / 前月比 '+monthlyPct(m.sales&&m.sales.momPct)+'。';
+    if(theme==='customers')return '客数 '+amount(now.customers)+'人 / '+yoy+' '+monthlyPct(m.customers&&m.customers.yoyPct)+' / 前月比 '+monthlyPct(m.customers&&m.customers.momPct)+'。';
+    if(theme==='waste')return '廃棄金額 '+yen(now.wasteYen)+' / '+yoy+' '+monthlyPct(m.waste&&m.waste.yoyPct)+' / 前月比 '+monthlyPct(m.waste&&m.waste.momPct)+'。';
+    return review.conclusion[0]||'月次KPIを確認しています。';
+  }
+  function monthlyPanel(m){
+    if(m==='salesCounts'){
+      var salePanel=salesCounts();
+      salePanel.summary.unshift('月次の販売・納品実績をカテゴリー別に確認しています。');
+      salePanel.checks.push('販売・納品は月次経営評価の補助情報として扱います。');
+      return salePanel;
+    }
+    if(!root.InsightMonthlyReview)throw new Error('月次レビューを利用できません。');
+    var info=reviewMonthContext(m),c=info.c,theme=m==='daily'?'dashboard':m;
+    var review=root.InsightMonthlyReview.review({
+      year:Number(c.year),month:info.monthNumber,throughDay:c.through,compareYear:c.prev,storeId:allStores.current
+    });
+    var items=review.forTheme(theme),p={
+      mode:m,
+      period:review.period.label+'（'+(review.period.yoyLabel||'前年比較なし')+'・保存済み）',
+      summary:[],good:[],caution:[],checks:[]
+    };
+    if(theme==='dashboard')p.summary=p.summary.concat(review.conclusion);
+    else p.summary.push(monthlyMetricSummary(review,theme));
+    items.slice(0,5).forEach(function(item){
+      p.summary.push(item.title+'：'+item.summary);
+    });
+    items.filter(function(item){return !item.positive;}).slice(0,3).forEach(function(item){
+      p.caution.push(item.title+'：'+item.summary);
+    });
+    items.filter(function(item){return item.positive;}).slice(0,2).forEach(function(item){
+      p.good.push(item.title+'：'+item.summary);
+    });
+    if(!items.length)p.good.push(monthlyThemeLabel(theme)+'に優先度の高い月次悪化項目はありません。');
+
+    if(theme==='dashboard'){
+      if(review.grossMargin&&review.grossMargin.current!=null){
+        var gm='粗利率 '+review.grossMargin.current.toFixed(1)+'%';
+        if(review.grossMargin.yoyPoint!=null)gm+=' / '+(review.period.yoyLabel||'同月比')+' '+monthlyPoint(review.grossMargin.yoyPoint);
+        p.summary.push(gm+'。');
+      }
+      if(review.labor&&review.labor.currentRate!=null){
+        var lr='人件費率 '+review.labor.currentRate.toFixed(1)+'%';
+        if(review.labor.yoyPoint!=null)lr+=' / '+(review.period.yoyLabel||'同月比')+' '+monthlyPoint(review.labor.yoyPoint);
+        p.summary.push(lr+'。');
+      }else if(!review.period.completed&&review.current.profitCost&&review.current.profitCost.available){
+        p.checks.push('人件費は月終了後に正式評価します。');
+      }
+    }
+
+    p.checks.push(review.period.completed?
+      '終了済み月の前年比・前月比は月合計を比較しています。':
+      '進行中月の前年比・前月比は入力済み1日平均を比較しています。');
+    if(review.period.compareYear==null)p.checks.push('前年比較は「なし」のため、前月比と現在値を中心に評価しています。');
+    else p.checks.push('3か月トレンドは各月を比較年同月と照合し、±1.5pt程度の変化は横ばいとして扱います。');
+    var events=review.current.conditions&&review.current.conditions.events||[];
+    if(events.length)p.checks.push('登録イベント '+events.length+'件。数値変化との因果関係は断定せず照合してください。');
+    savedNote(p);
+    return p;
+  }
+  function monthlyQuestionAnswer(q,m){
+    if(m==='salesCounts'){
+      var salesPanel=salesCounts(),saleLines=[];
+      if(/問題|悪い|注意|課題/.test(q))saleLines=salesPanel.caution;
+      else if(/確認|見る|すべき/.test(q))saleLines=salesPanel.checks;
+      else saleLines=salesPanel.summary.concat(salesPanel.checks.slice(0,2));
+      return saleLines.length?saleLines.join('\n'):'販売・納品の月次データが不足しています。';
+    }
+    if(!root.InsightMonthlyReview)return '月次レビューを利用できません。';
+    var info=reviewMonthContext(m),c=info.c,theme=m==='daily'?'dashboard':m;
+    var review=root.InsightMonthlyReview.review({
+      year:Number(c.year),month:info.monthNumber,throughDay:c.through,compareYear:c.prev,storeId:allStores.current
+    });
+    var explicit=null;
+    if(/人件費|人件費率|粗利|利益|コスト/.test(q))explicit='costs';
+    else if(/売上/.test(q))explicit='sales';
+    else if(/客数|来店/.test(q))explicit='customers';
+    else if(/廃棄|ロス/.test(q))explicit='waste';
+    var items=review.forTheme(explicit||theme),out=[];
+    if(!explicit&&theme==='dashboard')out=out.concat(review.conclusion);
+    if(/3か月|トレンド|傾向/.test(q)){
+      var names={sales:'売上',customers:'客数',waste:'廃棄'};
+      Object.keys(names).forEach(function(key){
+        var t=review.trends[key];
+        if(t&&t.label!=='データ不足')out.push(names[key]+'：3か月 '+t.label+(t.badStreak>=2?'（悪化側 '+t.badStreak+'か月継続）':''));
+      });
+    }
+    if(/なぜ|原因|理由/.test(q)&&(/売上/.test(q)||(!explicit&&theme==='sales'))){
+      var customer=review.metrics.customers&&review.metrics.customers.yoyPct;
+      var unit=review.metrics.customerUnitPrice&&review.metrics.customerUnitPrice.yoyPct;
+      if(customer!=null||unit!=null)out.push('売上の変動内訳：客数 '+monthlyPct(customer)+' / 客単価 '+monthlyPct(unit)+'。');
+    }
+    if(explicit==='costs'){
+      if(review.grossMargin.current!=null)out.push('粗利率は'+review.grossMargin.current.toFixed(1)+'%'+(review.grossMargin.yoyPoint!=null?'、'+(review.period.yoyLabel||'同月比')+' '+monthlyPoint(review.grossMargin.yoyPoint):'')+'。');
+      if(review.labor.currentRate!=null)out.push('人件費率は'+review.labor.currentRate.toFixed(1)+'%'+(review.labor.yoyPoint!=null?'、'+(review.period.yoyLabel||'同月比')+' '+monthlyPoint(review.labor.yoyPoint):'')+'。');
+      else if(!review.period.completed)out.push('人件費は月終了後に正式評価します。');
+    }
+    if(/良い|改善|伸び|機会/.test(q))items=items.filter(function(i){return i.positive;});
+    else if(/問題|悪い|注意|課題|下が|減っ/.test(q))items=items.filter(function(i){return !i.positive;});
+    items.slice(0,5).forEach(function(item){out.push(item.title+'：'+item.summary);});
+    if(!out.length)out.push(monthlyThemeLabel(explicit||theme)+'に表示対象となる大きな月次変化はありません。');
+    out.push(review.period.completed?'比較基準は月合計です。':'進行中月の比較基準は入力済み1日平均です。');
+    return Array.from(new Set(out)).join('\n');
+  }
   function build(m){
     m=m||mode();
     if(m==='salesCounts')return salesCounts();
@@ -313,7 +429,18 @@
         ctx.cancel=true;
         return false;
       }
-      if(periodMode==='month'&&m==='daily'){heading('今月の要点');return;}
+      if(periodMode==='month'){
+        var monthly;
+        try{monthly=monthlyPanel(m);}catch(e){monthly={period:'月次データを取得できません',summary:[],good:[],caution:['月次レビューに必要なデータを取得できません。'],checks:[]};}
+        heading('今月の'+monthlyThemeLabel(m==='daily'?'dashboard':m));
+        var monthlyPeriod=document.getElementById('aiAnalysisPeriod');if(monthlyPeriod)monthlyPeriod.textContent=monthly.period;
+        append('aiAnalysisSummary',monthly.summary,'今月のデータが不足しています。');
+        append('aiAnalysisGood',monthly.good,'今月の改善・機会は確認されていません。');
+        append('aiAnalysisCaution',monthly.caution,'今月の重要な注意点は確認されていません。');
+        append('aiAnalysisChecks',monthly.checks,'月次データを確認してください。');
+        ctx.cancel=true;
+        return false;
+      }
       if(m==='dashboard'){heading('今月の要点');return;}
       var p;
       try{p=build(m);}catch(e){p={period:'対象データを取得できません',summary:[],good:[],caution:['データ不足のため分析できません。対象期間の入力を確認してください。'],checks:[]};}
@@ -337,7 +464,18 @@
       ctx.cancel=true;
       return false;
     },1);
+
+    root.InsightHooks.on('ai:question:before','page-ai-month-question',function(ctx){
+      var m=mode();
+      if(analysisPeriod(m)!=='month')return;
+      var q=String(ctx.args[0]||'').trim();
+      if(!q){ctx.result='質問を入力してください。';ctx.cancel=true;return false;}
+      try{ctx.result=monthlyQuestionAnswer(q,m);}
+      catch(e){ctx.result='月次レビューに必要なデータを取得できません。';}
+      ctx.cancel=true;
+      return false;
+    },1);
   }
-  root.InsightAIPageComments={mode:mode,analysisPeriod:analysisPeriod,build:build,weeklyPanel:weeklyPanel};
+  root.InsightAIPageComments={mode:mode,analysisPeriod:analysisPeriod,build:build,weeklyPanel:weeklyPanel,monthlyPanel:monthlyPanel};
   if(document.readyState==='complete')install();else root.addEventListener('load',install,{once:true});
 })(window);
