@@ -92,7 +92,7 @@ test('STEP6で履歴タブ・週次月次切替・過去レビュー再表示を
   const pageAI=read('insight_ai_page_comments_v1.js');
   const history=read('insight_analysis_history_v1.js');
   assert.match(index,/insight_analysis_history_v1\.js\?v=20261001-step6/);
-  assert.match(index,/insight_ai_page_comments_v1\.js\?v=20261001-step6/);
+  assert.match(index,/insight_ai_page_comments_v1\.js\?v=20261001-period-lock/);
   assert.match(presentation,/aiHistoryToolbar/);
   assert.match(presentation,/aiHistoryPeriodList/);
   assert.match(presentation,/historySelected/);
