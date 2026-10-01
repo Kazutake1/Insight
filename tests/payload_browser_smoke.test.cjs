@@ -46,9 +46,9 @@ test('主要ナビ・入力・保存関数はbase payloadに存在する',()=>{
 
 test('STEP5で残した文字列patchの元anchorはpayload内に全て残っている',()=>{
   const html=basePayload();
-  const index=read('Index.html');
-  const persistMatch=index.match(/var originalPersist='([\s\S]*?)';\nvar safePersist=/);
-  assert.ok(persistMatch,'IndexのoriginalPersist定義を取得できません');
+  const bootstrap=read('insight_bootstrap_patches_v1.js');
+  const persistMatch=bootstrap.match(/var originalPersist='([\s\S]*?)';\nvar safePersist=/);
+  assert.ok(persistMatch,'bootstrapのoriginalPersist定義を取得できません');
   const originalPersist=Function('return '+JSON.stringify(persistMatch[1]))()
     .replace(/\\n/g,'\n');
   const anchors=[
