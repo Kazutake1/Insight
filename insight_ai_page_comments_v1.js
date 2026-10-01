@@ -51,7 +51,12 @@
   }
   function daily(c){
     var p=panel(c,'daily'),r=rows(c).find(function(r,i){return dayOf(r,i)===c.day;})||{};
-    var k=root.KPIEngine.calc([r]),missing=[];
+    var k=root.KPIEngine.calc([r]),missing=[],anomaly=null;
+    try{
+      if(root.InsightDailyAnomaly&&typeof root.InsightDailyAnomaly.evaluate==='function'){
+        anomaly=root.InsightDailyAnomaly.evaluate(dateKey(c,c.day),allStores.current);
+      }
+    }catch(_){}
     [['売上','売上',yen(k.salesYen)],['客数','客数',amount(k.customers)+'人'],['買上点数','買上点数',num(k.items).toLocaleString('ja-JP')+'点']].forEach(function(x){
       if(num(r[x[0]])>0)p.summary.push(c.day+'日の'+x[1]+'は'+x[2]+'です。');else missing.push(x[1]);
     });
@@ -63,8 +68,17 @@
     p.summary.push('最高気温 '+temperature(r.tempMaxC)+'℃ / 最低気温 '+temperature(r.tempMinC)+'℃。');
     if(r.tempMaxC==null||r.tempMaxC===''||r.tempMinC==null||r.tempMinC==='')missing.push('気温');
     if(r.storeMemo)p.checks.push('店舗メモ：'+short(r.storeMemo));
+    if(anomaly&&anomaly.display&&anomaly.display.length){
+      anomaly.display.slice(0,3).forEach(function(item){
+        p.caution.push('【'+(item.level==='important'?'重要':'注意')+'】'+item.title+'：'+item.summary);
+      });
+    }
+    if(anomaly&&anomaly.opportunities&&anomaly.opportunities.length){
+      var opp=anomaly.opportunities[0];
+      p.good.push(opp.title+'：'+opp.summary);
+    }
     if(missing.length)p.caution.push(missing.join('・')+'はデータ不足のため評価できません。');
-    p.good.push('選択日の記録を中心に表示しています。改善の判定には比較データが必要です。');
+    if(!anomaly||!anomaly.display||!anomaly.display.length)p.good.push('日次の即時警告対象はありません。');
     eventLines(p,c,c.day);savedNote(p);return p;
   }
   function metricRows(list,key){
