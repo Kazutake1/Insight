@@ -78,7 +78,7 @@ test('STEP5で今月タブを月次レビューへ接続する',()=>{
   const pageAI=read('insight_ai_page_comments_v1.js');
   const monthly=read('insight_monthly_review_v1.js');
   assert.match(index,/insight_monthly_review_v1\.js\?v=20261001-step5/);
-  assert.match(index,/insight_ai_page_comments_v1\.js\?v=20261001-active-trips/);
+  assert.match(index,/insight_ai_page_comments_v1\.js\?v=20261001-decision-analysis/);
   assert.match(pageAI,/function monthlyPanel\(/);
   assert.match(pageAI,/function monthlyQuestionAnswer\(/);
   assert.match(pageAI,/periodMode==='month'/);
@@ -94,7 +94,7 @@ test('STEP6で履歴タブ・週次月次切替・過去レビュー再表示を
   const pageAI=read('insight_ai_page_comments_v1.js');
   const history=read('insight_analysis_history_v1.js');
   assert.match(index,/insight_analysis_history_v1\.js\?v=20261001-step6/);
-  assert.match(index,/insight_ai_page_comments_v1\.js\?v=20261001-active-trips/);
+  assert.match(index,/insight_ai_page_comments_v1\.js\?v=20261001-decision-analysis/);
   assert.match(presentation,/aiHistoryToolbar/);
   assert.match(presentation,/aiHistoryPeriodList/);
   assert.match(presentation,/historySelected/);
@@ -139,7 +139,8 @@ test('STEP7で将来AI接続用の共通analysisContext境界を追加する',()
   const index=read('Index.html');
   const aiContext=read('insight_ai_context_v1.js');
   assert.match(index,/insight_ai_context_v1\.js\?v=20261001-step7/);
-  assert.ok(index.indexOf('insight_analysis_history_v1.js')<index.indexOf('insight_ai_context_v1.js'));
+  assert.ok(index.indexOf('insight_analysis_history_v1.js')<index.indexOf('insight_ai_interpretation_v1.js'));
+  assert.ok(index.indexOf('insight_ai_interpretation_v1.js')<index.indexOf('insight_ai_context_v1.js'));
   assert.ok(index.indexOf('insight_ai_context_v1.js')<index.indexOf('insight_ai_page_comments_v1.js'));
   assert.match(aiContext,/sourceOfTruth:'insight_deterministic_engine'/);
   assert.match(aiContext,/aiRole:'interpret_explain_summarize_only'/);
@@ -189,7 +190,7 @@ test('分析AIコメントは文章列ではなく構造化カードで表示し
   const presentation=read('insight_ai_presentation_v1.js');
   const visual=read('insight_ai_visual_v1.js');
   const pageAI=read('insight_ai_page_comments_v1.js');
-  assert.match(index,/insight_ai_visual_v1\.js\?v=20261001-waste-color/);
+  assert.match(index,/insight_ai_visual_v1\.js\?v=20261001-decision-analysis/);
   assert.ok(index.indexOf('insight_ai_presentation_v1.js')<index.indexOf('insight_ai_visual_v1.js'));
   assert.ok(index.indexOf('insight_ai_visual_v1.js')<index.indexOf('insight_ai_page_comments_v1.js'));
   assert.match(pageAI,/InsightAIVisual\.renderLines/);
@@ -200,6 +201,31 @@ test('分析AIコメントは文章列ではなく構造化カードで表示し
   assert.match(presentation,/\.ai-insight-item\.is-success/);
   assert.doesNotMatch(presentation,/--warning|--info|--accent2|--purple|--orange/);
   assert.doesNotThrow(()=>new vm.Script(visual),'AI visual module must be valid JavaScript');
+});
+
+test('分析AIはダッシュボード再掲ではなく4ブロックの意思決定支援へ変換する',()=>{
+  const index=read('Index.html');
+  const interpretation=read('insight_ai_interpretation_v1.js');
+  const pageAI=read('insight_ai_page_comments_v1.js');
+  const presentation=read('insight_ai_presentation_v1.js');
+  assert.match(index,/insight_ai_interpretation_v1\.js\?v=20261001-decision-analysis/);
+  assert.match(index,/insight_ai_page_comments_v1\.js\?v=20261001-decision-analysis/);
+  assert.match(index,/insight_ai_presentation_v1\.js\?v=20261001-decision-analysis/);
+  assert.match(index,/insight_ai_visual_v1\.js\?v=20261001-decision-analysis/);
+  assert.ok(index.indexOf('insight_analysis_history_v1.js')<index.indexOf('insight_ai_interpretation_v1.js'));
+  assert.ok(index.indexOf('insight_ai_interpretation_v1.js')<index.indexOf('insight_ai_page_comments_v1.js'));
+  assert.match(interpretation,/売上 × 客数 × 客単価/);
+  assert.match(interpretation,/客単価 × 買上点数 × 1点当たり売上/);
+  assert.match(interpretation,/納品 × 販売 × 廃棄/);
+  assert.match(interpretation,/因果関係は断定せず/);
+  assert.match(pageAI,/function renderStructured\(/);
+  assert.match(pageAI,/setSectionTitle\('aiAnalysisSummary','結論'\)/);
+  assert.match(pageAI,/setSectionTitle\('aiAnalysisCaution','重要ポイント'\)/);
+  assert.match(pageAI,/setSectionTitle\('aiAnalysisGood','関連性'\)/);
+  assert.match(pageAI,/setSectionTitle\('aiAnalysisChecks','次に確認すること'\)/);
+  assert.match(presentation,/createCard\('結論','aiAnalysisSummary'\)/);
+  assert.doesNotMatch(interpretation,/localStorage|InsightStorage|fetch\s*\(/);
+  assert.doesNotThrow(()=>new vm.Script(interpretation),'AI interpretation module must be valid JavaScript');
 });
 
 test('店舗運営UIのCSSはops moduleが所有する',()=>{
@@ -240,7 +266,7 @@ test('互換パッチ10件はfail-fast bootstrapに集約しfeature挿入境界�
 
 test('分析AI workspace assetはcache bustされている',()=>{
   const index=read('Index.html');
-  assert.match(index,/insight_ai_presentation_v1\.js\?v=20261001-salescount-card/);
+  assert.match(index,/insight_ai_presentation_v1\.js\?v=20261001-decision-analysis/);
   assert.match(index,/insight_ops_v1\.js\?v=20260930-step5-2/);
 });
 
@@ -284,7 +310,7 @@ test('販売数カテゴリーの対象便設定を全関連層で共有する',
   assert.match(index,/insight_sales_count_v1\.js\?v=20261001-weekday-gray/);
   assert.match(index,/insight_sale_results_v1\.js\?v=20261001-active-trips/);
   assert.match(index,/insight_analysis_context_v1\.js\?v=20261001-active-trips/);
-  assert.match(index,/insight_ai_page_comments_v1\.js\?v=20261001-active-trips/);
+  assert.match(index,/insight_ai_page_comments_v1\.js\?v=20261001-decision-analysis/);
   assert.match(sales,/activeTrips:\[true,true,true\]/);
   assert.match(sales,/対象便を1つ以上選択してください/);
   assert.match(sales,/sc-not-applicable/);
