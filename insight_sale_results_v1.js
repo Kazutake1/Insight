@@ -35,13 +35,17 @@
     var count=PERIODS[period],start=new Date(ref.getFullYear(),ref.getMonth()-(count-1),1,12,0,0,0);
     return {start:iso(start),end:end,label:'直近'+period+'か月'};
   }
-  function total(record,key){
+  function total(record,key,mask){
     if(!record||!Array.isArray(record.trips))return null;
-    var values=record.trips.map(function(t){return t&&t[key]!==undefined?t[key]:null;});
+    mask=Array.isArray(mask)&&mask.length===3?mask:[true,true,true];
+    var indexes=[0,1,2].filter(function(i){return mask[i]!==false;});
+    var values=indexes.map(function(i){var t=record.trips[i];return t&&t[key]!==undefined?t[key]:null;});
     return values.every(function(v){return v===null;})?null:values.reduce(function(sum,v){return sum+(v===null?0:Number(v));},0);
   }
-  function complete(record,key){
-    return !!(record&&Array.isArray(record.trips)&&record.trips.length===3&&record.trips.every(function(t){return t&&t[key]!==null&&t[key]!==undefined;}));
+  function complete(record,key,mask){
+    if(!(record&&Array.isArray(record.trips)&&record.trips.length===3))return false;
+    mask=Array.isArray(mask)&&mask.length===3?mask:[true,true,true];
+    return [0,1,2].filter(function(i){return mask[i]!==false;}).every(function(i){var t=record.trips[i];return t&&t[key]!==null&&t[key]!==undefined;});
   }
   function fmt(value,digits){
     if(value===null||value===undefined||!Number.isFinite(Number(value)))return '—';
@@ -60,9 +64,10 @@
   function hasRecord(record){
     return !!(record&&record.trips&&record.trips.some(function(t){return t.delivery!==null||t.sales!==null;}));
   }
-  function stats(records,salesApi){
+  function stats(records,salesApi,category){
     records=records||[];
-    var delivery=salesApi.average(records,'delivery').total,sales=salesApi.average(records,'sales').total;
+    var mask=salesApi.activeTrips?salesApi.activeTrips(category):[true,true,true];
+    var delivery=salesApi.average(records,'delivery',mask).total,sales=salesApi.average(records,'sales',mask).total;
     return {
       averageDelivery:delivery,
       averageSales:sales,
@@ -74,8 +79,8 @@
     days.forEach(function(day){seen.add(day.date.slice(0,7));});
     return Array.from(seen);
   }
-  function normalComparison(all,storeId,categoryId,occurrence,range,deps){
-    var eventsApi=deps.events,salesApi=deps.sales;
+  function normalComparison(all,storeId,categoryId,occurrence,range,deps,category){
+    var eventsApi=deps.events,salesApi=deps.sales,mask=salesApi.activeTrips?salesApi.activeTrips(category):[true,true,true];
     var weekdays=new Set(occurrence.days.map(function(day){return parseIso(day.date).getDay();}));
     var records=[],seen=new Set(),months=monthKeysForDays(occurrence.days);
     months.forEach(function(monthKey){
@@ -87,12 +92,12 @@
         var sale=eventsApi.list(all,storeId,date,date).some(function(event){return categoryMatches(all,event,categoryId,salesApi);});
         if(sale||seen.has(date))continue;
         var record=recordAt(all,storeId,date,categoryId,salesApi);
-        if(!hasRecord(record)||!complete(record,'sales'))continue;
+        if(!hasRecord(record)||!complete(record,'sales',mask))continue;
         seen.add(date);records.push(record);
       }
     });
-    var saleStats=stats(occurrence.days.filter(function(day){return hasRecord(day.record);}).map(function(day){return day.record;}),salesApi);
-    var normalStats=stats(records,salesApi);
+    var saleStats=stats(occurrence.days.filter(function(day){return hasRecord(day.record);}).map(function(day){return day.record;}),salesApi,category);
+    var normalStats=stats(records,salesApi,category);
     return {
       normalCount:records.length,
       normalAverageSales:normalStats.averageSales,
@@ -105,7 +110,7 @@
     var eventsApi=deps.events,salesApi=deps.sales;
     if(!eventsApi||!salesApi)throw new Error('セール実績の分析機能を利用できません。');
     salesApi.ensure(all);
-    var range=rangeFor(period,referenceIso),store=all.stores&&all.stores[storeId];
+    var range=rangeFor(period,referenceIso),store=all.stores&&all.stores[storeId],category=(all.salesCountManagement.categories||[]).find(function(c){return c.id===categoryId;})||null;
     if(!store)return {range:range,groups:[],occurrences:[]};
     var events=eventsApi.list(all,storeId,range.start,range.end).filter(function(event){
       return categoryMatches(all,event,categoryId,salesApi);
@@ -129,8 +134,8 @@
         originalEndDate:event.endDate,
         days:days
       };
-      var saleStats=stats(days.filter(function(day){return day.hasRecord;}).map(function(day){return day.record;}),salesApi);
-      Object.assign(occurrence,saleStats,normalComparison(all,storeId,categoryId,occurrence,range,deps));
+      var saleStats=stats(days.filter(function(day){return day.hasRecord;}).map(function(day){return day.record;}),salesApi,category);
+      Object.assign(occurrence,saleStats,normalComparison(all,storeId,categoryId,occurrence,range,deps,category));
       occurrences.push(occurrence);
 
       if(!groupsBySummary[summary])groupsBySummary[summary]={summary:summary,occurrences:[],daysByDate:{}};
@@ -149,7 +154,7 @@
         });
       });
       group.days=ordered;
-      var groupStats=stats(group.days.filter(function(day){return day.hasRecord;}).map(function(day){return day.record;}),salesApi);
+      var groupStats=stats(group.days.filter(function(day){return day.hasRecord;}).map(function(day){return day.record;}),salesApi,category);
       group.averageDelivery=groupStats.averageDelivery;
       group.averageSales=groupStats.averageSales;
       group.sellThrough=groupStats.sellThrough;
@@ -215,7 +220,7 @@
         ].forEach(function(text){statsRow.append(el('span',text));});
         head.append(title,statsRow);
         var grid=el('div',undefined,'sr-day-grid');
-        group.days.forEach(function(day){grid.append(root.InsightSalesCount.createReadOnlyDayCard(day.date,day.record));});
+        var category=selectedCategory();group.days.forEach(function(day){grid.append(root.InsightSalesCount.createReadOnlyDayCard(day.date,day.record,category));});
         section.append(head,grid);area.append(section);
       });
     }
