@@ -86,9 +86,22 @@
     function eventsFor(storeId,date){try{return root.InsightEvents?root.InsightEvents.list(allStores,storeId,date).filter(eventMatches):[];}catch(_){return [];}}
     function analysisData(){var saleRows=[],normal=[],saleWeekdays=new Set(),days=daysInMonth(),storeId=allStores.current,st=allStores.stores[storeId];if(!st)return {sales:saleRows,normal:normal};for(var d=1;d<=days;d++){var date=monthPrefix()+'-'+pad(d),evs=eventsFor(storeId,date),r=st.salesCounts&&st.salesCounts[date]&&st.salesCounts[date][state.categoryId]?normalizeRecord(st.salesCounts[date][state.categoryId]):null;if(evs.length){saleWeekdays.add(new Date(date+'T12:00:00').getDay());evs.forEach(function(e){saleRows.push({date:date,store:st.name,event:e,record:r||emptyRecord()});});}}for(var n=1;n<=days;n++){var normalDate=monthPrefix()+'-'+pad(n),wd=new Date(normalDate+'T12:00:00').getDay();if(saleWeekdays.has(wd)&&eventsFor(storeId,normalDate).length===0){var normalRecord=st.salesCounts&&st.salesCounts[normalDate]&&st.salesCounts[normalDate][state.categoryId];if(normalRecord)normal.push(normalizeRecord(normalRecord));}}return {sales:saleRows,normal:normal};}
 
+    function reloadFromStore(){
+      ensure(allStores);
+      store=allStores.stores[allStores.current];
+      if(!store)return false;
+      var active=activeCategories();
+      if(!active.length&&categories().length){categories()[0].hidden=false;active=activeCategories();}
+      if(!selectedCategory()||selectedCategory().hidden)state.categoryId=active[0]&&active[0].id||null;
+      readMonth();
+      render();
+      return true;
+    }
+
     // Read-only snapshot for automatic AI comments; reuse the page's calculations.
     model.getPeriod=function(){return {year:state.year,month:state.month};};
     model.setPeriod=function(year,month){return setPeriod(year,month);};
+    model.reloadFromStore=reloadFromStore;
 
     model.getAnalysisContext=function(){
       var data=analysisData(),records=Object.keys(state.draft).sort().map(function(date){
