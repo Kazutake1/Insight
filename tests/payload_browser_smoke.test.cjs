@@ -144,5 +144,5 @@ test('画面フローの主要module contractを維持する',()=>{
   assert.match(aiContext,/InsightAIContext/);
   assert.match(aiContext,/createRequest/);
   assert.match(aiContext,/authoritativeArithmetic:true/);
-  assert.doesNotMatch(aiContext,/\\bfetch\\s*\\(|XMLHttpRequest|WebSocket|localStorage|InsightStorage/);
+  assert.doesNotMatch(aiContext,/\bfetch\s*\(|XMLHttpRequest|WebSocket|localStorage|InsightStorage/);
 });
