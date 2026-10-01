@@ -78,7 +78,7 @@ test('STEP5で今月タブを月次レビューへ接続する',()=>{
   const pageAI=read('insight_ai_page_comments_v1.js');
   const monthly=read('insight_monthly_review_v1.js');
   assert.match(index,/insight_monthly_review_v1\.js\?v=20261001-step5/);
-  assert.match(index,/insight_ai_page_comments_v1\.js\?v=20261001-period-lock/);
+  assert.match(index,/insight_ai_page_comments_v1\.js\?v=20261001-comment-cards/);
   assert.match(pageAI,/function monthlyPanel\(/);
   assert.match(pageAI,/function monthlyQuestionAnswer\(/);
   assert.match(pageAI,/periodMode==='month'/);
@@ -94,7 +94,7 @@ test('STEP6で履歴タブ・週次月次切替・過去レビュー再表示を
   const pageAI=read('insight_ai_page_comments_v1.js');
   const history=read('insight_analysis_history_v1.js');
   assert.match(index,/insight_analysis_history_v1\.js\?v=20261001-step6/);
-  assert.match(index,/insight_ai_page_comments_v1\.js\?v=20261001-period-lock/);
+  assert.match(index,/insight_ai_page_comments_v1\.js\?v=20261001-comment-cards/);
   assert.match(presentation,/aiHistoryToolbar/);
   assert.match(presentation,/aiHistoryPeriodList/);
   assert.match(presentation,/historySelected/);
@@ -184,6 +184,24 @@ test('セール実績ページは販売数入力直後に読み込み同一日�
   assert.doesNotThrow(()=>new vm.Script(saleResults),'sale results module must be valid JavaScript');
 });
 
+test('分析AIコメントは文章列ではなく構造化カードで表示し色は注意と改善だけに限定する',()=>{
+  const index=read('Index.html');
+  const presentation=read('insight_ai_presentation_v1.js');
+  const visual=read('insight_ai_visual_v1.js');
+  const pageAI=read('insight_ai_page_comments_v1.js');
+  assert.match(index,/insight_ai_visual_v1\.js\?v=20261001-comment-cards/);
+  assert.ok(index.indexOf('insight_ai_presentation_v1.js')<index.indexOf('insight_ai_visual_v1.js'));
+  assert.ok(index.indexOf('insight_ai_visual_v1.js')<index.indexOf('insight_ai_page_comments_v1.js'));
+  assert.match(pageAI,/InsightAIVisual\.renderLines/);
+  assert.match(visual,/ai-insight-item/);
+  assert.match(visual,/ai-check-list/);
+  assert.match(presentation,/\.ai-insight-value/);
+  assert.match(presentation,/\.ai-insight-item\.is-danger/);
+  assert.match(presentation,/\.ai-insight-item\.is-success/);
+  assert.doesNotMatch(presentation,/--warning|--info|--accent2|--purple|--orange/);
+  assert.doesNotThrow(()=>new vm.Script(visual),'AI visual module must be valid JavaScript');
+});
+
 test('店舗運営UIのCSSはops moduleが所有する',()=>{
   const index=read('Index.html');
   const ops=read('insight_ops_v1.js');
@@ -222,7 +240,7 @@ test('互換パッチ10件はfail-fast bootstrapに集約しfeature挿入境界�
 
 test('分析AI workspace assetはcache bustされている',()=>{
   const index=read('Index.html');
-  assert.match(index,/insight_ai_presentation_v1\.js\?v=20261001-top-align/);
+  assert.match(index,/insight_ai_presentation_v1\.js\?v=20261001-comment-cards/);
   assert.match(index,/insight_ops_v1\.js\?v=20260930-step5-2/);
 });
 
