@@ -154,7 +154,7 @@ test('STEP7で将来AI接続用の共通analysisContext境界を追加する',()
 test('通常画面の選択年月をサイドバー切替後も全ページで維持する',()=>{
   const index=read('Index.html');
   const pagePeriod=read('insight_page_period_sync_v1.js');
-  assert.match(index,/insight_page_period_sync_v1\.js\?v=20261001-store-fallback/);
+  assert.match(index,/insight_page_period_sync_v1\.js\?v=20261001-route-capture/);
   assert.ok(index.indexOf('insight_sales_count_v1.js')<index.indexOf('insight_page_period_sync_v1.js'));
   assert.ok(index.indexOf('insight_page_period_sync_v1.js')<index.indexOf('insight_analysis_period_lock_v1.js'));
   assert.match(pagePeriod,/function captureCurrent\(/);
