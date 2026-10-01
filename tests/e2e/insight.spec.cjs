@@ -98,3 +98,38 @@ test('販売数ページはデータ本体の置換後に古いdraftを残さな
   expect(result).toEqual({first:6,second:60});
   expect(errors).toEqual([]);
 });
+
+test('分析AIの上端は左サイドバーの上端と揃う',async({page})=>{
+  const errors=await openInsight(page);
+  await page.locator('#aiAnalysisToggle').click();
+  await expect(page.locator('body')).toHaveClass(/ai-analysis-open/);
+
+  const positions=await page.evaluate(()=>{
+    const panel=document.getElementById('aiAnalysisPanel');
+    const button=document.getElementById('aiAnalysisToggle');
+    let sidebar=button.closest&&button.closest('.sidebar');
+    if(!sidebar){
+      let node=button.parentElement,best=null;
+      while(node&&node!==document.body&&node!==document.documentElement){
+        const rect=node.getBoundingClientRect();
+        if(
+          rect.width>=120&&rect.width<=360&&
+          rect.height>=Math.max(320,window.innerHeight*.55)&&
+          rect.left>=0&&rect.left<80&&rect.top>=0&&rect.top<160
+        ){
+          if(!best||rect.height>best.rect.height)best={node,rect};
+        }
+        node=node.parentElement;
+      }
+      sidebar=best&&best.node;
+    }
+    return {
+      panelTop:panel.getBoundingClientRect().top,
+      sidebarTop:sidebar&&sidebar.getBoundingClientRect().top
+    };
+  });
+
+  expect(positions.sidebarTop).not.toBeNull();
+  expect(Math.abs(positions.panelTop-positions.sidebarTop)).toBeLessThanOrEqual(1);
+  expect(errors).toEqual([]);
+});
