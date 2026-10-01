@@ -133,6 +133,22 @@ test('分析AIの対象年月をサイドバー切替後も固定し各ページ
   assert.doesNotThrow(()=>new vm.Script(lock),'period lock module must be valid JavaScript');
 });
 
+test('STEP7で将来AI接続用の共通analysisContext境界を追加する',()=>{
+  const index=read('Index.html');
+  const aiContext=read('insight_ai_context_v1.js');
+  assert.match(index,/insight_ai_context_v1\.js\?v=20261001-step7/);
+  assert.ok(index.indexOf('insight_analysis_history_v1.js')<index.indexOf('insight_ai_context_v1.js'));
+  assert.ok(index.indexOf('insight_ai_context_v1.js')<index.indexOf('insight_ai_page_comments_v1.js'));
+  assert.match(aiContext,/sourceOfTruth:'insight_deterministic_engine'/);
+  assert.match(aiContext,/aiRole:'interpret_explain_summarize_only'/);
+  assert.match(aiContext,/function createRequest\(/);
+  assert.match(aiContext,/function toTransportPayload\(/);
+  assert.match(aiContext,/includeFreeText/);
+  assert.match(aiContext,/externalTransmission:false/);
+  assert.doesNotMatch(aiContext,/\\bfetch\\s*\\(|XMLHttpRequest|WebSocket|localStorage|InsightStorage/);
+  assert.doesNotThrow(()=>new vm.Script(aiContext),'AI context module must be valid JavaScript');
+});
+
 test('店舗運営UIのCSSはops moduleが所有する',()=>{
   const index=read('Index.html');
   const ops=read('insight_ops_v1.js');
