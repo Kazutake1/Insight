@@ -256,7 +256,7 @@
       var base=labels[mode]||'分析サマリー';
       if(activePeriod==='week')heading.textContent='今週の'+base;
       else if(activePeriod==='month')heading.textContent=mode==='daily'?'今月の総合分析':'今月の'+base;
-      else if(activePeriod==='history')heading.textContent='分析履歴';
+      else if(activePeriod==='history')heading.textContent=(viewState.historyKind==='month'?'月次履歴':'週次履歴');
       else heading.textContent=base;
     }
     syncWorkspacePosition();
