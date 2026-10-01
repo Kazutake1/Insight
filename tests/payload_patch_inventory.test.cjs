@@ -2,6 +2,7 @@ const test=require('node:test');
 const assert=require('node:assert/strict');
 const fs=require('node:fs');
 const path=require('node:path');
+const vm=require('node:vm');
 
 const root=path.join(__dirname,'..');
 const read=name=>fs.readFileSync(path.join(root,name),'utf8');
@@ -24,8 +25,11 @@ test('AI表示CSSはIndexの文字列置換ではなくpresentation moduleが所
   ]) assert.ok(!index.includes("html=html.replace('"+marker),marker+' がIndexのreplaceに残っています');
   assert.match(presentation,/insightAiPresentationStyle/);
   assert.match(presentation,/body\.ai-analysis-open #main\{margin-right:0!important\}/);
+  assert.match(presentation,/\.ai-analysis-panel\.ai-analysis-workspace/);
+  assert.match(presentation,/\.ai-workspace-grid/);
   assert.match(presentation,/\.ai-analysis-question-row/);
-  assert.match(presentation,/@media\(max-width:520px\)/);
+  assert.match(presentation,/@media\(max-width:920px\)/);
+  assert.doesNotThrow(()=>new vm.Script(presentation), 'presentation module must be valid JavaScript');
 });
 
 test('AIのDOM・背景・開閉同期はpresentation moduleが所有する',()=>{
@@ -80,8 +84,8 @@ test('残す11件はSTEP5で意図的に維持する互換・安全パッチだ�
   assert.equal((index.match(/html=html\.replace/g)||[]).length,11);
 });
 
-test('STEP5-3対象assetはcache bustされている',()=>{
+test('分析AI workspace assetはcache bustされている',()=>{
   const index=read('Index.html');
-  assert.match(index,/insight_ai_presentation_v1\.js\?v=20260930-step5-3/);
+  assert.match(index,/insight_ai_presentation_v1\.js\?v=20261001-step1/);
   assert.match(index,/insight_ops_v1\.js\?v=20260930-step5-2/);
 });
