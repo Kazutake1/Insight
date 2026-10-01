@@ -117,7 +117,7 @@ test('分析AIの対象年月をサイドバー切替後も固定し各ページ
   const lock=read('insight_analysis_period_lock_v1.js');
   const salesCount=read('insight_sales_count_v1.js');
   assert.match(index,/insight_analysis_period_lock_v1\.js\?v=20261001-sync-owner/);
-  assert.match(index,/insight_sales_count_v1\.js\?v=20261001-weekday-dash2/);
+  assert.match(index,/insight_sales_count_v1\.js\?v=20261001-weekday-gray/);
   assert.match(presentation,/aiAnalysisTarget/);
   assert.match(presentation,/!window\.InsightPagePeriodSync&&window\.InsightAnalysisPeriodLock/);
   assert.match(pageAI,/InsightAnalysisPeriodLock\.getContext/);
@@ -171,7 +171,7 @@ test('セール実績ページは販売数入力直後に読み込み同一日�
   const index=read('Index.html');
   const saleResults=read('insight_sale_results_v1.js');
   const sales=read('insight_sales_count_v1.js');
-  assert.match(index,/insight_sales_count_v1\.js\?v=20261001-weekday-dash2/);
+  assert.match(index,/insight_sales_count_v1\.js\?v=20261001-weekday-gray/);
   assert.match(index,/insight_sale_results_v1\.js\?v=20261001-active-trips/);
   assert.ok(index.indexOf('insight_sales_count_v1.js')<index.indexOf('insight_sale_results_v1.js'));
   assert.ok(index.indexOf('insight_sale_results_v1.js')<index.indexOf('insight_page_period_sync_v1.js'));
@@ -281,7 +281,7 @@ test('販売数カテゴリーの対象便設定を全関連層で共有する',
   const analysis=read('insight_analysis_context_v1.js');
   const saleResults=read('insight_sale_results_v1.js');
   const pageAI=read('insight_ai_page_comments_v1.js');
-  assert.match(index,/insight_sales_count_v1\.js\?v=20261001-weekday-dash2/);
+  assert.match(index,/insight_sales_count_v1\.js\?v=20261001-weekday-gray/);
   assert.match(index,/insight_sale_results_v1\.js\?v=20261001-active-trips/);
   assert.match(index,/insight_analysis_context_v1\.js\?v=20261001-active-trips/);
   assert.match(index,/insight_ai_page_comments_v1\.js\?v=20261001-active-trips/);
@@ -300,11 +300,13 @@ test('対象外便のカード表示は簡潔なダッシュを使い判定文�
   assert.match(sales,/対象便を1つ以上選択してください/);
 });
 
-test('曜日別平均も対象外便をダッシュ表示に統一する',()=>{
+test('曜日別平均も対象外便をダッシュ＋グレー表示に統一する',()=>{
   const sales=read('insight_sales_count_v1.js');
   const start=sales.indexOf('function renderAverages()');
   assert.ok(start>=0);
-  const block=sales.slice(start,start+2200);
-  assert.match(block,/function v\(value,index\)\{return mask\[index\]===false\?'ー':fmt\(value\);\}/);
+  const block=sales.slice(start,start+2600);
+  assert.match(block,/class="sc-not-applicable"/);
+  assert.match(block,/\?'ー':fmt\(value\)/);
   assert.doesNotMatch(block,/対象外/);
+  assert.match(sales,/\.sc-average-row b\.sc-not-applicable\{background:var\(--surface2\)!important;border-color:var\(--border\)!important;color:var\(--text4\)!important\}/);
 });
