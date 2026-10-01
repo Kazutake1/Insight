@@ -145,7 +145,7 @@ test('STEP7で将来AI接続用の共通analysisContext境界を追加する',()
   assert.match(aiContext,/function toTransportPayload\(/);
   assert.match(aiContext,/includeFreeText/);
   assert.match(aiContext,/externalTransmission:false/);
-  assert.doesNotMatch(aiContext,/\\bfetch\\s*\\(|XMLHttpRequest|WebSocket|localStorage|InsightStorage/);
+  assert.doesNotMatch(aiContext,/\bfetch\s*\(|XMLHttpRequest|WebSocket|localStorage|InsightStorage/);
   assert.doesNotThrow(()=>new vm.Script(aiContext),'AI context module must be valid JavaScript');
 });
 
