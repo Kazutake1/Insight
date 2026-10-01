@@ -133,5 +133,5 @@ test('画面フローの主要module contractを維持する',()=>{
   assert.match(monthly,/selectDisplay/);
   assert.match(history,/InsightAnalysisHistory/);
   assert.match(history,/buildTimeline/);
-  assert.match(history,/保存/);
+  assert.doesNotMatch(history,/localStorage|InsightStorage/);
 });
