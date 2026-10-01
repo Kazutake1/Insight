@@ -80,6 +80,7 @@ test('feature manifestの主要構造モジュールは一意かつ依存順に�
     'insight_events_v1.js',
     'insight_temperature_v1.js',
     'insight_sales_count_v1.js',
+    'insight_page_period_sync_v1.js',
     'insight_analysis_period_lock_v1.js',
     'insight_analysis_context_v1.js',
     'insight_daily_anomaly_v1.js',
@@ -105,6 +106,7 @@ test('画面フローの主要module contractを維持する',()=>{
   const ai=read('insight_ai_presentation_v1.js');
   const events=read('insight_events_v1.js');
   const sales=read('insight_sales_count_v1.js');
+  const pagePeriod=read('insight_page_period_sync_v1.js');
   const periodLock=read('insight_analysis_period_lock_v1.js');
   const analysis=read('insight_analysis_context_v1.js');
   const anomaly=read('insight_daily_anomaly_v1.js');
@@ -123,6 +125,9 @@ test('画面フローの主要module contractを維持する',()=>{
   assert.match(ai,/ensureBackdrop/);
   assert.match(events,/InsightStorage\.transaction/);
   assert.match(sales,/InsightStorage\.writeSnapshot/);
+  assert.match(pagePeriod,/InsightPagePeriodSync/);
+  assert.match(pagePeriod,/syncCurrentPage/);
+  assert.doesNotMatch(pagePeriod,/localStorage|InsightStorage/);
   assert.match(periodLock,/InsightAnalysisPeriodLock/);
   assert.match(periodLock,/syncCurrentPage/);
   assert.doesNotMatch(periodLock,/localStorage|InsightStorage/);
