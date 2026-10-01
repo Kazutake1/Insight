@@ -1,0 +1,12 @@
+{
+  "name": "insight-regression",
+  "private": true,
+  "version": "1.0.0",
+  "scripts": {
+    "test:e2e": "playwright test --config=playwright.config.cjs"
+  },
+  "devDependencies": {
+    "@playwright/test": "1.55.0",
+    "pako": "2.1.0"
+  }
+}
