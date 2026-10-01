@@ -6,6 +6,7 @@
   var target=null;
   var syncing=false;
   var routeTransition=false;
+  var storeTransition=false;
   var scheduled=false;
 
   function monthNumber(value){
@@ -38,6 +39,19 @@
   function currentNavValue(){
     try{return typeof currentNav!=='undefined'?currentNav:1;}catch(_){return 1;}
   }
+  function yearsForStore(storeValue){
+    return storeValue&&Array.isArray(storeValue.years)?storeValue.years.map(function(y){return String(y);}):[];
+  }
+  function resolveForStore(value,storeValue){
+    value=normalize(value);
+    if(!value)return null;
+    var years=yearsForStore(storeValue);
+    if(!years.length)return value;
+    if(years.indexOf(String(value.year))>=0)return value;
+    var fallback=validYear(years[years.length-1]);
+    if(!fallback)return value;
+    return normalize({year:fallback,month:value.month,day:value.day,source:value.source||'storeFallback'});
+  }
   function getTarget(){return target?Object.assign({},target):null;}
   function setTarget(spec){
     var next=normalize(spec);
@@ -47,7 +61,7 @@
   }
 
   function captureCurrent(){
-    if(syncing||routeTransition)return target;
+    if(syncing||routeTransition||storeTransition)return target;
     var nav=currentNavValue(),spec=null;
     try{
       if(nav==='salesCounts'&&root.InsightSalesCount&&typeof root.InsightSalesCount.getPeriod==='function'){
@@ -152,7 +166,7 @@
   }
 
   function captureIfUserChanged(){
-    if(syncing||routeTransition)return;
+    if(syncing||routeTransition||storeTransition)return;
     captureCurrent();
   }
 
@@ -167,7 +181,48 @@
     else setTimeout(run,0);
   }
 
+  function reconcileCurrentStore(value){
+    var currentStore=null;
+    try{currentStore=typeof allStores!=='undefined'&&allStores.stores?allStores.stores[allStores.current]:null;}catch(_){}
+    var next=resolveForStore(value||effectiveTarget()||target,currentStore);
+    if(!next)return false;
+    target=next;
+    try{
+      if(root.InsightAnalysisPeriodLock&&typeof root.InsightAnalysisPeriodLock.isActive==='function'&&
+        root.InsightAnalysisPeriodLock.isActive()&&typeof root.InsightAnalysisPeriodLock.setTarget==='function'){
+        var compare=null;
+        try{compare=typeof cmpYear!=='undefined'?cmpYear:null;}catch(_){}
+        root.InsightAnalysisPeriodLock.setTarget({
+          year:next.year,month:next.month,day:next.day,compareYear:compare,source:'storeSwitch'
+        });
+      }
+    }catch(_){}
+    return syncCurrentPage();
+  }
+
+  function installStoreSwitchBridge(){
+    if(typeof root.switchStore!=='function'||root.switchStore.__insightPagePeriodSync)return;
+    var original=root.switchStore;
+    var wrapped=function(id){
+      var before=effectiveTarget()||captureCurrent(),previous=null;
+      try{previous=typeof allStores!=='undefined'?allStores.current:null;}catch(_){}
+      storeTransition=true;
+      var result;
+      try{return result=original.apply(this,arguments);}
+      finally{
+        var changed=false;
+        try{changed=typeof allStores!=='undefined'&&allStores.current!==previous&&allStores.current===id;}catch(_){}
+        storeTransition=false;
+        if(changed)reconcileCurrentStore(before);
+      }
+    };
+    wrapped.__insightPagePeriodSync=true;
+    wrapped.__insightOriginal=original;
+    root.switchStore=wrapped;
+  }
+
   function install(){
+    installStoreSwitchBridge();
     if(root.document&&typeof root.document.addEventListener==='function'){
       root.document.addEventListener('click',function(event){
         var node=event.target&&event.target.closest?
@@ -199,7 +254,7 @@
     captureCurrent();
   }
 
-  function isTransitioning(){return syncing||routeTransition||scheduled;}
+  function isTransitioning(){return syncing||routeTransition||storeTransition||scheduled;}
 
   var model={
     normalize:normalize,
@@ -209,6 +264,8 @@
     effectiveTarget:effectiveTarget,
     syncCurrentPage:syncCurrentPage,
     referenceDate:referenceDate,
+    resolveForStore:resolveForStore,
+    reconcileCurrentStore:reconcileCurrentStore,
     isTransitioning:isTransitioning
   };
 
