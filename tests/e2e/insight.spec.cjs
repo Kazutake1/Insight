@@ -10,7 +10,7 @@ async function openInsight(page){
   page.on('pageerror',error=>errors.push(error.message));
   await page.goto('/Index.html',{waitUntil:'domcontentloaded'});
   await expect(page.locator('#nav1')).toBeVisible();
-  await page.waitForFunction(()=>window.InsightPagePeriodSync&&window.InsightSalesCount&&window.InsightAnalysisPeriodLock);
+  await page.waitForFunction(()=>window.InsightPagePeriodSync&&window.InsightSalesCount&&window.InsightSaleResults&&window.InsightAnalysisPeriodLock);
   return errors;
 }
 
@@ -131,5 +131,74 @@ test('分析AIの上端は左サイドバーの上端と揃う',async({page})=>{
 
   expect(positions.sidebarTop).not.toBeNull();
   expect(Math.abs(positions.panelTop-positions.sidebarTop)).toBeLessThanOrEqual(1);
+  expect(errors).toEqual([]);
+});
+
+test('セール実績は内容別に表示し販売数入力と同じカードを7枚ごとに折り返す',async({page})=>{
+  const errors=await openInsight(page);
+
+  await page.evaluate(()=>{
+    const categoryId='cat_onigiri';
+    const storeId=allStores.current;
+    if(!allStores.eventManagement)allStores.eventManagement={version:1,presets:[],events:[]};
+    allStores.eventManagement.events=(allStores.eventManagement.events||[]).filter(e=>e.id!=='e2e_sale_results');
+    allStores.eventManagement.events.push({
+      id:'e2e_sale_results',
+      type:'sale',
+      scope:'global',
+      startDate:'2026-09-01',
+      endDate:'2026-09-08',
+      snapshot:{
+        title:'E2Eおにぎりセール',
+        sale:{categoryId,category:'おにぎり',method:'amount',params:{amount:20}}
+      }
+    });
+    const store=allStores.stores[storeId];
+    if(!store.salesCounts)store.salesCounts={};
+    for(let day=1;day<=8;day++){
+      const date='2026-09-'+String(day).padStart(2,'0');
+      store.salesCounts[date]=store.salesCounts[date]||{};
+      store.salesCounts[date][categoryId]={
+        trips:[
+          {delivery:40+day,sales:36+day},
+          {delivery:50+day,sales:46+day},
+          {delivery:45+day,sales:41+day}
+        ]
+      };
+    }
+    window.InsightSaleResults.render();
+  });
+
+  await page.locator('#navSaleResults').click();
+  await expect(page.locator('#pageSaleResults')).toHaveClass(/show/);
+  await expect(page.locator('.sr-group')).toHaveCount(1);
+  await expect(page.locator('.sr-group-head h2')).toContainText('おにぎり 20円引き');
+  await expect(page.locator('.sr-group .sc-day')).toHaveCount(8);
+
+  const layout=await page.evaluate(()=>{
+    const cards=Array.from(document.querySelectorAll('.sr-group .sc-day'));
+    const saleCard=cards[0];
+    const inputCard=document.querySelector('#scCalendar .sc-day:not(.empty)');
+    return {
+      firstTop:cards[0].getBoundingClientRect().top,
+      seventhTop:cards[6].getBoundingClientRect().top,
+      eighthTop:cards[7].getBoundingClientRect().top,
+      saleChildren:Array.from(saleCard.children).map(node=>node.className),
+      inputChildren:inputCard?Array.from(inputCard.children).map(node=>node.className):[],
+      allReadOnly:Array.from(saleCard.querySelectorAll('input')).every(input=>input.readOnly)
+    };
+  });
+
+  expect(Math.abs(layout.firstTop-layout.seventhTop)).toBeLessThanOrEqual(1);
+  expect(layout.eighthTop).toBeGreaterThan(layout.seventhTop+20);
+  expect(layout.saleChildren).toEqual(layout.inputChildren);
+  expect(layout.allReadOnly).toBe(true);
+
+  const order=await page.evaluate(()=>({
+    afterSales:document.getElementById('navSalesCount').nextElementSibling&&document.getElementById('navSalesCount').nextElementSibling.id,
+    afterResults:document.getElementById('navSaleResults').nextElementSibling&&document.getElementById('navSaleResults').nextElementSibling.id
+  }));
+  expect(order.afterSales).toBe('navSaleResults');
+  expect(order.afterResults).toBe('aiAnalysisToggle');
   expect(errors).toEqual([]);
 });
