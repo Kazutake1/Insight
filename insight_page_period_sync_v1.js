@@ -199,6 +199,8 @@
     captureCurrent();
   }
 
+  function isTransitioning(){return syncing||routeTransition||scheduled;}
+
   var model={
     normalize:normalize,
     getTarget:getTarget,
@@ -206,7 +208,8 @@
     captureCurrent:captureCurrent,
     effectiveTarget:effectiveTarget,
     syncCurrentPage:syncCurrentPage,
-    referenceDate:referenceDate
+    referenceDate:referenceDate,
+    isTransitioning:isTransitioning
   };
 
   if(typeof module!=='undefined'&&module.exports)module.exports=model;
