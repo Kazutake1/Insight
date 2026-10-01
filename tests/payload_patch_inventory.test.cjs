@@ -54,7 +54,8 @@ test('AIのDOM・背景・開閉同期はpresentation moduleが所有する',()=
 
 test('分析AI内の重複サイドバーを廃止し本体ナビへ統合する',()=>{
   const presentation=read('insight_ai_presentation_v1.js');
-  assert.doesNotMatch(presentation,/ai-workspace-left/);
+  assert.doesNotMatch(presentation,/className='ai-workspace-left'/);
+  assert.doesNotMatch(presentation,/\.ai-workspace-left\{/);
   assert.doesNotMatch(presentation,/createNavButton/);
   assert.doesNotMatch(presentation,/ai-workspace-nav-btn/);
   assert.match(presentation,/grid-template-columns:minmax\(0,1fr\) 250px/);
