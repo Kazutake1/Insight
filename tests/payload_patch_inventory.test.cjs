@@ -73,6 +73,21 @@ test('STEP4で今週タブを有効化し履歴だけを未実装のまま残す
   assert.match(pageAI,/weeklyQuestionAnswer/);
 });
 
+test('STEP5で今月タブを月次レビューへ接続する',()=>{
+  const index=read('Index.html');
+  const pageAI=read('insight_ai_page_comments_v1.js');
+  const monthly=read('insight_monthly_review_v1.js');
+  assert.match(index,/insight_monthly_review_v1\.js\?v=20261001-step5/);
+  assert.match(index,/insight_ai_page_comments_v1\.js\?v=20261001-step5/);
+  assert.match(pageAI,/function monthlyPanel\(/);
+  assert.match(pageAI,/function monthlyQuestionAnswer\(/);
+  assert.match(pageAI,/periodMode==='month'/);
+  assert.match(pageAI,/page-ai-month-question/);
+  assert.match(monthly,/basis:isDone\?'total':'dailyAverage'/);
+  assert.match(monthly,/badStreak/);
+  assert.doesNotThrow(()=>new vm.Script(pageAI),'page AI module must be valid JavaScript');
+});
+
 test('店舗運営UIのCSSはops moduleが所有する',()=>{
   const index=read('Index.html');
   const ops=read('insight_ops_v1.js');
@@ -109,6 +124,6 @@ test('残す11件はSTEP5で意図的に維持する互換・安全パッチだ�
 
 test('分析AI workspace assetはcache bustされている',()=>{
   const index=read('Index.html');
-  assert.match(index,/insight_ai_presentation_v1\.js\?v=20261001-step4/);
+  assert.match(index,/insight_ai_presentation_v1\.js\?v=20261001-step5/);
   assert.match(index,/insight_ops_v1\.js\?v=20260930-step5-2/);
 });
