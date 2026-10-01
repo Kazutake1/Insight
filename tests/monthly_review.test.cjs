@@ -32,6 +32,14 @@ function setup(){
     {available:true,evaluationReady:true,laborCostYen:210000,grossMarginRate:30,laborRate:11.05}
   ));
 
+  put(2026,7,31,ctx(2026,7,31,
+    {salesYen:2970000,customers:1470,customerUnitPrice:2020.408,wasteYen:31500,wasteRate:1.061,inputDays:31},
+    {available:true,evaluationReady:true,laborCostYen:215000,grossMarginRate:30.8,laborRate:7.239}
+  ));
+  put(2025,7,31,ctx(2025,7,31,
+    {salesYen:3000000,customers:1500,customerUnitPrice:2000,wasteYen:30000,wasteRate:1,inputDays:31},
+    {available:true,evaluationReady:true,laborCostYen:205000,grossMarginRate:31,laborRate:6.833}
+  ));
   put(2026,8,31,ctx(2026,8,31,
     {salesYen:2880000,customers:1450,customerUnitPrice:1986.207,wasteYen:33000,wasteRate:1.146,inputDays:31},
     {available:true,evaluationReady:true,laborCostYen:220000,grossMarginRate:30.5,laborRate:7.64}
