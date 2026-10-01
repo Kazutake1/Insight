@@ -230,8 +230,13 @@
         if(!node)return;
         captureCurrent();
         routeTransition=true;
-        scheduleRouteSync();
       },true);
+      root.document.addEventListener('click',function(event){
+        var node=event.target&&event.target.closest?
+          event.target.closest('#nav0,#nav1,#nav2,#nav3,#nav4,#navSalesCount'):null;
+        if(!node||!routeTransition)return;
+        scheduleRouteSync();
+      });
     }
 
     if(root.InsightHooks){
