@@ -77,6 +77,7 @@ test('feature manifestの主要構造モジュールは一意かつ依存順に�
     'insight_ops_v1.js',
     'insight_backup_guard_v1.js',
     'insight_ai_presentation_v1.js',
+    'insight_ai_visual_v1.js',
     'insight_events_v1.js',
     'insight_temperature_v1.js',
     'insight_sales_count_v1.js',
@@ -105,6 +106,7 @@ test('画面フローの主要module contractを維持する',()=>{
   const hooks=read('insight_hooks_v1.js');
   const storage=read('insight_storage_v1.js');
   const ai=read('insight_ai_presentation_v1.js');
+  const aiVisual=read('insight_ai_visual_v1.js');
   const events=read('insight_events_v1.js');
   const sales=read('insight_sales_count_v1.js');
   const saleResults=read('insight_sale_results_v1.js');
@@ -125,6 +127,10 @@ test('画面フローの主要module contractを維持する',()=>{
   assert.match(storage,/CURRENT_SCHEMA_VERSION/);
   assert.match(ai,/ensureAnalysisDom/);
   assert.match(ai,/ensureBackdrop/);
+  assert.match(aiVisual,/InsightAIVisual/);
+  assert.match(aiVisual,/function parseLine\(/);
+  assert.match(aiVisual,/function renderLines\(/);
+  assert.doesNotMatch(aiVisual,/localStorage|InsightStorage|fetch\s*\(/);
   assert.match(events,/InsightStorage\.transaction/);
   assert.match(sales,/InsightStorage\.writeSnapshot/);
   assert.match(saleResults,/InsightSaleResults/);
