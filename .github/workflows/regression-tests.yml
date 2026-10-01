@@ -35,6 +35,7 @@ jobs:
           - page_period_sync.test.cjs
           - payload_browser_smoke.test.cjs
           - payload_patch_inventory.test.cjs
+          - sale_results.test.cjs
           - script_load_order.test.cjs
           - security_storage_regression.test.cjs
           - storage_layer.test.cjs
