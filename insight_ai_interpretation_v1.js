@@ -152,7 +152,7 @@
     basketRelation(review,kind,relations);
     wasteSupplyRelation(review,kind,relations);
     if(theme==='dashboard'||theme==='daily'||!theme)contextRelation(review,relations);
-    relations=uniq(relations).slice(0,3);
+    relations=uniq(relations).slice(0,4);
     var checks=checksFor(items,review,relations);
     return {
       conclusion:conclusion(items,kind),
@@ -192,7 +192,7 @@
     if(relations.length)checks.push('関連性は因果関係の断定ではありません。必要な実績を追加確認してください。');
     var conclusionLine=display.length?'【結論】選択日は「'+display.slice(0,2).map(function(i){return i.title;}).join('」「')+'」を優先確認してください。':
       '【結論】選択日に即時対応が必要な大きな異常は確認されていません。';
-    return {conclusion:[conclusionLine],priorities:priorities.slice(0,5),relations:uniq(relations).slice(0,3),checks:uniq(checks).slice(0,4)};
+    return {conclusion:[conclusionLine],priorities:priorities.slice(0,5),relations:uniq(relations).slice(0,4),checks:uniq(checks).slice(0,4)};
   }
 
   var model={VERSION:VERSION,monthly:monthly,weekly:weekly,daily:daily,pickItems:pickItems,itemPriority:itemPriority};
