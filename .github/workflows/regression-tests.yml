@@ -33,6 +33,7 @@ jobs:
           - security_storage_regression.test.cjs
           - storage_layer.test.cjs
           - weather_future_guard.test.cjs
+          - weekly_review.test.cjs
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
