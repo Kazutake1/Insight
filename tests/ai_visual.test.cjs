@@ -43,3 +43,11 @@ test('廃棄の増減判定は符号付き数値で行う',()=>{
   assert.equal(visual.metricNumber('-12.4%'),-12.4);
   assert.equal(visual.toneFor('aiAnalysisSummary',visual.parseLine('廃棄額：前年同月比 -12.4%')),'neutral');
 });
+
+test('結論・関連性はニュートラル、重要・注意は赤、改善は緑にする',()=>{
+  assert.equal(visual.toneFor('aiAnalysisSummary',visual.parseLine('【結論】今月は客数を確認してください。')),'neutral');
+  assert.equal(visual.toneFor('aiAnalysisGood',visual.parseLine('【関連】売上 × 客数：主因候補は客数。')),'neutral');
+  assert.equal(visual.toneFor('aiAnalysisCaution',visual.parseLine('【重要】客数低下：-8.0%')),'danger');
+  assert.equal(visual.toneFor('aiAnalysisCaution',visual.parseLine('【注意】廃棄増加：+10.0%')),'danger');
+  assert.equal(visual.toneFor('aiAnalysisCaution',visual.parseLine('【改善】廃棄改善：-12.0%')),'success');
+});
