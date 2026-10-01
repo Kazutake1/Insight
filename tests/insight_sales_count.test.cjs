@@ -137,3 +137,10 @@ test('対象外便のUIは対象外表示となり入力対象から外れる',(
   assert.match(source,/sc-category-trips/);
   assert.match(source,/activeTrips:activeTrips/);
 });
+
+test('曜日別平均の対象外便はダッシュ表示にする',()=>{
+  const source=fs.readFileSync(path.join(__dirname,'..','insight_sales_count_v1.js'),'utf8');
+  assert.match(source,/mask\[0\]===false\?'ー':fmt/);
+  assert.match(source,/function v\(value,index\)\{return mask\[index\]===false\?'ー':fmt\(value\);\}/);
+  assert.doesNotMatch(source,/mask\[[012]\]===false\?'対象外':fmt/);
+});
