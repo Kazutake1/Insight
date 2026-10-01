@@ -5,6 +5,7 @@
 
   var target=null;
   var syncing=false;
+  var routeTransition=false;
   var lastOpen=false;
 
   function pad(v){return String(v).padStart(2,'0');}
@@ -160,7 +161,10 @@
     }catch(_){return false;}
   }
   function syncCurrentPage(){
-    if(!isActive()||syncing)return false;
+    if(!isActive()||syncing){
+      if(!syncing)routeTransition=false;
+      return false;
+    }
     syncing=true;
     var ok=false,nav=currentNavValue();
     try{
@@ -172,6 +176,7 @@
       else if(nav==='salesCounts')ok=syncSalesCount();
     }finally{
       syncing=false;
+      routeTransition=false;
       refreshLabel();
     }
     return ok;
@@ -186,12 +191,19 @@
   }
 
   function recaptureIfUserChanged(){
-    if(!isOpen()||syncing)return;
+    if(!isOpen()||syncing||routeTransition)return;
     captureCurrent();
     if(typeof root.renderAIAnalysisPanel==='function')root.renderAIAnalysisPanel();
   }
 
   function installHooks(){
+    if(root.document&&typeof root.document.addEventListener==='function'){
+      root.document.addEventListener('click',function(event){
+        if(!isOpen())return;
+        var node=event.target&&event.target.closest?event.target.closest('#nav0,#nav1,#nav2,#nav3,#nav4,#navSalesCount'):null;
+        if(node)routeTransition=true;
+      },true);
+    }
     if(root.InsightHooks){
       root.InsightHooks.on('dashboard:refresh:after','analysis-period-lock-dashboard',function(){
         if(currentNavValue()===1)recaptureIfUserChanged();
