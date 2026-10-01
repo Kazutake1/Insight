@@ -35,10 +35,10 @@
 
     var frag=document.createDocumentFragment();
     frag.append(
-      createCard('今月の要点','aiAnalysisSummary'),
-      createCard('良い点','aiAnalysisGood'),
-      createCard('注意点','aiAnalysisCaution'),
-      createCard('確認事項','aiAnalysisChecks')
+      createCard('結論','aiAnalysisSummary'),
+      createCard('関連性','aiAnalysisGood'),
+      createCard('重要ポイント','aiAnalysisCaution'),
+      createCard('次に確認すること','aiAnalysisChecks')
     );
 
     var questionCard=document.createElement('section');
@@ -216,7 +216,8 @@
     right.className='ai-workspace-right';
     var rightTitle=document.createElement('div');
     rightTitle.className='ai-workspace-side-title';
-    rightTitle.textContent='重要ポイント';
+    rightTitle.textContent='';
+    rightTitle.hidden=true;
     cautionCard.classList.add('ai-workspace-status-card','is-caution');
     goodCard.classList.add('ai-workspace-status-card','is-good');
     checksCard.classList.add('ai-workspace-status-card','is-check');
