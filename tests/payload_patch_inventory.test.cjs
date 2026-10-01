@@ -117,7 +117,7 @@ test('分析AIの対象年月をサイドバー切替後も固定し各ページ
   const lock=read('insight_analysis_period_lock_v1.js');
   const salesCount=read('insight_sales_count_v1.js');
   assert.match(index,/insight_analysis_period_lock_v1\.js\?v=20261001-sync-owner/);
-  assert.match(index,/insight_sales_count_v1\.js\?v=20261001-average-card/);
+  assert.match(index,/insight_sales_count_v1\.js\?v=20261001-salescount-ai-card/);
   assert.match(presentation,/aiAnalysisTarget/);
   assert.match(presentation,/!window\.InsightPagePeriodSync&&window\.InsightAnalysisPeriodLock/);
   assert.match(pageAI,/InsightAnalysisPeriodLock\.getContext/);
@@ -171,7 +171,7 @@ test('セール実績ページは販売数入力直後に読み込み同一日�
   const index=read('Index.html');
   const saleResults=read('insight_sale_results_v1.js');
   const sales=read('insight_sales_count_v1.js');
-  assert.match(index,/insight_sales_count_v1\.js\?v=20261001-average-card/);
+  assert.match(index,/insight_sales_count_v1\.js\?v=20261001-salescount-ai-card/);
   assert.match(index,/insight_sale_results_v1\.js\?v=20261001-sale-results/);
   assert.ok(index.indexOf('insight_sales_count_v1.js')<index.indexOf('insight_sale_results_v1.js'));
   assert.ok(index.indexOf('insight_sale_results_v1.js')<index.indexOf('insight_page_period_sync_v1.js'));
