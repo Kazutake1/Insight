@@ -535,6 +535,10 @@
     return m==='daily'?daily(c):inputPage(c,m);
   }
   function append(id,lines,fallback){
+    if(root.InsightAIVisual&&typeof root.InsightAIVisual.renderLines==='function'){
+      root.InsightAIVisual.renderLines(id,lines,fallback,document);
+      return;
+    }
     var el=document.getElementById(id);if(!el)return;
     el.innerHTML='';
     var unique=Array.from(new Set(lines));
