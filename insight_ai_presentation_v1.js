@@ -441,7 +441,8 @@
         }
         if(typeof window.renderAIAnalysisPanel==='function')window.renderAIAnalysisPanel();
       }
-      if(typeof queueMicrotask==='function')queueMicrotask(syncAndRender);
+      if(window.InsightPagePeriodSync)setTimeout(syncAndRender,0);
+      else if(typeof queueMicrotask==='function')queueMicrotask(syncAndRender);
       else setTimeout(syncAndRender,0);
     });
   }
