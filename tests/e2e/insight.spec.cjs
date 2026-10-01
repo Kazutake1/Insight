@@ -295,3 +295,44 @@ test('廃棄のプラス変化だけは分析要約でも赤表示にする',asy
   expect(colors.waste).not.toBe(colors.sales);
   expect(errors).toEqual([]);
 });
+
+test('カテゴリーごとの対象便設定で対象外便を入力漏れ扱いしない',async({page})=>{
+  const errors=await openInsight(page);
+  await page.locator('#navSalesCount').click();
+  await page.locator('#scManage').click();
+  await expect(page.locator('.sc-dialog')).toBeVisible();
+
+  const firstRow=page.locator('.sc-dialog .sc-category-row').first();
+  const checks=firstRow.locator('.sc-category-trips input[type="checkbox"]');
+  await expect(checks).toHaveCount(3);
+  await checks.nth(0).uncheck();
+  await expect(checks.nth(1)).toBeChecked();
+  await expect(checks.nth(2)).toBeChecked();
+  await page.locator('.sc-dialog [data-save]').click();
+  await expect(page.locator('.sc-dialog')).toHaveCount(0);
+
+  const saved=await page.evaluate(()=>{
+    const category=allStores.salesCountManagement.categories.find(c=>!c.hidden);
+    const card=document.querySelector('#scCalendar .sc-day:not(.empty)');
+    const delivery=Array.from(card.querySelectorAll('.sc-delivery-row input')).map(input=>({type:input.type,value:input.value,readOnly:input.readOnly,className:input.className}));
+    const sales=Array.from(card.querySelectorAll('.sc-sales-row input')).map(input=>({type:input.type,value:input.value,readOnly:input.readOnly,className:input.className}));
+    const context=window.InsightSalesCount.getAnalysisContext();
+    return {activeTrips:category.activeTrips,delivery,sales,contextTrips:context.activeTrips};
+  });
+
+  expect(saved.activeTrips).toEqual([false,true,true]);
+  expect(saved.contextTrips).toEqual([false,true,true]);
+  expect(saved.delivery[0].value).toBe('対象外');
+  expect(saved.sales[0].value).toBe('対象外');
+  expect(saved.delivery[0].readOnly).toBe(true);
+  expect(saved.sales[0].readOnly).toBe(true);
+  expect(saved.delivery[0].className).toContain('sc-not-applicable');
+  expect(saved.delivery[1].type).toBe('number');
+  expect(saved.delivery[2].type).toBe('number');
+
+  await page.locator('#aiAnalysisToggle').click();
+  await expect(page.locator('body')).toHaveClass(/ai-analysis-open/);
+  await expect(page.locator('#aiAnalysisSummary .ai-sales-count-overall .sc-delivery-row input').nth(0)).toHaveValue('対象外');
+  await expect(page.locator('#aiAnalysisSummary .ai-sales-count-overall .sc-sales-row input').nth(0)).toHaveValue('対象外');
+  expect(errors).toEqual([]);
+});
