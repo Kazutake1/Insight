@@ -4,6 +4,7 @@
   var viewState=window.InsightAIViewState||(window.InsightAIViewState={period:null});
   function selectedPeriod(){
     var mode=currentMode();
+    if(viewState.period==='today'&&mode!=='daily')return 'month';
     return viewState.period||(mode==='daily'?'today':'month');
   }
   function setPeriod(period){
