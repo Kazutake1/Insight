@@ -1,6 +1,8 @@
 const test=require('node:test');
 const assert=require('node:assert/strict');
 const sales=require('../insight_sales_count_v1.js');
+const fs=require('node:fs');
+const path=require('node:path');
 
 function base(){return {current:'a',stores:{a:{name:'A',years:['2026'],data:{},salesCounts:{}}}};}
 
@@ -83,4 +85,18 @@ test('sale averages use each store date only once when events overlap',()=>{
     {date:'2026-09-08',record:second}
   ];
   assert.equal(sales.average(sales.uniqueSaleRecords(rows),'sales').total,60);
+});
+
+test('曜日別平均は販売数入力カードと同じDOMクラス構造を再利用する',()=>{
+  const source=fs.readFileSync(path.join(__dirname,'..','insight_sales_count_v1.js'),'utf8');
+  assert.match(source,/function buildAverageInput\(/);
+  assert.match(source,/sc-day sc-average-card/);
+  assert.match(source,/sc-day-title/);
+  assert.match(source,/sc-day-num/);
+  assert.match(source,/sc-col-head/);
+  assert.match(source,/sc-trip sc-delivery-row/);
+  assert.match(source,/sc-trip sc-sales-row/);
+  assert.match(source,/class="sc-total-delivery"/);
+  assert.match(source,/class="sc-total-sales"/);
+  assert.doesNotMatch(source,/var card=el\('section',undefined,'sc-average-day/);
 });
