@@ -104,3 +104,8 @@ test('廃棄分析の既存コンパクト表示スタイルは維持する',()=
   assert.match(source,/iwcRow/);
   assert.doesNotMatch(source,/insightWasteInsightsV1Script/);
 });
+
+test('bootstrap互換パッチはpayload展開処理より前に読み込む',()=>{
+  const index=read('Index.html');
+  assert.ok(index.indexOf('insight_bootstrap_patches_v1.js')<index.indexOf('Promise.all(files.map'),'bootstrap patch module must load before payload expansion');
+});
