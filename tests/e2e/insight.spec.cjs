@@ -322,8 +322,8 @@ test('カテゴリーごとの対象便設定で対象外便を入力漏れ扱�
 
   expect(saved.activeTrips).toEqual([false,true,true]);
   expect(saved.contextTrips).toEqual([false,true,true]);
-  expect(saved.delivery[0].value).toBe('対象外');
-  expect(saved.sales[0].value).toBe('対象外');
+  expect(saved.delivery[0].value).toBe('ー');
+  expect(saved.sales[0].value).toBe('ー');
   expect(saved.delivery[0].readOnly).toBe(true);
   expect(saved.sales[0].readOnly).toBe(true);
   expect(saved.delivery[0].className).toContain('sc-not-applicable');
@@ -332,7 +332,7 @@ test('カテゴリーごとの対象便設定で対象外便を入力漏れ扱�
 
   await page.locator('#aiAnalysisToggle').click();
   await expect(page.locator('body')).toHaveClass(/ai-analysis-open/);
-  await expect(page.locator('#aiAnalysisSummary .ai-sales-count-overall .sc-delivery-row input').nth(0)).toHaveValue('対象外');
-  await expect(page.locator('#aiAnalysisSummary .ai-sales-count-overall .sc-sales-row input').nth(0)).toHaveValue('対象外');
+  await expect(page.locator('#aiAnalysisSummary .ai-sales-count-overall .sc-delivery-row input').nth(0)).toHaveValue('ー');
+  await expect(page.locator('#aiAnalysisSummary .ai-sales-count-overall .sc-sales-row input').nth(0)).toHaveValue('ー');
   expect(errors).toEqual([]);
 });
