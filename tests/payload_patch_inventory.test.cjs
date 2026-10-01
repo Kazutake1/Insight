@@ -78,7 +78,7 @@ test('STEP5で今月タブを月次レビューへ接続する',()=>{
   const pageAI=read('insight_ai_page_comments_v1.js');
   const monthly=read('insight_monthly_review_v1.js');
   assert.match(index,/insight_monthly_review_v1\.js\?v=20261001-step5/);
-  assert.match(index,/insight_ai_page_comments_v1\.js\?v=20261001-salescount-card/);
+  assert.match(index,/insight_ai_page_comments_v1\.js\?v=20261001-active-trips/);
   assert.match(pageAI,/function monthlyPanel\(/);
   assert.match(pageAI,/function monthlyQuestionAnswer\(/);
   assert.match(pageAI,/periodMode==='month'/);
@@ -94,7 +94,7 @@ test('STEP6で履歴タブ・週次月次切替・過去レビュー再表示を
   const pageAI=read('insight_ai_page_comments_v1.js');
   const history=read('insight_analysis_history_v1.js');
   assert.match(index,/insight_analysis_history_v1\.js\?v=20261001-step6/);
-  assert.match(index,/insight_ai_page_comments_v1\.js\?v=20261001-salescount-card/);
+  assert.match(index,/insight_ai_page_comments_v1\.js\?v=20261001-active-trips/);
   assert.match(presentation,/aiHistoryToolbar/);
   assert.match(presentation,/aiHistoryPeriodList/);
   assert.match(presentation,/historySelected/);
@@ -117,7 +117,7 @@ test('分析AIの対象年月をサイドバー切替後も固定し各ページ
   const lock=read('insight_analysis_period_lock_v1.js');
   const salesCount=read('insight_sales_count_v1.js');
   assert.match(index,/insight_analysis_period_lock_v1\.js\?v=20261001-sync-owner/);
-  assert.match(index,/insight_sales_count_v1\.js\?v=20261001-salescount-ai-card/);
+  assert.match(index,/insight_sales_count_v1\.js\?v=20261001-active-trips22/);
   assert.match(presentation,/aiAnalysisTarget/);
   assert.match(presentation,/!window\.InsightPagePeriodSync&&window\.InsightAnalysisPeriodLock/);
   assert.match(pageAI,/InsightAnalysisPeriodLock\.getContext/);
@@ -171,8 +171,8 @@ test('セール実績ページは販売数入力直後に読み込み同一日�
   const index=read('Index.html');
   const saleResults=read('insight_sale_results_v1.js');
   const sales=read('insight_sales_count_v1.js');
-  assert.match(index,/insight_sales_count_v1\.js\?v=20261001-salescount-ai-card/);
-  assert.match(index,/insight_sale_results_v1\.js\?v=20261001-sale-results/);
+  assert.match(index,/insight_sales_count_v1\.js\?v=20261001-active-trips22/);
+  assert.match(index,/insight_sale_results_v1\.js\?v=20261001-active-trips/);
   assert.ok(index.indexOf('insight_sales_count_v1.js')<index.indexOf('insight_sale_results_v1.js'));
   assert.ok(index.indexOf('insight_sale_results_v1.js')<index.indexOf('insight_page_period_sync_v1.js'));
   assert.match(saleResults,/id='navSaleResults'|nav\.id='navSaleResults'/);
@@ -273,4 +273,22 @@ test('販売数AI分析は販売数入力と同じ平均カード生成APIを使
   assert.match(sales,/model\.createAverageCard=createAverageCard/);
   assert.match(presentation,/\.ai-sales-count-overall/);
   assert.match(presentation,/\.ai-sales-count-weekdays/);
+});
+
+test('販売数カテゴリーの対象便設定を全関連層で共有する',()=>{
+  const index=read('Index.html');
+  const sales=read('insight_sales_count_v1.js');
+  const analysis=read('insight_analysis_context_v1.js');
+  const saleResults=read('insight_sale_results_v1.js');
+  const pageAI=read('insight_ai_page_comments_v1.js');
+  assert.match(index,/insight_sales_count_v1\.js\?v=20261001-active-trips2/);
+  assert.match(index,/insight_sale_results_v1\.js\?v=20261001-active-trips/);
+  assert.match(index,/insight_analysis_context_v1\.js\?v=20261001-active-trips/);
+  assert.match(index,/insight_ai_page_comments_v1\.js\?v=20261001-active-trips/);
+  assert.match(sales,/activeTrips:\[true,true,true\]/);
+  assert.match(sales,/対象便を1つ以上選択してください/);
+  assert.match(sales,/sc-not-applicable/);
+  assert.match(analysis,/activeTrips:copy\(mask\)/);
+  assert.match(saleResults,/salesApi\.activeTrips/);
+  assert.match(pageAI,/if\(active\[t\]===false\)continue/);
 });
