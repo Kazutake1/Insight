@@ -45,9 +45,17 @@
       metric:metricFrom(detail||text)
     };
   }
+  function metricNumber(metric){
+    var match=String(metric||'').replace(/,/g,'').match(/^([+\-−]?\d+(?:\.\d+)?)/);
+    return match?Number(match[1].replace('−','-')):null;
+  }
   function toneFor(id,parts){
     if(id==='aiAnalysisCaution')return 'danger';
     if(id==='aiAnalysisGood')return 'success';
+    if(parts&&/廃棄/.test(parts.original||'')){
+      var value=metricNumber(parts.metric);
+      if(value!==null&&value>0)return 'danger';
+    }
     if(parts&&parts.state&&(parts.state==='改善'||parts.state==='解消'))return 'success';
     return 'neutral';
   }
@@ -121,7 +129,7 @@
     return true;
   }
 
-  var model={VERSION:1,parseLine:parseLine,metricFrom:metricFrom,toneFor:toneFor,renderLines:renderLines};
+  var model={VERSION:1,parseLine:parseLine,metricFrom:metricFrom,metricNumber:metricNumber,toneFor:toneFor,renderLines:renderLines};
   if(typeof module!=='undefined'&&module.exports)module.exports=model;
   root.InsightAIVisual=model;
 })(typeof window!=='undefined'?window:globalThis);
