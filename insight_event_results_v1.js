@@ -57,7 +57,7 @@
     });
     return Object.keys(latest).sort(function(a,b){return latest[b].localeCompare(latest[a])||a.localeCompare(b,'ja');});
   }
-  function emptyMetrics(){return {salesYen:null,customers:null,customerUnitPrice:null,items:null,wasteYen:null,wasteRate:null,inputDays:0};}
+  function emptyMetrics(){return {salesYen:null,customers:null,customerUnitPrice:null,items:null,inputDays:0};}
   function normalizeMetrics(metrics){
     metrics=metrics||{};
     return {
@@ -65,8 +65,6 @@
       customers:finite(metrics.customers),
       customerUnitPrice:finite(metrics.customerUnitPrice),
       items:finite(metrics.items),
-      wasteYen:finite(metrics.wasteYen),
-      wasteRate:finite(metrics.wasteRate),
       inputDays:Number.isFinite(Number(metrics.inputDays))?Number(metrics.inputDays):0
     };
   }
@@ -79,7 +77,7 @@
         conditions=context.conditions&&Array.isArray(context.conditions.daily)?context.conditions.daily[0]||null:null;
       }
     }catch(_){}
-    var hasData=metrics.inputDays>0||['salesYen','customers','customerUnitPrice','items','wasteYen','wasteRate'].some(function(key){return metrics[key]!==null;});
+    var hasData=metrics.inputDays>0||['salesYen','customers','customerUnitPrice','items'].some(function(key){return metrics[key]!==null;});
     return {date:date,metrics:metrics,conditions:conditions,hasData:hasData};
   }
   function collect(all,storeId,location,title,analysisApi){
@@ -123,7 +121,6 @@
     }
     function yen(value){return value===null?'—':numberText(value,0)+'円';}
     function people(value){return value===null?'—':numberText(value,0)+'人';}
-    function rate(value){return value===null?'—':numberText(value,2)+'%';}
     function dateLabel(value){
       var date=parseIso(value);if(!date)return value;
       return date.getFullYear()+'/'+(date.getMonth()+1)+'/'+date.getDate()+'（'+WEEKDAYS[date.getDay()]+'）';
@@ -158,7 +155,7 @@
       section.append(el('h2','開催日実績'));
       if(!data.days.length){section.append(el('div','開催日データがありません。','er-empty'));results.append(section);return;}
       var scroll=el('div',undefined,'er-table-scroll'),table=el('table',undefined,'er-table');
-      table.innerHTML='<thead><tr><th>開催日</th><th>売上</th><th>客数</th><th>客単価</th><th>買上点数</th><th>廃棄額</th><th>廃棄率</th></tr></thead><tbody id="erTableBody"></tbody>';
+      table.innerHTML='<thead><tr><th>開催日</th><th>売上</th><th>客数</th><th>客単価</th><th>買上点数</th></tr></thead><tbody id="erTableBody"></tbody>';
       var body=table.querySelector('tbody');
       data.days.forEach(function(day){
         var row=el('tr');if(!day.hasData)row.className='er-no-data';
@@ -167,9 +164,7 @@
           yen(day.metrics.salesYen),
           people(day.metrics.customers),
           yen(day.metrics.customerUnitPrice),
-          day.metrics.items===null?'—':numberText(day.metrics.items,2),
-          yen(day.metrics.wasteYen),
-          rate(day.metrics.wasteRate)
+          day.metrics.items===null?'—':numberText(day.metrics.items,2)
         ];
         values.forEach(function(value,index){var cell=el('td',value);if(index===0)cell.className='er-date';row.append(cell);});
         body.append(row);

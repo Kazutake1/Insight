@@ -279,8 +279,8 @@ test('イベント実績は場所→イベント名を選ぶと開催日の基�
   await expect(page.locator('#erTableBody tr').first()).toContainText('102人');
   await expect(page.locator('#erTableBody tr').first()).toContainText('1,012円');
   await expect(page.locator('#erTableBody tr').first()).toContainText('200.12');
-  await expect(page.locator('#erTableBody tr').first()).toContainText('3,120円');
-  await expect(page.locator('#erTableBody tr').first()).toContainText('2.12%');
+  await expect(page.locator('#pageEventResults .er-table th')).toHaveText(['開催日','売上','客数','客単価','買上点数']);
+  await expect(page.locator('#erTableBody tr').first().locator('td')).toHaveCount(5);
   expect(errors).toEqual([]);
 });
 

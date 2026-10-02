@@ -175,7 +175,7 @@ test('イベント実績は近隣イベントを場所→イベント名で絞�
   const eventResults=read('insight_event_results_v1.js');
   const events=read('insight_events_v1.js');
   assert.match(index,/insight_events_v1\.js\?v=20261002-nearby-location/);
-  assert.match(index,/insight_event_results_v1\.js\?v=20261002-initial/);
+  assert.match(index,/insight_event_results_v1\.js\?v=20261002-no-waste/);
   assert.ok(index.indexOf('insight_analysis_context_v1.js')<index.indexOf('insight_event_results_v1.js'));
   assert.ok(index.indexOf('insight_event_results_v1.js')<index.indexOf('insight_daily_anomaly_v1.js'));
   assert.match(eventResults,/navEventResults/);
@@ -184,6 +184,8 @@ test('イベント実績は近隣イベントを場所→イベント名で絞�
   assert.match(eventResults,/イベント名を選択/);
   assert.match(eventResults,/InsightAnalysisContext/);
   assert.match(eventResults,/type==='nearby'/);
+  assert.match(eventResults,/<th>開催日<\/th><th>売上<\/th><th>客数<\/th><th>客単価<\/th><th>買上点数<\/th>/);
+  assert.doesNotMatch(eventResults,/<th>廃棄額<\/th>|<th>廃棄率<\/th>/);
   assert.doesNotMatch(eventResults,/localStorage|InsightStorage/);
   assert.match(events,/イベント場所/);
   assert.match(events,/snapshot\.location=location\.value\.trim\(\)/);
