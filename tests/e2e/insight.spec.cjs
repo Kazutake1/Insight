@@ -50,7 +50,7 @@ test('選択月は主要ページを横断しても維持される',async({page}
 test('トップページはビルド番号を持ち最新版確認をno-storeで行う',async({page})=>{
   const errors=await openInsight(page);
   const source=await page.evaluate(()=>fetch('/Index.html?e2e-shell-check=1',{cache:'no-store'}).then(r=>r.text()));
-  expect(source).toContain('name="insight-shell-version" content="20261002-quick-historical-year-1"');
+  expect(source).toContain('name="insight-shell-version" content="20261002-year-delete-consistency-1"');
   expect(source).toContain("fetch('./Index.html?insight_probe='+Date.now(),{cache:'no-store'})");
   expect(source).toContain("location.replace('./Index.html?insight_build='+encodeURIComponent(m[1]))");
   expect(errors).toEqual([]);
@@ -351,6 +351,101 @@ test('セール実績は内容別に表示し販売数入力と同じカード�
   expect(order.afterSales).toBe('navSaleResults');
   expect(order.afterResults).toBe('navEventResults');
   expect(order.afterEventResults).toBe('aiAnalysisToggle');
+  expect(errors).toEqual([]);
+});
+
+
+test('年度削除は年度直結データだけを削除しイベント履歴と他年度を保持する',async({page})=>{
+  const errors=await openInsight(page);
+  await page.evaluate(()=>{
+    const store=allStores.stores[allStores.current];
+    if(!store.data['2024'])store.data['2024']=blankYearData('2024');
+    if(!store.data['2025'])store.data['2025']=blankYearData('2025');
+    if(!store.data['2026'])store.data['2026']=blankYearData('2026');
+    store.years=['2024','2025','2026'];
+    store.data['2024']['8月'][2].売上=444;
+    store.monthlyOps=store.monthlyOps||{};
+    store.monthlyOps['2024']={'8月':{laborCostYen:123456,grossMarginRate:31.5}};
+    store.monthlyOps['2025']={'8月':{laborCostYen:222222,grossMarginRate:32.5}};
+    window.InsightSalesCount.ensure(allStores);
+    const category=allStores.salesCountManagement.categories.find(c=>!c.hidden);
+    store.salesCounts=store.salesCounts||{};
+    store.salesCounts['2024-08-03']={};
+    store.salesCounts['2024-08-03'][category.id]={trips:[{delivery:10,sales:9},{delivery:20,sales:18},{delivery:30,sales:27}]};
+    store.salesCounts['2025-08-03']={};
+    store.salesCounts['2025-08-03'][category.id]={trips:[{delivery:11,sales:10},{delivery:21,sales:19},{delivery:31,sales:28}]};
+    store.hourlyCustomers=store.hourlyCustomers||{};
+    store.hourlyCustomers['2024-08-03']=Array.from({length:24},(_,i)=>i);
+    store.hourlyCustomers['2025-08-03']=Array.from({length:24},(_,i)=>i+1);
+    store.events=(store.events||[]).filter(e=>!String(e.id||'').startsWith('e2e_year_delete_'));
+    store.events.push({id:'e2e_year_delete_local',type:'special',scope:'store',startDate:'2024-08-03',endDate:'2024-08-03',snapshot:{version:1,title:'削除年度でも保持する催事',note:''}});
+    allStores.eventManagement=allStores.eventManagement||{version:1,presets:[],events:[]};
+    allStores.eventManagement.events=(allStores.eventManagement.events||[]).filter(e=>e.id!=='e2e_year_delete_global');
+    allStores.eventManagement.events.push({id:'e2e_year_delete_global',type:'sale',scope:'global',startDate:'2024-08-03',endDate:'2024-08-03',snapshot:{version:1,title:'削除年度でも保持する共通セール',note:'',sale:{categoryId:category.id,category:category.name,method:'amount',params:{amount:10}}}});
+    baseYear='2026';
+    cmpYear='2025';
+    editYear={sales:'2026',kyaku:'2026',haiki:'2026'};
+    InsightStorage.persistCurrent(allStores);
+    renderYearPills();
+    refreshDash();
+  });
+
+  await expect(page.locator('#insightDeleteYearButton')).toBeVisible();
+  await page.locator('#insightDeleteYearButton').click();
+  await expect(page.locator('#insightYearDeleteOverlay')).toBeVisible();
+  await page.locator('#insightYearDeleteSelect').selectOption('2024');
+  await expect(page.locator('#insightYearDeleteWarning')).toContainText('販売数/納品数');
+  await expect(page.locator('#insightYearDeleteWarning')).toContainText('イベント・催事の開催記録と店舗設定は削除しません');
+  await page.locator('#insightYearDeleteConfirm').click();
+
+  await expect(page.locator('#insightYearDeleteOverlay')).toBeHidden();
+  const state=await page.evaluate(()=>{
+    const store=allStores.stores[allStores.current];
+    return {
+      years:store.years.slice(),
+      hasData:Object.prototype.hasOwnProperty.call(store.data,'2024'),
+      hasMonthly:!!(store.monthlyOps&&store.monthlyOps['2024']),
+      oldSales:!!(store.salesCounts&&store.salesCounts['2024-08-03']),
+      keepSales:!!(store.salesCounts&&store.salesCounts['2025-08-03']),
+      oldHourly:!!(store.hourlyCustomers&&store.hourlyCustomers['2024-08-03']),
+      keepHourly:!!(store.hourlyCustomers&&store.hourlyCustomers['2025-08-03']),
+      localEvent:(store.events||[]).some(e=>e.id==='e2e_year_delete_local'),
+      globalEvent:(allStores.eventManagement.events||[]).some(e=>e.id==='e2e_year_delete_global'),
+      base:String(baseYear),
+      compare:cmpYear==null?null:String(cmpYear)
+    };
+  });
+  expect(state.years).toEqual(['2025','2026']);
+  expect(state.hasData).toBe(false);
+  expect(state.hasMonthly).toBe(false);
+  expect(state.oldSales).toBe(false);
+  expect(state.keepSales).toBe(true);
+  expect(state.oldHourly).toBe(false);
+  expect(state.keepHourly).toBe(true);
+  expect(state.localEvent).toBe(true);
+  expect(state.globalEvent).toBe(true);
+  expect(state.base).toBe('2026');
+  expect(state.compare).toBe('2025');
+
+  await page.reload({waitUntil:'domcontentloaded'});
+  await expect(page.locator('#nav1')).toBeVisible();
+  const restored=await page.evaluate(()=>{
+    const store=allStores.stores[allStores.current];
+    return {
+      years:store.years.slice(),
+      hasData:Object.prototype.hasOwnProperty.call(store.data,'2024'),
+      oldSales:!!(store.salesCounts&&store.salesCounts['2024-08-03']),
+      oldHourly:!!(store.hourlyCustomers&&store.hourlyCustomers['2024-08-03']),
+      localEvent:(store.events||[]).some(e=>e.id==='e2e_year_delete_local'),
+      globalEvent:(allStores.eventManagement.events||[]).some(e=>e.id==='e2e_year_delete_global')
+    };
+  });
+  expect(restored.years).toEqual(['2025','2026']);
+  expect(restored.hasData).toBe(false);
+  expect(restored.oldSales).toBe(false);
+  expect(restored.oldHourly).toBe(false);
+  expect(restored.localEvent).toBe(true);
+  expect(restored.globalEvent).toBe(true);
   expect(errors).toEqual([]);
 });
 

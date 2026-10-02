@@ -17,7 +17,7 @@ test('payload互換パッチ11件はbootstrap moduleへ分離しIndexにはbody�
 
 test('トップページはキャッシュ抑止とビルド自己更新を持つ',()=>{
   const index=read('Index.html');
-  assert.match(index,/insight-shell-version" content="20261002-quick-historical-year-1/);
+  assert.match(index,/insight-shell-version" content="20261002-year-delete-consistency-1/);
   assert.match(index,/Cache-Control" content="no-cache, no-store, must-revalidate/);
   assert.match(index,/insight_probe=/);
   assert.match(index,/cache:'no-store'/);
@@ -165,7 +165,7 @@ test('過年度は既存の疎データを保持して正式年度へ昇格し�
   const index=read('Index.html');
   const manager=read('insight_year_manager_v1.js');
   const salesCount=read('insight_sales_count_v1.js');
-  assert.match(index,/insight_year_manager_v1\.js\?v=20261002-historical-years/);
+  assert.match(index,/insight_year_manager_v1\.js\?v=20261002-year-delete-consistency/);
   assert.ok(index.indexOf('insight_storage_v1.js')<index.indexOf('insight_year_manager_v1.js'));
   assert.ok(index.indexOf('insight_year_manager_v1.js')<index.indexOf('insight_sales_count_v1.js'));
   assert.match(manager,/function normalizeYearData\(/);
@@ -176,6 +176,24 @@ test('過年度は既存の疎データを保持して正式年度へ昇格し�
   assert.match(salesCount,/年度を追加して販売数を入力しますか/);
   assert.match(salesCount,/InsightYearManager\.promoteCurrent/);
   assert.doesNotThrow(()=>new vm.Script(manager),'year manager module must be valid JavaScript');
+});
+
+test('年度削除は年度直結データをトランザクションで削除しイベント履歴を保持する',()=>{
+  const index=read('Index.html');
+  const manager=read('insight_year_manager_v1.js');
+  const yearFix=read('insight_dashboard_year_fix_v1.js');
+  assert.match(index,/insight_year_manager_v1\.js\?v=20261002-year-delete-consistency/);
+  assert.match(index,/insight_dashboard_year_fix_v1\.js\?v=20261002-year-delete-consistency/);
+  assert.match(manager,/function removeYear\(/);
+  assert.match(manager,/removeDateYear\(target\.salesCounts,y\)/);
+  assert.match(manager,/removeDateYear\(target\.hourlyCustomers,y\)/);
+  assert.match(manager,/function resolveSelection\(/);
+  assert.match(manager,/model\.removeCurrent=removeCurrent/);
+  assert.match(yearFix,/InsightYearManager\.removeCurrent\(chosen\)/);
+  assert.match(yearFix,/イベント・催事の開催記録と店舗設定は削除しません/);
+  assert.doesNotMatch(yearFix,/delete store\.data\[chosen\]/);
+  assert.doesNotMatch(yearFix,/delete store\.monthlyOps\[chosen\]/);
+  assert.doesNotThrow(()=>new vm.Script(yearFix),'year delete UI must be valid JavaScript');
 });
 
 test('今日の入力は未登録年度の日付移動前に正式年度追加を確認する',()=>{

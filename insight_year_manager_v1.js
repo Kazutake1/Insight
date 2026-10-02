@@ -61,11 +61,60 @@
     return {year:y,added:!wasRegistered,recoveredRows:normalized.recoveredRows};
   }
 
+  function removeDateYear(container,year){
+    if(!object(container))return 0;
+    var prefix=String(year)+'-',removed=0;
+    Object.keys(container).forEach(function(key){
+      if(String(key).slice(0,prefix.length)!==prefix)return;
+      delete container[key];removed++;
+    });
+    return removed;
+  }
+
+  function removeYear(snapshot,storeId,year){
+    var y=validYear(year);
+    if(!y)throw new Error('4桁の西暦を入力してください');
+    if(!object(snapshot)||!object(snapshot.stores)||!object(snapshot.stores[storeId]))throw new Error('店舗データを確認できません。');
+    var target=snapshot.stores[storeId];
+    var years=Array.isArray(target.years)?target.years.map(function(value){return String(value);}):[];
+    if(years.indexOf(y)<0)throw new Error(y+'年度は登録されていません。');
+    if(years.length<=1)throw new Error('最後の1年度は削除できません。');
+    var remaining=years.filter(function(value){return value!==y;});
+    var removed={
+      dataYear:!!(object(target.data)&&hasOwn(target.data,y)),
+      monthlyOpsYear:!!(object(target.monthlyOps)&&hasOwn(target.monthlyOps,y)),
+      salesCountDates:removeDateYear(target.salesCounts,y),
+      hourlyCustomerDates:removeDateYear(target.hourlyCustomers,y)
+    };
+    if(object(target.data))delete target.data[y];
+    if(object(target.monthlyOps))delete target.monthlyOps[y];
+    target.years=remaining;
+    return {year:y,remaining:remaining,removed:removed};
+  }
+
+  function resolveSelection(years,baseYear,compareYear){
+    var list=(Array.isArray(years)?years:[]).map(function(value){return String(value);}).filter(validYear);
+    if(!list.length)return {baseYear:null,compareYear:null};
+    var base=baseYear!=null&&list.indexOf(String(baseYear))>=0?String(baseYear):list[list.length-1];
+    var compare=null;
+    if(compareYear!=null){
+      var requested=String(compareYear);
+      if(list.indexOf(requested)>=0&&requested!==base)compare=requested;
+      else{
+        var index=list.indexOf(base);
+        compare=index>0?list[index-1]:null;
+      }
+    }
+    return {baseYear:base,compareYear:compare};
+  }
+
   var model={
     validYear:validYear,
     isRegistered:isRegistered,
     normalizeYearData:normalizeYearData,
-    promote:promote
+    promote:promote,
+    removeYear:removeYear,
+    resolveSelection:resolveSelection
   };
   if(typeof module!=='undefined'&&module.exports)module.exports=model;
   root.InsightYearManager=model;
@@ -93,9 +142,21 @@
     );
     return result;
   }
+  function removeCurrent(year){
+    if(!root.InsightStorage||typeof root.InsightStorage.transaction!=='function')throw new Error('保存機能を初期化できませんでした。');
+    var result=null;
+    root.InsightStorage.transaction(
+      allStores,
+      function(next){result=removeYear(next,next.current,year);},
+      null,
+      applySnapshot
+    );
+    return result;
+  }
   function isCurrentRegistered(year){return isRegistered(currentStore(),year);}
 
   model.promoteCurrent=promoteCurrent;
+  model.removeCurrent=removeCurrent;
   model.isCurrentRegistered=isCurrentRegistered;
 
   root.addYear=function(value){
