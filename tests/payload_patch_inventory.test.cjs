@@ -17,7 +17,7 @@ test('payload互換パッチ11件はbootstrap moduleへ分離しIndexにはbody�
 
 test('トップページはキャッシュ抑止とビルド自己更新を持つ',()=>{
   const index=read('Index.html');
-  assert.match(index,/insight-shell-version" content="20261002-backup-preflight-2/);
+  assert.match(index,/insight-shell-version" content="20261002-settings-page-1/);
   assert.match(index,/Cache-Control" content="no-cache, no-store, must-revalidate/);
   assert.match(index,/insight_probe=/);
   assert.match(index,/cache:'no-store'/);
@@ -159,6 +159,20 @@ test('STEP7で将来AI接続用の共通analysisContext境界を追加する',()
   assert.match(aiContext,/externalTransmission:false/);
   assert.doesNotMatch(aiContext,/\bfetch\s*\(|XMLHttpRequest|WebSocket|localStorage|InsightStorage/);
   assert.doesNotThrow(()=>new vm.Script(aiContext),'AI context module must be valid JavaScript');
+});
+
+test('設定ページはサイドバー下部の管理項目を集約する',()=>{
+  const index=fs.readFileSync(path.join(root,'Index.html'),'utf8');
+  const settings=fs.readFileSync(path.join(root,'insight_settings_v1.js'),'utf8');
+  assert.match(index,/insight_settings_v1\.js\?v=20261002-settings-page/);
+  assert.ok(index.indexOf('insight_data_health_v1.js')<index.indexOf('insight_settings_v1.js'));
+  assert.match(settings,/nav\.id='navSettings'/);
+  assert.match(settings,/page\.id='pageSettings'/);
+  assert.match(settings,/insightSettingsDataActions/);
+  assert.match(settings,/append\(backup,restore,health,csv,restoreFile,csvFile\)/);
+  assert.match(settings,/insightSettingsDisplayActions/);
+  assert.match(settings,/append\(dark\)/);
+  assert.match(settings,/sidebarActions\.replaceChildren\(nav\)/);
 });
 
 test('保存データ健全性チェックは読み取り専用で不整合を可視化する',()=>{

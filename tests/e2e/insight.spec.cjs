@@ -11,7 +11,7 @@ async function openInsight(page){
   page.on('pageerror',error=>errors.push(error.message));
   await page.goto('/Index.html',{waitUntil:'domcontentloaded'});
   await expect(page.locator('#nav1')).toBeVisible();
-  await page.waitForFunction(()=>window.InsightPagePeriodSync&&window.InsightSalesCount&&window.InsightSaleResults&&window.InsightHourlyCustomers&&window.InsightEventResults&&window.InsightAIVisual&&window.InsightAIInterpretation&&window.InsightAnalysisPeriodLock);
+  await page.waitForFunction(()=>window.InsightPagePeriodSync&&window.InsightSalesCount&&window.InsightSaleResults&&window.InsightHourlyCustomers&&window.InsightEventResults&&window.InsightAIVisual&&window.InsightAIInterpretation&&window.InsightAnalysisPeriodLock&&window.InsightSettings&&document.getElementById('navSettings')&&document.getElementById('pageSettings'));
   return errors;
 }
 
@@ -51,9 +51,29 @@ test('選択月は主要ページを横断しても維持される',async({page}
 test('トップページはビルド番号を持ち最新版確認をno-storeで行う',async({page})=>{
   const errors=await openInsight(page);
   const source=await page.evaluate(()=>fetch('/Index.html?e2e-shell-check=1',{cache:'no-store'}).then(r=>r.text()));
-  expect(source).toContain('name="insight-shell-version" content="20261002-backup-preflight-2"');
+  expect(source).toContain('name="insight-shell-version" content="20261002-settings-page-1"');
   expect(source).toContain("fetch('./Index.html?insight_probe='+Date.now(),{cache:'no-store'})");
   expect(source).toContain("location.replace('./Index.html?insight_build='+encodeURIComponent(m[1]))");
+  expect(errors).toEqual([]);
+});
+
+test('サイドバー下部は設定だけを表示し管理項目は設定ページへ集約する',async({page})=>{
+  const errors=await openInsight(page);
+  const sidebar=page.locator('.sidebar-btns');
+  await expect(sidebar.locator('#navSettings')).toBeVisible();
+  await expect(sidebar.locator('button')).toHaveCount(1);
+  await expect(sidebar.locator('#backupBtn')).toHaveCount(0);
+  await expect(sidebar.locator('#darkModeBtn')).toHaveCount(0);
+  await expect(sidebar.locator('#insightDataHealthButton')).toHaveCount(0);
+
+  await page.locator('#navSettings').click();
+  await expect(page.locator('#pageSettings')).toHaveClass(/show/);
+  await expect(page.locator('#pageSettings > .page-header > .page-title')).toHaveText('設定');
+  await expect(page.locator('#insightSettingsDataActions #backupBtn')).toBeVisible();
+  await expect(page.locator('#insightSettingsDataActions')).toContainText('データ復元');
+  await expect(page.locator('#insightSettingsDataActions #insightDataHealthButton')).toBeVisible();
+  await expect(page.locator('#insightSettingsDataActions')).toContainText('CSVインポート');
+  await expect(page.locator('#insightSettingsDisplayActions #darkModeBtn')).toBeVisible();
   expect(errors).toEqual([]);
 });
 
@@ -64,6 +84,8 @@ test('通常バックアップはメタ情報を含み復元前に内容と検�
     years:Array.from(new Set(Object.values(allStores.stores).flatMap(st=>st.years.map(String)))).sort()
   }));
 
+  await page.locator('#navSettings').click();
+  await expect(page.locator('#pageSettings')).toHaveClass(/show/);
   const downloadPromise=page.waitForEvent('download');
   await page.locator('#backupBtn').click();
   const download=await downloadPromise;
@@ -164,6 +186,8 @@ test('年度一覧にない古い疎データは起動を妨げず正式年度�
 test('データ状態チェックは未登録年度を要確認表示し保存内容を変更しない',async({page})=>{
   const errors=await openInsight(page);
   await page.waitForFunction(()=>window.InsightDataHealth&&document.getElementById('insightDataHealthButton'));
+  await page.locator('#navSettings').click();
+  await expect(page.locator('#pageSettings')).toHaveClass(/show/);
   await expect(page.locator('#insightDataHealthButton')).toBeVisible();
 
   await page.evaluate(()=>{
