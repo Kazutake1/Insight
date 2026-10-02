@@ -17,7 +17,7 @@ test('payload互換パッチ11件はbootstrap moduleへ分離しIndexにはbody�
 
 test('トップページはキャッシュ抑止とビルド自己更新を持つ',()=>{
   const index=read('Index.html');
-  assert.match(index,/insight-shell-version" content="20261002-orphan-year-fix-1/);
+  assert.match(index,/insight-shell-version" content="20261002-hourly-chart-color-1/);
   assert.match(index,/Cache-Control" content="no-cache, no-store, must-revalidate/);
   assert.match(index,/insight_probe=/);
   assert.match(index,/cache:'no-store'/);
@@ -201,7 +201,7 @@ test('イベント実績は過去開催・日付カード・時間帯グラフ�
   const eventResults=read('insight_event_results_v1.js');
   const events=read('insight_events_v1.js');
   assert.match(index,/insight_events_v1\.js\?v=20261002-special-presets/);
-  assert.match(index,/insight_event_results_v1\.js\?v=20261002-event-campaign-title/);
+  assert.match(index,/insight_event_results_v1\.js\?v=20261002-hourly-chart-color/);
   assert.ok(index.indexOf('insight_analysis_context_v1.js')<index.indexOf('insight_event_results_v1.js'));
   assert.ok(index.indexOf('insight_event_results_v1.js')<index.indexOf('insight_daily_anomaly_v1.js'));
   assert.match(eventResults,/過去開催一覧/);
@@ -216,6 +216,7 @@ test('イベント実績は過去開催・日付カード・時間帯グラフ�
   assert.match(eventResults,/客数 /);
   assert.match(eventResults,/er-day-tab/);
   assert.match(eventResults,/時間帯別客数/);
+  assert.match(eventResults,/\.er-hour-bar\{[^}]*background:#3b82f6/);
   assert.match(eventResults,/min-width:1440px/);
   assert.match(eventResults,/createReadOnlyDayCard/);
   assert.match(eventResults,/カテゴリー別・便別実績/);
