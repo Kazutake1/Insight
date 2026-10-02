@@ -50,7 +50,7 @@ test('選択月は主要ページを横断しても維持される',async({page}
 test('トップページはビルド番号を持ち最新版確認をno-storeで行う',async({page})=>{
   const errors=await openInsight(page);
   const source=await page.evaluate(()=>fetch('/Index.html?e2e-shell-check=1',{cache:'no-store'}).then(r=>r.text()));
-  expect(source).toContain('name="insight-shell-version" content="20261002-data-health-1"');
+  expect(source).toContain('name="insight-shell-version" content="20261002-hourly-tap-labels-1"');
   expect(source).toContain("fetch('./Index.html?insight_probe='+Date.now(),{cache:'no-store'})");
   expect(source).toContain("location.replace('./Index.html?insight_build='+encodeURIComponent(m[1]))");
   expect(errors).toEqual([]);
@@ -751,8 +751,22 @@ test('イベント実績は過去開催→複数日→時間帯グラフ→カ�
   await expect(page.locator('.er-hourly-section')).toBeVisible();
   await expect(page.locator('.er-peak')).toContainText('18時台 186人');
   await expect(page.locator('.er-hour-item')).toHaveCount(24);
+  await expect(page.locator('.er-hour-item>strong')).toHaveCount(0);
+  await expect(page.locator('.er-hour-plot')).toHaveCount(24);
+  await expect(page.locator('.er-hour-value:visible')).toHaveCount(0);
   const hourlyBarColor=await page.locator('.er-hour-bar').first().evaluate(el=>getComputedStyle(el).backgroundColor);
   expect(hourlyBarColor).toBe('rgb(59, 130, 246)');
+  const timeFontSize=await page.locator('.er-hour-item>span').first().evaluate(el=>getComputedStyle(el).fontSize);
+  expect(timeFontSize).toBe('11.5px');
+  await expect(page.locator('.er-hour-plot').nth(18)).toHaveAttribute('aria-label','18時台 186人');
+  await page.locator('.er-hour-plot').first().click();
+  await expect(page.locator('.er-hour-value:visible')).toHaveText('20人');
+  await expect(page.locator('.er-hour-plot').first()).toHaveAttribute('aria-pressed','true');
+  await page.locator('.er-hour-plot').nth(18).click();
+  await expect(page.locator('.er-hour-value:visible')).toHaveCount(1);
+  await expect(page.locator('.er-hour-value:visible')).toHaveText('186人');
+  await expect(page.locator('.er-hour-plot').first()).toHaveAttribute('aria-pressed','false');
+  await expect(page.locator('.er-hour-plot').nth(18)).toHaveAttribute('aria-pressed','true');
 
   const horizontal=await page.evaluate(()=>{
     const scroll=document.querySelector('.er-hour-scroll');
