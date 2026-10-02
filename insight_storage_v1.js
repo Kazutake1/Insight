@@ -47,6 +47,14 @@
     return serialized;
   }
 
+  function readSnapshot(){
+    var raw=root.localStorage.getItem(storageKey());
+    if(raw===null||raw===undefined||raw==='')throw new Error('Insight saved data is unavailable.');
+    var parsed;
+    try{parsed=JSON.parse(raw);}catch(_){throw new Error('Insight saved data JSON is invalid.');}
+    return migrateSnapshot(parsed);
+  }
+
   function writeMetadata(key,value){
     if(typeof key!=='string'||!key)throw new Error('Insight metadata key is invalid.');
     root.localStorage.setItem(key,String(value));
@@ -95,6 +103,7 @@
     migrateSnapshot:migrateSnapshot,
     serialize:serialize,
     writeSnapshot:writeSnapshot,
+    readSnapshot:readSnapshot,
     writeMetadata:writeMetadata,
     persistCurrent:persistCurrent,
     transaction:transaction

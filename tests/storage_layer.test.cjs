@@ -9,19 +9,24 @@ const source=fs.readFileSync(path.join(root,'insight_storage_v1.js'),'utf8');
 
 function setup(options={}){
   const calls=[];
+  const values=Object.assign({},options.initial||{});
   const window={
     SK:'insight_v11',
     localStorage:{
       setItem(key,value){
         if(options.failWrite)throw new Error('quota');
         calls.push([key,value]);
+        values[key]=value;
+      },
+      getItem(key){
+        return Object.prototype.hasOwnProperty.call(values,key)?values[key]:null;
       }
     }
   };
   const context={window,globalThis:window,SK:'insight_v11',JSON,Error};
   vm.createContext(context);
   vm.runInContext(source,context);
-  return {window,calls};
+  return {window,calls,values};
 }
 
 test('snapshot writerはschemaVersionを付けて指定キーへ1回だけJSON保存する',()=>{
@@ -31,6 +36,18 @@ test('snapshot writerはschemaVersionを付けて指定キーへ1回だけJSON�
   assert.deepEqual(JSON.parse(serialized),{current:'a',stores:{a:{name:'A'}},schemaVersion:1});
   assert.deepEqual(calls,[['insight_v11',serialized]]);
   assert.equal(value.schemaVersion,undefined);
+});
+
+test('snapshot readerは実際の保存内容をschema検証付きで読み戻す',()=>{
+  const saved=JSON.stringify({schemaVersion:1,current:'a',stores:{a:{name:'A'}}});
+  const {window}=setup({initial:{insight_v11:saved}});
+  const value=window.InsightStorage.readSnapshot();
+  assert.deepEqual(JSON.parse(JSON.stringify(value)),{schemaVersion:1,current:'a',stores:{a:{name:'A'}}});
+});
+
+test('snapshot readerは壊れたJSONを拒否する',()=>{
+  const {window}=setup({initial:{insight_v11:'{broken'}});
+  assert.throws(()=>window.InsightStorage.readSnapshot(),/saved data JSON is invalid/);
 });
 
 test('snapshot writerは保存失敗を握りつぶさない',()=>{
@@ -122,5 +139,5 @@ test('bootstrapの共通persistはStorage読込後に共有保存層へ委譲す
   assert.match(bootstrap,/var safePersist=/);
   assert.match(bootstrap,/InsightStorage\.persistCurrent\(allStores\)/);
   assert.match(bootstrap,/localStorage\.setItem\(SK,JSON\.stringify\(allStores\)\)/);
-  assert.match(index,/insight_storage_v1\.js\?v=20261002-backup-metadata/);
+  assert.match(index,/insight_storage_v1\.js\?v=20261003-restore-readback/);
 });

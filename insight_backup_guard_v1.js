@@ -165,6 +165,32 @@ function normalizeBackup(raw){
   else if(next.eventManagement!==undefined||Object.keys(next.stores).some(function(id){return next.stores[id].events!==undefined;}))throw new Error("店舗イベント機能の読み込み後に復元してください");
   return next;
 }
+function runRestorePostflight(snapshot){
+  if(!window.InsightDataHealth||typeof window.InsightDataHealth.check!=="function")throw validationError("データ状態確認機能を初期化できませんでした。");
+  var report=window.InsightDataHealth.check(snapshot);
+  if(!report||!report.counts)throw validationError("復元後検査を完了できませんでした。");
+  if(report.counts.errors){
+    var details=(report.issues||[]).filter(function(item){return item.severity==="error";}).slice(0,5).map(function(item){return "・"+item.message;}).join("\n");
+    throw validationError("復元後検査で重大な問題が"+report.counts.errors+"件見つかりました。"+(details?"\n"+details:""));
+  }
+  return report;
+}
+function verifyRestoredSnapshot(expected){
+  if(!window.InsightStorage||typeof window.InsightStorage.readSnapshot!=="function")throw validationError("保存済みデータを読み戻せませんでした。");
+  var persisted=window.InsightStorage.readSnapshot();
+  var normalized=normalizeBackup(persisted);
+  var report=runRestorePostflight(normalized);
+  if(window.InsightStorage.serialize(normalized)!==window.InsightStorage.serialize(expected))throw validationError("復元後検査で保存内容が復元対象と一致しませんでした。");
+  return {snapshot:normalized,report:report};
+}
+function rollbackPreRestoreSnapshot(){
+  if(!preRestoreMemorySnapshot)throw new Error("復元前データがメモリにありません。");
+  if(!window.InsightStorage||typeof window.InsightStorage.readSnapshot!=="function")throw new Error("保存済みデータを読み戻せません。");
+  window.InsightStorage.writeSnapshot(preRestoreMemorySnapshot);
+  var restored=window.InsightStorage.readSnapshot();
+  if(window.InsightStorage.serialize(restored)!==window.InsightStorage.serialize(preRestoreMemorySnapshot))throw new Error("復元前データの再保存結果が一致しません。");
+  return restored;
+}
 backupData=function(){
   try{
     if(!window.InsightStorage)throw new Error("保存機能を初期化できませんでした");
@@ -192,8 +218,24 @@ restoreData=function(e){
     var preflight=runRestorePreflight(newAll);
     if(!confirm(restoreSummary(file.name,envelope.info,newAll,preflight))){e.target.value="";return;}
     try{createPreRestoreBackup();}catch(safetyErr){throw new Error("復元直前バックアップを作成できないため、復元を中止しました。 "+String(safetyErr&&safetyErr.message?safetyErr.message:safetyErr));}
-    try{if(!window.InsightStorage)throw new Error("保存機能を初期化できませんでした");window.InsightStorage.writeSnapshot(newAll);}catch(storageErr){throw new Error("保存容量が不足しているため復元できません");}
-    allStores=newAll;store=allStores.stores[allStores.current];baseYear=store.years[store.years.length-1];cmpYear=store.years.length>1?store.years[store.years.length-2]:null;editYear={sales:baseYear,kyaku:baseYear,haiki:baseYear};editMonth={sales:todayFY().month,kyaku:todayFY().month,haiki:todayFY().month};renderStoreSel();if(currentNav==='salesCounts'){if(window.InsightSalesCount&&typeof window.InsightSalesCount.reloadFromStore==="function")window.InsightSalesCount.reloadFromStore();else gotoNav('salesCounts');}else if(currentNav==='settings'){if(window.InsightSettings&&typeof window.InsightSettings.open==="function")window.InsightSettings.open();}else if(currentNav===1)refreshDash();else if(currentNav>1)initInputPage(["","","sales","kyaku","haiki"][currentNav]);else initQuickPage();if(window.InsightPagePeriodSync&&typeof window.InsightPagePeriodSync.reconcileCurrentStore==="function")window.InsightPagePeriodSync.reconcileCurrentStore();updateMissingBadge();showToast("📤 データを復元しました","#1d4ed8","#eff6ff");
+    var verifiedRestore=null,writeCompleted=false;
+    try{
+      if(!window.InsightStorage)throw new Error("保存機能を初期化できませんでした");
+      window.InsightStorage.writeSnapshot(newAll);writeCompleted=true;
+      verifiedRestore=verifyRestoredSnapshot(newAll);
+    }catch(postErr){
+      if(!writeCompleted)throw new Error("保存容量が不足しているため復元できません");
+      try{
+        rollbackPreRestoreSnapshot();
+        preRestoreMemorySnapshot=null;
+        alert("復元後の整合性確認に失敗したため、復元前の状態へ自動で戻しました。\n\n"+String(postErr&&postErr.message?postErr.message:postErr)+"\n\n復元直前バックアップも保存されています。");
+      }catch(rollbackErr){
+        alert("重大なエラー：復元後の整合性確認に失敗し、自動復旧にも失敗しました。\n\n"+String(postErr&&postErr.message?postErr.message:postErr)+"\n\n自動復旧エラー："+String(rollbackErr&&rollbackErr.message?rollbackErr.message:rollbackErr)+"\n\n保存された Insight_pre_restore_...json を使って手動で復元してください。");
+      }
+      e.target.value="";return;
+    }
+    newAll=verifiedRestore.snapshot;preRestoreMemorySnapshot=null;
+    allStores=newAll;store=allStores.stores[allStores.current];baseYear=store.years[store.years.length-1];cmpYear=store.years.length>1?store.years[store.years.length-2]:null;editYear={sales:baseYear,kyaku:baseYear,haiki:baseYear};editMonth={sales:todayFY().month,kyaku:todayFY().month,haiki:todayFY().month};renderStoreSel();if(currentNav==='salesCounts'){if(window.InsightSalesCount&&typeof window.InsightSalesCount.reloadFromStore==="function")window.InsightSalesCount.reloadFromStore();else gotoNav('salesCounts');}else if(currentNav==='settings'){if(window.InsightSettings&&typeof window.InsightSettings.open==="function")window.InsightSettings.open();}else if(currentNav===1)refreshDash();else if(currentNav>1)initInputPage(["","","sales","kyaku","haiki"][currentNav]);else initQuickPage();if(window.InsightPagePeriodSync&&typeof window.InsightPagePeriodSync.reconcileCurrentStore==="function")window.InsightPagePeriodSync.reconcileCurrentStore();if(window.InsightDataHealth&&typeof window.InsightDataHealth.refresh==="function")window.InsightDataHealth.refresh();updateMissingBadge();showToast("📤 データを復元しました（整合性確認済み）","#1d4ed8","#eff6ff");
   }catch(err){
     console.warn("Insight restore rejected:",err);
     var detail=String(err&&err.message?err.message:err);

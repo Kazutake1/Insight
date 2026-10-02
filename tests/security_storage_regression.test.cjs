@@ -198,6 +198,25 @@ test('復元直前に現在データをv2形式で自動退避してから上書
   assert.match(source,/復元直前バックアップを作成できないため、復元を中止しました/);
 });
 
+test('復元後は保存済みデータを読み戻して健全性と内容一致を確認する',()=>{
+  const source=fs.readFileSync(path.join(root,'insight_backup_guard_v1.js'),'utf8');
+  assert.match(source,/function runRestorePostflight\(snapshot\)/);
+  assert.match(source,/function verifyRestoredSnapshot\(expected\)/);
+  assert.match(source,/InsightStorage\.readSnapshot\(\)/);
+  assert.match(source,/復元後検査で保存内容が復元対象と一致しませんでした/);
+  assert.ok(source.indexOf('InsightStorage.writeSnapshot(newAll)')<source.indexOf('verifyRestoredSnapshot(newAll)'));
+  assert.ok(source.indexOf('verifyRestoredSnapshot(newAll)')<source.indexOf('allStores=newAll'));
+});
+
+test('復元後検査失敗時は復元前メモリデータへ自動ロールバックする',()=>{
+  const source=fs.readFileSync(path.join(root,'insight_backup_guard_v1.js'),'utf8');
+  assert.match(source,/function rollbackPreRestoreSnapshot\(\)/);
+  assert.match(source,/InsightStorage\.writeSnapshot\(preRestoreMemorySnapshot\)/);
+  assert.match(source,/復元前の状態へ自動で戻しました/);
+  assert.match(source,/自動復旧にも失敗しました/);
+  assert.match(source,/Insight_pre_restore_\.\.\.json/);
+});
+
 test('設定ページから復元した場合は復元後も設定ページを維持する',()=>{
   const source=fs.readFileSync(path.join(root,'insight_backup_guard_v1.js'),'utf8');
   assert.match(source,/currentNav==='settings'/);

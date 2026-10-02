@@ -51,7 +51,7 @@ test('選択月は主要ページを横断しても維持される',async({page}
 test('トップページはビルド番号を持ち最新版確認をno-storeで行う',async({page})=>{
   const errors=await openInsight(page);
   const source=await page.evaluate(()=>fetch('/Index.html?e2e-shell-check=1',{cache:'no-store'}).then(r=>r.text()));
-  expect(source).toContain('name="insight-shell-version" content="20261002-pre-restore-backup-1"');
+  expect(source).toContain('name="insight-shell-version" content="20261003-post-restore-verify-1"');
   expect(source).toContain("fetch('./Index.html?insight_probe='+Date.now(),{cache:'no-store'})");
   expect(source).toContain("location.replace('./Index.html?insight_build='+encodeURIComponent(m[1]))");
   expect(errors).toEqual([]);
@@ -143,6 +143,60 @@ test('復元確定時は上書き前のデータを自動ダウンロードし�
   expect(safety.data.stores).toEqual(before.stores);
   await expect(page.locator('#pageSettings')).toHaveClass(/show/);
   await expect(page.locator('#navSettings')).toHaveClass(/active/);
+  await expect(page.getByText('データを復元しました（整合性確認済み）')).toBeVisible();
+  expect(errors).toEqual([]);
+});
+
+test('復元後検査で異常を検出した場合は復元前データへ自動で戻す',async({page})=>{
+  const errors=await openInsight(page);
+  await page.locator('#navSettings').click();
+
+  const backupDownloadPromise=page.waitForEvent('download');
+  await page.locator('#backupBtn').click();
+  const targetBackup=await backupDownloadPromise;
+  const targetPath=await targetBackup.path();
+
+  await page.evaluate(()=>{
+    const st=allStores.stores[allStores.current];
+    const year=String(st.years[0]),month='1月';
+    st.data[year][month][0].storeMemo='E2E自動ロールバック保持';
+    persist();
+  });
+  const rawBefore=await page.evaluate(()=>localStorage.getItem('insight_v11'));
+  expect(rawBefore).toContain('E2E自動ロールバック保持');
+
+  await page.evaluate(()=>{
+    const original=window.InsightStorage.readSnapshot.bind(window.InsightStorage);
+    let reads=0;
+    window.InsightStorage.readSnapshot=function(){
+      reads++;
+      const value=original();
+      if(reads===1)value.current='__e2e_invalid_store__';
+      return value;
+    };
+  });
+
+  const confirmPromise=page.waitForEvent('dialog');
+  const fileAction=page.locator('#restoreFile').setInputFiles(targetPath);
+  const confirmDialog=await confirmPromise;
+  expect(confirmDialog.type()).toBe('confirm');
+
+  const safetyDownloadPromise=page.waitForEvent('download');
+  const rollbackAlertPromise=page.waitForEvent('dialog');
+  await confirmDialog.accept();
+  const safetyDownload=await safetyDownloadPromise;
+  expect(safetyDownload.suggestedFilename()).toMatch(/^Insight_pre_restore_\d{8}_\d{6}\.json$/);
+
+  const rollbackAlert=await rollbackAlertPromise;
+  expect(rollbackAlert.type()).toBe('alert');
+  expect(rollbackAlert.message()).toContain('復元前の状態へ自動で戻しました');
+  await rollbackAlert.accept();
+  await fileAction;
+
+  const rawAfter=await page.evaluate(()=>localStorage.getItem('insight_v11'));
+  expect(rawAfter).toBe(rawBefore);
+  expect(rawAfter).toContain('E2E自動ロールバック保持');
+  await expect(page.locator('#pageSettings')).toHaveClass(/show/);
   expect(errors).toEqual([]);
 });
 
