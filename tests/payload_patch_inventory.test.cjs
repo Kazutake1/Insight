@@ -17,7 +17,7 @@ test('payload互換パッチ11件はbootstrap moduleへ分離しIndexにはbody�
 
 test('トップページはキャッシュ抑止とビルド自己更新を持つ',()=>{
   const index=read('Index.html');
-  assert.match(index,/insight-shell-version" content="20261003-post-restore-verify-1/);
+  assert.match(index,/insight-shell-version" content="20261003-multiyear-analysis-1/);
   assert.match(index,/Cache-Control" content="no-cache, no-store, must-revalidate/);
   assert.match(index,/insight_probe=/);
   assert.match(index,/cache:'no-store'/);
@@ -173,6 +173,19 @@ test('設定ページはサイドバー下部の管理項目を集約する',()=
   assert.match(settings,/insightSettingsDisplayActions/);
   assert.match(settings,/append\(dark\)/);
   assert.match(settings,/sidebarActions\.replaceChildren\(nav\)/);
+});
+
+test('複数年度分析はAnalysisContextの後に読み込み読み取り専用で動作する',()=>{
+  const index=read('Index.html');
+  const multi=read('insight_multiyear_analysis_v1.js');
+  assert.match(index,/insight_multiyear_analysis_v1\.js\?v=20261003-multiyear-1/);
+  assert.ok(index.indexOf('insight_analysis_context_v1.js')<index.indexOf('insight_multiyear_analysis_v1.js'));
+  assert.ok(index.indexOf('insight_multiyear_analysis_v1.js')<index.indexOf('insight_daily_anomaly_v1.js'));
+  assert.match(multi,/function analyzeMonth\(/);
+  assert.match(multi,/basis=completed\?'total':'dailyAverage'/);
+  assert.match(multi,/externalTransmission:false/);
+  assert.doesNotMatch(multi,/\bfetch\s*\(|XMLHttpRequest|WebSocket|localStorage|InsightStorage/);
+  assert.doesNotThrow(()=>new vm.Script(multi),'multi-year analysis module must be valid JavaScript');
 });
 
 test('保存データ健全性チェックは読み取り専用で不整合を可視化する',()=>{
