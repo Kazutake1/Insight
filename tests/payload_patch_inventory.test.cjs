@@ -17,7 +17,7 @@ test('payload互換パッチ11件はbootstrap moduleへ分離しIndexにはbody�
 
 test('トップページはキャッシュ抑止とビルド自己更新を持つ',()=>{
   const index=read('Index.html');
-  assert.match(index,/insight-shell-version" content="20261002-historical-years-1/);
+  assert.match(index,/insight-shell-version" content="20261002-quick-historical-year-1/);
   assert.match(index,/Cache-Control" content="no-cache, no-store, must-revalidate/);
   assert.match(index,/insight_probe=/);
   assert.match(index,/cache:'no-store'/);
@@ -176,6 +176,19 @@ test('過年度は既存の疎データを保持して正式年度へ昇格し�
   assert.match(salesCount,/年度を追加して販売数を入力しますか/);
   assert.match(salesCount,/InsightYearManager\.promoteCurrent/);
   assert.doesNotThrow(()=>new vm.Script(manager),'year manager module must be valid JavaScript');
+});
+
+test('今日の入力は未登録年度の日付移動前に正式年度追加を確認する',()=>{
+  const index=read('Index.html');
+  const quick=read('insight_quick_date_nav_v1.js');
+  assert.match(index,/insight_quick_date_nav_v1\.js\?v=20261002-quick-historical-year/);
+  assert.match(quick,/function ensureRegisteredYear\(/);
+  assert.match(quick,/InsightYearManager/);
+  assert.match(quick,/年度を追加してこの日付を入力しますか/);
+  assert.match(quick,/manager\.promoteCurrent\(year\)/);
+  assert.match(quick,/if\(!ensureRegisteredYear\(date\)\)return/);
+  assert.doesNotMatch(quick,/localStorage/);
+  assert.doesNotThrow(()=>new vm.Script(quick),'quick date navigation must be valid JavaScript');
 });
 
 test('通常画面の選択年月をサイドバー切替後も全ページで維持する',()=>{

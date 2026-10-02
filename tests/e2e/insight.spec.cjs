@@ -50,7 +50,7 @@ test('選択月は主要ページを横断しても維持される',async({page}
 test('トップページはビルド番号を持ち最新版確認をno-storeで行う',async({page})=>{
   const errors=await openInsight(page);
   const source=await page.evaluate(()=>fetch('/Index.html?e2e-shell-check=1',{cache:'no-store'}).then(r=>r.text()));
-  expect(source).toContain('name="insight-shell-version" content="20261002-historical-years-1"');
+  expect(source).toContain('name="insight-shell-version" content="20261002-quick-historical-year-1"');
   expect(source).toContain("fetch('./Index.html?insight_probe='+Date.now(),{cache:'no-store'})");
   expect(source).toContain("location.replace('./Index.html?insight_build='+encodeURIComponent(m[1]))");
   expect(errors).toEqual([]);
@@ -417,6 +417,80 @@ test('販売数入力で未登録の過年度へ移動すると年度を正式�
   });
   expect(afterReload.years).toContain('2024');
   expect(afterReload.value).toBe(321);
+  expect(afterReload.firstDayIsObject).toBe(true);
+  expect(errors).toEqual([]);
+});
+
+
+test('今日の入力で未登録の過年度日付を選ぶと年度を正式追加し既存データを保持する',async({page})=>{
+  const errors=await openInsight(page);
+  await page.evaluate(()=>{
+    const store=allStores.stores[allStores.current];
+    store.years=['2025','2026'];
+    store.data['2024']={'8月':[null,null,{d:'3',売上:456,客数:123,買上点数:7.89,廃棄金額:90,haiki:blankHaiki(),weather:'晴',storeMemo:'E2E今日過年度保持'}]};
+    InsightStorage.persistCurrent(allStores);
+  });
+
+  await page.locator('#nav0').click();
+  await expect(page.locator('#iqdDateInput')).toBeAttached();
+  const before=await page.evaluate(()=>window.InsightDateContext.getSelectedIso());
+
+  const cancelDialogPromise=page.waitForEvent('dialog');
+  const cancelChange=page.locator('#iqdDateInput').evaluate(input=>{
+    input.value='2023-08-03';
+    input.dispatchEvent(new Event('change',{bubbles:true}));
+  });
+  const cancelDialog=await cancelDialogPromise;
+  expect(cancelDialog.message()).toContain('2023年度はダッシュボードに登録されていません');
+  await cancelDialog.dismiss();
+  await cancelChange;
+  await expect.poll(()=>page.evaluate(()=>window.InsightDateContext.getSelectedIso())).toBe(before);
+  expect(await page.evaluate(()=>allStores.stores[allStores.current].years.includes('2023'))).toBe(false);
+
+  const acceptDialogPromise=page.waitForEvent('dialog');
+  const acceptChange=page.locator('#iqdDateInput').evaluate(input=>{
+    input.value='2024-08-03';
+    input.dispatchEvent(new Event('change',{bubbles:true}));
+  });
+  const acceptDialog=await acceptDialogPromise;
+  expect(acceptDialog.message()).toContain('2024年度はダッシュボードに登録されていません');
+  await acceptDialog.accept();
+  await acceptChange;
+
+  await expect.poll(()=>page.evaluate(()=>window.InsightDateContext.getSelectedIso())).toBe('2024-08-03');
+  const promoted=await page.evaluate(()=>{
+    const store=allStores.stores[allStores.current];
+    return {
+      years:store.years.slice(),
+      monthCount:Object.keys(store.data['2024']).length,
+      febDays:store.data['2024']['2月'].length,
+      augDays:store.data['2024']['8月'].length,
+      firstDay:store.data['2024']['8月'][0],
+      preserved:store.data['2024']['8月'][2]
+    };
+  });
+  expect(promoted.years).toContain('2024');
+  expect(promoted.monthCount).toBe(12);
+  expect(promoted.febDays).toBe(29);
+  expect(promoted.augDays).toBe(31);
+  expect(promoted.firstDay).not.toBeNull();
+  expect(promoted.firstDay.d).toBe('1');
+  expect(promoted.preserved.売上).toBe(456);
+  expect(promoted.preserved.客数).toBe(123);
+  expect(promoted.preserved.storeMemo).toBe('E2E今日過年度保持');
+
+  await page.reload({waitUntil:'domcontentloaded'});
+  await expect(page.locator('#nav1')).toBeVisible();
+  const afterReload=await page.evaluate(()=>{
+    const store=allStores.stores[allStores.current];
+    return {
+      years:store.years.slice(),
+      value:store.data['2024']['8月'][2].売上,
+      firstDayIsObject:!!store.data['2024']['8月'][0]&&typeof store.data['2024']['8月'][0]==='object'
+    };
+  });
+  expect(afterReload.years).toContain('2024');
+  expect(afterReload.value).toBe(456);
   expect(afterReload.firstDayIsObject).toBe(true);
   expect(errors).toEqual([]);
 });

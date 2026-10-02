@@ -34,9 +34,29 @@
 
   function selectedDate(){return dateContext.getSelectedDate();}
   function todaySelected(){return dateContext.isToday();}
+  function ensureRegisteredYear(date){
+    if(!date||typeof date.getFullYear!=='function'||!Number.isFinite(date.getTime()))return false;
+    var year=String(date.getFullYear()),manager=window.InsightYearManager;
+    if(manager&&typeof manager.isCurrentRegistered==='function'&&manager.isCurrentRegistered(year))return true;
+    if(!manager||typeof manager.promoteCurrent!=='function'){
+      window.alert('この年度を追加する機能を使用できません。');
+      return false;
+    }
+    if(!window.confirm(year+'年度はダッシュボードに登録されていません。\n年度を追加してこの日付を入力しますか？\n\n既にある過去データは保持したまま、未入力日を正常な空データで補完します。'))return false;
+    try{
+      manager.promoteCurrent(year);
+      if(typeof renderYearPills==='function')renderYearPills();
+      if(typeof showToast==='function')showToast('✓ '+year+'年度を追加しました','#15803d','#f0fdf4');
+      return true;
+    }catch(error){
+      window.alert('年度を追加できませんでした。\n'+(error&&error.message?error.message:error));
+      return false;
+    }
+  }
   function selectDate(date){
     if(!date||typeof date.getTime!=='function'||!Number.isFinite(date.getTime())||dateContext.iso(date)===dateContext.getSelectedIso())return;
     if(dirty&&!window.confirm('未保存の入力があります。\n保存せずに別の日付へ移動しますか？'))return;
+    if(!ensureRegisteredYear(date))return;
     dateContext.setSelectedDate(date);
     quickEditDay=dateContext.getSelectedInfo().day;
     window.renderQuickNav();
