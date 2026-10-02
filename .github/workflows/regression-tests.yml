@@ -38,6 +38,7 @@ jobs:
           - insight_yoy_policy.test.cjs
           - monthly_review.test.cjs
           - multiyear_analysis.test.cjs
+          - weekday_analysis.test.cjs
           - page_period_sync.test.cjs
           - payload_browser_smoke.test.cjs
           - payload_patch_inventory.test.cjs
