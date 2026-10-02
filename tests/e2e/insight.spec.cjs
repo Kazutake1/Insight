@@ -47,6 +47,14 @@ test('選択月は主要ページを横断しても維持される',async({page}
 });
 
 
+test('トップページはビルド番号を持ち最新版確認をno-storeで行う',async({page})=>{
+  const errors=await openInsight(page);
+  const meta=await page.locator('meta[name="insight-shell-version"]').getAttribute('content');
+  expect(meta).toBe('20261002-shell-refresh-1');
+  expect(await page.evaluate(()=>window.__INSIGHT_SHELL_VERSION__)).toBe('20261002-shell-refresh-1');
+  expect(errors).toEqual([]);
+});
+
 test('保存したデータはページ再読込後も復元される',async({page})=>{
   const errors=await openInsight(page);
   const expected=await page.evaluate(()=>{

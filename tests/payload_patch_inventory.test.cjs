@@ -15,6 +15,15 @@ test('payload互換パッチ11件はbootstrap moduleへ分離しIndexにはbody�
   assert.match(index,/insight_bootstrap_patches_v1\.js\?v=20261002-storage-recovery/);
 });
 
+test('トップページはキャッシュ抑止とビルド自己更新を持つ',()=>{
+  const index=read('Index.html');
+  assert.match(index,/insight-shell-version" content="20261002-shell-refresh-1/);
+  assert.match(index,/Cache-Control" content="no-cache, no-store, must-revalidate/);
+  assert.match(index,/insight_probe=/);
+  assert.match(index,/cache:'no-store'/);
+  assert.match(index,/location\.replace\('\.\/Index\.html\?insight_build='/);
+});
+
 test('AI表示CSSはIndexの文字列置換ではなくpresentation moduleが所有する',()=>{
   const index=read('Index.html');
   const presentation=read('insight_ai_presentation_v1.js');
