@@ -173,13 +173,15 @@ test('通常画面の選択年月をサイドバー切替後も全ページで�
 test('時間帯別客数は日報客数と分離して日付別24時間データとして保存する',()=>{
   const index=read('Index.html');
   const hourly=read('insight_hourly_customers_v1.js');
-  assert.match(index,/insight_hourly_customers_v1\.js\?v=20261002-hourly-v1/);
+  assert.match(index,/insight_hourly_customers_v1\.js\?v=20261002-hourly-position/);
   assert.ok(index.indexOf('insight_events_v1.js')<index.indexOf('insight_hourly_customers_v1.js'));
   assert.ok(index.indexOf('insight_hourly_customers_v1.js')<index.indexOf('insight_event_results_v1.js'));
   assert.match(hourly,/hourlyCustomers/);
   assert.match(hourly,/Array\(24\)/);
   assert.match(hourly,/途中/);
   assert.match(hourly,/入力済み 24\/24/);
+  assert.match(hourly,/getElementById\('insightEvents'\)/);
+  assert.match(hourly,/insertBefore\(card,events\)/);
   assert.doesNotMatch(hourly,/日次客数|差異|暦日/);
   assert.doesNotThrow(()=>new vm.Script(hourly),'hourly customers module must be valid JavaScript');
 });

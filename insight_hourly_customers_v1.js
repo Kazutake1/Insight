@@ -110,7 +110,9 @@
       copyBox.append(title,state);
       var button=el('button',value.count?'編集':'入力','hourly-quick-button');button.type='button';button.onclick=function(){openDialog(date);};
       head.append(copyBox,button);card.append(head);
-      host.append(card);
+      var events=doc.getElementById('insightEvents');
+      if(events&&events.parentElement===host)host.insertBefore(card,events);
+      else host.append(card);
     }
     function openDialog(date){
       if(activeDialog)return;

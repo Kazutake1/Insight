@@ -255,6 +255,9 @@ test('今日の入力で時間帯別客数を途中保存し24時間入力を完
   const errors=await openInsight(page);
   await page.locator('#nav0').click();
   await expect(page.locator('#hourlyCustomersQuick')).toBeVisible();
+  await expect(page.locator('#insightEvents')).toBeVisible();
+  const initialOrder=await page.evaluate(()=>Array.from(document.getElementById('opsDailyWrap').children).map(node=>node.id));
+  expect(initialOrder.indexOf('hourlyCustomersQuick')).toBeLessThan(initialOrder.indexOf('insightEvents'));
 
   await page.locator('#hourlyCustomersQuick .hourly-quick-button').click();
   await expect(page.locator('.hourly-dialog')).toBeVisible();
@@ -265,6 +268,8 @@ test('今日の入力で時間帯別客数を途中保存し24時間入力を完
   await page.locator('.hourly-dialog .hourly-primary').click();
   await expect(page.locator('#hourlyCustomersQuick .hourly-quick-status')).toContainText('途中 2/24');
   await expect(page.locator('#hourlyCustomersQuick .hourly-quick-status')).toContainText('合計 12人');
+  const orderAfterPartialSave=await page.evaluate(()=>Array.from(document.getElementById('opsDailyWrap').children).map(node=>node.id));
+  expect(orderAfterPartialSave.indexOf('hourlyCustomersQuick')).toBeLessThan(orderAfterPartialSave.indexOf('insightEvents'));
 
   const partial=await page.evaluate(()=>{
     const date=window.InsightDateContext.getSelectedIso();
@@ -287,6 +292,8 @@ test('今日の入力で時間帯別客数を途中保存し24時間入力を完
   await page.locator('.hourly-dialog .hourly-primary').click();
   await expect(page.locator('#hourlyCustomersQuick .hourly-quick-status')).toContainText('入力済み 24/24');
   await expect(page.locator('.hourly-dialog')).toHaveCount(0);
+  const orderAfterCompleteSave=await page.evaluate(()=>Array.from(document.getElementById('opsDailyWrap').children).map(node=>node.id));
+  expect(orderAfterCompleteSave.indexOf('hourlyCustomersQuick')).toBeLessThan(orderAfterCompleteSave.indexOf('insightEvents'));
 
   const complete=await page.evaluate(()=>{
     const date=window.InsightDateContext.getSelectedIso();
