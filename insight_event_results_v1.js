@@ -29,12 +29,14 @@
     return value||LEGACY_LOCATION;
   }
   function eventTitle(event){return event&&event.snapshot?text(event.snapshot.title):'';}
-  function nearbyEvents(all,storeId){
+  function storeEventsByType(all,storeId,type){
     var store=all&&all.stores&&all.stores[storeId],items=store&&Array.isArray(store.events)?store.events:[];
-    return items.filter(function(event){return event&&event.type==='nearby';}).map(copy).sort(function(a,b){
+    return items.filter(function(event){return event&&event.type===type;}).map(copy).sort(function(a,b){
       return String(b.endDate||'').localeCompare(String(a.endDate||''))||String(b.startDate||'').localeCompare(String(a.startDate||''));
     });
   }
+  function nearbyEvents(all,storeId){return storeEventsByType(all,storeId,'nearby');}
+  function specialEvents(all,storeId){return storeEventsByType(all,storeId,'special');}
   function locations(all,storeId){
     var latest={};
     nearbyEvents(all,storeId).forEach(function(event){
@@ -51,6 +53,15 @@
     var latest={};
     nearbyEvents(all,storeId).forEach(function(event){
       if(eventLocation(event)!==location)return;
+      var title=eventTitle(event),date=String(event.endDate||event.startDate||'');
+      if(!title)return;
+      if(!latest[title]||date>latest[title])latest[title]=date;
+    });
+    return Object.keys(latest).sort(function(a,b){return latest[b].localeCompare(latest[a])||a.localeCompare(b,'ja');});
+  }
+  function specialNames(all,storeId){
+    var latest={};
+    specialEvents(all,storeId).forEach(function(event){
       var title=eventTitle(event),date=String(event.endDate||event.startDate||'');
       if(!title)return;
       if(!latest[title]||date>latest[title])latest[title]=date;
@@ -112,28 +123,40 @@
   }
   function collect(all,storeId,location,title,analysisApi){
     location=text(location);title=text(title);
-    if(!location||!title)return {location:location,title:title,occurrences:[]};
+    if(!location||!title)return {kind:'nearby',location:location,title:title,occurrences:[]};
     var matched=nearbyEvents(all,storeId).filter(function(event){
       return eventLocation(event)===location&&eventTitle(event)===title;
     });
     return {
+      kind:'nearby',
       location:location,
       title:title,
       occurrences:matched.map(function(event){return occurrenceResult(event,storeId,analysisApi);})
     };
   }
+  function collectSpecial(all,storeId,title,analysisApi){
+    title=text(title);
+    if(!title)return {kind:'special',location:'',title:title,occurrences:[]};
+    var matched=specialEvents(all,storeId).filter(function(event){return eventTitle(event)===title;});
+    return {
+      kind:'special',
+      location:'',
+      title:title,
+      occurrences:matched.map(function(event){return occurrenceResult(event,storeId,analysisApi);})
+    };
+  }
 
-  var model={VERSION:2,LEGACY_LOCATION:LEGACY_LOCATION,eachDate:eachDate,eventLocation:eventLocation,nearbyEvents:nearbyEvents,locations:locations,eventNames:eventNames,aggregateDays:aggregateDays,occurrenceResult:occurrenceResult,collect:collect};
+  var model={VERSION:3,LEGACY_LOCATION:LEGACY_LOCATION,eachDate:eachDate,eventLocation:eventLocation,storeEventsByType:storeEventsByType,nearbyEvents:nearbyEvents,specialEvents:specialEvents,locations:locations,eventNames:eventNames,specialNames:specialNames,aggregateDays:aggregateDays,occurrenceResult:occurrenceResult,collect:collect,collectSpecial:collectSpecial};
   if(typeof module!=='undefined'&&module.exports)module.exports=model;
   root.InsightEventResults=model;
   if(!root.document)return;
 
   function init(){
-    if(root.__insightEventResultsV2)return;
+    if(root.__insightEventResultsV3)return;
     if(!root.InsightEvents||!root.InsightAnalysisContext||!root.InsightSalesCount||!root.InsightHourlyCustomers){setTimeout(init,0);return;}
-    root.__insightEventResultsV2=true;
+    root.__insightEventResultsV3=true;
 
-    var doc=root.document,state={location:'',eventName:'',occurrenceId:'',selectedDate:''};
+    var doc=root.document,state={kind:'nearby',location:'',eventName:'',occurrenceId:'',selectedDate:''};
     function el(tag,label,cls){var node=doc.createElement(tag);if(label!==undefined)node.textContent=label;if(cls)node.className=cls;return node;}
     function currentStoreId(){return typeof allStores!=='undefined'&&allStores?allStores.current:null;}
     function option(value,label){var node=el('option',label);node.value=value;return node;}
@@ -159,6 +182,25 @@
     }
     function renderSelectors(){
       var storeId=currentStoreId(),locationSelect=doc.getElementById('erLocation'),eventSelect=doc.getElementById('erEvent');
+      var locationField=doc.getElementById('erLocationField'),arrow=doc.getElementById('erLocationArrow'),eventLabel=doc.getElementById('erEventFieldLabel');
+      doc.querySelectorAll('.er-kind-btn').forEach(function(button){button.classList.toggle('active',button.dataset.kind===state.kind);});
+      if(state.kind==='special'){
+        state.location='';
+        if(locationField)locationField.hidden=true;
+        if(arrow)arrow.hidden=true;
+        if(eventLabel)eventLabel.textContent='特別日名';
+        var specialItems=specialNames(allStores,storeId);
+        if(state.eventName&&specialItems.indexOf(state.eventName)<0){state.eventName='';state.occurrenceId='';state.selectedDate='';}
+        eventSelect.replaceChildren(option('','特別日を選択'));
+        specialItems.forEach(function(value){eventSelect.append(option(value,value));});
+        eventSelect.disabled=!specialItems.length;
+        eventSelect.value=state.eventName;
+        return {locations:[],names:specialItems};
+      }
+
+      if(locationField)locationField.hidden=false;
+      if(arrow)arrow.hidden=false;
+      if(eventLabel)eventLabel.textContent='イベント名';
       var locationItems=locations(allStores,storeId);
       if(state.location&&locationItems.indexOf(state.location)<0){state.location='';state.eventName='';state.occurrenceId='';state.selectedDate='';}
       locationSelect.replaceChildren(option('','イベント場所を選択'));
@@ -173,7 +215,11 @@
       eventSelect.value=state.eventName;
       return {locations:locationItems,names:names};
     }
-    function currentData(){return collect(allStores,currentStoreId(),state.location,state.eventName,root.InsightAnalysisContext);}
+    function currentData(){
+      return state.kind==='special'
+        ?collectSpecial(allStores,currentStoreId(),state.eventName,root.InsightAnalysisContext)
+        :collect(allStores,currentStoreId(),state.location,state.eventName,root.InsightAnalysisContext);
+    }
     function renderHistory(data){
       var summary=doc.getElementById('erSummary'),results=doc.getElementById('erResults');
       summary.replaceChildren();summary.append(el('span','過去開催 '+data.occurrences.length+'回'));
@@ -280,10 +326,15 @@
     }
     function render(){
       var available=renderSelectors();
-      if(!available.locations.length){renderEmpty('近隣イベントが登録されていません。');return;}
-      if(!state.location){renderEmpty('イベント場所を選択してください。');return;}
-      if(!available.names.length){renderEmpty('この場所にはイベントが登録されていません。');return;}
-      if(!state.eventName){renderEmpty('イベント名を選択してください。');return;}
+      if(state.kind==='special'){
+        if(!available.names.length){renderEmpty('特別日が登録されていません。');return;}
+        if(!state.eventName){renderEmpty('特別日を選択してください。');return;}
+      }else{
+        if(!available.locations.length){renderEmpty('近隣イベントが登録されていません。');return;}
+        if(!state.location){renderEmpty('イベント場所を選択してください。');return;}
+        if(!available.names.length){renderEmpty('この場所にはイベントが登録されていません。');return;}
+        if(!state.eventName){renderEmpty('イベント名を選択してください。');return;}
+      }
       var data=currentData();
       var occurrence=data.occurrences.find(function(item){return item.id===state.occurrenceId;});
       if(!occurrence){state.occurrenceId='';state.selectedDate='';renderHistory(data);return;}
@@ -298,16 +349,18 @@
       saleNav.insertAdjacentElement('afterend',nav);
       var page=el('div',undefined,'page er-page');page.id='pageEventResults';
       page.innerHTML='<div class="page-header"><div class="page-title">イベント実績</div></div>'+
-        '<div class="er-toolbar"><label>イベント場所<select id="erLocation" aria-label="イベント場所"></select></label><span class="er-arrow" aria-hidden="true">→</span><label>イベント名<select id="erEvent" aria-label="イベント名"></select></label></div>'+
+        '<div class="er-kind-switch" role="group" aria-label="実績種別"><button type="button" class="er-kind-btn active" data-kind="nearby">近隣イベント</button><button type="button" class="er-kind-btn" data-kind="special">特別日</button></div>'+
+        '<div class="er-toolbar"><label id="erLocationField">イベント場所<select id="erLocation" aria-label="イベント場所"></select></label><span id="erLocationArrow" class="er-arrow" aria-hidden="true">→</span><label><span id="erEventFieldLabel">イベント名</span><select id="erEvent" aria-label="イベント名／特別日名"></select></label></div>'+
         '<div id="erSummary" class="er-summary"></div><div id="erResults"></div>';
       main.append(page);
+      doc.querySelectorAll('.er-kind-btn').forEach(function(button){button.onclick=function(){if(state.kind===button.dataset.kind)return;state.kind=button.dataset.kind;state.location='';state.eventName='';state.occurrenceId='';state.selectedDate='';render();};});
       doc.getElementById('erLocation').onchange=function(event){state.location=event.target.value;state.eventName='';state.occurrenceId='';state.selectedDate='';render();};
       doc.getElementById('erEvent').onchange=function(event){state.eventName=event.target.value;state.occurrenceId='';state.selectedDate='';render();};
       return true;
     }
 
     var style=el('style');style.id='insightEventResultsStyle';style.textContent=
-      '.er-page{overflow:auto}.er-toolbar{display:flex;align-items:flex-end;gap:12px;flex-wrap:wrap;margin-bottom:12px;padding:12px 14px;border:1px solid var(--border);border-radius:12px;background:var(--surface)}'+
+      '.er-page{overflow:auto}.er-kind-switch{display:inline-flex;gap:3px;margin:0 0 10px;padding:3px;border:1px solid var(--border);border-radius:11px;background:var(--surface2)}.er-kind-btn{border:0;border-radius:8px;background:transparent;color:var(--text3);padding:7px 12px;font:800 11px/1 inherit;cursor:pointer}.er-kind-btn.active{background:var(--surface);color:var(--text);box-shadow:0 1px 4px var(--shadow2)}.er-toolbar{display:flex;align-items:flex-end;gap:12px;flex-wrap:wrap;margin-bottom:12px;padding:12px 14px;border:1px solid var(--border);border-radius:12px;background:var(--surface)}'+
       '.er-toolbar label{display:flex;flex-direction:column;gap:5px;min-width:220px;font-size:11px;font-weight:800;color:var(--text3)}.er-toolbar select{min-height:36px;border:1px solid var(--border);border-radius:9px;background:var(--surface2);color:var(--text);padding:7px 10px;font:700 12px/1.2 -apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif}.er-toolbar select:disabled{opacity:.55}.er-arrow{padding-bottom:9px;color:var(--text4);font-weight:800}'+
       '.er-summary{display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin:0 0 12px}.er-summary>span{border:1px solid var(--border);border-radius:999px;background:var(--surface);padding:5px 9px;color:var(--text3);font-size:10.5px;font-weight:800}.er-back{border:1px solid var(--border);border-radius:9px;background:var(--surface);color:var(--text3);padding:7px 10px;font:700 11px/1 inherit;cursor:pointer}'+
       '.er-section{margin-bottom:12px;padding:14px;border:1px solid var(--border);border-radius:14px;background:var(--surface)}.er-section h2{margin:0;font-size:15px}.er-empty{padding:28px;border:1px solid var(--border);border-radius:12px;background:var(--surface);color:var(--text4);font-size:12px;text-align:center}'+
@@ -345,7 +398,7 @@
       currentNav=1;
       try{result=originalSwitch.apply(this,arguments);}
       finally{currentNav='eventResults';}
-      state.location='';state.eventName='';state.occurrenceId='';state.selectedDate='';
+      state.kind='nearby';state.location='';state.eventName='';state.occurrenceId='';state.selectedDate='';
       doc.querySelectorAll('.nav-btn').forEach(function(node){node.classList.remove('active');});
       doc.querySelectorAll('.page').forEach(function(node){node.classList.remove('show');});
       doc.getElementById('navEventResults').classList.add('active');

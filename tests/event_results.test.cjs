@@ -14,7 +14,10 @@ function data(){
           {id:'e2',type:'nearby',scope:'store',startDate:'2025-09-12',endDate:'2025-09-12',snapshot:{version:1,title:'秋まつり',note:'前年',location:'文化フォーラム'}},
           {id:'e3',type:'nearby',scope:'store',startDate:'2026-10-01',endDate:'2026-10-01',snapshot:{version:1,title:'展示会',note:'',location:'市民会館'}},
           {id:'e4',type:'nearby',scope:'store',startDate:'2026-08-01',endDate:'2026-08-01',snapshot:{version:1,title:'旧催事',note:''}},
-          {id:'e5',type:'staff',scope:'store',startDate:'2026-09-10',endDate:'2026-09-10',snapshot:{version:1,title:'応援',note:''}}
+          {id:'e5',type:'staff',scope:'store',startDate:'2026-09-10',endDate:'2026-09-10',snapshot:{version:1,title:'応援',note:''}},
+          {id:'s1',type:'special',scope:'store',startDate:'2026-12-24',endDate:'2026-12-25',snapshot:{version:1,title:'クリスマス',note:'今年'}},
+          {id:'s2',type:'special',scope:'store',startDate:'2025-12-24',endDate:'2025-12-25',snapshot:{version:1,title:'クリスマス',note:'前年'}},
+          {id:'s3',type:'special',scope:'store',startDate:'2026-02-14',endDate:'2026-02-14',snapshot:{version:1,title:'バレンタイン',note:''}}
         ]
       }
     }
@@ -52,6 +55,18 @@ test('period summary recalculates customer unit price from totals',()=>{
   assert.equal(first.metrics.customers,221);
   assert.equal(first.metrics.customerUnitPrice,200021/221);
   assert.equal(first.metrics.items,402.1);
+});
+
+test('special day names and occurrences are collected without location',()=>{
+  const all=data();
+  assert.deepEqual(results.specialNames(all,'a'),['クリスマス','バレンタイン']);
+  const value=results.collectSpecial(all,'a','クリスマス',analysis);
+  assert.equal(value.kind,'special');
+  assert.equal(value.location,'');
+  assert.equal(value.occurrences.length,2);
+  assert.equal(value.occurrences[0].id,'s1');
+  assert.deepEqual(value.occurrences[0].days.map(day=>day.date),['2026-12-24','2026-12-25']);
+  assert.equal(value.occurrences[1].id,'s2');
 });
 
 test('empty selection does not read unrelated events',()=>{

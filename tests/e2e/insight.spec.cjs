@@ -397,6 +397,53 @@ test('イベント実績は過去開催→複数日→時間帯グラフ→カ�
 });
 
 
+test('イベント実績の特別日は場所選択なしで過去開催を参照できる',async({page})=>{
+  const errors=await openInsight(page);
+  await page.evaluate(()=>{
+    const store=allStores.stores[allStores.current];
+    store.events=(store.events||[]).filter(event=>!String(event.id||'').startsWith('e2e_special_day_'));
+    store.events.push(
+      {id:'e2e_special_day_old',type:'special',scope:'store',startDate:'2025-12-24',endDate:'2025-12-25',snapshot:{version:1,title:'E2Eクリスマス',note:'前年'}},
+      {id:'e2e_special_day_new',type:'special',scope:'store',startDate:'2026-12-24',endDate:'2026-12-25',snapshot:{version:1,title:'E2Eクリスマス',note:'今年'}}
+    );
+    function metricsFor(date){
+      const day=Number(date.slice(-2));
+      return {salesYen:200000+day*1000,customers:150+day,customerUnitPrice:(200000+day*1000)/(150+day),items:300+day/100,inputDays:1};
+    }
+    window.InsightAnalysisContext.buildDay=function(date){
+      return {metrics:metricsFor(date),conditions:{daily:[]}};
+    };
+    window.InsightAnalysisContext.buildRange=function(start,end){
+      const dates=[start];
+      if(end!==start)dates.push(end);
+      const rows=dates.map(metricsFor);
+      const sales=rows.reduce((sum,row)=>sum+row.salesYen,0);
+      const customers=rows.reduce((sum,row)=>sum+row.customers,0);
+      const items=rows.reduce((sum,row)=>sum+row.items,0);
+      return {metrics:{salesYen:sales,customers,customerUnitPrice:sales/customers,items,inputDays:rows.length}};
+    };
+    window.InsightEventResults.render();
+  });
+
+  await page.locator('#navEventResults').click();
+  await page.locator('.er-kind-btn[data-kind="special"]').click();
+  await expect(page.locator('.er-kind-btn[data-kind="special"]')).toHaveClass(/active/);
+  await expect(page.locator('#erLocationField')).toBeHidden();
+  await expect(page.locator('#erEventFieldLabel')).toHaveText('特別日名');
+  await expect(page.locator('#erEvent')).toBeEnabled();
+  await page.locator('#erEvent').selectOption({label:'E2Eクリスマス'});
+  await expect(page.locator('.er-occurrence')).toHaveCount(2);
+  await expect(page.locator('.er-occurrence').first()).toContainText('2026/12/24');
+  await expect(page.locator('.er-occurrence').first()).toContainText('12/25');
+  await page.locator('.er-occurrence').first().click();
+  await expect(page.locator('.er-detail-title h2')).toHaveText('E2Eクリスマス');
+  await expect(page.locator('.er-day-tab')).toHaveCount(2);
+  await page.locator('.er-back').click();
+  await page.locator('.er-kind-btn[data-kind="nearby"]').click();
+  await expect(page.locator('#erLocationField')).toBeVisible();
+  expect(errors).toEqual([]);
+});
+
 test('分析AIコメントは数値カードと簡潔な確認事項として表示する',async({page})=>{
   const errors=await openInsight(page);
   await page.locator('#aiAnalysisToggle').click();

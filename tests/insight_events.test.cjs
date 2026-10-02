@@ -60,6 +60,17 @@ test('nearby event location is optional for old backups and retained when presen
   const restored=JSON.parse(JSON.stringify(current));events.validate(restored);
   assert.equal(restored.stores.a.events[0].snapshot.location,'文化フォーラム');
 });
+test('special day is stored per store without a location and survives backup roundtrip',()=>{
+  const a=data();
+  events.add(a,'a',{type:'special',scope:'store',startDate:'2026-12-24',endDate:'2026-12-25',snapshot:{version:1,title:'クリスマス',note:'重点日'}});
+  events.validate(a);
+  assert.equal(events.list(a,'a','2026-12-24').length,1);
+  assert.equal(events.list(a,'b','2026-12-24').length,0);
+  assert.equal(a.stores.a.events[0].snapshot.location,undefined);
+  const restored=JSON.parse(JSON.stringify(a));events.validate(restored);
+  assert.equal(restored.stores.a.events[0].type,'special');
+  assert.equal(restored.stores.a.events[0].snapshot.title,'クリスマス');
+});
 test('malformed periods, scope, duplicates and conditions are rejected',()=>{
   const mutations=[e=>e.endDate='2026-02-30',e=>e.endDate='2026-09-21',e=>e.scope='store',e=>e.snapshot.sale.params.amount=-1,e=>e.snapshot.sale.params.amount='50',e=>e.snapshot.version=2];
   for(const mutate of mutations){const a=data();events.add(a,'a',sale());mutate(a.eventManagement.events[0]);assert.throws(()=>events.validate(a));}
