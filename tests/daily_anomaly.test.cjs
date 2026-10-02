@@ -152,3 +152,38 @@ test('通常ブレ幅は5%未満・15%超に広がらない',()=>{
   assert.equal(anomaly.bandPct([100,100,100],100),5);
   assert.equal(anomaly.bandPct([10,190],100),15);
 });
+
+
+test('説明レイヤーを利用して警告を説明済みと要調査に分離する',()=>{
+  const AnalysisContext=fakeAnalysis({
+    targetDay:{sales:70000,customers:70,unit:1000,waste:1000,wasteRate:1}
+  });
+  const AnomalyExplanation={
+    buildContext(){return {date:'2026-10-01'};},
+    enrich(findings){
+      return {
+        findings:findings.map(f=>Object.assign({},f,{explanation:{status:f.key==='sales'?'explained':'unexplained',label:f.key==='sales'?'説明要因あり':'説明要因未特定'}})),
+        counts:{explained:findings.some(f=>f.key==='sales')?1:0,partial:0,unexplained:0,not_applicable:0}
+      };
+    }
+  };
+  const result=anomaly.evaluate('2026-10-01','storeA',{AnalysisContext,AnomalyExplanation,nowIso:'2026-10-01'});
+  assert.equal(result.display.length,1);
+  assert.equal(result.display[0].key,'sales');
+  assert.equal(result.display[0].explanation.status,'explained');
+  assert.equal(result.explainedAlerts.length,1);
+  assert.equal(result.investigation.length,0);
+  assert.equal(result.explanationSummary.explained,1);
+});
+
+test('説明レイヤーが無くても既存の異常検知結果は変わらない',()=>{
+  const AnalysisContext=fakeAnalysis({
+    targetDay:{sales:70000,customers:70,unit:1000,waste:1000,wasteRate:1}
+  });
+  const result=anomaly.evaluate('2026-10-01','storeA',{AnalysisContext,AnomalyExplanation:null,nowIso:'2026-10-01'});
+  assert.equal(result.display.length,1);
+  assert.equal(result.display[0].key,'sales');
+  assert.equal(result.display[0].rawSeverity,'important');
+  assert.deepEqual(result.investigation.map(f=>f.key),['sales']);
+  assert.deepEqual(result.explainedAlerts,[]);
+});

@@ -17,7 +17,7 @@ test('payload互換パッチ11件はbootstrap moduleへ分離しIndexにはbody�
 
 test('トップページはキャッシュ抑止とビルド自己更新を持つ',()=>{
   const index=read('Index.html');
-  assert.match(index,/insight-shell-version" content="20261003-seasonality-1/);
+  assert.match(index,/insight-shell-version" content="20261003-anomaly-context-1/);
   assert.match(index,/Cache-Control" content="no-cache, no-store, must-revalidate/);
   assert.match(index,/insight_probe=/);
   assert.match(index,/cache:'no-store'/);
@@ -243,6 +243,24 @@ test('季節性分析は過去年度の季節指数と今年固有の変化を�
   assert.match(season,/externalTransmission:false/);
   assert.doesNotMatch(season,/\bfetch\s*\(|XMLHttpRequest|WebSocket|localStorage|InsightStorage/);
   assert.doesNotThrow(()=>new vm.Script(season),'seasonality module must be valid JavaScript');
+});
+
+test('異常説明レイヤーは曜日・セール・イベント・季節性を統合し既存警告を消さない',()=>{
+  const index=read('Index.html');
+  const explanation=read('insight_anomaly_explanation_v1.js');
+  const anomaly=read('insight_daily_anomaly_v1.js');
+  assert.match(index,/insight_anomaly_explanation_v1\.js\?v=20261003-anomaly-context-1/);
+  assert.match(index,/insight_daily_anomaly_v1\.js\?v=20261003-anomaly-context-1/);
+  assert.ok(index.indexOf('insight_seasonality_analysis_v1.js')<index.indexOf('insight_anomaly_explanation_v1.js'));
+  assert.ok(index.indexOf('insight_anomaly_explanation_v1.js')<index.indexOf('insight_daily_anomaly_v1.js'));
+  assert.match(explanation,/weekdayRole:'contextOnlyBecauseCoreBaselineAlreadyWeekdayMatched'/);
+  assert.match(explanation,/causality:'notAsserted'/);
+  assert.match(explanation,/説明要因未特定/);
+  assert.match(anomaly,/explainedAlerts/);
+  assert.match(anomaly,/investigation/);
+  assert.match(anomaly,/var display=findings\.filter/);
+  assert.doesNotMatch(explanation,/\bfetch\s*\(|XMLHttpRequest|WebSocket|localStorage|InsightStorage/);
+  assert.doesNotThrow(()=>new vm.Script(explanation),'anomaly explanation module must be valid JavaScript');
 });
 
 test('保存データ健全性チェックは読み取り専用で不整合を可視化する',()=>{

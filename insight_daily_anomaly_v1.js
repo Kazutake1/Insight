@@ -77,6 +77,7 @@
     overrides=overrides||{};
     return {
       context:overrides.AnalysisContext||root.InsightAnalysisContext,
+      explanation:overrides.AnomalyExplanation||root.InsightAnomalyExplanation,
       nowIso:overrides.nowIso||iso(new Date())
     };
   }
@@ -402,7 +403,25 @@
       return finalize(f,persistenceFor(f,date,storeId,overrides));
     }).sort(function(a,b){return priority(b)-priority(a);});
     var opportunities=core.opportunities.map(function(f){return finalize(f,1);}).filter(function(f){return f.confidence!=='low'&&f.confidence!=='none';});
+    var explanationContext=null,explanationCounts={explained:0,partial:0,unexplained:0,not_applicable:0};
+    var e=env(overrides),allToExplain=findings.concat(opportunities);
+    if(allToExplain.length&&e.explanation&&typeof e.explanation.buildContext==='function'&&typeof e.explanation.enrich==='function'){
+      try{
+        var targetDay=findDay(core.target,date);
+        explanationContext=e.explanation.buildContext(date,storeId,targetDay,overrides);
+        var enriched=e.explanation.enrich(findings,explanationContext);
+        findings=enriched.findings;
+        explanationCounts=enriched.counts;
+        opportunities=e.explanation.enrich(opportunities,explanationContext).findings;
+      }catch(_){}
+    }
     var display=findings.filter(function(f){return f.alertNow;}).slice(0,3);
+    var investigation=findings.filter(function(f){
+      return f.alertNow&&(!f.explanation||f.explanation.status!=='explained');
+    });
+    var explainedAlerts=findings.filter(function(f){
+      return f.alertNow&&f.explanation&&f.explanation.status==='explained';
+    });
     return {
       version:VERSION,
       date:date,
@@ -411,7 +430,11 @@
       findings:findings,
       display:display,
       opportunities:opportunities,
-      hasAlert:display.length>0
+      hasAlert:display.length>0,
+      explanationContext:explanationContext,
+      explanationSummary:explanationCounts,
+      investigation:investigation,
+      explainedAlerts:explainedAlerts
     };
   }
 
