@@ -324,15 +324,17 @@
       var selected=occurrence.days.find(function(day){return day.date===state.selectedDate;})||occurrence.days[0];
       if(!selected)return;
 
-      var daily=el('section',undefined,'er-section er-daily-summary');daily.append(el('h2',dateLabel(selected.date,true)));
-      var dailyCards=el('div',undefined,'er-daily-grid');
-      dailyCards.append(
-        summaryMetric('売上',yen(selected.metrics.salesYen)),
-        summaryMetric('客数',people(selected.metrics.customers)),
-        summaryMetric('客単価',yen(selected.metrics.customerUnitPrice)),
-        summaryMetric('買上点数',selected.metrics.items===null?'—':numberText(selected.metrics.items,2))
-      );
-      daily.append(dailyCards);results.append(daily);
+      if(occurrence.days.length>1){
+        var daily=el('section',undefined,'er-section er-daily-summary');daily.append(el('h2',dateLabel(selected.date,true)));
+        var dailyCards=el('div',undefined,'er-daily-grid');
+        dailyCards.append(
+          summaryMetric('売上',yen(selected.metrics.salesYen)),
+          summaryMetric('客数',people(selected.metrics.customers)),
+          summaryMetric('客単価',yen(selected.metrics.customerUnitPrice)),
+          summaryMetric('買上点数',selected.metrics.items===null?'—':numberText(selected.metrics.items,2))
+        );
+        daily.append(dailyCards);results.append(daily);
+      }
       var hourly=hourlySection(selected.date);if(hourly)results.append(hourly);
       var sales=salesCategoriesSection(selected.date);if(sales)results.append(sales);
     }

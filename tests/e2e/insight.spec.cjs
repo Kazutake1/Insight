@@ -746,6 +746,7 @@ test('イベント実績は過去開催→複数日→時間帯グラフ→カ�
 
   await page.locator('.er-occurrence').first().click();
   await expect(page.locator('.er-overview-grid .er-summary-card')).toHaveCount(4);
+  await expect(page.locator('.er-daily-summary')).toBeVisible();
   await expect(page.locator('.er-day-tab')).toHaveCount(2);
   await expect(page.locator('.er-day-tab').first()).toHaveClass(/active/);
   await expect(page.locator('.er-hourly-section')).toBeVisible();
@@ -799,7 +800,7 @@ test('イベント実績は過去開催→複数日→時間帯グラフ→カ�
   await page.locator('.er-back').click();
   await page.locator('.er-occurrence').nth(1).click();
   await expect(page.locator('.er-day-tabs')).toHaveCount(0);
-  await expect(page.locator('.er-daily-summary')).toBeVisible();
+  await expect(page.locator('.er-daily-summary')).toHaveCount(0);
   expect(errors).toEqual([]);
 });
 
