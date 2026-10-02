@@ -50,7 +50,7 @@ test('選択月は主要ページを横断しても維持される',async({page}
 test('トップページはビルド番号を持ち最新版確認をno-storeで行う',async({page})=>{
   const errors=await openInsight(page);
   const source=await page.evaluate(()=>fetch('/Index.html?e2e-shell-check=1',{cache:'no-store'}).then(r=>r.text()));
-  expect(source).toContain('name="insight-shell-version" content="20261002-year-delete-consistency-1"');
+  expect(source).toContain('name="insight-shell-version" content="20261002-data-health-1"');
   expect(source).toContain("fetch('./Index.html?insight_probe='+Date.now(),{cache:'no-store'})");
   expect(source).toContain("location.replace('./Index.html?insight_build='+encodeURIComponent(m[1]))");
   expect(errors).toEqual([]);
@@ -125,6 +125,42 @@ test('年度一覧にない古い疎データは起動を妨げず正式年度�
   expect(restored.orphan[1]).toBeNull();
   expect(errors).toEqual([]);
 });
+
+test('データ状態チェックは未登録年度を要確認表示し保存内容を変更しない',async({page})=>{
+  const errors=await openInsight(page);
+  await page.waitForFunction(()=>window.InsightDataHealth&&document.getElementById('insightDataHealthButton'));
+  await expect(page.locator('#insightDataHealthButton')).toBeVisible();
+
+  await page.evaluate(()=>{
+    const store=allStores.stores[allStores.current];
+    store.data['1999']={'8月':[null,null,{d:'3',売上:0,客数:0,買上点数:0,廃棄金額:0,haiki:{},weather:'晴'}]};
+    store.years=store.years.filter(y=>String(y)!=='1999');
+    store.monthlyOps=store.monthlyOps||{};
+    store.monthlyOps['1999']={'8月':{laborCostYen:1,grossMarginRate:1}};
+    store.salesCounts=store.salesCounts||{};
+    store.salesCounts['1999-08-03']={};
+    store.hourlyCustomers=store.hourlyCustomers||{};
+    store.hourlyCustomers['1999-08-03']=Array(24).fill(null);
+    persist();
+    window.InsightDataHealth.refresh();
+  });
+
+  const rawBefore=await page.evaluate(()=>localStorage.getItem('insight_v11'));
+  await expect(page.locator('#insightDataHealthButton')).toContainText('データ状態：要確認');
+  await page.locator('#insightDataHealthButton').click();
+  await expect(page.locator('#insightDataHealthOverlay')).toBeVisible();
+  await expect(page.locator('#insightDataHealthSummary')).toContainText('要確認');
+  await expect(page.locator('#insightDataHealthIssues')).toContainText('1999年度');
+  await expect(page.locator('#insightDataHealthIssues')).toContainText('正式年度一覧にない');
+  const report=await page.evaluate(()=>window.InsightDataHealth.getLastReport());
+  expect(report.issues.some(item=>item.code==='orphan_data_year')).toBe(true);
+  expect(report.issues.some(item=>item.code==='sales_unregistered_year')).toBe(true);
+  expect(report.issues.some(item=>item.code==='hourly_unregistered_year')).toBe(true);
+  const rawAfter=await page.evaluate(()=>localStorage.getItem('insight_v11'));
+  expect(rawAfter).toBe(rawBefore);
+  expect(errors).toEqual([]);
+});
+
 
 test('保存済みデータが壊れている場合は空データで起動せず保存データを保持する',async({page})=>{
   const pakoPath=path.join(process.cwd(),'node_modules','pako','dist','pako.min.js');

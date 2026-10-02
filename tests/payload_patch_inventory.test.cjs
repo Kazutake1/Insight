@@ -17,7 +17,7 @@ test('payload互換パッチ11件はbootstrap moduleへ分離しIndexにはbody�
 
 test('トップページはキャッシュ抑止とビルド自己更新を持つ',()=>{
   const index=read('Index.html');
-  assert.match(index,/insight-shell-version" content="20261002-year-delete-consistency-1/);
+  assert.match(index,/insight-shell-version" content="20261002-data-health-1/);
   assert.match(index,/Cache-Control" content="no-cache, no-store, must-revalidate/);
   assert.match(index,/insight_probe=/);
   assert.match(index,/cache:'no-store'/);
@@ -159,6 +159,22 @@ test('STEP7で将来AI接続用の共通analysisContext境界を追加する',()
   assert.match(aiContext,/externalTransmission:false/);
   assert.doesNotMatch(aiContext,/\bfetch\s*\(|XMLHttpRequest|WebSocket|localStorage|InsightStorage/);
   assert.doesNotThrow(()=>new vm.Script(aiContext),'AI context module must be valid JavaScript');
+});
+
+test('保存データ健全性チェックは読み取り専用で不整合を可視化する',()=>{
+  const index=read('Index.html');
+  const health=read('insight_data_health_v1.js');
+  assert.match(index,/insight_data_health_v1\.js\?v=20261002-data-health/);
+  assert.ok(index.indexOf('insight_backup_guard_v1.js')<index.indexOf('insight_data_health_v1.js'));
+  assert.match(health,/function check\(snapshot\)/);
+  assert.match(health,/orphan_data_year/);
+  assert.match(health,/sales_unregistered_year/);
+  assert.match(health,/hourly_unregistered_year/);
+  assert.match(health,/データ状態：正常/);
+  assert.match(health,/データ状態：要確認/);
+  assert.match(health,/この確認は読み取り専用です/);
+  assert.doesNotMatch(health,/localStorage\.setItem|InsightStorage\.writeSnapshot|InsightStorage\.persistCurrent/);
+  assert.doesNotThrow(()=>new vm.Script(health),'data health module must be valid JavaScript');
 });
 
 test('過年度は既存の疎データを保持して正式年度へ昇格し販売数入力から追加できる',()=>{

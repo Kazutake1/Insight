@@ -18,6 +18,7 @@ const ordered=[
   'insight_ops_kpifix_v1.js',
   'insight_ai_ops_v1.js',
   'insight_backup_guard_v1.js',
+  'insight_data_health_v1.js',
   'insight_waste_insights_v1.js',
   'insight_dashboard_year_fix_v1.js',
   'insight_kyaku_insights_v1.js',
