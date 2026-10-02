@@ -59,6 +59,12 @@ test('不正なschemaVersionは拒否する',()=>{
   assert.throws(()=>window.InsightStorage.migrateSnapshot({schemaVersion:-1}),/schema version is invalid/);
 });
 
+test('writeMetadataは補助メタデータを共有storage層から保存する',()=>{
+  const {storage,calls}=load({schemaVersion:1,current:'a',stores:{a:{}}});
+  assert.equal(storage.writeMetadata('insight_last_backup',12345),true);
+  assert.deepEqual(calls,[['insight_last_backup','12345']]);
+});
+
 test('persistCurrentは現在データを共有writer経由で保存する',()=>{
   const {window,calls}=setup();
   const live={current:'a',stores:{a:{name:'A'}}};

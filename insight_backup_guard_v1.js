@@ -149,7 +149,7 @@ backupData=function(){
     var url=URL.createObjectURL(blob),a=document.createElement("a");
     a.href=url;a.download=filename;document.body.appendChild(a);a.click();a.remove();
     setTimeout(function(){URL.revokeObjectURL(url);},1000);
-    localStorage.setItem("insight_last_backup",String(Date.now()));
+    window.InsightStorage.writeMetadata("insight_last_backup",String(Date.now()));
     if(typeof updateBackupDaysLabel==="function")updateBackupDaysLabel();
     showToast("📥 バックアップを保存しました","#15803d","#f0fdf4");
   }catch(err){

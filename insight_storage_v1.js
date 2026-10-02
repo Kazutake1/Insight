@@ -47,6 +47,12 @@
     return serialized;
   }
 
+  function writeMetadata(key,value){
+    if(typeof key!=='string'||!key)throw new Error('Insight metadata key is invalid.');
+    root.localStorage.setItem(key,String(value));
+    return true;
+  }
+
   function persistCurrent(snapshot){
     var target=snapshot;
     if(target===undefined){
@@ -89,6 +95,7 @@
     migrateSnapshot:migrateSnapshot,
     serialize:serialize,
     writeSnapshot:writeSnapshot,
+    writeMetadata:writeMetadata,
     persistCurrent:persistCurrent,
     transaction:transaction
   };
