@@ -39,6 +39,7 @@ jobs:
           - monthly_review.test.cjs
           - multiyear_analysis.test.cjs
           - weekday_analysis.test.cjs
+          - sale_impact.test.cjs
           - page_period_sync.test.cjs
           - payload_browser_smoke.test.cjs
           - payload_patch_inventory.test.cjs

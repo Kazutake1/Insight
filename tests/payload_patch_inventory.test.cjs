@@ -17,7 +17,7 @@ test('payload互換パッチ11件はbootstrap moduleへ分離しIndexにはbody�
 
 test('トップページはキャッシュ抑止とビルド自己更新を持つ',()=>{
   const index=read('Index.html');
-  assert.match(index,/insight-shell-version" content="20261003-weekday-analysis-1/);
+  assert.match(index,/insight-shell-version" content="20261003-sale-impact-1/);
   assert.match(index,/Cache-Control" content="no-cache, no-store, must-revalidate/);
   assert.match(index,/insight_probe=/);
   assert.match(index,/cache:'no-store'/);
@@ -199,6 +199,20 @@ test('曜日分析は複数年度分析の後に読み込みイベント・祝�
   assert.match(weekday,/externalTransmission:false/);
   assert.doesNotMatch(weekday,/\bfetch\s*\(|XMLHttpRequest|WebSocket|localStorage|InsightStorage/);
   assert.doesNotThrow(()=>new vm.Script(weekday),'weekday analysis module must be valid JavaScript');
+});
+
+test('セール影響分析は曜日分析の後に読み込み前中後を読み取り専用で比較する',()=>{
+  const index=read('Index.html');
+  const impact=read('insight_sale_impact_v1.js');
+  assert.match(index,/insight_sale_impact_v1\.js\?v=20261003-sale-impact-1/);
+  assert.ok(index.indexOf('insight_weekday_analysis_v1.js')<index.indexOf('insight_sale_impact_v1.js'));
+  assert.ok(index.indexOf('insight_sale_impact_v1.js')<index.indexOf('insight_daily_anomaly_v1.js'));
+  assert.match(impact,/DEFAULT_WINDOW_WEEKS=4/);
+  assert.match(impact,/controlDayDefinition:'sameWeekdayNoEventNoHoliday'/);
+  assert.match(impact,/function analyzeOccurrence\(/);
+  assert.match(impact,/externalTransmission:false/);
+  assert.doesNotMatch(impact,/\bfetch\s*\(|XMLHttpRequest|WebSocket|localStorage|InsightStorage/);
+  assert.doesNotThrow(()=>new vm.Script(impact),'sale impact module must be valid JavaScript');
 });
 
 test('保存データ健全性チェックは読み取り専用で不整合を可視化する',()=>{
