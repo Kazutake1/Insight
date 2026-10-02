@@ -159,6 +159,35 @@ test('バックアップ復元は実在日と有効なカテゴリーマスタ�
   assert.match(source,/CURRENT_SCHEMA_VERSION/);
 });
 
+test('通常バックアップは日時・店舗数・対象年度を持つv2形式で保存する',()=>{
+  const source=fs.readFileSync(path.join(root,'insight_backup_guard_v1.js'),'utf8');
+  assert.match(source,/BACKUP_FORMAT="InsightBackup",BACKUP_FORMAT_VERSION=2/);
+  assert.match(source,/createdAt:now\.toISOString\(\)/);
+  assert.match(source,/storeCount:stores\.length/);
+  assert.match(source,/years:backupYears\(snapshot\)/);
+  assert.match(source,/stores:stores/);
+  assert.match(source,/data:snapshot/);
+  assert.match(source,/Insight_backup_all_stores_/);
+});
+
+test('復元前検査はデータ健全性を確認し重大エラーを保存前に拒否する',()=>{
+  const source=fs.readFileSync(path.join(root,'insight_backup_guard_v1.js'),'utf8');
+  assert.match(source,/InsightDataHealth\.check\(snapshot\)/);
+  assert.match(source,/if\(report\.counts\.errors\)/);
+  assert.ok(source.indexOf('runRestorePreflight(newAll)')<source.indexOf('InsightStorage.writeSnapshot(newAll)'));
+  assert.match(source,/バックアップ日時：/);
+  assert.match(source,/店舗数：/);
+  assert.match(source,/対象年度：/);
+  assert.match(source,/復元前検査：/);
+});
+
+test('新旧バックアップ形式を復元対象として維持する',()=>{
+  const source=fs.readFileSync(path.join(root,'insight_backup_guard_v1.js'),'utf8');
+  assert.match(source,/Object\.prototype\.hasOwnProperty\.call\(raw,"backupInfo"\)/);
+  assert.match(source,/return \{data:raw,info:null,legacy:true\}/);
+  assert.match(source,/Array\.isArray\(raw\.years\)&&isPlainObject\(raw\.data\)/);
+});
+
 test('販売数入力を開いたままバックアップ復元しても復元後データを再読込する',()=>{
   const sales=fs.readFileSync(path.join(root,'insight_sales_count_v1.js'),'utf8');
   const backup=fs.readFileSync(path.join(root,'insight_backup_guard_v1.js'),'utf8');

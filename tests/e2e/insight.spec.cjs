@@ -1,5 +1,6 @@
 const {test,expect}=require('@playwright/test');
 const path=require('node:path');
+const fs=require('node:fs');
 
 async function openInsight(page){
   const pakoPath=path.join(process.cwd(),'node_modules','pako','dist','pako.min.js');
@@ -50,9 +51,43 @@ test('選択月は主要ページを横断しても維持される',async({page}
 test('トップページはビルド番号を持ち最新版確認をno-storeで行う',async({page})=>{
   const errors=await openInsight(page);
   const source=await page.evaluate(()=>fetch('/Index.html?e2e-shell-check=1',{cache:'no-store'}).then(r=>r.text()));
-  expect(source).toContain('name="insight-shell-version" content="20261002-single-day-summary-1"');
+  expect(source).toContain('name="insight-shell-version" content="20261002-backup-preflight-1"');
   expect(source).toContain("fetch('./Index.html?insight_probe='+Date.now(),{cache:'no-store'})");
   expect(source).toContain("location.replace('./Index.html?insight_build='+encodeURIComponent(m[1]))");
+  expect(errors).toEqual([]);
+});
+
+test('通常バックアップはメタ情報を含み復元前に内容と検査結果を確認できる',async({page})=>{
+  const errors=await openInsight(page);
+  const expected=await page.evaluate(()=>({
+    storeCount:Object.keys(allStores.stores).length,
+    years:Array.from(new Set(Object.values(allStores.stores).flatMap(st=>st.years.map(String)))).sort()
+  }));
+
+  const downloadPromise=page.waitForEvent('download');
+  await page.locator('#backupBtn').click();
+  const download=await downloadPromise;
+  expect(download.suggestedFilename()).toMatch(/^Insight_backup_all_stores_\d{8}_\d{6}\.json$/);
+  const downloadPath=await download.path();
+  const backup=JSON.parse(fs.readFileSync(downloadPath,'utf8'));
+  expect(backup.backupInfo.format).toBe('InsightBackup');
+  expect(backup.backupInfo.formatVersion).toBe(2);
+  expect(Number.isFinite(Date.parse(backup.backupInfo.createdAt))).toBe(true);
+  expect(backup.backupInfo.storeCount).toBe(expected.storeCount);
+  expect(backup.backupInfo.years).toEqual(expected.years);
+  expect(backup.backupInfo.stores).toHaveLength(expected.storeCount);
+  expect(backup.data&&backup.data.stores).toBeTruthy();
+
+  const dialogPromise=page.waitForEvent('dialog');
+  const setFile=page.locator('#restoreFile').setInputFiles(downloadPath);
+  const dialog=await dialogPromise;
+  expect(dialog.type()).toBe('confirm');
+  expect(dialog.message()).toContain('バックアップ日時：');
+  expect(dialog.message()).toContain('店舗数：'+expected.storeCount);
+  expect(dialog.message()).toContain('対象年度：'+expected.years.join(' / '));
+  expect(dialog.message()).toContain('復元前検査：正常');
+  await dialog.dismiss();
+  await setFile;
   expect(errors).toEqual([]);
 });
 

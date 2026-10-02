@@ -4,6 +4,83 @@ function validYear(v){return /^\d{4}$/.test(String(v));}
 function nonNegativeNumber(v,label){if(v===undefined||v===null||v==="")return 0;var n=Number(v);if(!Number.isFinite(n)||n<0)throw new Error(label+" が不正です");return n;}
 function expectedDays(year,monthIndex){var y=Number(year);if(monthIndex===1&&y%4===0&&(y%100!==0||y%400===0))return 29;return DAYS_IN_MONTH[monthIndex];}
 function validSalesCountDate(value){var match=/^(\d{4})-(\d{2})-(\d{2})$/.exec(value);if(!match)return false;var year=Number(match[1]),month=Number(match[2]),day=Number(match[3]),date=new Date(Date.UTC(year,month-1,day));return date.getUTCFullYear()===year&&date.getUTCMonth()===month-1&&date.getUTCDate()===day;}
+var BACKUP_FORMAT="InsightBackup",BACKUP_FORMAT_VERSION=2;
+function validationError(message){var error=new Error(message);error.name="InsightBackupValidationError";return error;}
+function currentStorageKey(){try{if(typeof SK!=="undefined"&&SK)return String(SK);}catch(_){}return "insight_v11";}
+function sameStrings(a,b){if(!Array.isArray(a)||!Array.isArray(b))return false;var x=a.map(String).slice().sort(),y=b.map(String).slice().sort();return x.length===y.length&&x.every(function(v,i){return v===y[i];});}
+function backupYears(snapshot){
+  var set=new Set();
+  Object.keys(snapshot.stores||{}).forEach(function(id){var st=snapshot.stores[id];if(st&&Array.isArray(st.years))st.years.forEach(function(y){if(validYear(y))set.add(String(y));});});
+  return Array.from(set).sort();
+}
+function backupStoreInfo(snapshot){
+  return Object.keys(snapshot.stores||{}).map(function(id){var st=snapshot.stores[id]||{};return {id:id,name:String(st.name||id),years:Array.isArray(st.years)?st.years.map(String).filter(validYear).sort():[]};});
+}
+function buildBackupInfo(snapshot,now){
+  var stores=backupStoreInfo(snapshot);
+  return {
+    format:BACKUP_FORMAT,
+    formatVersion:BACKUP_FORMAT_VERSION,
+    createdAt:now.toISOString(),
+    storageKey:currentStorageKey(),
+    schemaVersion:snapshot.schemaVersion,
+    buildId:window.__INSIGHT_SHELL_VERSION__||"",
+    storeCount:stores.length,
+    currentStoreId:snapshot.current,
+    years:backupYears(snapshot),
+    stores:stores
+  };
+}
+function parseBackupEnvelope(raw){
+  if(isPlainObject(raw)&&Object.prototype.hasOwnProperty.call(raw,"backupInfo")){
+    if(!isPlainObject(raw.backupInfo)||!isPlainObject(raw.data))throw validationError("バックアップ情報またはデータ本体が不正です。");
+    return {data:raw.data,info:raw.backupInfo,legacy:false};
+  }
+  return {data:raw,info:null,legacy:true};
+}
+function validateBackupInfo(info,snapshot){
+  if(info.format!==BACKUP_FORMAT||Number(info.formatVersion)!==BACKUP_FORMAT_VERSION)throw validationError("このバックアップ形式には対応していません。");
+  if(typeof info.createdAt!=="string"||!Number.isFinite(Date.parse(info.createdAt)))throw validationError("バックアップ日時が不正です。");
+  if(info.storageKey!==undefined&&typeof info.storageKey!=="string")throw validationError("保存領域情報が不正です。");
+  if(info.buildId!==undefined&&typeof info.buildId!=="string")throw validationError("ビルド情報が不正です。");
+  if(Number(info.schemaVersion)!==Number(snapshot.schemaVersion))throw validationError("バックアップ情報とデータ形式のバージョンが一致しません。");
+  var actualStores=backupStoreInfo(snapshot),actualIds=actualStores.map(function(item){return item.id;});
+  if(!Number.isSafeInteger(Number(info.storeCount))||Number(info.storeCount)!==actualStores.length)throw validationError("バックアップ情報の店舗数がデータ本体と一致しません。");
+  if(!Array.isArray(info.stores)||info.stores.length!==actualStores.length)throw validationError("バックアップ情報の店舗一覧がデータ本体と一致しません。");
+  var metaIds=[];
+  info.stores.forEach(function(item){
+    if(!isPlainObject(item)||typeof item.id!=="string"||!item.id||typeof item.name!=="string"||!Array.isArray(item.years))throw validationError("バックアップ情報の店舗内容が不正です。");
+    var actual=actualStores.find(function(store){return store.id===item.id;});
+    if(!actual||actual.name!==item.name||!sameStrings(item.years,actual.years))throw validationError("バックアップ情報の店舗・年度がデータ本体と一致しません。");
+    metaIds.push(item.id);
+  });
+  if(!sameStrings(metaIds,actualIds))throw validationError("バックアップ情報の店舗識別情報が一致しません。");
+  if(!Array.isArray(info.years)||info.years.some(function(y){return !validYear(y);})||!sameStrings(info.years,backupYears(snapshot)))throw validationError("バックアップ情報の対象年度がデータ本体と一致しません。");
+  if(typeof info.currentStoreId!=="string"||info.currentStoreId!==snapshot.current)throw validationError("バックアップ情報の現在店舗がデータ本体と一致しません。");
+}
+function runRestorePreflight(snapshot){
+  if(!window.InsightDataHealth||typeof window.InsightDataHealth.check!=="function")throw validationError("データ状態確認機能を初期化できませんでした。");
+  var report=window.InsightDataHealth.check(snapshot);
+  if(!report||!report.counts)throw validationError("復元前検査を完了できませんでした。");
+  if(report.counts.errors){
+    var details=(report.issues||[]).filter(function(item){return item.severity==="error";}).slice(0,5).map(function(item){return "・"+item.message;}).join("\n");
+    throw validationError("復元前検査で重大な問題が"+report.counts.errors+"件見つかりました。"+(details?"\n"+details:""));
+  }
+  return report;
+}
+function restoreSummary(fileName,info,snapshot,report){
+  var created="記録なし（従来形式）";
+  if(info&&typeof info.createdAt==="string"){try{created=new Date(info.createdAt).toLocaleString("ja-JP");}catch(_){}}
+  var years=backupYears(snapshot);
+  var checkText=report.counts.warnings?"注意 "+report.counts.warnings+"件（重大 0件）":"正常";
+  var message=fileName+"\n\nバックアップ日時："+created+"\n店舗数："+Object.keys(snapshot.stores).length+"\n対象年度："+(years.length?years.join(" / "):"なし")+"\n復元前検査："+checkText;
+  if(report.counts.warnings){
+    var warnings=(report.issues||[]).filter(function(item){return item.severity==="warning";}).slice(0,3).map(function(item){return "・"+item.message;}).join("\n");
+    if(warnings)message+="\n\n注意事項\n"+warnings;
+  }
+  return message+"\n\n現在の全データは上書きされます。復元しますか？";
+}
+
 function normalizeSalesCount(next){
   if(next.salesCountManagement===undefined)next.salesCountManagement={version:1,categories:[{id:"cat_onigiri",name:"おにぎり",hidden:false,aliases:[]},{id:"cat_sandwich",name:"サンドイッチ",hidden:false,aliases:[]},{id:"cat_noodles",name:"麺類",hidden:false,aliases:[]}]};
   if(!isPlainObject(next.salesCountManagement)||next.salesCountManagement.version!==1||!Array.isArray(next.salesCountManagement.categories)||!next.salesCountManagement.categories.length||!next.salesCountManagement.categories.some(function(c){return isPlainObject(c)&&c.hidden===false;}))throw new Error("販売数カテゴリーマスターが不正です");
@@ -60,8 +137,39 @@ function normalizeBackup(raw){
   else if(next.eventManagement!==undefined||Object.keys(next.stores).some(function(id){return next.stores[id].events!==undefined;}))throw new Error("店舗イベント機能の読み込み後に復元してください");
   return next;
 }
+backupData=function(){
+  try{
+    if(!window.InsightStorage)throw new Error("保存機能を初期化できませんでした");
+    var snapshot=window.InsightStorage.migrateSnapshot(allStores),now=new Date();
+    var payload={backupInfo:buildBackupInfo(snapshot,now),data:snapshot};
+    var pad=function(n){return String(n).padStart(2,"0");};
+    var stamp=now.getFullYear()+pad(now.getMonth()+1)+pad(now.getDate())+"_"+pad(now.getHours())+pad(now.getMinutes())+pad(now.getSeconds());
+    var filename="Insight_backup_all_stores_"+stamp+".json";
+    var blob=new Blob([JSON.stringify(payload,null,2)],{type:"application/json"});
+    var url=URL.createObjectURL(blob),a=document.createElement("a");
+    a.href=url;a.download=filename;document.body.appendChild(a);a.click();a.remove();
+    setTimeout(function(){URL.revokeObjectURL(url);},1000);
+    localStorage.setItem("insight_last_backup",String(Date.now()));
+    if(typeof updateBackupDaysLabel==="function")updateBackupDaysLabel();
+    showToast("📥 バックアップを保存しました","#15803d","#f0fdf4");
+  }catch(err){
+    console.warn("Insight backup failed:",err);
+    alert("バックアップを保存できませんでした。\n"+String(err&&err.message?err.message:err));
+  }
+};
 restoreData=function(e){
   var file=e.target.files[0];if(!file)return;if(file.size>20*1024*1024){alert("バックアップファイルが大きすぎます。\n20MB以下のファイルを選択してください。");e.target.value="";return;}
-  var reader=new FileReader();reader.onload=function(ev){try{var parsed=JSON.parse(ev.target.result);var newAll=normalizeBackup(parsed);var serialized=JSON.stringify(newAll);if(!confirm(file.name+"\nのデータを復元します。現在の全データは上書きされます。よろしいですか？")){e.target.value="";return;}try{if(!window.InsightStorage)throw new Error("保存機能を初期化できませんでした");window.InsightStorage.writeSnapshot(newAll);}catch(storageErr){throw new Error("保存容量が不足しているため復元できません");}allStores=newAll;store=allStores.stores[allStores.current];baseYear=store.years[store.years.length-1];cmpYear=store.years.length>1?store.years[store.years.length-2]:null;editYear={sales:baseYear,kyaku:baseYear,haiki:baseYear};editMonth={sales:todayFY().month,kyaku:todayFY().month,haiki:todayFY().month};renderStoreSel();if(currentNav==='salesCounts'){if(window.InsightSalesCount&&typeof window.InsightSalesCount.reloadFromStore==="function")window.InsightSalesCount.reloadFromStore();else gotoNav('salesCounts');}else if(currentNav===1)refreshDash();else if(currentNav>1)initInputPage(["","","sales","kyaku","haiki"][currentNav]);else initQuickPage();if(window.InsightPagePeriodSync&&typeof window.InsightPagePeriodSync.reconcileCurrentStore==="function")window.InsightPagePeriodSync.reconcileCurrentStore();updateMissingBadge();showToast("📤 データを復元しました","#1d4ed8","#eff6ff");}catch(err){console.warn("Insight restore rejected:",err);alert("ファイルの読み込みに失敗しました。\nInsightの正しいバックアップファイルを選択してください。\n\n現在のデータは変更されていません。");}e.target.value="";};reader.onerror=function(){alert("ファイルを読み込めませんでした。\n現在のデータは変更されていません。");e.target.value="";};reader.readAsText(file);
+  var reader=new FileReader();reader.onload=function(ev){try{
+    var parsed=JSON.parse(ev.target.result),envelope=parseBackupEnvelope(parsed),newAll=normalizeBackup(envelope.data);
+    if(envelope.info)validateBackupInfo(envelope.info,newAll);
+    var preflight=runRestorePreflight(newAll);
+    if(!confirm(restoreSummary(file.name,envelope.info,newAll,preflight))){e.target.value="";return;}
+    try{if(!window.InsightStorage)throw new Error("保存機能を初期化できませんでした");window.InsightStorage.writeSnapshot(newAll);}catch(storageErr){throw new Error("保存容量が不足しているため復元できません");}
+    allStores=newAll;store=allStores.stores[allStores.current];baseYear=store.years[store.years.length-1];cmpYear=store.years.length>1?store.years[store.years.length-2]:null;editYear={sales:baseYear,kyaku:baseYear,haiki:baseYear};editMonth={sales:todayFY().month,kyaku:todayFY().month,haiki:todayFY().month};renderStoreSel();if(currentNav==='salesCounts'){if(window.InsightSalesCount&&typeof window.InsightSalesCount.reloadFromStore==="function")window.InsightSalesCount.reloadFromStore();else gotoNav('salesCounts');}else if(currentNav===1)refreshDash();else if(currentNav>1)initInputPage(["","","sales","kyaku","haiki"][currentNav]);else initQuickPage();if(window.InsightPagePeriodSync&&typeof window.InsightPagePeriodSync.reconcileCurrentStore==="function")window.InsightPagePeriodSync.reconcileCurrentStore();updateMissingBadge();showToast("📤 データを復元しました","#1d4ed8","#eff6ff");
+  }catch(err){
+    console.warn("Insight restore rejected:",err);
+    var detail=String(err&&err.message?err.message:err);
+    alert("バックアップを復元できませんでした。\n"+detail+"\n\n現在のデータは変更されていません。");
+  }e.target.value="";};reader.onerror=function(){alert("ファイルを読み込めませんでした。\n現在のデータは変更されていません。");e.target.value="";};reader.readAsText(file);
 };
 })();
