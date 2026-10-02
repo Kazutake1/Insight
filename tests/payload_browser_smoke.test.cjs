@@ -44,6 +44,16 @@ test('主要ナビ・入力・保存関数はbase payloadに存在する',()=>{
   }
 });
 
+test('起動時の保存データ読込は失敗時に空データへフォールバックしない',()=>{
+  const bootstrap=read('insight_bootstrap_patches_v1.js');
+  assert.match(bootstrap,/var originalLoadAll=/);
+  assert.match(bootstrap,/var safeLoadAll=/);
+  assert.match(bootstrap,/Insight stored data load failed/);
+  assert.match(bootstrap,/insightStorageLoadError/);
+  assert.match(bootstrap,/if\(current!==null\)/);
+  assert.match(bootstrap,/failStoredDataLoad/);
+});
+
 test('STEP5で残した文字列patchの元anchorはpayload内に全て残っている',()=>{
   const html=basePayload();
   const bootstrap=read('insight_bootstrap_patches_v1.js');

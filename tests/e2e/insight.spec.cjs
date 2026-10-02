@@ -47,6 +47,60 @@ test('選択月は主要ページを横断しても維持される',async({page}
 });
 
 
+test('保存したデータはページ再読込後も復元される',async({page})=>{
+  const errors=await openInsight(page);
+  const expected=await page.evaluate(()=>{
+    const storeId=allStores.current;
+    const st=allStores.stores[storeId];
+    const year=String(st.years[0]);
+    const month='1月';
+    if(!st.data[year]||!st.data[year][month])throw new Error('fixture month unavailable');
+    st.data[year][month][0].storeMemo='E2E再読込保持';
+    st.hourlyCustomers=st.hourlyCustomers||{};
+    st.hourlyCustomers['2026-10-02']=Array.from({length:24},(_,hour)=>hour);
+    allStores.eventManagement=allStores.eventManagement||{version:1,presets:[],events:[]};
+    allStores.eventManagement.specialPresets=[{id:'reload_preset',snapshot:{version:1,title:'E2E再読込催事',note:'保持確認'}}];
+    persist();
+    return {storeId,year};
+  });
+
+  const rawBefore=await page.evaluate(()=>localStorage.getItem('insight_v11'));
+  expect(rawBefore).toContain('E2E再読込保持');
+  await page.reload({waitUntil:'domcontentloaded'});
+  await expect(page.locator('#nav1')).toBeVisible();
+  await page.waitForFunction(()=>window.InsightStorage&&window.InsightHourlyCustomers&&window.InsightEvents);
+
+  const restored=await page.evaluate(({storeId,year})=>{
+    const st=allStores.stores[storeId];
+    return {
+      memo:st.data[year]['1月'][0].storeMemo,
+      hourly:st.hourlyCustomers['2026-10-02'],
+      preset:allStores.eventManagement.specialPresets[0].snapshot.title,
+      raw:localStorage.getItem('insight_v11')
+    };
+  },expected);
+  expect(restored.memo).toBe('E2E再読込保持');
+  expect(restored.hourly).toHaveLength(24);
+  expect(restored.hourly[23]).toBe(23);
+  expect(restored.preset).toBe('E2E再読込催事');
+  expect(restored.raw).toBe(rawBefore);
+  expect(errors).toEqual([]);
+});
+
+test('保存済みデータが壊れている場合は空データで起動せず保存データを保持する',async({page})=>{
+  const pakoPath=path.join(process.cwd(),'node_modules','pako','dist','pako.min.js');
+  await page.route('https://unpkg.com/pako@2.1.0/dist/pako.min.js',route=>
+    route.fulfill({path:pakoPath,contentType:'application/javascript'})
+  );
+  await page.addInitScript(()=>localStorage.setItem('insight_v11','{"current":"broken","stores":'));
+  await page.goto('/Index.html',{waitUntil:'domcontentloaded'});
+  await expect(page.locator('#insightStorageLoadError')).toBeVisible();
+  await expect(page.locator('#insightStorageLoadError')).toContainText('空のデータでは起動していません');
+  await expect(page.locator('#nav1')).toHaveCount(0);
+  const raw=await page.evaluate(()=>localStorage.getItem('insight_v11'));
+  expect(raw).toBe('{"current":"broken","stores":');
+});
+
 test('全ページタイトルはダッシュボード位置に揃い追加ページも自動追従する',async({page})=>{
   const errors=await openInsight(page);
 
