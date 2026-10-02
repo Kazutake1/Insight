@@ -17,7 +17,7 @@ test('payload互換パッチ11件はbootstrap moduleへ分離しIndexにはbody�
 
 test('トップページはキャッシュ抑止とビルド自己更新を持つ',()=>{
   const index=read('Index.html');
-  assert.match(index,/insight-shell-version" content="20261002-hourly-chart-color-1/);
+  assert.match(index,/insight-shell-version" content="20261002-historical-years-1/);
   assert.match(index,/Cache-Control" content="no-cache, no-store, must-revalidate/);
   assert.match(index,/insight_probe=/);
   assert.match(index,/cache:'no-store'/);
@@ -126,7 +126,7 @@ test('分析AIの対象年月をサイドバー切替後も固定し各ページ
   const lock=read('insight_analysis_period_lock_v1.js');
   const salesCount=read('insight_sales_count_v1.js');
   assert.match(index,/insight_analysis_period_lock_v1\.js\?v=20261001-sync-owner/);
-  assert.match(index,/insight_sales_count_v1\.js\?v=20261001-weekday-gray/);
+  assert.match(index,/insight_sales_count_v1\.js\?v=20261002-historical-years/);
   assert.match(presentation,/aiAnalysisTarget/);
   assert.match(presentation,/!window\.InsightPagePeriodSync&&window\.InsightAnalysisPeriodLock/);
   assert.match(pageAI,/InsightAnalysisPeriodLock\.getContext/);
@@ -159,6 +159,23 @@ test('STEP7で将来AI接続用の共通analysisContext境界を追加する',()
   assert.match(aiContext,/externalTransmission:false/);
   assert.doesNotMatch(aiContext,/\bfetch\s*\(|XMLHttpRequest|WebSocket|localStorage|InsightStorage/);
   assert.doesNotThrow(()=>new vm.Script(aiContext),'AI context module must be valid JavaScript');
+});
+
+test('過年度は既存の疎データを保持して正式年度へ昇格し販売数入力から追加できる',()=>{
+  const index=read('Index.html');
+  const manager=read('insight_year_manager_v1.js');
+  const salesCount=read('insight_sales_count_v1.js');
+  assert.match(index,/insight_year_manager_v1\.js\?v=20261002-historical-years/);
+  assert.ok(index.indexOf('insight_storage_v1.js')<index.indexOf('insight_year_manager_v1.js'));
+  assert.ok(index.indexOf('insight_year_manager_v1.js')<index.indexOf('insight_sales_count_v1.js'));
+  assert.match(manager,/function normalizeYearData\(/);
+  assert.match(manager,/function promote\(/);
+  assert.match(manager,/merged\.d=String\(targetIndex\+1\)/);
+  assert.match(manager,/root\.addYear=function/);
+  assert.match(salesCount,/function ensureRegisteredYear\(/);
+  assert.match(salesCount,/年度を追加して販売数を入力しますか/);
+  assert.match(salesCount,/InsightYearManager\.promoteCurrent/);
+  assert.doesNotThrow(()=>new vm.Script(manager),'year manager module must be valid JavaScript');
 });
 
 test('通常画面の選択年月をサイドバー切替後も全ページで維持する',()=>{
@@ -253,7 +270,7 @@ test('セール実績ページは販売数入力直後に読み込み同一日�
   const index=read('Index.html');
   const saleResults=read('insight_sale_results_v1.js');
   const sales=read('insight_sales_count_v1.js');
-  assert.match(index,/insight_sales_count_v1\.js\?v=20261001-weekday-gray/);
+  assert.match(index,/insight_sales_count_v1\.js\?v=20261002-historical-years/);
   assert.match(index,/insight_sale_results_v1\.js\?v=20261002-card-fit/);
   assert.ok(index.indexOf('insight_sales_count_v1.js')<index.indexOf('insight_sale_results_v1.js'));
   assert.ok(index.indexOf('insight_sale_results_v1.js')<index.indexOf('insight_page_period_sync_v1.js'));
@@ -390,7 +407,7 @@ test('販売数カテゴリーの対象便設定を全関連層で共有する',
   const analysis=read('insight_analysis_context_v1.js');
   const saleResults=read('insight_sale_results_v1.js');
   const pageAI=read('insight_ai_page_comments_v1.js');
-  assert.match(index,/insight_sales_count_v1\.js\?v=20261001-weekday-gray/);
+  assert.match(index,/insight_sales_count_v1\.js\?v=20261002-historical-years/);
   assert.match(index,/insight_sale_results_v1\.js\?v=20261002-card-fit/);
   assert.match(index,/insight_analysis_context_v1\.js\?v=20261001-active-trips/);
   assert.match(index,/insight_ai_page_comments_v1\.js\?v=20261001-decision-analysis/);

@@ -50,7 +50,7 @@ test('選択月は主要ページを横断しても維持される',async({page}
 test('トップページはビルド番号を持ち最新版確認をno-storeで行う',async({page})=>{
   const errors=await openInsight(page);
   const source=await page.evaluate(()=>fetch('/Index.html?e2e-shell-check=1',{cache:'no-store'}).then(r=>r.text()));
-  expect(source).toContain('name="insight-shell-version" content="20261002-hourly-chart-color-1"');
+  expect(source).toContain('name="insight-shell-version" content="20261002-historical-years-1"');
   expect(source).toContain("fetch('./Index.html?insight_probe='+Date.now(),{cache:'no-store'})");
   expect(source).toContain("location.replace('./Index.html?insight_build='+encodeURIComponent(m[1]))");
   expect(errors).toEqual([]);
@@ -351,6 +351,73 @@ test('セール実績は内容別に表示し販売数入力と同じカード�
   expect(order.afterSales).toBe('navSaleResults');
   expect(order.afterResults).toBe('navEventResults');
   expect(order.afterEventResults).toBe('aiAnalysisToggle');
+  expect(errors).toEqual([]);
+});
+
+
+test('販売数入力で未登録の過年度へ移動すると年度を正式追加し疎データを補完する',async({page})=>{
+  const errors=await openInsight(page);
+  await page.evaluate(()=>{
+    const store=allStores.stores[allStores.current];
+    store.years=['2025','2026'];
+    store.data['2024']={'8月':[null,null,{d:'3',売上:321,客数:654,買上点数:12.34,廃棄金額:100,haiki:blankHaiki(),weather:'晴',storeMemo:'E2E過年度保持'}]};
+    store.hourlyCustomers=store.hourlyCustomers||{};
+    store.hourlyCustomers['2024-08-03']=Array.from({length:24},(_,i)=>i);
+    window.InsightSalesCount.ensure(allStores);
+    const category=allStores.salesCountManagement.categories.find(c=>!c.hidden);
+    store.salesCounts=store.salesCounts||{};
+    store.salesCounts['2024-08-03']={};
+    store.salesCounts['2024-08-03'][category.id]={trips:[{delivery:10,sales:9},{delivery:20,sales:18},{delivery:30,sales:27}]};
+    InsightStorage.persistCurrent(allStores);
+  });
+
+  await page.locator('#navSalesCount').click();
+  await page.evaluate(()=>window.InsightSalesCount.setPeriod(2025,1));
+  let dialogMessage='';
+  page.once('dialog',dialog=>{dialogMessage=dialog.message();dialog.accept();});
+  await page.locator('#scPrev').click();
+  expect(dialogMessage).toContain('2024年度はダッシュボードに登録されていません');
+  await expect.poll(()=>page.evaluate(()=>window.InsightSalesCount.getPeriod())).toEqual({year:'2024',month:12});
+
+  const promoted=await page.evaluate(()=>{
+    const store=allStores.stores[allStores.current];
+    const category=allStores.salesCountManagement.categories.find(c=>!c.hidden);
+    return {
+      years:store.years.slice(),
+      monthCount:Object.keys(store.data['2024']).length,
+      febDays:store.data['2024']['2月'].length,
+      augDays:store.data['2024']['8月'].length,
+      firstDay:store.data['2024']['8月'][0],
+      preserved:store.data['2024']['8月'][2],
+      salesCount:store.salesCounts['2024-08-03'][category.id],
+      hourly:store.hourlyCustomers['2024-08-03']
+    };
+  });
+  expect(promoted.years).toContain('2024');
+  expect(promoted.monthCount).toBe(12);
+  expect(promoted.febDays).toBe(29);
+  expect(promoted.augDays).toBe(31);
+  expect(promoted.firstDay).not.toBeNull();
+  expect(promoted.firstDay.d).toBe('1');
+  expect(promoted.preserved.売上).toBe(321);
+  expect(promoted.preserved.客数).toBe(654);
+  expect(promoted.preserved.storeMemo).toBe('E2E過年度保持');
+  expect(promoted.salesCount.trips[0].delivery).toBe(10);
+  expect(promoted.hourly).toHaveLength(24);
+
+  await page.reload({waitUntil:'domcontentloaded'});
+  await expect(page.locator('#nav1')).toBeVisible();
+  const afterReload=await page.evaluate(()=>{
+    const store=allStores.stores[allStores.current];
+    return {
+      years:store.years.slice(),
+      value:store.data['2024']['8月'][2].売上,
+      firstDayIsObject:!!store.data['2024']['8月'][0]&&typeof store.data['2024']['8月'][0]==='object'
+    };
+  });
+  expect(afterReload.years).toContain('2024');
+  expect(afterReload.value).toBe(321);
+  expect(afterReload.firstDayIsObject).toBe(true);
   expect(errors).toEqual([]);
 });
 

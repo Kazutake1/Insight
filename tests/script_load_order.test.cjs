@@ -11,6 +11,7 @@ const ordered=[
   'insight_date_context_v1.js',
   'insight_hooks_v1.js',
   'insight_storage_v1.js',
+  'insight_year_manager_v1.js',
   'insight_ops_v1.js',
   'insight_preserve_dailyops_v1.js',
   'insight_quick_date_nav_v1.js',
