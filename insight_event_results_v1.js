@@ -1,4 +1,4 @@
-/* イベント実績 v2: 過去開催→開催サマリー→日別ピーク/販売実績を参照する読み取り専用ページ */
+/* イベント・催事実績 v3: 過去開催→開催サマリー→日別ピーク/販売実績を参照する読み取り専用ページ */
 (function(root){
   'use strict';
 
@@ -348,7 +348,7 @@
       nav.onclick=function(){root.gotoNav('eventResults');};
       saleNav.insertAdjacentElement('afterend',nav);
       var page=el('div',undefined,'page er-page');page.id='pageEventResults';
-      page.innerHTML='<div class="page-header"><div class="page-title">イベント実績</div></div>'+
+      page.innerHTML='<div class="page-header"><div class="page-title">イベント・催事実績</div></div>'+
         '<div class="er-kind-switch" role="group" aria-label="実績種別"><button type="button" class="er-kind-btn active" data-kind="nearby">近隣イベント</button><button type="button" class="er-kind-btn" data-kind="special">催事</button></div>'+
         '<div class="er-toolbar"><label id="erLocationField">イベント場所<select id="erLocation" aria-label="イベント場所"></select></label><span id="erLocationArrow" class="er-arrow" aria-hidden="true">→</span><label><span id="erEventFieldLabel">イベント名</span><select id="erEvent" aria-label="イベント名／催事名"></select></label></div>'+
         '<div id="erSummary" class="er-summary"></div><div id="erResults"></div>';

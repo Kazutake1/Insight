@@ -71,6 +71,30 @@ test('special day is stored per store without a location and survives backup rou
   assert.equal(restored.stores.a.events[0].type,'special');
   assert.equal(restored.stores.a.events[0].snapshot.title,'クリスマス');
 });
+test('special presets are optional, global, ordered and survive backup roundtrip',()=>{
+  const a=data();
+  a.eventManagement={version:1,presets:[],events:[],specialPresets:[
+    {id:'sp1',snapshot:{version:1,title:'クリスマス',note:''}},
+    {id:'sp2',snapshot:{version:1,title:'節分',note:'予約強化'}}
+  ]};
+  events.validate(a);
+  assert.deepEqual(events.specialPresets(a).map(p=>p.snapshot.title),['クリスマス','節分']);
+  const restored=JSON.parse(JSON.stringify(a));events.validate(restored);
+  assert.deepEqual(restored,a);
+  restored.eventManagement.specialPresets.push({id:'sp3',snapshot:{version:1,title:'クリスマス',note:''}});
+  assert.throws(()=>events.validate(restored),/よく使う催事名が重複/);
+});
+
+test('same-store special duplicate detection requires same title and exact period',()=>{
+  const a=data();
+  const id=events.add(a,'a',{type:'special',scope:'store',startDate:'2026-12-24',endDate:'2026-12-25',snapshot:{version:1,title:'クリスマス',note:''}});
+  const same={type:'special',scope:'store',startDate:'2026-12-24',endDate:'2026-12-25',snapshot:{version:1,title:'クリスマス',note:'別メモ'}};
+  assert.equal(events.findDuplicateSpecial(a,'a',same).id,id);
+  assert.equal(events.findDuplicateSpecial(a,'a',same,id),null);
+  assert.equal(events.findDuplicateSpecial(a,'b',same),null);
+  assert.equal(events.findDuplicateSpecial(a,'a',{...same,startDate:'2026-12-23'}),null);
+  assert.equal(events.findDuplicateSpecial(a,'a',{...same,snapshot:{...same.snapshot,title:'年末'}}),null);
+});
 test('malformed periods, scope, duplicates and conditions are rejected',()=>{
   const mutations=[e=>e.endDate='2026-02-30',e=>e.endDate='2026-09-21',e=>e.scope='store',e=>e.snapshot.sale.params.amount=-1,e=>e.snapshot.sale.params.amount='50',e=>e.snapshot.version=2];
   for(const mutate of mutations){const a=data();events.add(a,'a',sale());mutate(a.eventManagement.events[0]);assert.throws(()=>events.validate(a));}

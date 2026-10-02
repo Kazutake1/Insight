@@ -58,6 +58,15 @@
       var m=all.eventManagement;
       requireValue(object(m)&&m.version===1&&Array.isArray(m.presets),'店舗イベントの保存形式に対応していません。');
       m.presets.forEach(function(p){requireValue(object(p),'よく使うセールが不正です。');unique(p);validateSnapshot(p.snapshot);requireValue(!!p.snapshot.sale,'よく使うセールの条件がありません。');});
+      if(m.specialPresets!==undefined){
+        requireValue(Array.isArray(m.specialPresets),'よく使う催事の保存形式が不正です。');
+        var specialTitles=new Set();
+        m.specialPresets.forEach(function(p){
+          requireValue(object(p),'よく使う催事が不正です。');unique(p);validateSnapshot(p.snapshot);
+          requireValue(!p.snapshot.sale&&p.snapshot.location===undefined,'よく使う催事の内容が不正です。');
+          var key=p.snapshot.title.trim();requireValue(!specialTitles.has(key),'よく使う催事名が重複しています。');specialTitles.add(key);
+        });
+      }
       events(m.events,'global');
     }
     Object.keys(all.stores||{}).forEach(function(id){var st=all.stores[id];if(st.events!==undefined)events(st.events,'store');});
@@ -79,6 +88,16 @@
     return categorySummary(a)+' '+t;
   }
   function presets(all){return all.eventManagement?all.eventManagement.presets:[];}
+  function specialPresets(all){var m=all&&all.eventManagement;return m&&Array.isArray(m.specialPresets)?m.specialPresets:[];}
+  function mutableSpecialPresets(all){var m=management(all);return m.specialPresets||(m.specialPresets=[]);}
+  function findDuplicateSpecial(all,storeId,event,excludeId){
+    if(!event||event.type!=='special'||!event.snapshot)return null;
+    var store=all&&all.stores&&all.stores[storeId],items=store&&Array.isArray(store.events)?store.events:[];
+    var title=String(event.snapshot.title||'').trim();
+    return items.find(function(item){
+      return item&&item.type==='special'&&item.id!==excludeId&&String(item.snapshot&&item.snapshot.title||'').trim()===title&&item.startDate===event.startDate&&item.endDate===event.endDate;
+    })||null;
+  }
   function list(all,storeId,start,end){
     end=end||start;
     var global=all.eventManagement?all.eventManagement.events:[],local=(all.stores[storeId]||{}).events||[];
@@ -92,7 +111,7 @@
     else{requireValue(!!all.stores[storeId],'対象店舗がありません。');(all.stores[storeId].events||(all.stores[storeId].events=[])).push(e);}
     validate(all);return e.id;
   }
-  var model={validate:validate,validateSnapshot:validateSnapshot,summary:summary,list:list,presets:presets,add:add,copy:copy};
+  var model={validate:validate,validateSnapshot:validateSnapshot,summary:summary,list:list,presets:presets,specialPresets:specialPresets,findDuplicateSpecial:findDuplicateSpecial,add:add,copy:copy};
   if(typeof module!=='undefined'&&module.exports)module.exports=model;
   if(!root.document)return;
   root.InsightEvents=model;
@@ -129,6 +148,13 @@
     }
     function field(parent,label,type,value){var l=el('label',label),input=el(type==='textarea'?'textarea':'input');if(type!=='textarea')input.type=type;input.value=value==null?'':String(value);input.setAttribute('aria-label',label);l.append(input);parent.append(l);return input;}
     function select(parent,label,options,value){var l=el('label',label),s=el('select');Object.keys(options).forEach(function(k){var o=el('option',options[k]);o.value=k;s.append(o);});s.value=value;s.setAttribute('aria-label',label);l.append(s);parent.append(l);return s;}
+    function specialPresetEditor(parent,snapshot){
+      var title=field(parent,'催事名','text',snapshot?snapshot.title:''),note=field(parent,'補足（任意）','textarea',snapshot?snapshot.note:'');title.required=true;
+      return function(){
+        var result={version:1,title:title.value.trim(),note:note.value.trim()};
+        validateSnapshot(result);return result;
+      };
+    }
     function saleEditor(parent,snapshot){
       var initial=snapshot&&snapshot.sale,master=allStores.salesCountManagement&&Array.isArray(allStores.salesCountManagement.categories)?allStores.salesCountManagement.categories:[],options=[],optionKeys=new Set(),selectedKeys=new Set();
       function addOption(key,name,categoryId){if(optionKeys.has(key))return;optionKeys.add(key);options.push({key:key,name:name,categoryId:categoryId});}
@@ -200,7 +226,7 @@
       var dates=el('div',undefined,'ie-dates');form.append(dates);
       var start=field(dates,'開始日','date',editing?source.startDate:selectedDate()),end=field(dates,'終了日','date',editing?source.endDate:selectedDate());start.required=end.required=true;
       start.onchange=function(){if(end.value<start.value)end.value=start.value;};
-      var content=el('div');form.append(content);var read,scope,showAll=false;
+      var content=el('div');form.append(content);var read,scope,showAll=false,specialTemplate=null;
       function replaceRegisteredEvent(next,event){
         var oldTarget=source.scope==='global'?management(next):next.stores[storeId];
         requireValue(oldTarget&&Array.isArray(oldTarget.events),'登録済みイベントが見つかりません。');
@@ -220,6 +246,10 @@
           if(editing)e.id=source.id;
           if(presetId)e.presetId=presetId;
           else if(editing&&source.presetId&&type.value==='sale')e.presetId=source.presetId;
+          if(e.type==='special'){
+            var duplicate=findDuplicateSpecial(allStores,storeId,e,editing?source.id:null);
+            if(duplicate&&!confirm('同じ店舗に同じ催事名・同じ期間の登録があります。\n\n'+e.snapshot.title+'\n'+e.startDate+' 〜 '+e.endDate+'\n\n重複して登録しますか？'))return;
+          }
           if(editing){
             if(!confirm('登録済みイベントを変更します。\n期間中の表示や関連する比較にも変更内容が反映されます。よろしいですか？'))return;
             if(transaction(function(next){replaceRegisteredEvent(next,e);}))d.close();
@@ -238,16 +268,53 @@
           read=saleEditor(content,editing&&source.type==='sale'?source.snapshot:null);
         }else{
           if(type.value==='other')scope=select(content,'適用範囲',{store:'この店舗のみ',global:'全店舗共通'},editing&&source.type==='other'?source.scope:'store');
-          var initialSnapshot=editing&&source.snapshot?source.snapshot:null;
+          if(type.value==='special'){
+            var specialHead=el('div',undefined,'ie-head');specialHead.append(el('strong','よく使う催事'),button('編集',function(){manageSpecialPresets(draw);}));content.append(specialHead);
+            var specialBox=el('div',undefined,'ie-presets'),specialItems=specialPresets(allStores);
+            specialItems.slice(0,showAll?specialItems.length:6).forEach(function(p){
+              specialBox.append(button(p.snapshot.title,function(){specialTemplate=copy(p.snapshot);draw();}));
+            });
+            if(!specialItems.length)specialBox.append(el('span','「編集」からよく使う催事を追加できます。','ie-muted'));
+            if(specialItems.length>6)specialBox.append(button(showAll?'折りたたむ':'すべて表示（'+specialItems.length+'件）',function(){showAll=!showAll;draw();}));
+            content.append(specialBox,el('p','選ぶと催事名と補足を入力欄へ反映します。実際の登録は下の「登録する」で行います。','ie-muted'));
+          }
+          var initialSnapshot=specialTemplate||(editing&&source.snapshot?source.snapshot:null);
           var location=type.value==='nearby'?field(content,'イベント場所','text',initialSnapshot&&initialSnapshot.location?initialSnapshot.location:''):null;if(location)location.required=true;
           var title=field(content,type.value==='special'?'催事名':'イベント名','text',initialSnapshot?initialSnapshot.title:''),note=field(content,'補足（任意）','textarea',initialSnapshot?initialSnapshot.note:'');title.required=true;
           read=function(){var snapshot={version:1,title:title.value.trim(),note:note.value.trim()};if(location){requireValue(location.value.trim()!=='','イベント場所を入力してください。');snapshot.location=location.value.trim();}validateSnapshot(snapshot);return snapshot;};
         }
       }
-      type.onchange=draw;draw();
+      type.onchange=function(){showAll=false;specialTemplate=null;draw();};draw();
       form.append(el('p',editing?'変更内容は保存後、登録済みの期間全体に反映されます。':'イベントは登録時に保存されます。日次の「クリア」では削除されません。','ie-muted'));
       var actions=el('div',undefined,'ie-actions'),submit=el('button',editing?'変更を保存':'登録する','ie-primary');submit.type='submit';actions.append(button('キャンセル',function(){d.close();}),submit);form.append(actions);
       form.onsubmit=function(e){e.preventDefault();try{save(read());}catch(err){alert(err.message);}};
+    }
+    function manageSpecialPresets(onChange){
+      var d=dialog('よく使う催事を編集'),body=el('div');d.classList.add('ie-preset-editor');d.append(body);d.addEventListener('close',onChange);
+      function editor(p){
+        body.replaceChildren();var form=el('form');body.append(form);var read=specialPresetEditor(form,p&&p.snapshot);
+        var actions=el('div',undefined,'ie-actions'),saveButton=el('button','保存する','ie-primary');saveButton.type='submit';actions.append(button('戻る',draw),saveButton);form.append(actions);
+        form.onsubmit=function(e){e.preventDefault();try{
+          var snapshot=read();
+          if(p&&!confirm('よく使う催事を変更します。登録済みの開催記録は変更されません。よろしいですか？'))return;
+          if(transaction(function(next){
+            var items=mutableSpecialPresets(next),duplicate=items.find(function(item){return item.id!==(p&&p.id)&&item.snapshot.title.trim()===snapshot.title.trim();});
+            requireValue(!duplicate,'同じ催事名が「よく使う催事」に登録されています。');
+            if(p){var item=items.find(function(v){return v.id===p.id;});requireValue(!!item,'対象が見つかりません。');item.snapshot=copy(snapshot);}
+            else items.push({id:id(),snapshot:copy(snapshot)});
+          }))draw();
+        }catch(err){alert(err.message);}};
+      }
+      function draw(){
+        body.replaceChildren();body.append(el('p','全店舗共通です。変更・削除しても登録済みの催事は変更されません。','ie-muted'),button('＋よく使う催事を追加',function(){editor(null);}));
+        var items=specialPresets(allStores);items.forEach(function(p,index){
+          var row=el('div',undefined,'ie-preset-row'),actions=el('div');row.append(el('span',p.snapshot.title));
+          function move(delta){if(transaction(function(next){var a=mutableSpecialPresets(next);var item=a.splice(index,1)[0];a.splice(index+delta,0,item);}))draw();}
+          var up=button('↑',function(){move(-1);}),down=button('↓',function(){move(1);});up.disabled=index===0;down.disabled=index===items.length-1;up.setAttribute('aria-label','上へ移動');down.setAttribute('aria-label','下へ移動');
+          actions.append(button('編集',function(){editor(p);}),button('削除',function(){if(!confirm(p.snapshot.title+'\nよく使う催事から削除します。登録済みの催事は残ります。よろしいですか？'))return;if(transaction(function(next){var a=mutableSpecialPresets(next);var at=a.findIndex(function(v){return v.id===p.id;});if(at>=0)a.splice(at,1);})){draw();}}),up,down);row.append(actions);body.append(row);
+        });
+      }
+      draw();
     }
     function managePresets(onChange){
       var d=dialog('よく使うセールを編集'),body=el('div');d.classList.add('ie-preset-editor');d.append(body);d.addEventListener('close',onChange);

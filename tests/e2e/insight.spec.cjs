@@ -355,6 +355,7 @@ test('イベント実績は過去開催→複数日→時間帯グラフ→カ�
   await expect(page.locator('#navEventResults')).toContainText('イベント・催事');
   await page.locator('#navEventResults').click();
   await expect(page.locator('#pageEventResults')).toHaveClass(/show/);
+  await expect(page.locator('#pageEventResults > .page-header > .page-title')).toHaveText('イベント・催事実績');
   await expect(page.locator('#erEvent')).toBeDisabled();
   await page.locator('#erLocation').selectOption({label:'E2E文化フォーラム'});
   await expect(page.locator('#erEvent')).toBeEnabled();
@@ -442,6 +443,55 @@ test('イベント実績の催事は場所選択なしで過去開催を参照�
   await page.locator('.er-back').click();
   await page.locator('.er-kind-btn[data-kind="nearby"]').click();
   await expect(page.locator('#erLocationField')).toBeVisible();
+  expect(errors).toEqual([]);
+});
+
+test('よく使う催事を登録して選択でき、同名同期間は重複警告する',async({page})=>{
+  const errors=await openInsight(page);
+  await page.locator('#nav0').click();
+  await page.evaluate(()=>{
+    const store=allStores.stores[allStores.current];
+    store.events=(store.events||[]).filter(event=>!(event.type==='special'&&event.snapshot&&event.snapshot.title==='E2E催事'));
+    if(!allStores.eventManagement)allStores.eventManagement={version:1,presets:[],events:[]};
+    allStores.eventManagement.specialPresets=(allStores.eventManagement.specialPresets||[]).filter(item=>item.snapshot&&item.snapshot.title!=='E2E催事');
+  });
+
+  await page.getByRole('button',{name:'＋イベントを追加'}).click();
+  let eventDialog=page.locator('.ie-dialog.ie-event-add');
+  await eventDialog.getByLabel('イベント種別').selectOption('special');
+  await expect(eventDialog.getByText('よく使う催事',{exact:true})).toBeVisible();
+  await eventDialog.getByRole('button',{name:'編集'}).click();
+
+  let presetDialog=page.locator('.ie-dialog.ie-preset-editor').last();
+  await expect(presetDialog.getByRole('heading',{name:'よく使う催事を編集'})).toBeVisible();
+  await presetDialog.getByRole('button',{name:'＋よく使う催事を追加'}).click();
+  await presetDialog.getByLabel('催事名').fill('E2E催事');
+  await presetDialog.getByLabel('補足（任意）').fill('毎年確認');
+  await presetDialog.getByRole('button',{name:'保存する'}).click();
+  await expect(presetDialog.getByText('E2E催事',{exact:true})).toBeVisible();
+  await presetDialog.getByRole('button',{name:'閉じる'}).click();
+
+  eventDialog=page.locator('.ie-dialog.ie-event-add');
+  await expect(eventDialog.getByRole('button',{name:'E2E催事'})).toBeVisible();
+  await eventDialog.getByRole('button',{name:'E2E催事'}).click();
+  await expect(eventDialog.getByLabel('催事名')).toHaveValue('E2E催事');
+  await expect(eventDialog.getByLabel('補足（任意）')).toHaveValue('毎年確認');
+  await eventDialog.getByRole('button',{name:'登録する'}).click();
+  await expect(eventDialog).toHaveCount(0);
+
+  await page.getByRole('button',{name:'＋イベントを追加'}).click();
+  eventDialog=page.locator('.ie-dialog.ie-event-add');
+  await eventDialog.getByLabel('イベント種別').selectOption('special');
+  await eventDialog.getByRole('button',{name:'E2E催事'}).click();
+  let duplicateMessage='';
+  page.once('dialog',async dialog=>{
+    duplicateMessage=dialog.message();
+    await dialog.dismiss();
+  });
+  await eventDialog.getByRole('button',{name:'登録する'}).click();
+  await expect.poll(()=>duplicateMessage).toContain('同じ店舗に同じ催事名・同じ期間の登録があります。');
+  await expect(eventDialog).toBeVisible();
+  await eventDialog.getByRole('button',{name:'キャンセル'}).click();
   expect(errors).toEqual([]);
 });
 
