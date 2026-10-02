@@ -11,7 +11,7 @@ async function openInsight(page){
   page.on('pageerror',error=>errors.push(error.message));
   await page.goto('/Index.html',{waitUntil:'domcontentloaded'});
   await expect(page.locator('#nav1')).toBeVisible();
-  await page.waitForFunction(()=>window.InsightPagePeriodSync&&window.InsightSalesCount&&window.InsightSaleResults&&window.InsightHourlyCustomers&&window.InsightEventResults&&window.InsightAIVisual&&window.InsightAIInterpretation&&window.InsightAnalysisPeriodLock&&window.InsightMultiYearAnalysis&&window.InsightWeekdayAnalysis&&window.InsightSaleImpactAnalysis&&window.InsightEventImpactAnalysis&&window.InsightSeasonalityAnalysis&&window.InsightAnomalyExplanation&&window.InsightSettings&&document.getElementById('navSettings')&&document.getElementById('pageSettings'));
+  await page.waitForFunction(()=>window.InsightPagePeriodSync&&window.InsightSalesCount&&window.InsightSaleResults&&window.InsightHourlyCustomers&&window.InsightEventResults&&window.InsightAIVisual&&window.InsightAIInterpretation&&window.InsightAnalysisPeriodLock&&window.InsightMultiYearAnalysis&&window.InsightWeekdayAnalysis&&window.InsightSaleImpactAnalysis&&window.InsightEventImpactAnalysis&&window.InsightSeasonalityAnalysis&&window.InsightAnomalyExplanation&&window.InsightSettings&&window.InsightDarkTheme&&document.getElementById('navSettings')&&document.getElementById('pageSettings'));
   return errors;
 }
 
@@ -51,7 +51,7 @@ test('選択月は主要ページを横断しても維持される',async({page}
 test('トップページはビルド番号を持ち最新版確認をno-storeで行う',async({page})=>{
   const errors=await openInsight(page);
   const source=await page.evaluate(()=>fetch('/Index.html?e2e-shell-check=1',{cache:'no-store'}).then(r=>r.text()));
-  expect(source).toContain('name="insight-shell-version" content="20261003-anomaly-context-1"');
+  expect(source).toContain('name="insight-shell-version" content="20261003-firefox-dark-1"');
   expect(source).toContain("fetch('./Index.html?insight_probe='+Date.now(),{cache:'no-store'})");
   expect(source).toContain("location.replace('./Index.html?insight_build='+encodeURIComponent(m[1]))");
   expect(errors).toEqual([]);
@@ -74,6 +74,32 @@ test('サイドバー下部は設定だけを表示し管理項目は設定ペ�
   await expect(page.locator('#insightSettingsDataActions #insightDataHealthButton')).toBeVisible();
   await expect(page.locator('#insightSettingsDataActions')).toContainText('CSVインポート');
   await expect(page.locator('#insightSettingsDisplayActions #darkModeBtn')).toBeVisible();
+  expect(errors).toEqual([]);
+});
+
+test('ダークモードはFirefox系のプラム・紫・ワイン配色を使う',async({page})=>{
+  const errors=await openInsight(page);
+  await page.locator('#navSettings').click();
+  const wasDark=await page.evaluate(()=>document.documentElement.classList.contains('dark')||document.body.classList.contains('dark'));
+  if(wasDark)await page.locator('#darkModeBtn').click();
+  await page.locator('#darkModeBtn').click();
+  await page.waitForFunction(()=>document.documentElement.classList.contains('dark')||document.body.classList.contains('dark'));
+  const palette=await page.evaluate(()=>({
+    bg:getComputedStyle(document.body).getPropertyValue('--bg').trim(),
+    surface:getComputedStyle(document.body).getPropertyValue('--surface').trim(),
+    surface2:getComputedStyle(document.body).getPropertyValue('--surface2').trim(),
+    border:getComputedStyle(document.body).getPropertyValue('--border').trim(),
+    text:getComputedStyle(document.body).getPropertyValue('--text').trim(),
+    meta:document.querySelector('meta[name="theme-color"]').getAttribute('content'),
+    theme:window.InsightDarkTheme.palette
+  }));
+  expect(palette.bg).toBe('#251b26');
+  expect(palette.surface).toBe('#2f2942');
+  expect(palette.surface2).toBe('#342c45');
+  expect(palette.border).toBe('#554a5e');
+  expect(palette.text).toBe('#e2e2ea');
+  expect(palette.meta).toBe('#251b26');
+  expect(palette.theme.wine).toBe('#432325');
   expect(errors).toEqual([]);
 });
 

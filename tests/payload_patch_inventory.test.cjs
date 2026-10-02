@@ -17,7 +17,7 @@ test('payload互換パッチ11件はbootstrap moduleへ分離しIndexにはbody�
 
 test('トップページはキャッシュ抑止とビルド自己更新を持つ',()=>{
   const index=read('Index.html');
-  assert.match(index,/insight-shell-version" content="20261003-anomaly-context-1/);
+  assert.match(index,/insight-shell-version" content="20261003-firefox-dark-1/);
   assert.match(index,/Cache-Control" content="no-cache, no-store, must-revalidate/);
   assert.match(index,/insight_probe=/);
   assert.match(index,/cache:'no-store'/);
@@ -261,6 +261,19 @@ test('異常説明レイヤーは曜日・セール・イベント・季節性�
   assert.match(anomaly,/var display=findings\.filter/);
   assert.doesNotMatch(explanation,/\bfetch\s*\(|XMLHttpRequest|WebSocket|localStorage|InsightStorage/);
   assert.doesNotThrow(()=>new vm.Script(explanation),'anomaly explanation module must be valid JavaScript');
+});
+
+test('Firefox系ダークテーマは設定モジュールの後に読み込みライトモードを変更しない',()=>{
+  const index=read('Index.html');
+  const theme=read('insight_dark_theme_v1.js');
+  assert.match(index,/insight_dark_theme_v1\.js\?v=20261003-firefox-dark-1/);
+  assert.ok(index.indexOf('insight_settings_v1.js')<index.indexOf('insight_dark_theme_v1.js'));
+  assert.match(theme,/background:'#251b26'/);
+  assert.match(theme,/surface:'#2f2942'/);
+  assert.match(theme,/wine:'#432325'/);
+  assert.match(theme,/\.dark\{/);
+  assert.doesNotMatch(theme,/localStorage|InsightStorage|\bfetch\s*\(|XMLHttpRequest|WebSocket/);
+  assert.doesNotThrow(()=>new vm.Script(theme),'dark theme module must be valid JavaScript');
 });
 
 test('保存データ健全性チェックは読み取り専用で不整合を可視化する',()=>{
