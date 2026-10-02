@@ -390,6 +390,7 @@ test('年度削除は年度直結データだけを削除しイベント履歴�
     refreshDash();
   });
 
+  await page.locator('#nav1').click();
   await expect(page.locator('#insightDeleteYearButton')).toBeVisible();
   await page.locator('#insightDeleteYearButton').click();
   await expect(page.locator('#insightYearDeleteOverlay')).toBeVisible();
