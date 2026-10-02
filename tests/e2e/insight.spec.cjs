@@ -352,6 +352,7 @@ test('イベント実績は過去開催→複数日→時間帯グラフ→カ�
     window.InsightEventResults.render();
   });
 
+  await expect(page.locator('#navEventResults')).toContainText('イベント・催事');
   await page.locator('#navEventResults').click();
   await expect(page.locator('#pageEventResults')).toHaveClass(/show/);
   await expect(page.locator('#erEvent')).toBeDisabled();

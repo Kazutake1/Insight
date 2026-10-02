@@ -195,6 +195,8 @@ test('イベント実績は過去開催・日付カード・時間帯グラフ�
   assert.ok(index.indexOf('insight_analysis_context_v1.js')<index.indexOf('insight_event_results_v1.js'));
   assert.ok(index.indexOf('insight_event_results_v1.js')<index.indexOf('insight_daily_anomaly_v1.js'));
   assert.match(eventResults,/過去開催一覧/);
+  assert.match(eventResults,/<span>イベント・催事<\/span>/);
+  assert.match(eventResults,/page-title">イベント実績/);
   assert.match(eventResults,/data-kind="special">催事/);
   assert.match(eventResults,/collectSpecial/);
   assert.match(eventResults,/specialNames/);

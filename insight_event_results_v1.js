@@ -344,7 +344,7 @@
       var saleNav=doc.getElementById('navSaleResults'),main=doc.getElementById('main');
       if(!saleNav||!main)return false;
       var nav=el('button',undefined,'nav-btn');nav.id='navEventResults';nav.type='button';
-      nav.innerHTML='<svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 10c0 5-8 11-8 11S4 15 4 10a8 8 0 1 1 16 0z"/><circle cx="12" cy="10" r="2.5"/></svg><span>イベント実績</span>';
+      nav.innerHTML='<svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 10c0 5-8 11-8 11S4 15 4 10a8 8 0 1 1 16 0z"/><circle cx="12" cy="10" r="2.5"/></svg><span>イベント・催事</span>';
       nav.onclick=function(){root.gotoNav('eventResults');};
       saleNav.insertAdjacentElement('afterend',nav);
       var page=el('div',undefined,'page er-page');page.id='pageEventResults';
