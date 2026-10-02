@@ -41,6 +41,7 @@ jobs:
           - weekday_analysis.test.cjs
           - sale_impact.test.cjs
           - event_impact.test.cjs
+          - seasonality_analysis.test.cjs
           - page_period_sync.test.cjs
           - payload_browser_smoke.test.cjs
           - payload_patch_inventory.test.cjs
