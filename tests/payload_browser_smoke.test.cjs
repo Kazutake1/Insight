@@ -50,6 +50,9 @@ test('起動時の保存データ読込は失敗時に空データへフォー�
   assert.match(bootstrap,/var safeLoadAll=/);
   assert.match(bootstrap,/Insight stored data load failed/);
   assert.match(bootstrap,/insightStorageLoadError/);
+  assert.match(bootstrap,/insightStorageLoadReason/);
+  assert.match(bootstrap,/insightStorageExportRaw/);
+  assert.match(bootstrap,/new Blob\(\[raw\]/);
   assert.match(bootstrap,/if\(current!==null\)/);
   assert.match(bootstrap,/failStoredDataLoad/);
 });

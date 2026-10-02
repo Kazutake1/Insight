@@ -12,7 +12,7 @@ test('payload互換パッチ11件はbootstrap moduleへ分離しIndexにはbody�
   const bootstrap=read('insight_bootstrap_patches_v1.js');
   assert.equal((bootstrap.match(/^patch\(/gm)||[]).length,11);
   assert.equal((index.match(/html=html\.replace/g)||[]).length,1);
-  assert.match(index,/insight_bootstrap_patches_v1\.js\?v=20261002-storage-load-guard/);
+  assert.match(index,/insight_bootstrap_patches_v1\.js\?v=20261002-storage-recovery/);
 });
 
 test('AI表示CSSはIndexの文字列置換ではなくpresentation moduleが所有する',()=>{
@@ -173,7 +173,7 @@ test('通常画面の選択年月をサイドバー切替後も全ページで�
 test('時間帯別客数は日報客数と分離して日付別24時間データとして保存する',()=>{
   const index=read('Index.html');
   const hourly=read('insight_hourly_customers_v1.js');
-  assert.match(index,/insight_bootstrap_patches_v1\.js\?v=20261002-storage-load-guard/);
+  assert.match(index,/insight_bootstrap_patches_v1\.js\?v=20261002-storage-recovery/);
   assert.match(index,/insight_hourly_customers_v1\.js\?v=20261002-hourly-position/);
   assert.ok(index.indexOf('insight_events_v1.js')<index.indexOf('insight_hourly_customers_v1.js'));
   assert.ok(index.indexOf('insight_hourly_customers_v1.js')<index.indexOf('insight_event_results_v1.js'));
@@ -312,7 +312,7 @@ test('店舗運営UIのCSSはops moduleが所有する',()=>{
 test('まだ必要な安全・互換パッチはbootstrap moduleで保持する',()=>{
   const index=read('Index.html');
   const bootstrap=read('insight_bootstrap_patches_v1.js');
-  assert.match(index,/insight_bootstrap_patches_v1\.js\?v=20261002-storage-load-guard/);
+  assert.match(index,/insight_bootstrap_patches_v1\.js\?v=20261002-storage-recovery/);
   assert.match(bootstrap,/const WX_KEYS=/);
   assert.match(bootstrap,/originalPersist/);
   assert.match(bootstrap,/safePersist/);

@@ -96,6 +96,8 @@ test('保存済みデータが壊れている場合は空データで起動せ�
   await page.goto('/Index.html',{waitUntil:'domcontentloaded'});
   await expect(page.locator('#insightStorageLoadError')).toBeVisible();
   await expect(page.locator('#insightStorageLoadError')).toContainText('空のデータでは起動していません');
+  await expect(page.locator('#insightStorageLoadReason')).toContainText('読込エラー');
+  await expect(page.locator('#insightStorageExportRaw')).toBeVisible();
   await expect(page.locator('#nav1')).toHaveCount(0);
   const raw=await page.evaluate(()=>localStorage.getItem('insight_v11'));
   expect(raw).toBe('{"current":"broken","stores":');
