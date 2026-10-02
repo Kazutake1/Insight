@@ -60,8 +60,8 @@ test('不正なschemaVersionは拒否する',()=>{
 });
 
 test('writeMetadataは補助メタデータを共有storage層から保存する',()=>{
-  const {storage,calls}=load({schemaVersion:1,current:'a',stores:{a:{}}});
-  assert.equal(storage.writeMetadata('insight_last_backup',12345),true);
+  const {window,calls}=setup();
+  assert.equal(window.InsightStorage.writeMetadata('insight_last_backup',12345),true);
   assert.deepEqual(calls,[['insight_last_backup','12345']]);
 });
 
@@ -122,5 +122,5 @@ test('bootstrapの共通persistはStorage読込後に共有保存層へ委譲す
   assert.match(bootstrap,/var safePersist=/);
   assert.match(bootstrap,/InsightStorage\.persistCurrent\(allStores\)/);
   assert.match(bootstrap,/localStorage\.setItem\(SK,JSON\.stringify\(allStores\)\)/);
-  assert.match(index,/insight_storage_v1\.js\?v=20260930-step6-4/);
+  assert.match(index,/insight_storage_v1\.js\?v=20261002-backup-metadata/);
 });
