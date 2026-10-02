@@ -190,12 +190,12 @@ test('イベント実績は過去開催・日付カード・時間帯グラフ�
   const index=read('Index.html');
   const eventResults=read('insight_event_results_v1.js');
   const events=read('insight_events_v1.js');
-  assert.match(index,/insight_events_v1\.js\?v=20261002-special-day/);
-  assert.match(index,/insight_event_results_v1\.js\?v=20261002-special-day-visibility/);
+  assert.match(index,/insight_events_v1\.js\?v=20261002-event-label/);
+  assert.match(index,/insight_event_results_v1\.js\?v=20261002-event-label/);
   assert.ok(index.indexOf('insight_analysis_context_v1.js')<index.indexOf('insight_event_results_v1.js'));
   assert.ok(index.indexOf('insight_event_results_v1.js')<index.indexOf('insight_daily_anomaly_v1.js'));
   assert.match(eventResults,/過去開催一覧/);
-  assert.match(eventResults,/data-kind="special">特別日/);
+  assert.match(eventResults,/data-kind="special">催事/);
   assert.match(eventResults,/collectSpecial/);
   assert.match(eventResults,/specialNames/);
   assert.match(eventResults,/\.er-toolbar \[hidden\]\{display:none!important\}/);
@@ -210,8 +210,8 @@ test('イベント実績は過去開催・日付カード・時間帯グラフ�
   assert.doesNotMatch(eventResults,/廃棄額|廃棄率|暦日/);
   assert.doesNotMatch(eventResults,/localStorage|InsightStorage/);
   assert.match(events,/イベント場所/);
-  assert.match(events,/special:'特別日'/);
-  assert.match(events,/type\.value==='special'\?'特別日名':'イベント名'/);
+  assert.match(events,/special:'催事'/);
+  assert.match(events,/type\.value==='special'\?'催事名':'イベント名'/);
   assert.match(events,/snapshot\.location=location\.value\.trim\(\)/);
   assert.doesNotThrow(()=>new vm.Script(eventResults),'event results module must be valid JavaScript');
 });

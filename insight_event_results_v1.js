@@ -188,10 +188,10 @@
         state.location='';
         if(locationField)locationField.hidden=true;
         if(arrow)arrow.hidden=true;
-        if(eventLabel)eventLabel.textContent='特別日名';
+        if(eventLabel)eventLabel.textContent='催事名';
         var specialItems=specialNames(allStores,storeId);
         if(state.eventName&&specialItems.indexOf(state.eventName)<0){state.eventName='';state.occurrenceId='';state.selectedDate='';}
-        eventSelect.replaceChildren(option('','特別日を選択'));
+        eventSelect.replaceChildren(option('','催事を選択'));
         specialItems.forEach(function(value){eventSelect.append(option(value,value));});
         eventSelect.disabled=!specialItems.length;
         eventSelect.value=state.eventName;
@@ -327,8 +327,8 @@
     function render(){
       var available=renderSelectors();
       if(state.kind==='special'){
-        if(!available.names.length){renderEmpty('特別日が登録されていません。');return;}
-        if(!state.eventName){renderEmpty('特別日を選択してください。');return;}
+        if(!available.names.length){renderEmpty('催事が登録されていません。');return;}
+        if(!state.eventName){renderEmpty('催事を選択してください。');return;}
       }else{
         if(!available.locations.length){renderEmpty('近隣イベントが登録されていません。');return;}
         if(!state.location){renderEmpty('イベント場所を選択してください。');return;}
@@ -349,8 +349,8 @@
       saleNav.insertAdjacentElement('afterend',nav);
       var page=el('div',undefined,'page er-page');page.id='pageEventResults';
       page.innerHTML='<div class="page-header"><div class="page-title">イベント実績</div></div>'+
-        '<div class="er-kind-switch" role="group" aria-label="実績種別"><button type="button" class="er-kind-btn active" data-kind="nearby">近隣イベント</button><button type="button" class="er-kind-btn" data-kind="special">特別日</button></div>'+
-        '<div class="er-toolbar"><label id="erLocationField">イベント場所<select id="erLocation" aria-label="イベント場所"></select></label><span id="erLocationArrow" class="er-arrow" aria-hidden="true">→</span><label><span id="erEventFieldLabel">イベント名</span><select id="erEvent" aria-label="イベント名／特別日名"></select></label></div>'+
+        '<div class="er-kind-switch" role="group" aria-label="実績種別"><button type="button" class="er-kind-btn active" data-kind="nearby">近隣イベント</button><button type="button" class="er-kind-btn" data-kind="special">催事</button></div>'+
+        '<div class="er-toolbar"><label id="erLocationField">イベント場所<select id="erLocation" aria-label="イベント場所"></select></label><span id="erLocationArrow" class="er-arrow" aria-hidden="true">→</span><label><span id="erEventFieldLabel">イベント名</span><select id="erEvent" aria-label="イベント名／催事名"></select></label></div>'+
         '<div id="erSummary" class="er-summary"></div><div id="erResults"></div>';
       main.append(page);
       doc.querySelectorAll('.er-kind-btn').forEach(function(button){button.onclick=function(){if(state.kind===button.dataset.kind)return;state.kind=button.dataset.kind;state.location='';state.eventName='';state.occurrenceId='';state.selectedDate='';render();};});

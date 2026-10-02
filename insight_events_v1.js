@@ -1,7 +1,7 @@
 /* 店舗イベント v1: 日次数値とは独立して保存。開催内容はプリセットから複製する。 */
 (function(root){
   'use strict';
-  var TYPES={sale:'セール',campaign:'キャンペーン',nearby:'近隣イベント',special:'特別日',environment:'周辺環境',equipment:'設備',staff:'人員',bulk:'大口注文',other:'その他'};
+  var TYPES={sale:'セール',campaign:'キャンペーン',nearby:'近隣イベント',special:'催事',environment:'周辺環境',equipment:'設備',staff:'人員',bulk:'大口注文',other:'その他'};
   var METHODS={amount:'○円引き',percent:'○%引き',fixed:'○円均一',multi:'複数購入値引き',gift:'購入特典',other:'その他／自由条件'};
   var CATEGORIES=['おにぎり','フライヤー','中華まん','麺類','ブリトー','その他'];
   var FIELDS={amount:[['amount','値引き額（円）',1]],percent:[['percent','割引率（%）',0.1,100]],fixed:[['minPrice','対象価格下限（円・任意）',0],['maxPrice','対象価格上限（円・任意）',0],['price','均一価格（円）',0]],multi:[['quantity','購入個数',1],['amount','値引き額（円）',1]],gift:[['quantity','購入個数',1],['giftType','特典種類（例：商品無料）'],['giftProduct','特典商品'],['giftQuantity','特典数量',1],['giftUnit','特典の単位（例：本・杯・個）']],other:[['text','自由条件']]};
@@ -240,7 +240,7 @@
           if(type.value==='other')scope=select(content,'適用範囲',{store:'この店舗のみ',global:'全店舗共通'},editing&&source.type==='other'?source.scope:'store');
           var initialSnapshot=editing&&source.snapshot?source.snapshot:null;
           var location=type.value==='nearby'?field(content,'イベント場所','text',initialSnapshot&&initialSnapshot.location?initialSnapshot.location:''):null;if(location)location.required=true;
-          var title=field(content,type.value==='special'?'特別日名':'イベント名','text',initialSnapshot?initialSnapshot.title:''),note=field(content,'補足（任意）','textarea',initialSnapshot?initialSnapshot.note:'');title.required=true;
+          var title=field(content,type.value==='special'?'催事名':'イベント名','text',initialSnapshot?initialSnapshot.title:''),note=field(content,'補足（任意）','textarea',initialSnapshot?initialSnapshot.note:'');title.required=true;
           read=function(){var snapshot={version:1,title:title.value.trim(),note:note.value.trim()};if(location){requireValue(location.value.trim()!=='','イベント場所を入力してください。');snapshot.location=location.value.trim();}validateSnapshot(snapshot);return snapshot;};
         }
       }

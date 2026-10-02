@@ -397,7 +397,7 @@ test('イベント実績は過去開催→複数日→時間帯グラフ→カ�
 });
 
 
-test('イベント実績の特別日は場所選択なしで過去開催を参照できる',async({page})=>{
+test('イベント実績の催事は場所選択なしで過去開催を参照できる',async({page})=>{
   const errors=await openInsight(page);
   await page.evaluate(()=>{
     const store=allStores.stores[allStores.current];
@@ -429,7 +429,7 @@ test('イベント実績の特別日は場所選択なしで過去開催を参�
   await page.locator('.er-kind-btn[data-kind="special"]').click();
   await expect(page.locator('.er-kind-btn[data-kind="special"]')).toHaveClass(/active/);
   await expect(page.locator('#erLocationField')).toBeHidden();
-  await expect(page.locator('#erEventFieldLabel')).toHaveText('特別日名');
+  await expect(page.locator('#erEventFieldLabel')).toHaveText('催事名');
   await expect(page.locator('#erEvent')).toBeEnabled();
   await page.locator('#erEvent').selectOption({label:'E2Eクリスマス'});
   await expect(page.locator('.er-occurrence')).toHaveCount(2);
