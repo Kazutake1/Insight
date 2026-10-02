@@ -50,7 +50,7 @@ test('選択月は主要ページを横断しても維持される',async({page}
 test('トップページはビルド番号を持ち最新版確認をno-storeで行う',async({page})=>{
   const errors=await openInsight(page);
   const source=await page.evaluate(()=>fetch('/Index.html?e2e-shell-check=1',{cache:'no-store'}).then(r=>r.text()));
-  expect(source).toContain('name="insight-shell-version" content="20261002-hourly-gap-1"');
+  expect(source).toContain('name="insight-shell-version" content="20261002-hourly-width-fit-1"');
   expect(source).toContain("fetch('./Index.html?insight_probe='+Date.now(),{cache:'no-store'})");
   expect(source).toContain("location.replace('./Index.html?insight_build='+encodeURIComponent(m[1]))");
   expect(errors).toEqual([]);
@@ -772,9 +772,19 @@ test('イベント実績は過去開催→複数日→時間帯グラフ→カ�
 
   const horizontal=await page.evaluate(()=>{
     const scroll=document.querySelector('.er-hour-scroll');
-    return {scrollWidth:scroll.scrollWidth,clientWidth:scroll.clientWidth};
+    const chart=document.querySelector('.er-hour-chart');
+    const last=document.querySelector('.er-hour-item:last-child');
+    const chartRect=chart.getBoundingClientRect(),lastRect=last.getBoundingClientRect();
+    return {
+      scrollWidth:scroll.scrollWidth,
+      clientWidth:scroll.clientWidth,
+      minWidth:getComputedStyle(chart).minWidth,
+      rightGap:Math.round(chartRect.right-lastRect.right)
+    };
   });
   expect(horizontal.scrollWidth).toBeGreaterThan(horizontal.clientWidth);
+  expect(horizontal.minWidth).toBe('1340px');
+  expect(horizontal.rightGap).toBeLessThanOrEqual(7);
 
   await expect(page.locator('.er-category-card')).toHaveCount(2);
   await expect(page.locator('.er-category-card .sc-day')).toHaveCount(2);
