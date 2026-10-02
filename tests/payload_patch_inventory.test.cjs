@@ -7,12 +7,12 @@ const vm=require('node:vm');
 const root=path.join(__dirname,'..');
 const read=name=>fs.readFileSync(path.join(root,name),'utf8');
 
-test('payload互換パッチ10件はbootstrap moduleへ分離しIndexにはbody挿入だけ残す',()=>{
+test('payload互換パッチ11件はbootstrap moduleへ分離しIndexにはbody挿入だけ残す',()=>{
   const index=read('Index.html');
   const bootstrap=read('insight_bootstrap_patches_v1.js');
-  assert.equal((bootstrap.match(/^patch\(/gm)||[]).length,10);
+  assert.equal((bootstrap.match(/^patch\(/gm)||[]).length,11);
   assert.equal((index.match(/html=html\.replace/g)||[]).length,1);
-  assert.match(index,/insight_bootstrap_patches_v1\.js\?v=20261001-structure/);
+  assert.match(index,/insight_bootstrap_patches_v1\.js\?v=20261002-storage-load-guard/);
 });
 
 test('AI表示CSSはIndexの文字列置換ではなくpresentation moduleが所有する',()=>{
@@ -312,7 +312,7 @@ test('店舗運営UIのCSSはops moduleが所有する',()=>{
 test('まだ必要な安全・互換パッチはbootstrap moduleで保持する',()=>{
   const index=read('Index.html');
   const bootstrap=read('insight_bootstrap_patches_v1.js');
-  assert.match(index,/insight_bootstrap_patches_v1\.js\?v=20261001-structure/);
+  assert.match(index,/insight_bootstrap_patches_v1\.js\?v=20261002-storage-load-guard/);
   assert.match(bootstrap,/const WX_KEYS=/);
   assert.match(bootstrap,/originalPersist/);
   assert.match(bootstrap,/safePersist/);
@@ -322,17 +322,18 @@ test('まだ必要な安全・互換パッチはbootstrap moduleで保持する'
   assert.match(index,/orderedFeatureLoads/);
 });
 
-test('互換パッチ10件はfail-fast bootstrapに集約しfeature挿入境界だけIndexに残す',()=>{
+test('互換パッチ11件はfail-fast bootstrapに集約しfeature挿入境界だけIndexに残す',()=>{
   const index=read('Index.html');
   const bootstrap=read('insight_bootstrap_patches_v1.js');
   assert.match(bootstrap,/STEP5 retained: base weather constants/);
+  assert.match(bootstrap,/STEP5 retained: saved data must never silently fall back/);
   assert.match(bootstrap,/STEP5 retained: persist\(\) must be hardened/);
   assert.match(bootstrap,/STEP5 retained: legacy core control contrast patch/);
   assert.match(bootstrap,/STEP5 retained: Chart\.js SRI\/referrer policy/);
   assert.match(bootstrap,/STEP5 retained: suppress the legacy year-delete UI/);
   assert.match(index,/STEP5 retained bootstrap boundary/);
   assert.match(bootstrap,/互換パッチの適用対象が見つかりません/);
-  assert.equal((bootstrap.match(/^patch\(/gm)||[]).length,10);
+  assert.equal((bootstrap.match(/^patch\(/gm)||[]).length,11);
   assert.equal((index.match(/html=html\.replace/g)||[]).length,1);
 });
 
