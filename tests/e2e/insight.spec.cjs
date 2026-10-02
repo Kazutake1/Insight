@@ -51,7 +51,7 @@ test('選択月は主要ページを横断しても維持される',async({page}
 test('トップページはビルド番号を持ち最新版確認をno-storeで行う',async({page})=>{
   const errors=await openInsight(page);
   const source=await page.evaluate(()=>fetch('/Index.html?e2e-shell-check=1',{cache:'no-store'}).then(r=>r.text()));
-  expect(source).toContain('name="insight-shell-version" content="20261002-settings-page-1"');
+  expect(source).toContain('name="insight-shell-version" content="20261002-pre-restore-backup-1"');
   expect(source).toContain("fetch('./Index.html?insight_probe='+Date.now(),{cache:'no-store'})");
   expect(source).toContain("location.replace('./Index.html?insight_build='+encodeURIComponent(m[1]))");
   expect(errors).toEqual([]);
@@ -110,6 +110,39 @@ test('通常バックアップはメタ情報を含み復元前に内容と検�
   expect(dialog.message()).toContain('復元前検査：正常');
   await dialog.dismiss();
   await setFile;
+  expect(errors).toEqual([]);
+});
+
+test('復元確定時は上書き前のデータを自動ダウンロードして設定ページを維持する',async({page})=>{
+  const errors=await openInsight(page);
+  await page.locator('#navSettings').click();
+  await expect(page.locator('#pageSettings')).toHaveClass(/show/);
+
+  const manualDownloadPromise=page.waitForEvent('download');
+  await page.locator('#backupBtn').click();
+  const manualDownload=await manualDownloadPromise;
+  const restorePath=await manualDownload.path();
+  const before=await page.evaluate(()=>JSON.parse(JSON.stringify(allStores)));
+
+  const dialogPromise=page.waitForEvent('dialog');
+  const fileAction=page.locator('#restoreFile').setInputFiles(restorePath);
+  const dialog=await dialogPromise;
+  expect(dialog.type()).toBe('confirm');
+
+  const safetyDownloadPromise=page.waitForEvent('download');
+  await dialog.accept();
+  const safetyDownload=await safetyDownloadPromise;
+  await fileAction;
+
+  expect(safetyDownload.suggestedFilename()).toMatch(/^Insight_pre_restore_\d{8}_\d{6}\.json$/);
+  const safetyPath=await safetyDownload.path();
+  const safety=JSON.parse(fs.readFileSync(safetyPath,'utf8'));
+  expect(safety.backupInfo.format).toBe('InsightBackup');
+  expect(safety.backupInfo.formatVersion).toBe(2);
+  expect(safety.backupInfo.backupType).toBe('preRestore');
+  expect(safety.data.stores).toEqual(before.stores);
+  await expect(page.locator('#pageSettings')).toHaveClass(/show/);
+  await expect(page.locator('#navSettings')).toHaveClass(/active/);
   expect(errors).toEqual([]);
 });
 

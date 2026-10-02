@@ -188,6 +188,22 @@ test('新旧バックアップ形式を復元対象として維持する',()=>{
   assert.match(source,/Array\.isArray\(raw\.years\)&&isPlainObject\(raw\.data\)/);
 });
 
+test('復元直前に現在データをv2形式で自動退避してから上書きする',()=>{
+  const source=fs.readFileSync(path.join(root,'insight_backup_guard_v1.js'),'utf8');
+  assert.match(source,/function createPreRestoreBackup\(\)/);
+  assert.match(source,/Insight_pre_restore_/);
+  assert.match(source,/backupType="preRestore"/);
+  assert.match(source,/preRestoreMemorySnapshot=snapshot/);
+  assert.ok(source.indexOf('createPreRestoreBackup()')<source.indexOf('InsightStorage.writeSnapshot(newAll)'));
+  assert.match(source,/復元直前バックアップを作成できないため、復元を中止しました/);
+});
+
+test('設定ページから復元した場合は復元後も設定ページを維持する',()=>{
+  const source=fs.readFileSync(path.join(root,'insight_backup_guard_v1.js'),'utf8');
+  assert.match(source,/currentNav==='settings'/);
+  assert.match(source,/InsightSettings\.open/);
+});
+
 test('販売数入力を開いたままバックアップ復元しても復元後データを再読込する',()=>{
   const sales=fs.readFileSync(path.join(root,'insight_sales_count_v1.js'),'utf8');
   const backup=fs.readFileSync(path.join(root,'insight_backup_guard_v1.js'),'utf8');

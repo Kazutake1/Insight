@@ -81,6 +81,34 @@ function restoreSummary(fileName,info,snapshot,report){
   return message+"\n\n現在の全データは上書きされます。復元しますか？";
 }
 
+
+var preRestoreMemorySnapshot=null;
+function backupStamp(now){
+  var pad=function(n){return String(n).padStart(2,"0");};
+  return now.getFullYear()+pad(now.getMonth()+1)+pad(now.getDate())+"_"+pad(now.getHours())+pad(now.getMinutes())+pad(now.getSeconds());
+}
+function downloadBackupPayload(payload,filename){
+  var blob=new Blob([JSON.stringify(payload,null,2)],{type:"application/json"});
+  var url=URL.createObjectURL(blob),a=document.createElement("a");
+  try{
+    a.href=url;a.download=filename;document.body.appendChild(a);a.click();
+  }finally{
+    if(a.parentNode)a.remove();
+    setTimeout(function(){URL.revokeObjectURL(url);},1000);
+  }
+  return filename;
+}
+function createPreRestoreBackup(){
+  if(!window.InsightStorage)throw new Error("保存機能を初期化できませんでした");
+  var now=new Date(),snapshot=window.InsightStorage.migrateSnapshot(allStores);
+  var payload={backupInfo:buildBackupInfo(snapshot,now),data:snapshot};
+  payload.backupInfo.backupType="preRestore";
+  var filename="Insight_pre_restore_"+backupStamp(now)+".json";
+  downloadBackupPayload(payload,filename);
+  preRestoreMemorySnapshot=snapshot;
+  return {snapshot:snapshot,filename:filename};
+}
+
 function normalizeSalesCount(next){
   if(next.salesCountManagement===undefined)next.salesCountManagement={version:1,categories:[{id:"cat_onigiri",name:"おにぎり",hidden:false,aliases:[]},{id:"cat_sandwich",name:"サンドイッチ",hidden:false,aliases:[]},{id:"cat_noodles",name:"麺類",hidden:false,aliases:[]}]};
   if(!isPlainObject(next.salesCountManagement)||next.salesCountManagement.version!==1||!Array.isArray(next.salesCountManagement.categories)||!next.salesCountManagement.categories.length||!next.salesCountManagement.categories.some(function(c){return isPlainObject(c)&&c.hidden===false;}))throw new Error("販売数カテゴリーマスターが不正です");
@@ -142,8 +170,7 @@ backupData=function(){
     if(!window.InsightStorage)throw new Error("保存機能を初期化できませんでした");
     var snapshot=window.InsightStorage.migrateSnapshot(allStores),now=new Date();
     var payload={backupInfo:buildBackupInfo(snapshot,now),data:snapshot};
-    var pad=function(n){return String(n).padStart(2,"0");};
-    var stamp=now.getFullYear()+pad(now.getMonth()+1)+pad(now.getDate())+"_"+pad(now.getHours())+pad(now.getMinutes())+pad(now.getSeconds());
+    var stamp=backupStamp(now);
     var filename="Insight_backup_all_stores_"+stamp+".json";
     var blob=new Blob([JSON.stringify(payload,null,2)],{type:"application/json"});
     var url=URL.createObjectURL(blob),a=document.createElement("a");
@@ -164,8 +191,9 @@ restoreData=function(e){
     if(envelope.info)validateBackupInfo(envelope.info,newAll);
     var preflight=runRestorePreflight(newAll);
     if(!confirm(restoreSummary(file.name,envelope.info,newAll,preflight))){e.target.value="";return;}
+    try{createPreRestoreBackup();}catch(safetyErr){throw new Error("復元直前バックアップを作成できないため、復元を中止しました。 "+String(safetyErr&&safetyErr.message?safetyErr.message:safetyErr));}
     try{if(!window.InsightStorage)throw new Error("保存機能を初期化できませんでした");window.InsightStorage.writeSnapshot(newAll);}catch(storageErr){throw new Error("保存容量が不足しているため復元できません");}
-    allStores=newAll;store=allStores.stores[allStores.current];baseYear=store.years[store.years.length-1];cmpYear=store.years.length>1?store.years[store.years.length-2]:null;editYear={sales:baseYear,kyaku:baseYear,haiki:baseYear};editMonth={sales:todayFY().month,kyaku:todayFY().month,haiki:todayFY().month};renderStoreSel();if(currentNav==='salesCounts'){if(window.InsightSalesCount&&typeof window.InsightSalesCount.reloadFromStore==="function")window.InsightSalesCount.reloadFromStore();else gotoNav('salesCounts');}else if(currentNav===1)refreshDash();else if(currentNav>1)initInputPage(["","","sales","kyaku","haiki"][currentNav]);else initQuickPage();if(window.InsightPagePeriodSync&&typeof window.InsightPagePeriodSync.reconcileCurrentStore==="function")window.InsightPagePeriodSync.reconcileCurrentStore();updateMissingBadge();showToast("📤 データを復元しました","#1d4ed8","#eff6ff");
+    allStores=newAll;store=allStores.stores[allStores.current];baseYear=store.years[store.years.length-1];cmpYear=store.years.length>1?store.years[store.years.length-2]:null;editYear={sales:baseYear,kyaku:baseYear,haiki:baseYear};editMonth={sales:todayFY().month,kyaku:todayFY().month,haiki:todayFY().month};renderStoreSel();if(currentNav==='salesCounts'){if(window.InsightSalesCount&&typeof window.InsightSalesCount.reloadFromStore==="function")window.InsightSalesCount.reloadFromStore();else gotoNav('salesCounts');}else if(currentNav==='settings'){if(window.InsightSettings&&typeof window.InsightSettings.open==="function")window.InsightSettings.open();}else if(currentNav===1)refreshDash();else if(currentNav>1)initInputPage(["","","sales","kyaku","haiki"][currentNav]);else initQuickPage();if(window.InsightPagePeriodSync&&typeof window.InsightPagePeriodSync.reconcileCurrentStore==="function")window.InsightPagePeriodSync.reconcileCurrentStore();updateMissingBadge();showToast("📤 データを復元しました","#1d4ed8","#eff6ff");
   }catch(err){
     console.warn("Insight restore rejected:",err);
     var detail=String(err&&err.message?err.message:err);
