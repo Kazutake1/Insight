@@ -50,7 +50,7 @@ test('選択月は主要ページを横断しても維持される',async({page}
 test('トップページはビルド番号を持ち最新版確認をno-storeで行う',async({page})=>{
   const errors=await openInsight(page);
   const source=await page.evaluate(()=>fetch('/Index.html?e2e-shell-check=1',{cache:'no-store'}).then(r=>r.text()));
-  expect(source).toContain('name="insight-shell-version" content="20261002-hourly-tap-labels-1"');
+  expect(source).toContain('name="insight-shell-version" content="20261002-hourly-gap-1"');
   expect(source).toContain("fetch('./Index.html?insight_probe='+Date.now(),{cache:'no-store'})");
   expect(source).toContain("location.replace('./Index.html?insight_build='+encodeURIComponent(m[1]))");
   expect(errors).toEqual([]);
@@ -758,6 +758,8 @@ test('イベント実績は過去開催→複数日→時間帯グラフ→カ�
   expect(hourlyBarColor).toBe('rgb(59, 130, 246)');
   const timeFontSize=await page.locator('.er-hour-item>span').first().evaluate(el=>getComputedStyle(el).fontSize);
   expect(timeFontSize).toBe('11.5px');
+  const hourlyGap=await page.locator('.er-hour-chart').evaluate(el=>getComputedStyle(el).gap);
+  expect(hourlyGap).toBe('4px');
   await expect(page.locator('.er-hour-plot').nth(18)).toHaveAttribute('aria-label','18時台 186人');
   await page.locator('.er-hour-plot').first().click();
   await expect(page.locator('.er-hour-value:visible')).toHaveText('20人');
