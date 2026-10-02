@@ -169,6 +169,27 @@ test('通常画面の選択年月をサイドバー切替後も全ページで�
 });
 
 
+
+test('イベント実績は近隣イベントを場所→イベント名で絞り込み開催日実績だけを読む',()=>{
+  const index=read('Index.html');
+  const eventResults=read('insight_event_results_v1.js');
+  const events=read('insight_events_v1.js');
+  assert.match(index,/insight_events_v1\.js\?v=20261002-nearby-location/);
+  assert.match(index,/insight_event_results_v1\.js\?v=20261002-initial/);
+  assert.ok(index.indexOf('insight_analysis_context_v1.js')<index.indexOf('insight_event_results_v1.js'));
+  assert.ok(index.indexOf('insight_event_results_v1.js')<index.indexOf('insight_daily_anomaly_v1.js'));
+  assert.match(eventResults,/navEventResults/);
+  assert.match(eventResults,/pageEventResults/);
+  assert.match(eventResults,/イベント場所を選択/);
+  assert.match(eventResults,/イベント名を選択/);
+  assert.match(eventResults,/InsightAnalysisContext/);
+  assert.match(eventResults,/type==='nearby'/);
+  assert.doesNotMatch(eventResults,/localStorage|InsightStorage/);
+  assert.match(events,/イベント場所/);
+  assert.match(events,/snapshot\.location=location\.value\.trim\(\)/);
+  assert.doesNotThrow(()=>new vm.Script(eventResults),'event results module must be valid JavaScript');
+});
+
 test('全ページタイトルはダッシュボード基準の共通モジュールで位置を統一する',()=>{
   const index=read('Index.html');
   const layout=read('insight_page_title_layout_v1.js');

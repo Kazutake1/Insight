@@ -52,6 +52,14 @@ test('multiple target categories survive validation and backup roundtrip',()=>{
   restored.eventManagement.events[0].snapshot.sale.targets.push({categoryId:'cat_cup_noodles',category:'重複'});
   assert.throws(()=>events.validate(restored));
 });
+
+test('nearby event location is optional for old backups and retained when present',()=>{
+  const legacy=data();events.add(legacy,'a',{type:'nearby',scope:'store',startDate:'2026-10-01',endDate:'2026-10-01',snapshot:{version:1,title:'旧イベント',note:''}});events.validate(legacy);
+  assert.equal(legacy.stores.a.events[0].snapshot.location,undefined);
+  const current=data();events.add(current,'a',{type:'nearby',scope:'store',startDate:'2026-10-02',endDate:'2026-10-02',snapshot:{version:1,title:'新イベント',note:'',location:'文化フォーラム'}});
+  const restored=JSON.parse(JSON.stringify(current));events.validate(restored);
+  assert.equal(restored.stores.a.events[0].snapshot.location,'文化フォーラム');
+});
 test('malformed periods, scope, duplicates and conditions are rejected',()=>{
   const mutations=[e=>e.endDate='2026-02-30',e=>e.endDate='2026-09-21',e=>e.scope='store',e=>e.snapshot.sale.params.amount=-1,e=>e.snapshot.sale.params.amount='50',e=>e.snapshot.version=2];
   for(const mutate of mutations){const a=data();events.add(a,'a',sale());mutate(a.eventManagement.events[0]);assert.throws(()=>events.validate(a));}

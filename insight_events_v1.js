@@ -15,7 +15,7 @@
   }
   function validateSnapshot(s){
     requireValue(object(s)&&s.version===1,'イベント内容の形式が不正です。');
-    str(s.title,'名称');str(s.note,'補足',true);
+    str(s.title,'名称');str(s.note,'補足',true);if(s.location!==undefined)str(s.location,'イベント場所',true);
     if(s.sale!==undefined){
       var sale=s.sale;requireValue(object(sale)&&object(sale.params),'セール条件が不正です。');
       str(sale.category,'対象カテゴリ');str(sale.method,'セール方式');
@@ -175,7 +175,7 @@
       try{validate(allStores);list(allStores,allStores.current,selectedDate()).forEach(function(e){
         var chip=el('div',undefined,'ie-chip');chip.title=e.startDate+' 〜 '+e.endDate+(e.snapshot.note?'\n'+e.snapshot.note:'');
         var desc=summary(e.snapshot);
-        var details=button(desc,function(){var d=dialog(TYPES[e.type]||e.type);d.append(el('p',desc),el('p',e.startDate+' 〜 '+e.endDate),el('p',e.scope==='global'?'全店舗共通':'この店舗のみ'));if(e.snapshot.note){var note=el('p',e.snapshot.note);note.style.whiteSpace='pre-wrap';d.append(note);}});details.className='ie-summary';
+        var details=button(desc,function(){var d=dialog(TYPES[e.type]||e.type);d.append(el('p',desc),el('p',e.startDate+' 〜 '+e.endDate),el('p',e.scope==='global'?'全店舗共通':'この店舗のみ'));if(e.type==='nearby'&&e.snapshot.location)d.append(el('p','場所：'+e.snapshot.location));if(e.snapshot.note){var note=el('p',e.snapshot.note);note.style.whiteSpace='pre-wrap';d.append(note);}});details.className='ie-summary';
         var edit=button('編集',function(){openEvent(e);});edit.className='ie-edit';edit.setAttribute('aria-label',desc+'を編集');
         chip.append(el('small',TYPES[e.type]||e.type),details,el('small',e.scope==='global'?'全店舗':'この店舗'));
         var remove=button('×',function(){
@@ -239,8 +239,9 @@
         }else{
           if(type.value==='other')scope=select(content,'適用範囲',{store:'この店舗のみ',global:'全店舗共通'},editing&&source.type==='other'?source.scope:'store');
           var initialSnapshot=editing&&source.snapshot?source.snapshot:null;
+          var location=type.value==='nearby'?field(content,'イベント場所','text',initialSnapshot&&initialSnapshot.location?initialSnapshot.location:''):null;if(location)location.required=true;
           var title=field(content,'イベント名','text',initialSnapshot?initialSnapshot.title:''),note=field(content,'補足（任意）','textarea',initialSnapshot?initialSnapshot.note:'');title.required=true;
-          read=function(){return {version:1,title:title.value.trim(),note:note.value.trim()};};
+          read=function(){var snapshot={version:1,title:title.value.trim(),note:note.value.trim()};if(location){requireValue(location.value.trim()!=='','イベント場所を入力してください。');snapshot.location=location.value.trim();}validateSnapshot(snapshot);return snapshot;};
         }
       }
       type.onchange=draw;draw();

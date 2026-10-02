@@ -10,7 +10,7 @@ async function openInsight(page){
   page.on('pageerror',error=>errors.push(error.message));
   await page.goto('/Index.html',{waitUntil:'domcontentloaded'});
   await expect(page.locator('#nav1')).toBeVisible();
-  await page.waitForFunction(()=>window.InsightPagePeriodSync&&window.InsightSalesCount&&window.InsightSaleResults&&window.InsightAIVisual&&window.InsightAIInterpretation&&window.InsightAnalysisPeriodLock);
+  await page.waitForFunction(()=>window.InsightPagePeriodSync&&window.InsightSalesCount&&window.InsightSaleResults&&window.InsightEventResults&&window.InsightAIVisual&&window.InsightAIInterpretation&&window.InsightAnalysisPeriodLock);
   return errors;
 }
 
@@ -61,7 +61,7 @@ test('全ページタイトルはダッシュボード位置に揃い追加ペ�
   await expect(page.locator('#pageDash > .page-header > .page-title')).toBeVisible();
   const reference=await titleRect();
 
-  for(const selector of ['#nav2','#nav3','#nav4','#navSalesCount','#navSaleResults']){
+  for(const selector of ['#nav2','#nav3','#nav4','#navSalesCount','#navSaleResults','#navEventResults']){
     await page.locator(selector).click();
     await expect(page.locator('.page.show > .page-header > .page-title')).toBeVisible();
     const current=await titleRect();
@@ -241,10 +241,46 @@ test('セール実績は内容別に表示し販売数入力と同じカード�
 
   const order=await page.evaluate(()=>({
     afterSales:document.getElementById('navSalesCount').nextElementSibling&&document.getElementById('navSalesCount').nextElementSibling.id,
-    afterResults:document.getElementById('navSaleResults').nextElementSibling&&document.getElementById('navSaleResults').nextElementSibling.id
+    afterResults:document.getElementById('navSaleResults').nextElementSibling&&document.getElementById('navSaleResults').nextElementSibling.id,
+    afterEventResults:document.getElementById('navEventResults').nextElementSibling&&document.getElementById('navEventResults').nextElementSibling.id
   }));
   expect(order.afterSales).toBe('navSaleResults');
-  expect(order.afterResults).toBe('aiAnalysisToggle');
+  expect(order.afterResults).toBe('navEventResults');
+  expect(order.afterEventResults).toBe('aiAnalysisToggle');
+  expect(errors).toEqual([]);
+});
+
+
+test('イベント実績は場所→イベント名を選ぶと開催日の基本実績だけを表示する',async({page})=>{
+  const errors=await openInsight(page);
+  await page.evaluate(()=>{
+    const store=allStores.stores[allStores.current];
+    store.events=(store.events||[]).filter(event=>!String(event.id||'').startsWith('e2e_event_results_'));
+    store.events.push(
+      {id:'e2e_event_results_1',type:'nearby',scope:'store',startDate:'2026-09-10',endDate:'2026-09-10',snapshot:{version:1,title:'E2Eコンサート',note:'',location:'E2E文化フォーラム'}},
+      {id:'e2e_event_results_2',type:'nearby',scope:'store',startDate:'2026-09-12',endDate:'2026-09-12',snapshot:{version:1,title:'E2Eコンサート',note:'',location:'E2E文化フォーラム'}}
+    );
+    window.InsightAnalysisContext.buildDay=function(date){
+      const day=Number(date.slice(-2));
+      return {metrics:{salesYen:100000+day*1000,customers:90+day,customerUnitPrice:1000+day,items:200+day/100,wasteYen:3000+day*10,wasteRate:2+day/100,inputDays:1},conditions:{daily:[]}};
+    };
+    window.InsightEventResults.render();
+  });
+
+  await page.locator('#navEventResults').click();
+  await expect(page.locator('#pageEventResults')).toHaveClass(/show/);
+  await expect(page.locator('#erEvent')).toBeDisabled();
+  await page.locator('#erLocation').selectOption({label:'E2E文化フォーラム'});
+  await expect(page.locator('#erEvent')).toBeEnabled();
+  await page.locator('#erEvent').selectOption({label:'E2Eコンサート'});
+  await expect(page.locator('#erTableBody tr')).toHaveCount(2);
+  await expect(page.locator('#erTableBody tr').first()).toContainText('2026/9/12');
+  await expect(page.locator('#erTableBody tr').first()).toContainText('112,000円');
+  await expect(page.locator('#erTableBody tr').first()).toContainText('102人');
+  await expect(page.locator('#erTableBody tr').first()).toContainText('1,012円');
+  await expect(page.locator('#erTableBody tr').first()).toContainText('200.12');
+  await expect(page.locator('#erTableBody tr').first()).toContainText('3,120円');
+  await expect(page.locator('#erTableBody tr').first()).toContainText('2.12%');
   expect(errors).toEqual([]);
 });
 
