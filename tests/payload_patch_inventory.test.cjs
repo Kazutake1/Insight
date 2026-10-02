@@ -168,8 +168,9 @@ test('保存データ健全性チェックは読み取り専用で不整合を�
   assert.ok(index.indexOf('insight_backup_guard_v1.js')<index.indexOf('insight_data_health_v1.js'));
   assert.match(health,/function check\(snapshot\)/);
   assert.match(health,/orphan_data_year/);
-  assert.match(health,/sales_unregistered_year/);
-  assert.match(health,/hourly_unregistered_year/);
+  assert.match(health,/kind\+'_unregistered_year'/);
+  assert.match(health,/dateYearCounts\(store\.salesCounts,registered,'sales'/);
+  assert.match(health,/dateYearCounts\(store\.hourlyCustomers,registered,'hourly'/);
   assert.match(health,/データ状態：正常/);
   assert.match(health,/データ状態：要確認/);
   assert.match(health,/この確認は読み取り専用です/);
