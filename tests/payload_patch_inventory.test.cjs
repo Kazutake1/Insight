@@ -243,7 +243,7 @@ test('セール実績ページは販売数入力直後に読み込み同一日�
   const saleResults=read('insight_sale_results_v1.js');
   const sales=read('insight_sales_count_v1.js');
   assert.match(index,/insight_sales_count_v1\.js\?v=20261001-weekday-gray/);
-  assert.match(index,/insight_sale_results_v1\.js\?v=20261001-active-trips/);
+  assert.match(index,/insight_sale_results_v1\.js\?v=20261002-card-fit/);
   assert.ok(index.indexOf('insight_sales_count_v1.js')<index.indexOf('insight_sale_results_v1.js'));
   assert.ok(index.indexOf('insight_sale_results_v1.js')<index.indexOf('insight_page_period_sync_v1.js'));
   assert.match(saleResults,/id='navSaleResults'|nav\.id='navSaleResults'/);
@@ -379,7 +379,7 @@ test('販売数カテゴリーの対象便設定を全関連層で共有する',
   const saleResults=read('insight_sale_results_v1.js');
   const pageAI=read('insight_ai_page_comments_v1.js');
   assert.match(index,/insight_sales_count_v1\.js\?v=20261001-weekday-gray/);
-  assert.match(index,/insight_sale_results_v1\.js\?v=20261001-active-trips/);
+  assert.match(index,/insight_sale_results_v1\.js\?v=20261002-card-fit/);
   assert.match(index,/insight_analysis_context_v1\.js\?v=20261001-active-trips/);
   assert.match(index,/insight_ai_page_comments_v1\.js\?v=20261001-decision-analysis/);
   assert.match(sales,/activeTrips:\[true,true,true\]/);
