@@ -10,7 +10,7 @@ async function openInsight(page){
   page.on('pageerror',error=>errors.push(error.message));
   await page.goto('/Index.html',{waitUntil:'domcontentloaded'});
   await expect(page.locator('#nav1')).toBeVisible();
-  await page.waitForFunction(()=>window.InsightPagePeriodSync&&window.InsightSalesCount&&window.InsightSaleResults&&window.InsightEventResults&&window.InsightAIVisual&&window.InsightAIInterpretation&&window.InsightAnalysisPeriodLock);
+  await page.waitForFunction(()=>window.InsightPagePeriodSync&&window.InsightSalesCount&&window.InsightSaleResults&&window.InsightHourlyCustomers&&window.InsightEventResults&&window.InsightAIVisual&&window.InsightAIInterpretation&&window.InsightAnalysisPeriodLock);
   return errors;
 }
 
@@ -251,19 +251,97 @@ test('セール実績は内容別に表示し販売数入力と同じカード�
 });
 
 
-test('イベント実績は場所→イベント名を選ぶと開催日の基本実績だけを表示する',async({page})=>{
+test('今日の入力で時間帯別客数を途中保存し24時間入力を完了できる',async({page})=>{
+  const errors=await openInsight(page);
+  await page.locator('#nav0').click();
+  await expect(page.locator('#hourlyCustomersQuick')).toBeVisible();
+
+  await page.locator('#hourlyCustomersQuick .hourly-quick-button').click();
+  await expect(page.locator('.hourly-dialog')).toBeVisible();
+  const inputs=page.locator('.hourly-dialog .hourly-input-group input');
+  await expect(inputs).toHaveCount(24);
+  await inputs.nth(0).fill('0');
+  await inputs.nth(1).fill('12');
+  await page.locator('.hourly-dialog .hourly-primary').click();
+  await expect(page.locator('#hourlyCustomersQuick .hourly-quick-status')).toContainText('途中 2/24');
+  await expect(page.locator('#hourlyCustomersQuick .hourly-quick-status')).toContainText('合計 12人');
+
+  const partial=await page.evaluate(()=>{
+    const date=window.InsightDateContext.getSelectedIso();
+    return window.InsightHourlyCustomers.status(allStores,allStores.current,date);
+  });
+  expect(partial.count).toBe(2);
+  expect(partial.complete).toBe(false);
+  expect(partial.hours[0]).toBe(0);
+  expect(partial.hours[2]).toBeNull();
+
+  await page.locator('#hourlyCustomersQuick .hourly-quick-button').click();
+  await page.evaluate(()=>{
+    const inputs=Array.from(document.querySelectorAll('.hourly-dialog .hourly-input-group input'));
+    inputs.forEach((input,index)=>{
+      if(input.value==='')input.value=String(index+1);
+      input.dispatchEvent(new Event('input',{bubbles:true}));
+    });
+  });
+  await expect(page.locator('.hourly-dialog-summary')).toContainText('入力 24/24');
+  await page.locator('.hourly-dialog .hourly-primary').click();
+  await expect(page.locator('#hourlyCustomersQuick .hourly-quick-status')).toContainText('入力済み 24/24');
+  await expect(page.locator('.hourly-dialog')).toHaveCount(0);
+
+  const complete=await page.evaluate(()=>{
+    const date=window.InsightDateContext.getSelectedIso();
+    return window.InsightHourlyCustomers.status(allStores,allStores.current,date);
+  });
+  expect(complete.complete).toBe(true);
+  expect(complete.count).toBe(24);
+  expect(errors).toEqual([]);
+});
+
+test('イベント実績は過去開催→複数日→時間帯グラフ→カテゴリー便別実績を表示する',async({page})=>{
   const errors=await openInsight(page);
   await page.evaluate(()=>{
-    const store=allStores.stores[allStores.current];
+    const storeId=allStores.current;
+    const store=allStores.stores[storeId];
     store.events=(store.events||[]).filter(event=>!String(event.id||'').startsWith('e2e_event_results_'));
     store.events.push(
-      {id:'e2e_event_results_1',type:'nearby',scope:'store',startDate:'2026-09-10',endDate:'2026-09-10',snapshot:{version:1,title:'E2Eコンサート',note:'',location:'E2E文化フォーラム'}},
-      {id:'e2e_event_results_2',type:'nearby',scope:'store',startDate:'2026-09-12',endDate:'2026-09-12',snapshot:{version:1,title:'E2Eコンサート',note:'',location:'E2E文化フォーラム'}}
+      {id:'e2e_event_results_old',type:'nearby',scope:'store',startDate:'2025-09-10',endDate:'2025-09-10',snapshot:{version:1,title:'E2Eコンサート',note:'前年',location:'E2E文化フォーラム'}},
+      {id:'e2e_event_results_new',type:'nearby',scope:'store',startDate:'2026-09-12',endDate:'2026-09-13',snapshot:{version:1,title:'E2Eコンサート',note:'2日開催',location:'E2E文化フォーラム'}}
     );
-    window.InsightAnalysisContext.buildDay=function(date){
+
+    function metricsFor(date){
       const day=Number(date.slice(-2));
-      return {metrics:{salesYen:100000+day*1000,customers:90+day,customerUnitPrice:1000+day,items:200+day/100,wasteYen:3000+day*10,wasteRate:2+day/100,inputDays:1},conditions:{daily:[]}};
+      return {salesYen:100000+day*1000,customers:90+day,customerUnitPrice:(100000+day*1000)/(90+day),items:200+day/100,inputDays:1};
+    }
+    window.InsightAnalysisContext.buildDay=function(date){
+      return {metrics:metricsFor(date),conditions:{daily:[]}};
     };
+    window.InsightAnalysisContext.buildRange=function(start,end){
+      const startDay=Number(start.slice(-2)),endDay=Number(end.slice(-2));
+      let sales=0,customers=0,items=0,count=0;
+      for(let day=startDay;day<=endDay;day++){
+        const date=start.slice(0,8)+String(day).padStart(2,'0');
+        const m=metricsFor(date);sales+=m.salesYen;customers+=m.customers;items+=m.items;count++;
+      }
+      return {metrics:{salesYen:sales,customers,customerUnitPrice:sales/customers,items,inputDays:count}};
+    };
+
+    store.hourlyCustomers=store.hourlyCustomers||{};
+    store.hourlyCustomers['2026-09-12']=Array.from({length:24},(_,hour)=>hour===18?186:20+hour);
+    store.hourlyCustomers['2026-09-13']=Array.from({length:24},(_,hour)=>hour<8?10+hour:null);
+
+    window.InsightSalesCount.ensure(allStores);
+    const categories=allStores.salesCountManagement.categories.filter(category=>!category.hidden).slice(0,2);
+    store.salesCounts=store.salesCounts||{};
+    store.salesCounts['2026-09-12']=store.salesCounts['2026-09-12']||{};
+    categories.forEach((category,index)=>{
+      store.salesCounts['2026-09-12'][category.id]={
+        trips:[
+          {delivery:40+index,sales:36+index},
+          {delivery:50+index,sales:46+index},
+          {delivery:45+index,sales:41+index}
+        ]
+      };
+    });
     window.InsightEventResults.render();
   });
 
@@ -273,16 +351,44 @@ test('イベント実績は場所→イベント名を選ぶと開催日の基�
   await page.locator('#erLocation').selectOption({label:'E2E文化フォーラム'});
   await expect(page.locator('#erEvent')).toBeEnabled();
   await page.locator('#erEvent').selectOption({label:'E2Eコンサート'});
-  await expect(page.locator('#erTableBody tr')).toHaveCount(2);
-  await expect(page.locator('#erTableBody tr').first()).toContainText('2026/9/12');
-  await expect(page.locator('#erTableBody tr').first()).toContainText('112,000円');
-  await expect(page.locator('#erTableBody tr').first()).toContainText('102人');
-  await expect(page.locator('#erTableBody tr').first()).toContainText('1,012円');
-  await expect(page.locator('#erTableBody tr').first()).toContainText('200.12');
-  await expect(page.locator('#pageEventResults .er-table th')).toHaveText(['開催日','売上','客数','客単価','買上点数']);
-  await expect(page.locator('#erTableBody tr').first().locator('td')).toHaveCount(5);
+
+  await expect(page.locator('.er-occurrence')).toHaveCount(2);
+  await expect(page.locator('.er-occurrence').first()).toContainText('2026/9/12');
+  await expect(page.locator('.er-occurrence').first()).toContainText('9/13');
+  await expect(page.locator('.er-occurrence').first()).toContainText('売上 225,000円');
+  await expect(page.locator('.er-occurrence').first()).toContainText('客数 205人');
+
+  await page.locator('.er-occurrence').first().click();
+  await expect(page.locator('.er-overview-grid .er-summary-card')).toHaveCount(4);
+  await expect(page.locator('.er-day-tab')).toHaveCount(2);
+  await expect(page.locator('.er-day-tab').first()).toHaveClass(/active/);
+  await expect(page.locator('.er-hourly-section')).toBeVisible();
+  await expect(page.locator('.er-peak')).toContainText('18時台 186人');
+  await expect(page.locator('.er-hour-item')).toHaveCount(24);
+
+  const horizontal=await page.evaluate(()=>{
+    const scroll=document.querySelector('.er-hour-scroll');
+    return {scrollWidth:scroll.scrollWidth,clientWidth:scroll.clientWidth};
+  });
+  expect(horizontal.scrollWidth).toBeGreaterThan(horizontal.clientWidth);
+
+  await expect(page.locator('.er-category-card')).toHaveCount(2);
+  await expect(page.locator('.er-category-card .sc-day')).toHaveCount(2);
+  const readOnly=await page.locator('.er-category-card input').evaluateAll(inputs=>inputs.every(input=>input.readOnly));
+  expect(readOnly).toBe(true);
+
+  await page.locator('.er-day-tab').nth(1).click();
+  await expect(page.locator('.er-day-tab').nth(1)).toHaveClass(/active/);
+  await expect(page.locator('.er-hourly-section')).toHaveCount(0);
+  await expect(page.locator('.er-category-card')).toHaveCount(0);
+
+  await page.locator('.er-back').click();
+  await page.locator('.er-occurrence').nth(1).click();
+  await expect(page.locator('.er-day-tabs')).toHaveCount(0);
+  await expect(page.locator('.er-daily-summary')).toBeVisible();
   expect(errors).toEqual([]);
 });
+
 
 test('分析AIコメントは数値カードと簡潔な確認事項として表示する',async({page})=>{
   const errors=await openInsight(page);

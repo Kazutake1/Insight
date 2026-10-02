@@ -31,6 +31,7 @@ jobs:
           - daily_anomaly.test.cjs
           - hook_bridge.test.cjs
           - insight_events.test.cjs
+          - hourly_customers.test.cjs
           - event_results.test.cjs
           - insight_sales_count.test.cjs
           - insight_yoy_policy.test.cjs

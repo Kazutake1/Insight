@@ -170,22 +170,38 @@ test('通常画面の選択年月をサイドバー切替後も全ページで�
 
 
 
-test('イベント実績は近隣イベントを場所→イベント名で絞り込み開催日実績だけを読む',()=>{
+test('時間帯別客数は日報客数と分離して日付別24時間データとして保存する',()=>{
+  const index=read('Index.html');
+  const hourly=read('insight_hourly_customers_v1.js');
+  assert.match(index,/insight_hourly_customers_v1\.js\?v=20261002-hourly-v1/);
+  assert.ok(index.indexOf('insight_events_v1.js')<index.indexOf('insight_hourly_customers_v1.js'));
+  assert.ok(index.indexOf('insight_hourly_customers_v1.js')<index.indexOf('insight_event_results_v1.js'));
+  assert.match(hourly,/hourlyCustomers/);
+  assert.match(hourly,/Array\(24\)/);
+  assert.match(hourly,/途中/);
+  assert.match(hourly,/入力済み 24\/24/);
+  assert.doesNotMatch(hourly,/日次客数|差異|暦日/);
+  assert.doesNotThrow(()=>new vm.Script(hourly),'hourly customers module must be valid JavaScript');
+});
+
+test('イベント実績は過去開催・日付カード・時間帯グラフ・販売数カードを読み取り専用で表示する',()=>{
   const index=read('Index.html');
   const eventResults=read('insight_event_results_v1.js');
   const events=read('insight_events_v1.js');
   assert.match(index,/insight_events_v1\.js\?v=20261002-nearby-location/);
-  assert.match(index,/insight_event_results_v1\.js\?v=20261002-no-waste/);
+  assert.match(index,/insight_event_results_v1\.js\?v=20261002-history-hourly/);
   assert.ok(index.indexOf('insight_analysis_context_v1.js')<index.indexOf('insight_event_results_v1.js'));
   assert.ok(index.indexOf('insight_event_results_v1.js')<index.indexOf('insight_daily_anomaly_v1.js'));
-  assert.match(eventResults,/navEventResults/);
-  assert.match(eventResults,/pageEventResults/);
-  assert.match(eventResults,/イベント場所を選択/);
-  assert.match(eventResults,/イベント名を選択/);
-  assert.match(eventResults,/InsightAnalysisContext/);
-  assert.match(eventResults,/type==='nearby'/);
-  assert.match(eventResults,/<th>開催日<\/th><th>売上<\/th><th>客数<\/th><th>客単価<\/th><th>買上点数<\/th>/);
-  assert.doesNotMatch(eventResults,/<th>廃棄額<\/th>|<th>廃棄率<\/th>/);
+  assert.match(eventResults,/過去開催一覧/);
+  assert.match(eventResults,/売上 /);
+  assert.match(eventResults,/客数 /);
+  assert.match(eventResults,/er-day-tab/);
+  assert.match(eventResults,/時間帯別客数/);
+  assert.match(eventResults,/min-width:1440px/);
+  assert.match(eventResults,/createReadOnlyDayCard/);
+  assert.match(eventResults,/カテゴリー別・便別実績/);
+  assert.match(eventResults,/hourly\.complete/);
+  assert.doesNotMatch(eventResults,/廃棄額|廃棄率|暦日/);
   assert.doesNotMatch(eventResults,/localStorage|InsightStorage/);
   assert.match(events,/イベント場所/);
   assert.match(events,/snapshot\.location=location\.value\.trim\(\)/);

@@ -26,6 +26,7 @@ const ordered=[
   'insight_ai_presentation_v1.js',
   'insight_ai_visual_v1.js',
   'insight_events_v1.js',
+  'insight_hourly_customers_v1.js',
   'insight_temperature_v1.js',
   'insight_weather_compact_v1.js',
   'insight_weather_temperature_auto_v1.js',
