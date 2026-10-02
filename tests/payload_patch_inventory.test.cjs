@@ -249,7 +249,8 @@ test('セール実績ページは販売数入力直後に読み込み同一日�
   assert.match(saleResults,/id='navSaleResults'|nav\.id='navSaleResults'/);
   assert.match(saleResults,/page\.id='pageSaleResults'/);
   assert.match(saleResults,/InsightSalesCount\.createReadOnlyDayCard/);
-  assert.match(saleResults,/grid-template-columns:repeat\(7,minmax\(165px,1fr\)\)/);
+  assert.match(saleResults,/grid-template-columns:repeat\(7,minmax\(0,1fr\)\)/);
+  assert.match(saleResults,/\.sr-day-grid>\.sc-day\{min-width:0\}/);
   assert.match(sales,/model\.createReadOnlyDayCard=createReadOnlyDayCard/);
   assert.doesNotMatch(saleResults,/localStorage|InsightStorage/);
   assert.doesNotThrow(()=>new vm.Script(saleResults),'sale results module must be valid JavaScript');

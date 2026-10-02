@@ -224,10 +224,17 @@ test('セール実績は内容別に表示し販売数入力と同じカード�
     const cards=Array.from(document.querySelectorAll('.sr-group .sc-day'));
     const saleCard=cards[0];
     const inputCard=document.querySelector('#scCalendar .sc-day:not(.empty)');
+    const grid=document.querySelector('.sr-day-grid');
+    const gridRect=grid.getBoundingClientRect();
+    const seventhRect=cards[6].getBoundingClientRect();
     return {
       firstTop:cards[0].getBoundingClientRect().top,
-      seventhTop:cards[6].getBoundingClientRect().top,
+      seventhTop:seventhRect.top,
       eighthTop:cards[7].getBoundingClientRect().top,
+      seventhRight:seventhRect.right,
+      gridRight:gridRect.right,
+      gridScrollWidth:grid.scrollWidth,
+      gridClientWidth:grid.clientWidth,
       saleChildren:Array.from(saleCard.children).map(node=>node.className),
       inputChildren:inputCard?Array.from(inputCard.children).map(node=>node.className):[],
       allReadOnly:Array.from(saleCard.querySelectorAll('input')).every(input=>input.readOnly)
@@ -236,6 +243,8 @@ test('セール実績は内容別に表示し販売数入力と同じカード�
 
   expect(Math.abs(layout.firstTop-layout.seventhTop)).toBeLessThanOrEqual(1);
   expect(layout.eighthTop).toBeGreaterThan(layout.seventhTop+20);
+  expect(layout.seventhRight).toBeLessThanOrEqual(layout.gridRight+1);
+  expect(layout.gridScrollWidth).toBeLessThanOrEqual(layout.gridClientWidth+1);
   expect(layout.saleChildren).toEqual(layout.inputChildren);
   expect(layout.allReadOnly).toBe(true);
 
