@@ -96,6 +96,36 @@ test('保存したデータはページ再読込後も復元される',async({pa
   expect(errors).toEqual([]);
 });
 
+test('年度一覧にない古い疎データは起動を妨げず正式年度を復元する',async({page})=>{
+  const errors=await openInsight(page);
+  const expected=await page.evaluate(()=>{
+    const storeId=allStores.current;
+    const st=allStores.stores[storeId];
+    const activeYear=String(st.years[st.years.length-1]);
+    st.data['1999']={'8月':[null,null,{d:'3',売上:0,客数:0,買上点数:0,廃棄金額:0,haiki:{},weather:'晴'}]};
+    if(st.years.includes('1999'))st.years=st.years.filter(y=>y!=='1999');
+    st.data[activeYear]['1月'][0].storeMemo='E2E正式年度保持';
+    persist();
+    return {storeId,activeYear};
+  });
+  await page.reload({waitUntil:'domcontentloaded'});
+  await expect(page.locator('#nav1')).toBeVisible();
+  await expect(page.locator('#insightStorageLoadError')).toHaveCount(0);
+  const restored=await page.evaluate(({storeId,activeYear})=>{
+    const st=allStores.stores[storeId];
+    return {
+      memo:st.data[activeYear]['1月'][0].storeMemo,
+      orphan:st.data['1999']['8月'],
+      years:st.years.slice()
+    };
+  },expected);
+  expect(restored.memo).toBe('E2E正式年度保持');
+  expect(restored.years).not.toContain('1999');
+  expect(restored.orphan[0]).toBeNull();
+  expect(restored.orphan[1]).toBeNull();
+  expect(errors).toEqual([]);
+});
+
 test('保存済みデータが壊れている場合は空データで起動せず保存データを保持する',async({page})=>{
   const pakoPath=path.join(process.cwd(),'node_modules','pako','dist','pako.min.js');
   await page.route('https://unpkg.com/pako@2.1.0/dist/pako.min.js',route=>

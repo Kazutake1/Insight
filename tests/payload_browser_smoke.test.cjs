@@ -55,6 +55,9 @@ test('起動時の保存データ読込は失敗時に空データへフォー�
   assert.match(bootstrap,/new Blob\(\[raw\]/);
   assert.match(bootstrap,/if\(current!==null\)/);
   assert.match(bootstrap,/failStoredDataLoad/);
+  assert.match(bootstrap,/activeYears/);
+  assert.match(bootstrap,/Object\.entries\(st\.data\)/);
+  assert.match(bootstrap,/activeYears&&!activeYears\.has/);
 });
 
 test('STEP5で残した文字列patchの元anchorはpayload内に全て残っている',()=>{
