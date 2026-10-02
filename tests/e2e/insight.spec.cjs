@@ -46,6 +46,51 @@ test('選択月は主要ページを横断しても維持される',async({page}
   expect(errors).toEqual([]);
 });
 
+
+test('全ページタイトルはダッシュボード位置に揃い追加ページも自動追従する',async({page})=>{
+  const errors=await openInsight(page);
+
+  async function titleRect(){
+    return page.locator('.page.show > .page-header > .page-title').evaluate(node=>{
+      const rect=node.getBoundingClientRect();
+      return {left:rect.left,top:rect.top};
+    });
+  }
+
+  await page.locator('#nav1').click();
+  await expect(page.locator('#pageDash > .page-header > .page-title')).toBeVisible();
+  const reference=await titleRect();
+
+  for(const selector of ['#nav2','#nav3','#nav4','#navSalesCount','#navSaleResults']){
+    await page.locator(selector).click();
+    await expect(page.locator('.page.show > .page-header > .page-title')).toBeVisible();
+    const current=await titleRect();
+    expect(Math.abs(current.left-reference.left),selector+' left').toBeLessThanOrEqual(1);
+    expect(Math.abs(current.top-reference.top),selector+' top').toBeLessThanOrEqual(1);
+  }
+
+  await page.evaluate(()=>{
+    document.querySelectorAll('.page').forEach(node=>node.classList.remove('show'));
+    const future=document.createElement('div');
+    future.id='e2eFuturePage';
+    future.className='page show';
+    future.style.padding='7px 11px 12px';
+    future.innerHTML='<div class="page-header"><div class="page-title">追加ページ</div></div><div>future</div>';
+    document.getElementById('main').appendChild(future);
+  });
+  await expect(page.locator('#e2eFuturePage > .page-header > .page-title')).toBeVisible();
+  await expect.poll(async()=>{
+    const current=await page.locator('#e2eFuturePage > .page-header > .page-title').evaluate(node=>{
+      const rect=node.getBoundingClientRect();
+      return {left:rect.left,top:rect.top};
+    });
+    return Math.max(Math.abs(current.left-reference.left),Math.abs(current.top-reference.top));
+  }).toBeLessThanOrEqual(1);
+
+  await page.evaluate(()=>document.getElementById('e2eFuturePage')?.remove());
+  expect(errors).toEqual([]);
+});
+
 test('分析AIを開いてサイドバーを切り替えても分析対象月を維持する',async({page})=>{
   const errors=await openInsight(page);
   await selectDashboardSeptember(page);

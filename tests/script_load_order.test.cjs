@@ -33,6 +33,7 @@ const ordered=[
   'insight_input_weather_temp_v1.js',
   'insight_sales_count_v1.js',
   'insight_sale_results_v1.js',
+  'insight_page_title_layout_v1.js',
   'insight_page_period_sync_v1.js',
   'insight_analysis_period_lock_v1.js',
   'insight_analysis_context_v1.js',

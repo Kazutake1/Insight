@@ -168,6 +168,22 @@ test('通常画面の選択年月をサイドバー切替後も全ページで�
   assert.doesNotThrow(()=>new vm.Script(pagePeriod),'page period module must be valid JavaScript');
 });
 
+
+test('全ページタイトルはダッシュボード基準の共通モジュールで位置を統一する',()=>{
+  const index=read('Index.html');
+  const layout=read('insight_page_title_layout_v1.js');
+  assert.match(index,/insight_page_title_layout_v1\.js\?v=20261002-title-align/);
+  assert.ok(index.indexOf('insight_sale_results_v1.js')<index.indexOf('insight_page_title_layout_v1.js'));
+  assert.ok(index.indexOf('insight_page_title_layout_v1.js')<index.indexOf('insight_page_period_sync_v1.js'));
+  assert.match(layout,/var SELECTOR='\.page > \.page-header > \.page-title'/);
+  assert.match(layout,/document\.getElementById\('pageDash'\)/);
+  assert.match(layout,/getComputedStyle\(page\)/);
+  assert.match(layout,/MutationObserver/);
+  assert.match(layout,/align-self:flex-start!important/);
+  assert.doesNotMatch(layout,/localStorage|InsightStorage/);
+  assert.doesNotThrow(()=>new vm.Script(layout),'page title layout module must be valid JavaScript');
+});
+
 test('セール実績ページは販売数入力直後に読み込み同一日別カードを再利用する',()=>{
   const index=read('Index.html');
   const saleResults=read('insight_sale_results_v1.js');
