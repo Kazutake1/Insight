@@ -25,7 +25,7 @@ test('画像は20MB以下のimageだけを受け付ける',()=>{
 });
 
 test('CAMERA-2は同一オリジンのローカルOCRを使用し画像を永続化しない',()=>{
-  assert.equal(camera.VERSION,6);
+  assert.equal(camera.VERSION,7);
   assert.deepEqual(camera.POLICY,{
     persistImages:false,
     externalTransmission:false,
@@ -255,6 +255,33 @@ test('低信頼の一致値は2方式で同じでも自動確定しない',()=>{
   const result=camera.consensusMultiDayResults([a,b]);
   assert.equal(result.cells.length,0);
   assert.ok(result.warnings.some(message=>message.includes('信頼度または位置情報が不足した 1項目')));
+});
+
+test('便番号ヘッダーを読めなくても連続日の日付座標から3便列を復元する',()=>{
+  function w(text,x,y,confidence=95){return {text,confidence,bbox:{x0:x-8,y0:y-7,x1:x+8,y1:y+7}};}
+  const lines=[
+    {index:0,text:'10/30 10/31',confidence:97,bbox:{x0:70,y0:30,x1:350,y1:50},words:[w('10/30',120,40,99),w('10/31',300,40,99)]},
+    {index:1,text:'おにぎり',confidence:97,bbox:{x0:10,y0:90,x1:90,y1:110},words:[w('おにぎり',50,100,98)]},
+    {index:2,text:'納晶 10 20 30 40 50 60',confidence:92,bbox:{x0:10,y0:120,x1:390,y1:140},words:[w('納晶',25,130,88),w('10',60,130,94),w('20',120,130,95),w('30',180,130,94),w('40',240,130,95),w('50',300,130,94),w('60',360,130,95)]},
+    {index:3,text:'阪売 9 18 27 36 45 54',confidence:92,bbox:{x0:10,y0:150,x1:390,y1:170},words:[w('阪売',25,160,88),w('9',60,160,94),w('18',120,160,95),w('27',180,160,94),w('36',240,160,95),w('45',300,160,94),w('54',360,160,95)]}
+  ];
+  const result=camera.buildMultiDayData(lines,[{id:'a',name:'おにぎり',aliases:[],hidden:false,activeTrips:[true,true,true]}],'2025-10-30');
+  assert.deepEqual(result.dates,['2025-10-30','2025-10-31']);
+  assert.equal(result.cells.length,12);
+  assert.equal(result.cells.find(x=>x.date==='2025-10-30'&&x.trip===1&&x.field==='delivery').value,10);
+  assert.equal(result.cells.find(x=>x.date==='2025-10-31'&&x.trip===3&&x.field==='sales').value,54);
+  assert.ok(result.cells.every(x=>x.geometryApproximate===true));
+});
+
+test('日付間隔が不規則な場合は便列を推測しない',()=>{
+  function w(text,x,y,confidence=95){return {text,confidence,bbox:{x0:x-8,y0:y-7,x1:x+8,y1:y+7}};}
+  const lines=[
+    {index:0,text:'10/30 10/31 11/1',confidence:97,bbox:{x0:70,y0:30,x1:600,y1:50},words:[w('10/30',120,40,99),w('10/31',300,40,99),w('11/1',580,40,99)]},
+    {index:1,text:'おにぎり',confidence:97,bbox:{x0:10,y0:90,x1:90,y1:110},words:[w('おにぎり',50,100,98)]},
+    {index:2,text:'納品数 10 20 30',confidence:92,bbox:{x0:10,y0:120,x1:200,y1:140},words:[w('納品数',25,130,90),w('10',60,130,94),w('20',120,130,95),w('30',180,130,94)]}
+  ];
+  const result=camera.buildMultiDayData(lines,[{id:'a',name:'おにぎり',aliases:[],hidden:false,activeTrips:[true,true,true]}],'2025-10-30');
+  assert.equal(result.cells.length,0);
 });
 
 test('対象外便は複数日OCR結果から除外する',()=>{
