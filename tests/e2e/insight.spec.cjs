@@ -1009,13 +1009,13 @@ test('イベント実績は過去開催→複数日→時間帯グラフ→カ�
   await expect(page.locator('.er-occurrence')).toHaveCount(2);
   await expect(page.locator('.er-occurrence').first()).toContainText('2026/9/12');
   await expect(page.locator('.er-occurrence').first()).toContainText('9/13');
-  await expect(page.locator('.er-occurrence').first()).toContainText('売上 226,000円');
+  await expect(page.locator('.er-occurrence').first()).toContainText('売上 226千円');
   await expect(page.locator('.er-occurrence').first()).toContainText('客数 205人');
 
   await page.locator('.er-occurrence').first().click();
   await expect(page.locator('.er-overview-grid .er-summary-card')).toHaveCount(4);
-  await expect(page.locator('.er-overview-grid .er-summary-card').first()).toContainText('226,000円');
-  await expect(page.locator('.er-daily-summary .er-summary-card').first()).toContainText('112,000円');
+  await expect(page.locator('.er-overview-grid .er-summary-card').first()).toContainText('226千円');
+  await expect(page.locator('.er-daily-summary .er-summary-card').first()).toContainText('112千円');
   await expect(page.locator('.er-daily-summary')).toBeVisible();
   await expect(page.locator('.er-day-tab')).toHaveCount(2);
   await expect(page.locator('.er-day-tab').first()).toHaveClass(/active/);
@@ -1057,8 +1057,11 @@ test('イベント実績は過去開催→複数日→時間帯グラフ→カ�
   expect(horizontal.minWidth).toBe('1340px');
   expect(horizontal.rightGap).toBeLessThanOrEqual(7);
 
+  await expect(page.locator('.er-sales-section > h2')).toHaveText('カテゴリー実績');
   await expect(page.locator('.er-category-card')).toHaveCount(2);
   await expect(page.locator('.er-category-card .sc-day')).toHaveCount(2);
+  const categoryWidths=await page.locator('.er-category-card').evaluateAll(cards=>cards.map(card=>Math.round(card.getBoundingClientRect().width)));
+  expect(categoryWidths.every(width=>width<=280)).toBe(true);
   const readOnly=await page.locator('.er-category-card input').evaluateAll(inputs=>inputs.every(input=>input.readOnly));
   expect(readOnly).toBe(true);
 
