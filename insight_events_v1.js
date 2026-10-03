@@ -116,6 +116,7 @@
   function segmentDetail(segment){
     if(!segment)return '';
     var label=String(segment.label||'').trim(),params=segment.params||{};
+    if(segment.method==='fixed'&&params.minPrice!==undefined&&params.maxPrice!==undefined)label=params.minPrice+'円〜'+params.maxPrice+'円';
     if(label&&segment.method==='fixed'&&params.price!==undefined)return label+'→'+params.price+'円均一';
     var condition=conditionText(segment.method,params);
     return label?(label+(condition?'：'+condition:'')):condition;
