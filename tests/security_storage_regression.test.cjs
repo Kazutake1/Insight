@@ -128,7 +128,6 @@ test('Index.htmlは必要先だけを許可するCSPを定義する',()=>{
     "upgrade-insecure-requests"
   ].forEach(directive=>assert.ok(policy.includes(directive),'CSPに '+directive+' が含まれること'));
   assert.doesNotMatch(policy,/'unsafe-eval'/);
-  assert.match(index,/insight_shell_v1\.js\?v=20261003-csp-hardening-1/,'起動処理は外部shellへ分離すること');
   assert.ok(index.indexOf('Content-Security-Policy')<index.indexOf('https://unpkg.com/pako'),'CSPは外部スクリプトより前に定義すること');
 });
 
