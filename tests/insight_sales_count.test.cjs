@@ -148,3 +148,11 @@ test('曜日別平均の対象外便はダッシュ表示かつグレー表示�
   assert.doesNotMatch(block,/対象外/);
   assert.match(source,/\.sc-average-row b\.sc-not-applicable\{background:var\(--surface2\)!important;border-color:var\(--border\)!important;color:var\(--text4\)!important\}/);
 });
+
+
+test('複数値引き条件でも通常カテゴリー実績を一度だけ使い専用区分入力を作らない',()=>{
+  const source=fs.readFileSync(path.join(__dirname,'..','insight_sales_count_v1.js'),'utf8');
+  assert.doesNotMatch(source,/saleSegmentCounts/);
+  assert.doesNotMatch(source,/renderSaleSegments/);
+  assert.doesNotMatch(source,/scSaleSegments/);
+});
