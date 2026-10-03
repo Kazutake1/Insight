@@ -934,16 +934,17 @@
   function addFiles(files){
     if(session.processing)return summary();
     var incoming=Array.prototype.slice.call(files||[]);
-    var errors=[];
+    var errors=[],added=[];
     incoming.forEach(function(file){
       if(session.items.length>=MAX_FILES){errors.push('画像は1回につき最大12枚です。');return;}
       var issue=fileIssue(file);
       if(issue){errors.push(issue);return;}
       var url='';
       try{url=root.URL.createObjectURL(file);}catch(_){}
-      session.items.push({id:nextId++,file:file,url:url,ocr:null,crop:null});
+      var item={id:nextId++,file:file,url:url,ocr:null,crop:null};
+      session.items.push(item);
+      added.push(item);
     });
-    var added=session.items.slice(Math.max(0,session.items.length-incoming.length));
     renderItems();
     if(errors.length)alert(Array.from(new Set(errors)).join('\n'));
     if(added.length===1&&root.setTimeout)root.setTimeout(function(){openCropEditor(added[0].id);},0);
