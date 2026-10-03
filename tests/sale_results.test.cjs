@@ -130,7 +130,7 @@ test('同一セールのカテゴリー別条件は別々の実績見出しと�
 
 
 test('同一カテゴリー複数値引きはセール実績区分ごとの専用データで別カード集計する',()=>{
-  const all=fixture();sales.ensure(all);
+  const all=fixture();sales.ensure(all);all.stores.storeA.saleSegmentCounts={};
   all.eventManagement.events=[{id:'sale_multi',type:'sale',scope:'global',startDate:'2026-09-15',endDate:'2026-09-17',snapshot:{version:1,title:'おにぎり複数価格',note:'',sale:{
     category:'おにぎり',categoryId:'cat_onigiri',method:'fixed',params:{maxPrice:179,price:100},
     targets:[{categoryId:'cat_onigiri',category:'おにぎり',method:'fixed',params:{maxPrice:179,price:100}}],
