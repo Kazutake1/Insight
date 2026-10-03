@@ -148,5 +148,5 @@ test('同一カテゴリー内の複数値引き条件は1つのセール実績�
   assert.match(data.groups[0].summary,/179円以下→100円均一/);
   assert.match(data.groups[0].summary,/180〜239円→150円均一/);
   assert.match(data.groups[0].summary,/240〜359円→250円均一/);
-  assert.equal(data.groups[0].averageSales,144);
+  assert.equal(data.groups[0].averageSales,(129+134+140)/3);
 });
