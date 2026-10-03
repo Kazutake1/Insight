@@ -25,7 +25,7 @@ test('画像は20MB以下のimageだけを受け付ける',()=>{
 });
 
 test('CAMERA-2は同一オリジンのローカルOCRを使用し画像を永続化しない',()=>{
-  assert.equal(camera.VERSION,5);
+  assert.equal(camera.VERSION,6);
   assert.deepEqual(camera.POLICY,{
     persistImages:false,
     externalTransmission:false,
@@ -198,6 +198,45 @@ test('line順フォールバックは余分な数字がある行を推測で確�
   assert.equal(result.cells.filter(x=>x.field==='delivery').length,0);
   assert.equal(result.cells.filter(x=>x.field==='sales').length,3);
   assert.equal(result.cells.some(x=>x.value===999),false);
+});
+
+test('ラベルがない数値行は納品・販売と推測しない',()=>{
+  function w(text,x,y,confidence=95){return {text,confidence,bbox:{x0:x-8,y0:y-7,x1:x+8,y1:y+7}};}
+  const lines=[
+    {index:0,text:'11/1',confidence:95,bbox:{x0:100,y0:30,x1:200,y1:50},words:[w('11/1',150,40)]},
+    {index:1,text:'1 2 3',confidence:96,bbox:{x0:80,y0:60,x1:220,y1:80},words:[w('1',100,70),w('2',150,70),w('3',200,70)]},
+    {index:2,text:'おにぎり',confidence:97,bbox:{x0:10,y0:90,x1:90,y1:110},words:[w('おにぎり',50,100)]},
+    {index:3,text:'10 20 30',confidence:90,bbox:{x0:80,y0:120,x1:220,y1:140},words:[w('10',100,130),w('20',150,130),w('30',200,130)]},
+    {index:4,text:'9 18 27',confidence:90,bbox:{x0:80,y0:150,x1:220,y1:170},words:[w('9',100,160),w('18',150,160),w('27',200,160)]}
+  ];
+  const result=camera.buildMultiDayData(lines,[{id:'a',name:'おにぎり',hidden:false,aliases:[],activeTrips:[true,true,true]}],'2025-11-01');
+  assert.equal(result.cells.length,0);
+});
+
+test('2方式OCRで値が一致しないセルは空欄にする',()=>{
+  const base={dates:['2025-11-01'],categories:[{id:'a',name:'おにぎり',activeTrips:[true,true,true]}],warnings:[],cells:[
+    {date:'2025-11-01',categoryId:'a',categoryName:'おにぎり',trip:1,field:'delivery',value:10,confidence:94,method:'bbox',geometryApproximate:false},
+    {date:'2025-11-01',categoryId:'a',categoryName:'おにぎり',trip:1,field:'sales',value:9,confidence:93,method:'bbox',geometryApproximate:false}
+  ]};
+  const second=JSON.parse(JSON.stringify(base));
+  second.cells[1].value=806;
+  second.cells[1].confidence=62;
+  const result=camera.consensusMultiDayResults([base,second]);
+  assert.equal(result.cells.length,1);
+  assert.equal(result.cells[0].field,'delivery');
+  assert.equal(result.cells[0].value,10);
+  assert.ok(result.warnings.some(message=>message.includes('一致しない 1項目')));
+});
+
+test('低信頼の一致値は2方式で同じでも自動確定しない',()=>{
+  const a={dates:['2025-11-01'],categories:[{id:'a',name:'おにぎり',activeTrips:[true,true,true]}],warnings:[],cells:[
+    {date:'2025-11-01',categoryId:'a',categoryName:'おにぎり',trip:2,field:'sales',value:438,confidence:61,method:'bbox',geometryApproximate:false}
+  ]};
+  const b=JSON.parse(JSON.stringify(a));
+  b.cells[0].confidence=65;
+  const result=camera.consensusMultiDayResults([a,b]);
+  assert.equal(result.cells.length,0);
+  assert.ok(result.warnings.some(message=>message.includes('信頼度または位置情報が不足した 1項目')));
 });
 
 test('対象外便は複数日OCR結果から除外する',()=>{
