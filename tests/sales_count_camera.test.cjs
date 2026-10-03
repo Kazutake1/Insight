@@ -25,7 +25,7 @@ test('画像は20MB以下のimageだけを受け付ける',()=>{
 });
 
 test('CAMERA-2は同一オリジンのローカルOCRを使用し画像を永続化しない',()=>{
-  assert.equal(camera.VERSION,3);
+  assert.equal(camera.VERSION,4);
   assert.deepEqual(camera.POLICY,{
     persistImages:false,
     externalTransmission:false,
@@ -134,6 +134,38 @@ test('複数日表を日付×カテゴリー×3便×納品販売へ構造化す�
   assert.equal(result.cells.length,12);
   assert.equal(result.cells.find(x=>x.date==='2025-11-01'&&x.trip===1&&x.field==='delivery').value,10);
   assert.equal(result.cells.find(x=>x.date==='2025-11-02'&&x.trip===3&&x.field==='sales').value,54);
+});
+
+test('分割された日付OCRを再結合し3便グループから連続日を補完する',()=>{
+  function w(text,x,y,confidence=95){return {text,confidence,bbox:{x0:x-8,y0:y-7,x1:x+8,y1:y+7}};}
+  const lines=[
+    {index:0,text:'10 / 28 10 / 29',bbox:{x0:40,y0:30,x1:340,y1:50},words:[w('10',80,40),w('/',100,40),w('28',120,40),w('10',260,40),w('/',280,40),w('29',300,40)]},
+    {index:1,text:'1 2 3 1 2 3 1 2 3',bbox:{x0:40,y0:60,x1:550,y1:80},words:[w('1',70,70),w('2',120,70),w('3',170,70),w('1',250,70),w('2',300,70),w('3',350,70),w('1',430,70),w('2',480,70),w('3',530,70)]},
+    {index:2,text:'おにぎり',bbox:{x0:10,y0:90,x1:90,y1:110},words:[w('おにぎり',50,100)]},
+    {index:3,text:'納品数 10 20 30 40 50 60 70 80 90',bbox:{x0:10,y0:120,x1:550,y1:140},words:[w('納品数',30,130),w('10',70,130),w('20',120,130),w('30',170,130),w('40',250,130),w('50',300,130),w('60',350,130),w('70',430,130),w('80',480,130),w('90',530,130)]},
+    {index:4,text:'販売数 9 18 27 36 45 54 63 72 81',bbox:{x0:10,y0:150,x1:550,y1:170},words:[w('販売数',30,160),w('9',70,160),w('18',120,160),w('27',170,160),w('36',250,160),w('45',300,160),w('54',350,160),w('63',430,160),w('72',480,160),w('81',530,160)]}
+  ];
+  const categories=[{id:'a',name:'おにぎり',aliases:[],hidden:false,activeTrips:[true,true,true]}];
+  const result=camera.buildMultiDayData(lines,categories,'2025-10-28');
+  assert.deepEqual(result.dates,['2025-10-28','2025-10-29','2025-10-30']);
+  assert.equal(result.cells.length,18);
+  assert.equal(result.cells.find(x=>x.date==='2025-10-30'&&x.trip===3&&x.field==='sales').value,81);
+});
+
+test('納品数・販売数ラベルを読み損ねてもカテゴリー直下の数値行から補完する',()=>{
+  function w(text,x,y){return {text,confidence:92,bbox:{x0:x-8,y0:y-7,x1:x+8,y1:y+7}};}
+  const lines=[
+    {index:0,text:'11/1',bbox:{x0:80,y0:30,x1:160,y1:50},words:[w('11/1',120,40)]},
+    {index:1,text:'1 2 3',bbox:{x0:50,y0:60,x1:190,y1:80},words:[w('1',70,70),w('2',120,70),w('3',170,70)]},
+    {index:2,text:'おにぎり',bbox:{x0:10,y0:90,x1:90,y1:110},words:[w('おにぎり',50,100)]},
+    {index:3,text:'納晶 10 20 30',bbox:{x0:10,y0:120,x1:190,y1:140},words:[w('納晶',30,130),w('10',70,130),w('20',120,130),w('30',170,130)]},
+    {index:4,text:'阪売 9 18 27',bbox:{x0:10,y0:150,x1:190,y1:170},words:[w('阪売',30,160),w('9',70,160),w('18',120,160),w('27',170,160)]},
+    {index:5,text:'廃棄数 1 2 3',bbox:{x0:10,y0:180,x1:190,y1:200},words:[w('廃棄数',30,190),w('1',70,190),w('2',120,190),w('3',170,190)]}
+  ];
+  const result=camera.buildMultiDayData(lines,[{id:'a',name:'おにぎり',hidden:false,aliases:[],activeTrips:[true,true,true]}],'2025-11-01');
+  assert.equal(result.cells.length,6);
+  assert.equal(result.cells.find(x=>x.trip===2&&x.field==='delivery').value,20);
+  assert.equal(result.cells.find(x=>x.trip===2&&x.field==='sales').value,18);
 });
 
 test('対象外便は複数日OCR結果から除外する',()=>{

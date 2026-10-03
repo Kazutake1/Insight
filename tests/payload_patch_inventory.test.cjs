@@ -17,7 +17,7 @@ test('payload互換パッチ11件はbootstrap moduleへ分離しIndexにはbody�
 
 test('トップページはキャッシュ抑止とビルド自己更新を持つ',()=>{
   const index=read('Index.html');
-  assert.match(index,/insight-shell-version" content="20261003-camera-multiday-2/);
+  assert.match(index,/insight-shell-version" content="20261003-camera-grid-recovery-1/);
   assert.match(index,/Cache-Control" content="no-cache, no-store, must-revalidate/);
   assert.match(index,/insight_probe=/);
   assert.match(index,/cache:'no-store'/);
@@ -297,7 +297,7 @@ test('販売数カメラSTEP2は同一オリジンOCRを使い画像・結果を
   const index=read('Index.html');
   const camera=read('insight_sales_count_camera_v1.js');
   assert.match(index,/vendor\/ocr\/tesseract\.min\.js\?v=7\.0\.0/);
-  assert.match(index,/insight_sales_count_camera_v1\.js\?v=20261003-camera-multiday-2/);
+  assert.match(index,/insight_sales_count_camera_v1\.js\?v=20261003-camera-grid-recovery-1/);
   assert.ok(index.indexOf('insight_sales_count_v1.js')<index.indexOf('vendor/ocr/tesseract.min.js'));
   assert.ok(index.indexOf('vendor/ocr/tesseract.min.js')<index.indexOf('insight_sales_count_camera_v1.js'));
   assert.ok(index.indexOf('insight_sales_count_camera_v1.js')<index.indexOf('insight_sale_results_v1.js'));
@@ -312,6 +312,8 @@ test('販売数カメラSTEP2は同一オリジンOCRを使い画像・結果を
   assert.match(camera,/analyzeOcrData/);
   assert.match(camera,/buildMultiDayData/);
   assert.match(camera,/mergeMultiDayResults/);
+  assert.match(camera,/expandDateAnchorsWithTrips/);
+  assert.match(camera,/SINGLE_BLOCK/);
   assert.match(camera,/基準日（年判定用）/);
   assert.match(camera,/matchCategories/);
   assert.doesNotMatch(camera,/cdn\.jsdelivr|unpkg\.com|projectnaptha/);

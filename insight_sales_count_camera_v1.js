@@ -1,4 +1,4 @@
-/* Sales-count camera capture v3: same-origin multi-day local OCR, in-memory review only. */
+/* Sales-count camera capture v4: resilient multi-day local OCR, in-memory review only. */
 (function(root){
   'use strict';
   if(root.InsightSalesCountCamera)return;
@@ -305,15 +305,43 @@
     });
     return out;
   }
+  function mergedWordBox(words){
+    var boxes=(words||[]).map(function(word){return word&&word.bbox;}).filter(Boolean);
+    if(!boxes.length)return null;
+    return {
+      x0:Math.min.apply(null,boxes.map(function(box){return Number(box.x0);})),
+      y0:Math.min.apply(null,boxes.map(function(box){return Number(box.y0);})),
+      x1:Math.max.apply(null,boxes.map(function(box){return Number(box.x1);})),
+      y1:Math.max.apply(null,boxes.map(function(box){return Number(box.y1);}))
+    };
+  }
+  function dateAnchorsForLine(line,index,referenceDate){
+    var words=(Array.isArray(line&&line.words)?line.words:[]).filter(function(word){return word&&word.bbox&&normalizeText(word.text);}).slice().sort(function(a,b){return centerX(a.bbox)-centerX(b.bbox);});
+    var anchors=[];
+    function add(wordsSlice,raw){
+      var iso=parseDateToken(raw,referenceDate),box=mergedWordBox(wordsSlice),x=centerX(box),y=centerY(box);
+      if(!iso||!Number.isFinite(x)||!Number.isFinite(y))return;
+      var confidences=wordsSlice.map(function(word){return Number(word.confidence);}).filter(Number.isFinite);
+      var confidence=confidences.length?Math.min.apply(null,confidences):null;
+      var candidate={iso:iso,x:x,y:y,raw:normalizeText(raw),confidence:confidence,lineIndex:Number.isInteger(line&&line.index)?line.index:index,span:wordsSlice.length};
+      var existing=anchors.find(function(anchor){return anchor.iso===iso;});
+      if(!existing){anchors.push(candidate);return;}
+      if(candidate.span<existing.span||((candidate.confidence==null?-1:candidate.confidence)>(existing.confidence==null?-1:existing.confidence)))Object.assign(existing,candidate);
+    }
+    words.forEach(function(word){add([word],word.text);});
+    for(var start=0;start<words.length;start++){
+      for(var length=2;length<=4&&start+length<=words.length;length++){
+        var slice=words.slice(start,start+length);
+        var joined=slice.map(function(word){return normalizeText(word.text);}).join('');
+        if(/[\/\.\-年月日]/.test(joined))add(slice,joined);
+      }
+    }
+    return anchors;
+  }
   function spatialDateAnchors(lines,referenceDate){
     var rows=[];
     (Array.isArray(lines)?lines:[]).forEach(function(line,index){
-      var anchors=[];
-      (Array.isArray(line&&line.words)?line.words:[]).forEach(function(word){
-        var iso=parseDateToken(word.text,referenceDate),x=centerX(word.bbox),y=centerY(word.bbox);
-        if(!iso||!Number.isFinite(x)||!Number.isFinite(y))return;
-        anchors.push({iso:iso,x:x,y:y,raw:normalizeText(word.text),confidence:Number.isFinite(Number(word.confidence))?Number(word.confidence):null,lineIndex:Number.isInteger(line.index)?line.index:index});
-      });
+      var anchors=dateAnchorsForLine(line,index,referenceDate);
       if(anchors.length)rows.push({anchors:anchors,y:lineCenterY(line)});
     });
     if(!rows.length)return [];
@@ -323,6 +351,51 @@
     });
     var chosen=rows[0].anchors.slice().sort(function(a,b){return a.x-b.x;}),seen=new Set();
     return chosen.filter(function(anchor){if(seen.has(anchor.iso))return false;seen.add(anchor.iso);return true;});
+  }
+  function tripGroups(lines,firstCategoryY){
+    var rows=[];
+    (Array.isArray(lines)?lines:[]).forEach(function(line,index){
+      var y=lineCenterY(line);
+      if(!Number.isFinite(y)||(Number.isFinite(firstCategoryY)&&y>=firstCategoryY-2))return;
+      var words=(Array.isArray(line&&line.words)?line.words:[]).map(function(word){
+        return {text:normalizeText(word.text),x:centerX(word.bbox),y:centerY(word.bbox)};
+      }).filter(function(word){return /^[123]$/.test(word.text)&&Number.isFinite(word.x);}).sort(function(a,b){return a.x-b.x;});
+      var groups=[];
+      for(var i=0;i<=words.length-3;){
+        if(words[i].text==='1'&&words[i+1].text==='2'&&words[i+2].text==='3'){
+          groups.push({x:(words[i].x+words[i+1].x+words[i+2].x)/3,tripXs:[words[i].x,words[i+1].x,words[i+2].x],y:y,lineIndex:Number.isInteger(line&&line.index)?line.index:index});
+          i+=3;
+        }else i++;
+      }
+      if(groups.length)rows.push({groups:groups,y:y});
+    });
+    if(!rows.length)return [];
+    rows.sort(function(a,b){return b.groups.length-a.groups.length||b.y-a.y;});
+    return rows[0].groups;
+  }
+  function addIsoDays(iso,delta){
+    var parts=targetDateParts(iso);
+    if(!parts)return null;
+    var date=new Date(Date.UTC(parts.year,parts.month-1,parts.day+delta));
+    return validIso(date.getUTCFullYear(),date.getUTCMonth()+1,date.getUTCDate());
+  }
+  function expandDateAnchorsWithTrips(anchors,groups){
+    anchors=(Array.isArray(anchors)?anchors:[]).slice().sort(function(a,b){return a.x-b.x;});
+    groups=(Array.isArray(groups)?groups:[]).slice().sort(function(a,b){return a.x-b.x;});
+    if(!anchors.length||groups.length<=anchors.length)return anchors;
+    var mapped=anchors.map(function(anchor){
+      var bestIndex=-1,bestDistance=Infinity;
+      groups.forEach(function(group,index){var distance=Math.abs(group.x-anchor.x);if(distance<bestDistance){bestDistance=distance;bestIndex=index;}});
+      return {anchor:anchor,index:bestIndex};
+    }).filter(function(item){return item.index>=0;});
+    if(!mapped.length)return anchors;
+    var baseline=mapped[0];
+    var consistent=mapped.every(function(item){return addIsoDays(baseline.anchor.iso,item.index-baseline.index)===item.anchor.iso;});
+    if(!consistent)return anchors;
+    return groups.map(function(group,index){
+      var iso=addIsoDays(baseline.anchor.iso,index-baseline.index);
+      return {iso:iso,x:group.x,y:baseline.anchor.y,raw:iso,confidence:baseline.anchor.confidence,lineIndex:baseline.anchor.lineIndex,inferred:index!==baseline.index,tripXs:group.tripXs.slice()};
+    });
   }
   function categoryAnchors(lines,categories){
     var active=(Array.isArray(categories)?categories:[]).filter(function(category){return category&&category.hidden!==true&&category.id&&category.name;});
@@ -354,6 +427,7 @@
   function dateColumns(dateAnchors,lines,firstCategoryY){
     var anchors=(Array.isArray(dateAnchors)?dateAnchors:[]).slice().sort(function(a,b){return a.x-b.x;});
     if(!anchors.length)return [];
+    var groups=tripGroups(lines,firstCategoryY);
     var tripWords=spatialWords(lines).filter(function(word){
       return /^[123]$/.test(word.text)&&word.y>(anchors[0].y+2)&&(!Number.isFinite(firstCategoryY)||word.y<firstCategoryY-2);
     });
@@ -361,16 +435,20 @@
       var prev=anchors[index-1],next=anchors[index+1];
       var left=prev?(prev.x+anchor.x)/2:(next?anchor.x-(next.x-anchor.x)/2:NaN);
       var right=next?(anchor.x+next.x)/2:(prev?anchor.x+(anchor.x-prev.x)/2:NaN);
-      var candidates=tripWords.filter(function(word){
-        if(Number.isFinite(left)&&word.x<left)return false;
-        if(Number.isFinite(right)&&word.x>=right)return false;
-        return true;
-      }).sort(function(a,b){return a.x-b.x;});
-      var tripXs=[null,null,null];
-      candidates.forEach(function(word){
-        var trip=Number(word.text)-1;
-        if(trip>=0&&trip<3&&tripXs[trip]===null)tripXs[trip]=word.x;
-      });
+      var nearestGroup=null,bestGroupDistance=Infinity;
+      groups.forEach(function(group){var distance=Math.abs(group.x-anchor.x);if(distance<bestGroupDistance){bestGroupDistance=distance;nearestGroup=group;}});
+      var tripXs=anchor.tripXs&&anchor.tripXs.length===3?anchor.tripXs.slice():(nearestGroup&&bestGroupDistance<Math.max(80,Number.isFinite(right-left)?(right-left)/2:80)?nearestGroup.tripXs.slice():[null,null,null]);
+      if(tripXs.some(function(value){return value===null;})){
+        var candidates=tripWords.filter(function(word){
+          if(Number.isFinite(left)&&word.x<left)return false;
+          if(Number.isFinite(right)&&word.x>=right)return false;
+          return true;
+        }).sort(function(a,b){return a.x-b.x;});
+        candidates.forEach(function(word){
+          var trip=Number(word.text)-1;
+          if(trip>=0&&trip<3&&tripXs[trip]===null)tripXs[trip]=word.x;
+        });
+      }
       if(tripXs.some(function(value){return value===null;})){
         if(Number.isFinite(left)&&Number.isFinite(right)){
           var width=(right-left)/3;
@@ -385,14 +463,22 @@
       return {date:anchor.iso,x:anchor.x,left:left,right:right,tripXs:tripXs};
     });
   }
+  function numericWordCount(line){
+    return (Array.isArray(line&&line.words)?line.words:[]).reduce(function(count,word){return count+(wordNumber(word)!==null?1:0);},0);
+  }
   function rowForCategory(lines,anchor,nextY,kind){
     var rx=kind==='delivery'?/納\s*品(?:\s*数)?/:/販\s*売(?:\s*数)?/;
-    var candidates=(Array.isArray(lines)?lines:[]).filter(function(line){
+    var inRange=(Array.isArray(lines)?lines:[]).filter(function(line){
       var y=lineCenterY(line);
-      return Number.isFinite(y)&&y>anchor.y&&(!Number.isFinite(nextY)||y<nextY)&&rx.test(normalizeText(line.text));
+      return Number.isFinite(y)&&y>anchor.y&&(!Number.isFinite(nextY)||y<nextY);
+    }).sort(function(a,b){return lineCenterY(a)-lineCenterY(b);});
+    var explicit=inRange.find(function(line){return rx.test(normalizeText(line.text));});
+    if(explicit)return explicit;
+    var numericRows=inRange.filter(function(line){
+      var text=normalizeText(line.text);
+      return numericWordCount(line)>=2&&!/廃\s*棄|欠\s*品/.test(text);
     });
-    candidates.sort(function(a,b){return lineCenterY(a)-lineCenterY(b);});
-    return candidates[0]||null;
+    return kind==='delivery'?(numericRows[0]||null):(numericRows[1]||null);
   }
   function mapRowCells(row,columns,category,field){
     if(!row)return [];
@@ -423,12 +509,13 @@
   }
   function buildMultiDayData(lines,categories,referenceDate){
     lines=Array.isArray(lines)?lines:[];
-    var dateAnchors=spatialDateAnchors(lines,referenceDate);
+    var catAnchors=categoryAnchors(lines,categories);
+    var firstCategoryY=catAnchors.length?catAnchors[0].y:NaN;
+    var directDateAnchors=spatialDateAnchors(lines,referenceDate);
+    var dateAnchors=expandDateAnchorsWithTrips(directDateAnchors,tripGroups(lines,firstCategoryY));
     var fallbackDates=extractDateCandidates(lines.map(function(line){return line.text;}).join('\n'),referenceDate);
     var dates=(dateAnchors.length?dateAnchors.map(function(anchor){return anchor.iso;}):fallbackDates.map(function(item){return item.iso;}));
     dates=Array.from(new Set(dates)).sort();
-    var catAnchors=categoryAnchors(lines,categories);
-    var firstCategoryY=catAnchors.length?catAnchors[0].y:NaN;
     var columns=dateColumns(dateAnchors,lines,firstCategoryY);
     var cells=[];
     catAnchors.forEach(function(category,index){
@@ -444,7 +531,7 @@
       cells:cells,
       spatial:dateAnchors.length>0&&columns.length>0,
       warnings:[
-        !dateAnchors.length?'日付列の位置を確定できませんでした':null,
+        !dateAnchors.length?'日付列の位置を確定できませんでした。画面全体が入るように撮影してください':null,
         dateAnchors.length&&!catAnchors.length?'登録カテゴリーの位置を確定できませんでした':null,
         dateAnchors.length&&catAnchors.length&&!cells.length?'納品数・販売数の位置を確定できませんでした':null
       ].filter(Boolean)
@@ -497,7 +584,7 @@
   }
 
   var model={
-    VERSION:3,
+    VERSION:4,
     MAX_FILES:MAX_FILES,
     MAX_FILE_BYTES:MAX_FILE_BYTES,
     POLICY:POLICY,
@@ -516,6 +603,9 @@
     analyzeOcrData:analyzeOcrData,
     buildMultiDayData:buildMultiDayData,
     mergeMultiDayResults:mergeMultiDayResults,
+    spatialDateAnchors:spatialDateAnchors,
+    tripGroups:tripGroups,
+    expandDateAnchorsWithTrips:expandDateAnchorsWithTrips,
     localOcrAssets:localOcrAssets
   };
   if(typeof module!=='undefined'&&module.exports)module.exports=model;
@@ -811,6 +901,20 @@
           var result=await worker.recognize(activeItem.file,{rotateAuto:true},{text:true,blocks:true});
           var analyzed=analyzeOcrData(result&&result.data||{},categories(),session.targetDate);
           analyzed.multiDay=buildMultiDayData(analyzed.lines,categories(),session.targetDate);
+          if(!analyzed.multiDay.cells.length&&worker&&typeof worker.setParameters==='function'){
+            session.engineStatus='画像 '+(i+1)+' / '+session.items.length+' を表形式で再解析中';
+            renderItems();
+            var blockPsm=root.Tesseract.PSM&&root.Tesseract.PSM.SINGLE_BLOCK!=null?root.Tesseract.PSM.SINGLE_BLOCK:'6';
+            await worker.setParameters({tessedit_pageseg_mode:blockPsm,preserve_interword_spaces:'1'});
+            var retryResult=await worker.recognize(activeItem.file,{rotateAuto:true},{text:true,blocks:true});
+            var retryAnalyzed=analyzeOcrData(retryResult&&retryResult.data||{},categories(),session.targetDate);
+            retryAnalyzed.multiDay=buildMultiDayData(retryAnalyzed.lines,categories(),session.targetDate);
+            var firstScore=analyzed.multiDay.cells.length*100+analyzed.multiDay.dates.length*10+analyzed.multiDay.categories.length;
+            var retryScore=retryAnalyzed.multiDay.cells.length*100+retryAnalyzed.multiDay.dates.length*10+retryAnalyzed.multiDay.categories.length;
+            if(retryScore>firstScore)analyzed=retryAnalyzed;
+            var sparsePsm=root.Tesseract.PSM&&root.Tesseract.PSM.SPARSE_TEXT!=null?root.Tesseract.PSM.SPARSE_TEXT:'11';
+            await worker.setParameters({tessedit_pageseg_mode:sparsePsm,preserve_interword_spaces:'1'});
+          }
           activeItem.ocr=Object.assign({status:'done',progress:1},analyzed);
         }catch(error){
           activeItem.ocr={status:'error',progress:0,error:error&&error.message?String(error.message):String(error)};
