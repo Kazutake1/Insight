@@ -188,7 +188,8 @@
     basketRelation(review,kind,relations);
     wasteSupplyRelation(review,kind,relations);
     if(theme==='dashboard'||theme==='daily'||!theme)contextRelation(review,relations);
-    relations=uniq(relations.concat(crossEvidence(cross))).slice(0,5);
+    var evidence=crossEvidence(cross);
+    relations=uniq(relations).slice(0,Math.max(0,5-evidence.length)).concat(evidence).slice(0,5);
     var checks=checksFor(items,review,relations);
     return {
       conclusion:conclusion(items,kind),
