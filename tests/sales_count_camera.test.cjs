@@ -47,6 +47,10 @@ test('CAMERA-2は同一オリジンのローカルOCRを使用し画像を永続
 
   const source=fs.readFileSync(path.join(root,'insight_sales_count_camera_v1.js'),'utf8');
   assert.match(source,/capture="environment"/);
+  assert.match(source,/className='sc-camera-open'/);
+  assert.match(source,/aria-label','カメラ読取'/);
+  assert.match(source,/sc-camera-open-icon/);
+  assert.doesNotMatch(source,/button\.textContent='カメラ読取'/);
   assert.match(source,/URL\.createObjectURL/);
   assert.match(source,/URL\.revokeObjectURL/);
   assert.match(source,/cacheMethod:'none'/);
