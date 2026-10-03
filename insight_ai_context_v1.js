@@ -50,6 +50,7 @@
       weekly:overrides.WeeklyReview||root.InsightWeeklyReview,
       monthly:overrides.MonthlyReview||root.InsightMonthlyReview,
       history:overrides.AnalysisHistory||root.InsightAnalysisHistory,
+      bundle:overrides.AnalysisBundle||root.InsightAnalysisBundle,
       getThroughDay:through,
       now:overrides.now||new Date()
     };
@@ -217,6 +218,26 @@
     };
   }
 
+  function compactCrossAnalysis(bundle){
+    if(!bundle)return null;
+    var analysis=bundle.analysis||{};
+    return {
+      period:copy(bundle.period||null),
+      signals:copy(bundle.signals||null),
+      weekday:copy(analysis.weekday||null),
+      seasonality:copy(analysis.seasonality||null),
+      anomaly:copy(analysis.anomaly||null),
+      saleImpacts:copy(analysis.saleImpacts||[]),
+      eventImpacts:copy(analysis.eventImpacts||[]),
+      diagnostics:copy(bundle.diagnostics||null),
+      policy:{
+        role:'supportingEvidenceForInterpretation',
+        causality:'notAsserted',
+        authoritativeKpi:false
+      }
+    };
+  }
+
   function monthlyAnalysis(target,e,overrides){
     if(!e.monthly||typeof e.monthly.review!=='function')throw new Error('月次レビューを利用できません。');
     var review=e.monthly.review({
@@ -224,6 +245,15 @@
       compareYear:target.compareYear,storeId:target.store.id
     },overrides);
     var items=typeof review.forTheme==='function'?review.forTheme(target.theme):review.display;
+    var cross=null;
+    if(e.bundle&&typeof e.bundle.build==='function'){
+      try{
+        cross=compactCrossAnalysis(e.bundle.build({
+          year:target.year,month:target.month,throughDay:target.throughDay,
+          compareYear:target.compareYear,storeId:target.store.id,referenceDate:target.referenceDate
+        },overrides));
+      }catch(_){cross=null;}
+    }
     return {
       facts:compactFacts(review.current),
       deterministic:{
@@ -234,7 +264,8 @@
         allFindings:compactItems(review.items,12),
         trends:copy(review.trends||{}),
         grossMargin:copy(review.grossMargin||null),
-        labor:copy(review.labor||null)
+        labor:copy(review.labor||null),
+        crossAnalysis:cross
       }
     };
   }
@@ -320,8 +351,9 @@
           'InsightAnalysisContext',
           target.period==='today'?'InsightDailyAnomaly':
           target.period==='week'?'InsightWeeklyReview':
-          target.period==='history'?'InsightAnalysisHistory':'InsightMonthlyReview'
-        ]
+          target.period==='history'?'InsightAnalysisHistory':'InsightMonthlyReview',
+          target.period==='month'&&body.deterministic.crossAnalysis?'InsightAnalysisBundle':null
+        ].filter(Boolean)
       },
       privacy:{
         localContext:true,
@@ -388,7 +420,8 @@
     toTransportPayload:toTransportPayload,
     stripFreeText:stripFreeText,
     resolveTarget:resolveTarget,
-    compactFacts:compactFacts
+    compactFacts:compactFacts,
+    compactCrossAnalysis:compactCrossAnalysis
   };
 
   if(typeof module!=='undefined'&&module.exports)module.exports=model;
