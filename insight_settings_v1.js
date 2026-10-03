@@ -36,7 +36,7 @@
       '.dark #pageSettings #insightDataHealthButton{color:#86efac}',
       '.insight-settings-actions .sidebar-btn-sub{font-size:9px;color:var(--text5)}',
       '.insight-theme-toggle{display:flex;align-items:center;justify-content:space-between;gap:10px;width:100%;box-sizing:border-box;padding:10px 12px;margin:0 0 8px;border:0;background:transparent;color:var(--text3);font:600 12px/1.35 -apple-system,BlinkMacSystemFont,"Noto Sans JP",sans-serif}',
-      '.insight-theme-toggle-label{display:flex;align-items:center;gap:9px;min-width:0}',
+      '.insight-theme-icon{display:block;width:18px;height:18px;flex:0 0 18px}',
       '.insight-theme-switch{position:relative;width:42px;height:24px;flex:0 0 auto}',
       '.insight-theme-switch input{position:absolute;opacity:0;pointer-events:none}',
       '.insight-theme-switch-track{position:absolute;inset:0;border-radius:999px;background:var(--border);transition:.18s ease;cursor:pointer}',
@@ -85,7 +85,7 @@
     page.querySelector('#insightSettingsDataActions').append(backup,restore,health,csv,restoreFile,csvFile);
     var themeWrap=doc.createElement('div');
     themeWrap.className='insight-theme-toggle';
-    themeWrap.innerHTML='<span class="insight-theme-toggle-label">ダークモード</span><label class="insight-theme-switch" aria-label="ダークモード"><input id="insightThemeToggle" type="checkbox" role="switch"><span class="insight-theme-switch-track"></span></label>';
+    themeWrap.innerHTML='<svg class="insight-theme-icon insight-theme-sun" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.93 4.93l1.42 1.42M17.65 17.65l1.42 1.42M2 12h2M20 12h2M4.93 19.07l1.42-1.42M17.65 6.35l1.42-1.42"/></svg><label class="insight-theme-switch" aria-label="ライト／ダークモード"><input id="insightThemeToggle" type="checkbox" role="switch"><span class="insight-theme-switch-track"></span></label><svg class="insight-theme-icon insight-theme-moon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/></svg>';
     var themeInput=themeWrap.querySelector('#insightThemeToggle');
     function syncThemeToggle(){
       themeInput.checked=doc.documentElement.classList.contains('dark')||!!(doc.body&&doc.body.classList.contains('dark'));
