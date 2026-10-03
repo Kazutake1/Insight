@@ -170,8 +170,8 @@ test('設定ページはサイドバー下部の管理項目を集約する',()=
   assert.match(settings,/page\.id='pageSettings'/);
   assert.match(settings,/insightSettingsDataActions/);
   assert.match(settings,/append\(backup,restore,health,csv,restoreFile,csvFile\)/);
-  assert.match(settings,/insightSettingsDisplayActions/);
-  assert.match(settings,/append\(dark\)/);
+  assert.doesNotMatch(settings,/insightSettingsDisplayActions/);
+  assert.match(settings,/page\.append\(dark\)/);
   assert.match(settings,/sidebarActions\.replaceChildren\(themeWrap,nav\)/);
 });
 
