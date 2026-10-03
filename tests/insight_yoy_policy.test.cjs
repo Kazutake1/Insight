@@ -24,10 +24,7 @@ function setup(){
   const rows=(count,factor)=>Array.from({length:30},(_,i)=>({d:i+1,売上:i<count?100*factor:0,客数:i<count?100*factor:0,買上点数:i<count?200*factor:0,廃棄金額:i<count?1000*factor:0}));
   c.store.data={'2026':{'9月':rows(10,1.2)},'2025':{'9月':rows(12,1)}};
   vm.createContext(c);vm.runInContext(engineSource,c);vm.runInContext(read('insight_yoy_policy_v1.js'),c);
-  const index=read('Index.html'),start=index.indexOf('var extra=')+10,end=index.indexOf(';\n// STEP5 retained bootstrap boundary',start);
-  assert.ok(start>=10&&end>start,'Index.html の分析AIインラインスクリプトを抽出できません');
-  const extra=vm.runInNewContext(index.slice(start,end));
-  vm.runInContext(extra.replace(/^<script>/,'').replace(/<\/script>$/,''),c);
+  vm.runInContext(read('insight_ai_compat_core_v1.js'),c);
   vm.runInContext(read('insight_date_context_v1.js'),c);
   vm.runInContext(read('insight_hooks_v1.js'),c);
   vm.runInContext(read('insight_dashboard_kpi_sync_v1.js'),c);
@@ -100,5 +97,6 @@ test('全JS・Index内スクリプト・展開後スクリプトに構文エラ�
   await new Promise(resolve=>setImmediate(resolve));assert.ok(expanded);
   for(const s of scripts(expanded))new vm.Script(s);
   assert.ok(expanded.indexOf('insight_yoy_policy_v1.js')<expanded.indexOf('insight_ops_v1.js'));
-  assert.ok(expanded.indexOf('insight_yoy_policy_v1.js')<expanded.indexOf('function C()'));
+  assert.ok(expanded.indexOf('insight_yoy_policy_v1.js')<expanded.indexOf('insight_ai_compat_core_v1.js'));
+  assert.ok(expanded.indexOf('insight_ai_compat_core_v1.js')<expanded.indexOf('insight_hooks_v1.js'));
 });
