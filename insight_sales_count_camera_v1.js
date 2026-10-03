@@ -1662,7 +1662,7 @@
             session.engineStatus='画像 '+(i+1)+' / '+session.items.length+' の数字セルを固定表として解析中';
             renderItems();
             fixedGridResult=await readFixedGridCells(worker,ocrInput,bestAnalyzed,categories(),session.targetDate);
-            if(fixedGridResult)consensus=fixedGridResult;
+            if(fixedGridResult&&fixedGridResult.cells&&fixedGridResult.cells.length)consensus=fixedGridResult;
           }
           var analyzed=Object.assign({},bestAnalyzed,{
             passes:passes,
