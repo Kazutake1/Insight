@@ -152,8 +152,22 @@ test('上下限のある値引き条件は「以上・以下」ではなく範�
     ]
   }};
   const text=events.summary(snap);
-  assert.match(text,/180円〜239円→150円均一/);
-  assert.match(text,/240円〜349円→250円均一/);
+  assert.match(text,/180〜239円→150円均一/);
+  assert.match(text,/240〜349円→250円均一/);
   assert.doesNotMatch(text,/180円以上239円以下/);
   assert.doesNotMatch(text,/240円以上349円以下/);
+});
+
+
+test('複数値引き条件の見出しは簡潔なカテゴリー＋条件一覧で表示する',()=>{
+  const snap={version:1,title:'おにぎりセール',note:'',sale:{
+    category:'おにぎり',categoryId:'cat_onigiri',method:'fixed',params:{maxPrice:179,price:100},
+    targets:[{categoryId:'cat_onigiri',category:'おにぎり',method:'fixed',params:{maxPrice:179,price:100}}],
+    segments:[
+      {id:'seg_low',categoryId:'cat_onigiri',category:'おにぎり',label:'179円以下',method:'fixed',params:{maxPrice:179,price:100}},
+      {id:'seg_mid',categoryId:'cat_onigiri',category:'おにぎり',label:'180円以上239円以下',method:'fixed',params:{minPrice:180,maxPrice:239,price:150}},
+      {id:'seg_high',categoryId:'cat_onigiri',category:'おにぎり',label:'240円以上349円以下',method:'fixed',params:{minPrice:240,maxPrice:349,price:250}}
+    ]
+  }};
+  assert.equal(events.summary(snap),'おにぎり：179円以下→100円均一 / 180〜239円→150円均一 / 240〜349円→250円均一');
 });
