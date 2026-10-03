@@ -11,7 +11,7 @@ async function openInsight(page){
   page.on('pageerror',error=>errors.push(error.message));
   await page.goto('/Index.html',{waitUntil:'domcontentloaded'});
   await expect(page.locator('#nav1')).toBeVisible();
-  await page.waitForFunction(()=>window.InsightPagePeriodSync&&window.InsightInputPeriodControls&&window.InsightSalesPeriodSelector&&window.InsightSalesCount&&window.InsightSaleResults&&window.InsightHourlyCustomers&&window.InsightEventResults&&window.InsightAIVisual&&window.InsightAIInterpretation&&window.InsightAnalysisPeriodLock&&window.InsightMultiYearAnalysis&&window.InsightWeekdayAnalysis&&window.InsightSaleImpactAnalysis&&window.InsightEventImpactAnalysis&&window.InsightSeasonalityAnalysis&&window.InsightAnomalyExplanation&&window.InsightAnalysisBundle&&window.InsightSettings&&window.InsightDarkTheme&&document.getElementById('navSettings')&&document.getElementById('pageSettings'));
+  await page.waitForFunction(()=>window.InsightPagePeriodSync&&window.InsightInputPeriodControls&&window.InsightSalesPeriodSelector&&window.InsightSalesCount&&window.InsightSalesCountCamera&&window.InsightSaleResults&&window.InsightHourlyCustomers&&window.InsightEventResults&&window.InsightAIVisual&&window.InsightAIInterpretation&&window.InsightAnalysisPeriodLock&&window.InsightMultiYearAnalysis&&window.InsightWeekdayAnalysis&&window.InsightSaleImpactAnalysis&&window.InsightEventImpactAnalysis&&window.InsightSeasonalityAnalysis&&window.InsightAnomalyExplanation&&window.InsightAnalysisBundle&&window.InsightSettings&&window.InsightDarkTheme&&document.getElementById('navSettings')&&document.getElementById('pageSettings'));
   return errors;
 }
 
@@ -82,6 +82,43 @@ test('売上・客数・廃棄は販売数入力と同じ前月・年月・翌�
   expect(errors).toEqual([]);
 });
 
+test('販売数入力のカメラ読取は画像を一時保持し閉じると破棄する',async({page})=>{
+  const errors=await openInsight(page);
+  await page.locator('#navSalesCount').click();
+  await expect(page.locator('#scCameraOpen')).toBeVisible();
+  const before=await page.evaluate(()=>JSON.stringify(allStores));
+
+  await page.locator('#scCameraOpen').click();
+  await expect(page.locator('#scCameraDialog')).toBeVisible();
+
+  const bounds=await page.evaluate(()=>window.InsightSalesCountCamera.periodBounds(window.InsightSalesCount.getPeriod()));
+  await expect(page.locator('#scCameraDate')).toHaveAttribute('min',bounds.min);
+  await expect(page.locator('#scCameraDate')).toHaveAttribute('max',bounds.max);
+  await expect(page.locator('#scCameraCapture')).toHaveAttribute('accept','image/*');
+  await expect(page.locator('#scCameraCapture')).toHaveAttribute('capture','environment');
+  await expect(page.locator('#scCameraFiles')).toHaveAttribute('multiple','');
+
+  const png=Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+A8AAQUBAScY42YAAAAASUVORK5CYII=','base64');
+  await page.locator('#scCameraCapture').setInputFiles({name:'capture.png',mimeType:'image/png',buffer:png});
+  await expect(page.locator('.sc-camera-item')).toHaveCount(1);
+  await expect(page.locator('#scCameraStatus')).toHaveText('撮影済み 1 / 12枚');
+  expect(await page.evaluate(()=>window.InsightSalesCountCamera.getSessionSummary().count)).toBe(1);
+
+  await page.locator('.sc-camera-remove').click();
+  await expect(page.locator('.sc-camera-item')).toHaveCount(0);
+  expect(await page.evaluate(()=>window.InsightSalesCountCamera.getSessionSummary().count)).toBe(0);
+
+  await page.locator('#scCameraCapture').setInputFiles({name:'capture2.png',mimeType:'image/png',buffer:png});
+  page.once('dialog',dialog=>dialog.accept());
+  await page.locator('#scCameraClose').click();
+  await expect(page.locator('#scCameraDialog')).toHaveCount(0);
+  expect(await page.evaluate(()=>window.InsightSalesCountCamera.getSessionSummary().count)).toBe(0);
+
+  const after=await page.evaluate(()=>JSON.stringify(allStores));
+  expect(after).toBe(before);
+  expect(errors).toEqual([]);
+});
+
 test('選択月は主要ページを横断しても維持される',async({page})=>{
   const errors=await openInsight(page);
   await selectDashboardSeptember(page);
@@ -109,7 +146,7 @@ test('選択月は主要ページを横断しても維持される',async({page}
 test('トップページはビルド番号を持ち最新版確認をno-storeで行う',async({page})=>{
   const errors=await openInsight(page);
   const source=await page.evaluate(()=>fetch('/Index.html?e2e-shell-check=1',{cache:'no-store'}).then(r=>r.text()));
-  expect(source).toContain('name="insight-shell-version" content="20261003-input-period-source-1"');
+  expect(source).toContain('name="insight-shell-version" content="20261003-camera-capture-1"');
   expect(source).toContain("fetch('./Index.html?insight_probe='+Date.now(),{cache:'no-store'})");
   expect(source).toContain("location.replace('./Index.html?insight_build='+encodeURIComponent(m[1]))");
   expect(errors).toEqual([]);

@@ -17,7 +17,7 @@ test('payload互換パッチ11件はbootstrap moduleへ分離しIndexにはbody�
 
 test('トップページはキャッシュ抑止とビルド自己更新を持つ',()=>{
   const index=read('Index.html');
-  assert.match(index,/insight-shell-version" content="20261003-input-period-source-1/);
+  assert.match(index,/insight-shell-version" content="20261003-camera-capture-1/);
   assert.match(index,/Cache-Control" content="no-cache, no-store, must-revalidate/);
   assert.match(index,/insight_probe=/);
   assert.match(index,/cache:'no-store'/);
@@ -291,6 +291,23 @@ test('全分析バンドルは履歴の後・AI解釈の前に読み込み外部
   assert.match(bundle,/diagnostics:diagnostics/);
   assert.doesNotMatch(bundle,/localStorage|InsightStorage|\bfetch\s*\(|XMLHttpRequest|WebSocket/);
   assert.doesNotThrow(()=>new vm.Script(bundle),'analysis bundle module must be valid JavaScript');
+});
+
+test('販売数カメラSTEP1は画像をメモリだけで保持し外部送信・保存を行わない',()=>{
+  const index=read('Index.html');
+  const camera=read('insight_sales_count_camera_v1.js');
+  assert.match(index,/insight_sales_count_camera_v1\.js\?v=20261003-camera-capture-1/);
+  assert.ok(index.indexOf('insight_sales_count_v1.js')<index.indexOf('insight_sales_count_camera_v1.js'));
+  assert.ok(index.indexOf('insight_sales_count_camera_v1.js')<index.indexOf('insight_sale_results_v1.js'));
+  assert.match(camera,/capture="environment"/);
+  assert.match(camera,/URL\.createObjectURL/);
+  assert.match(camera,/URL\.revokeObjectURL/);
+  assert.match(camera,/persistImages:false/);
+  assert.match(camera,/externalTransmission:false/);
+  assert.match(camera,/autoSave:false/);
+  assert.match(camera,/unmatchedCategory:'discard'/);
+  assert.doesNotMatch(camera,/localStorage|sessionStorage|indexedDB|InsightStorage|\bfetch\s*\(|XMLHttpRequest|WebSocket/);
+  assert.doesNotThrow(()=>new vm.Script(camera),'camera capture module must be valid JavaScript');
 });
 
 test('売上・客数・廃棄の旧年月UIは本体実行前に削除し販売数入力方式だけを使う',()=>{
