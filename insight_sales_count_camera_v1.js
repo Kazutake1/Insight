@@ -954,6 +954,8 @@
       var winner=Array.from(votes.entries()).sort(function(a,b){return b[1]-a[1];})[0]||null;
       if(!winner||winner[1]<2){unresolved++;return;}
       var value=Number(winner[0]),conf=confidences.get(winner[0])||[];
+      var confidence=conf.length?conf.reduce(function(sum,item){return sum+item;},0)/conf.length:null;
+      if(confidence!==null&&confidence<60){unresolved++;return;}
       cells.push({
         date:slot.date,
         categoryId:slot.categoryId,
@@ -961,7 +963,7 @@
         trip:slot.trip,
         field:slot.field,
         value:value,
-        confidence:conf.length?Math.min.apply(null,conf):null,
+        confidence:confidence,
         method:'fixed-cell',
         consensus:true
       });
