@@ -1,4 +1,4 @@
-/* Sales-count camera capture v11: fixed-grid numeric-row clustering + date-gap recovery. */
+/* Sales-count camera capture v12: multi-pass geometric grid + isolated numeric cell OCR. */
 (function(root){
   'use strict';
   if(root.InsightSalesCountCamera)return;
@@ -1034,6 +1034,102 @@
       categories:categoryPlans
     };
   }
+  function medianNumber(values){
+    values=(Array.isArray(values)?values:[]).map(Number).filter(Number.isFinite).sort(function(a,b){return a-b;});
+    if(!values.length)return NaN;
+    var mid=Math.floor(values.length/2);
+    return values.length%2?values[mid]:(values[mid-1]+values[mid])/2;
+  }
+  function mergeGeometryLines(passes){
+    var lines=[];
+    (Array.isArray(passes)?passes:[]).forEach(function(pass,passIndex){
+      (Array.isArray(pass&&pass.lines)?pass.lines:[]).forEach(function(line,lineIndex){
+        lines.push(Object.assign({},line,{
+          index:lines.length,
+          geometryPass:passIndex,
+          geometryLine:Number.isInteger(line&&line.index)?line.index:lineIndex
+        }));
+      });
+    });
+    return lines;
+  }
+  function mergedDateAnchors(lines,referenceDate){
+    var grouped=new Map();
+    (Array.isArray(lines)?lines:[]).forEach(function(line,index){
+      dateAnchorsForLine(line,index,referenceDate).filter(function(anchor){return !anchor.approximate;}).forEach(function(anchor){
+        if(!grouped.has(anchor.iso))grouped.set(anchor.iso,[]);
+        grouped.get(anchor.iso).push(anchor);
+      });
+    });
+    var anchors=[];
+    grouped.forEach(function(items,iso){
+      var x=medianNumber(items.map(function(item){return item.x;}));
+      var y=medianNumber(items.map(function(item){return item.y;}));
+      if(!Number.isFinite(x)||!Number.isFinite(y))return;
+      anchors.push({
+        iso:iso,x:x,y:y,raw:iso,
+        confidence:medianNumber(items.map(function(item){return item.confidence;})),
+        lineIndex:items[0].lineIndex,
+        mergedPasses:items.length,
+        approximate:false
+      });
+    });
+    anchors.sort(function(a,b){return a.x-b.x;});
+    return recoverSingleMissingDateAnchor(anchors);
+  }
+  function mergedCategoryAnchors(lines,categories){
+    var raw=categoryAnchors(lines,categories),grouped=new Map();
+    raw.forEach(function(anchor){
+      if(!grouped.has(anchor.id))grouped.set(anchor.id,[]);
+      grouped.get(anchor.id).push(anchor);
+    });
+    var out=[];
+    grouped.forEach(function(items){
+      var y=medianNumber(items.map(function(item){return item.y;}));
+      if(!Number.isFinite(y))return;
+      var base=items[0];
+      out.push({
+        id:base.id,name:base.name,matchedLabel:base.matchedLabel,
+        activeTrips:base.activeTrips.slice(),y:y,lineIndex:base.lineIndex,
+        mergedPasses:items.length
+      });
+    });
+    return out.sort(function(a,b){return a.y-b.y;});
+  }
+  function fixedGridPlanFromPasses(passes,categories,referenceDate){
+    var lines=mergeGeometryLines(passes);
+    if(!lines.length)return null;
+    var catAnchors=mergedCategoryAnchors(lines,categories);
+    if(!catAnchors.length)return null;
+    var dateAnchors=mergedDateAnchors(lines,referenceDate);
+    if(!dateAnchors.length)return null;
+    var firstCategoryY=catAnchors[0].y;
+    var groups=tripGroups(lines,firstCategoryY);
+    dateAnchors=expandDateAnchorsWithTrips(dateAnchors,groups);
+    dateAnchors=recoverSingleMissingDateAnchor(dateAnchors);
+    var columns=dateColumns(dateAnchors,lines,firstCategoryY);
+    if(columns.length!==dateAnchors.length)return null;
+    var categoryPlans=[];
+    catAnchors.forEach(function(category,index){
+      var next=catAnchors[index+1],nextY=next?next.y:Infinity;
+      var rows=fixedMetricRows(lines,category,nextY);
+      if(!rows)return;
+      categoryPlans.push({
+        id:category.id,name:category.name,activeTrips:category.activeTrips.slice(),
+        y:category.y,delivery:rows.delivery,sales:rows.sales,
+        geometrySource:rows.source||'merged-lines'
+      });
+    });
+    if(!categoryPlans.length)return null;
+    return {
+      dates:dateAnchors.map(function(anchor){return anchor.iso;}),
+      columns:columns,
+      categories:categoryPlans,
+      geometrySource:'multi-pass',
+      mergedLineCount:lines.length
+    };
+  }
+
   function fixedGridSlots(plan){
     if(!plan||!Array.isArray(plan.columns)||!Array.isArray(plan.categories))return [];
     var slots=[];
@@ -1118,7 +1214,7 @@
   }
 
   var model={
-    VERSION:11,
+    VERSION:12,
     MAX_FILES:MAX_FILES,
     MAX_FILE_BYTES:MAX_FILE_BYTES,
     POLICY:POLICY,
@@ -1146,6 +1242,10 @@
     recoverSingleMissingDateAnchor:recoverSingleMissingDateAnchor,
     numericRowClusters:numericRowClusters,
     fixedGridPlan:fixedGridPlan,
+    mergeGeometryLines:mergeGeometryLines,
+    mergedDateAnchors:mergedDateAnchors,
+    mergedCategoryAnchors:mergedCategoryAnchors,
+    fixedGridPlanFromPasses:fixedGridPlanFromPasses,
     fixedGridSlots:fixedGridSlots,
     fixedCellConsensus:fixedCellConsensus,
     mergeMultiDayResults:mergeMultiDayResults,
@@ -1606,8 +1706,8 @@
     var result=await worker.recognize(canvas,{rotateAuto:false},{text:true,blocks:true});
     return parseFixedCellSheet(result&&result.data||{},tiles);
   }
-  async function readFixedGridCells(worker,source,analyzed,categoriesList,referenceDate){
-    var plan=fixedGridPlan(analyzed&&analyzed.lines,categoriesList,referenceDate);
+  async function readFixedGridCells(worker,source,analyzed,categoriesList,referenceDate,passes){
+    var plan=fixedGridPlanFromPasses(passes,categoriesList,referenceDate)||fixedGridPlan(analyzed&&analyzed.lines,categoriesList,referenceDate);
     if(!plan)return null;
     var slots=fixedGridSlots(plan);
     if(!slots.length)return null;
@@ -1906,7 +2006,7 @@
           if(activeItem.crop){
             session.engineStatus='画像 '+(i+1)+' / '+session.items.length+' の数字セルを固定表として解析中';
             renderItems();
-            fixedGridResult=await readFixedGridCells(worker,ocrInput,bestAnalyzed,categories(),session.targetDate);
+            fixedGridResult=await readFixedGridCells(worker,ocrInput,bestAnalyzed,categories(),session.targetDate,passes);
             if(fixedGridResult&&fixedGridResult.cells&&fixedGridResult.cells.length)consensus=fixedGridResult;
           }
           var analyzed=Object.assign({},bestAnalyzed,{
