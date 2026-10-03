@@ -1013,9 +1013,14 @@ test('イベント実績は過去開催→複数日→時間帯グラフ→カ�
   await expect(page.locator('.er-occurrence').first()).toContainText('客数 205人');
 
   await page.locator('.er-occurrence').first().click();
-  await expect(page.locator('.er-overview-grid .er-summary-card')).toHaveCount(4);
+  await expect(page.locator('.er-overview-grid .er-summary-card')).toHaveCount(2);
   await expect(page.locator('.er-overview-grid .er-summary-card').first()).toContainText('226千円');
+  await expect(page.locator('.er-overview-grid')).not.toContainText('客単価');
+  await expect(page.locator('.er-overview-grid')).not.toContainText('買上点数');
+  await expect(page.locator('.er-daily-summary .er-summary-card')).toHaveCount(2);
   await expect(page.locator('.er-daily-summary .er-summary-card').first()).toContainText('112千円');
+  await expect(page.locator('.er-daily-summary')).not.toContainText('客単価');
+  await expect(page.locator('.er-daily-summary')).not.toContainText('買上点数');
   await expect(page.locator('.er-daily-summary')).toBeVisible();
   await expect(page.locator('.er-day-tab')).toHaveCount(2);
   await expect(page.locator('.er-day-tab').first()).toHaveClass(/active/);
