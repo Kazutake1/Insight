@@ -25,7 +25,7 @@ test('画像は20MB以下のimageだけを受け付ける',()=>{
 });
 
 test('CAMERA-2は同一オリジンのローカルOCRを使用し画像を永続化しない',()=>{
-  assert.equal(camera.VERSION,4);
+  assert.equal(camera.VERSION,5);
   assert.deepEqual(camera.POLICY,{
     persistImages:false,
     externalTransmission:false,
@@ -166,6 +166,38 @@ test('納品数・販売数ラベルを読み損ねてもカテゴリー直下�
   assert.equal(result.cells.length,6);
   assert.equal(result.cells.find(x=>x.trip===2&&x.field==='delivery').value,20);
   assert.equal(result.cells.find(x=>x.trip===2&&x.field==='sales').value,18);
+});
+
+test('wordのbboxがなくてもline bboxと数値順が完全一致すれば構造化する',()=>{
+  const lines=[
+    {index:0,text:'10/28 10/29',confidence:93,bbox:{x0:50,y0:30,x1:410,y1:50},words:[]},
+    {index:1,text:'1 2 3 1 2 3',confidence:96,bbox:{x0:50,y0:60,x1:410,y1:80},words:[]},
+    {index:2,text:'おにぎり',confidence:97,bbox:{x0:10,y0:90,x1:90,y1:110},words:[]},
+    {index:3,text:'納品数 10 20 30 40 50 60',confidence:91,bbox:{x0:10,y0:120,x1:410,y1:140},words:[]},
+    {index:4,text:'販売数 9 18 27 36 45 54',confidence:90,bbox:{x0:10,y0:150,x1:410,y1:170},words:[]},
+    {index:5,text:'廃棄数 1 2 3 4 5 6',confidence:92,bbox:{x0:10,y0:180,x1:410,y1:200},words:[]},
+    {index:6,text:'欠品率 0.0 0.0 0.0 0.0 0.0 0.0',confidence:92,bbox:{x0:10,y0:210,x1:410,y1:230},words:[]}
+  ];
+  const result=camera.buildMultiDayData(lines,[{id:'a',name:'おにぎり',hidden:false,aliases:[],activeTrips:[true,true,true]}],'2025-10-28');
+  assert.deepEqual(result.dates,['2025-10-28','2025-10-29']);
+  assert.equal(result.cells.length,12);
+  assert.equal(result.cells.find(x=>x.date==='2025-10-28'&&x.trip===2&&x.field==='delivery').value,20);
+  assert.equal(result.cells.find(x=>x.date==='2025-10-29'&&x.trip===3&&x.field==='sales').value,54);
+  assert.ok(result.cells.every(x=>x.fallback===true));
+});
+
+test('line順フォールバックは余分な数字がある行を推測で確定しない',()=>{
+  const lines=[
+    {index:0,text:'11/1',confidence:93,bbox:{x0:50,y0:30,x1:230,y1:50},words:[]},
+    {index:1,text:'1 2 3',confidence:96,bbox:{x0:50,y0:60,x1:230,y1:80},words:[]},
+    {index:2,text:'おにぎり',confidence:97,bbox:{x0:10,y0:90,x1:90,y1:110},words:[]},
+    {index:3,text:'納品数 10 20 30 999',confidence:91,bbox:{x0:10,y0:120,x1:230,y1:140},words:[]},
+    {index:4,text:'販売数 9 18 27',confidence:90,bbox:{x0:10,y0:150,x1:230,y1:170},words:[]}
+  ];
+  const result=camera.buildMultiDayData(lines,[{id:'a',name:'おにぎり',hidden:false,aliases:[],activeTrips:[true,true,true]}],'2025-11-01');
+  assert.equal(result.cells.filter(x=>x.field==='delivery').length,0);
+  assert.equal(result.cells.filter(x=>x.field==='sales').length,3);
+  assert.equal(result.cells.some(x=>x.value===999),false);
 });
 
 test('対象外便は複数日OCR結果から除外する',()=>{
