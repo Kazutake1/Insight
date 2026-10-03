@@ -93,7 +93,7 @@ test('販売数入力のカメラ読取はローカルOCRし結果だけを一�
     window.__originalTesseract=original;
     window.__ocrCreateOptions=null;
     window.Tesseract={
-      PSM:{SPARSE_TEXT:'11'},
+      PSM:{SPARSE_TEXT:'11',SINGLE_BLOCK:'6',AUTO:'3'},
       createWorker:async(langs,oem,options)=>{
         window.__ocrCreateOptions={langs,oem,options:{
           workerPath:options.workerPath,
@@ -103,11 +103,27 @@ test('販売数入力のカメラ読取はローカルOCRし結果だけを一�
           workerBlobURL:options.workerBlobURL
         }};
         if(options.logger)options.logger({status:'loading language traineddata',progress:0.5});
+        let params={};
         return {
-          setParameters:async()=>{},
-          recognize:async()=>{
+          setParameters:async(next)=>{params={...params,...next};},
+          recognize:async(input)=>{
             if(options.logger)options.logger({status:'recognizing text',progress:0.8});
             const w=(text,x,y,confidence=95)=>({text,confidence,bbox:{x0:x-10,y0:y-8,x1:x+10,y1:y+8}});
+            if(params.tessedit_char_whitelist==='0123456789'){
+              const values=['10','20','30','40','50','60','9','18','27','36','45','54'];
+              const words=values.map((value,index)=>{
+                const col=index%8,row=Math.floor(index/8);
+                return w(value,col*144+72,row*82+41,96);
+              });
+              return {data:{
+                text:values.join(' '),
+                confidence:96,
+                blocks:[{paragraphs:[{lines:[
+                  {text:values.slice(0,8).join(' '),confidence:96,bbox:{x0:0,y0:0,x1:1152,y1:82},words:words.slice(0,8)},
+                  {text:values.slice(8).join(' '),confidence:96,bbox:{x0:0,y0:82,x1:576,y1:164},words:words.slice(8)}
+                ]}]}]
+              }};
+            }
             return {data:{
               text:'10/3 10/4\n1 2 3 1 2 3\nおにぎり\n納品数 10 20 30 40 50 60\n販売数 9 18 27 36 45 54',
               confidence:92,
