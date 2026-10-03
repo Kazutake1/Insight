@@ -25,7 +25,7 @@ test('画像は20MB以下のimageだけを受け付ける',()=>{
 });
 
 test('CAMERA-2は同一オリジンのローカルOCRを使用し画像を永続化しない',()=>{
-  assert.equal(camera.VERSION,11);
+  assert.equal(camera.VERSION,12);
   assert.deepEqual(camera.POLICY,{
     persistImages:false,
     externalTransmission:false,
@@ -214,6 +214,35 @@ test('納品販売ラベルを読めなくてもカテゴリー直下の数値�
   assert.equal(slots.length,48);
   assert.equal(slots.filter(slot=>slot.field==='delivery').length,24);
   assert.equal(slots.filter(slot=>slot.field==='sales').length,24);
+});
+
+test('OCR各回が不完全でも複数回の座標を統合して固定表を復元する',()=>{
+  const w=(text,x,y,confidence=95)=>({text,confidence,bbox:{x0:x-8,y0:y-6,x1:x+8,y1:y+6}});
+  const line=(index,text,y,words)=>({index,text,confidence:92,bbox:{x0:5,y0:y-9,x1:850,y1:y+9},words});
+  const pass1={lines:[
+    line(0,'10/27 10/28 10/29 10/30',40,[w('10/27',100,40),w('10/28',200,40),w('10/29',300,40),w('10/30',400,40)]),
+    line(1,'おにぎり',100,[w('おにぎり',50,100,98)]),
+    line(2,'x',131,[w('10',66,131),w('20',100,131),w('30',134,131),w('40',166,131)]),
+    line(3,'y',161,[w('9',66,161),w('18',100,161),w('27',134,161),w('36',166,161)])
+  ]};
+  const pass2={lines:[
+    line(0,'10/30 10/31 11/1 11/2 11/3',40,[w('10/30',400,40),w('10/31',500,40),w('11/1',600,40),w('11/2',700,40),w('11/3',800,40)]),
+    line(1,'おにぎり',101,[w('おにぎり',50,101,98)]),
+    line(2,'?',132,[w('50',266,132),w('60',300,132),w('70',334,132),w('80',366,132)]),
+    line(3,'?',162,[w('45',266,162),w('54',300,162),w('63',334,162),w('72',366,162)])
+  ]};
+  const cats=[{id:'a',name:'おにぎり',aliases:[],hidden:false,activeTrips:[true,true,true]}];
+  const plan=camera.fixedGridPlanFromPasses([pass1,pass2],cats,'2025-11-01');
+  assert.ok(plan);
+  assert.equal(plan.geometrySource,'multi-pass');
+  assert.deepEqual(plan.dates,[
+    '2025-10-27','2025-10-28','2025-10-29','2025-10-30',
+    '2025-10-31','2025-11-01','2025-11-02','2025-11-03'
+  ]);
+  assert.equal(plan.categories.length,1);
+  assert.equal(plan.categories[0].delivery.source,'numeric-cluster');
+  assert.equal(plan.categories[0].sales.source,'numeric-cluster');
+  assert.equal(camera.fixedGridSlots(plan).length,48);
 });
 
 test('複数日画面は対象日の直接OCR失敗でも日付範囲から判定する',()=>{
