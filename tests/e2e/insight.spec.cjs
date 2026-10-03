@@ -11,7 +11,7 @@ async function openInsight(page){
   page.on('pageerror',error=>errors.push(error.message));
   await page.goto('/Index.html',{waitUntil:'domcontentloaded'});
   await expect(page.locator('#nav1')).toBeVisible();
-  await page.waitForFunction(()=>window.InsightPagePeriodSync&&window.InsightSalesCount&&window.InsightSaleResults&&window.InsightHourlyCustomers&&window.InsightEventResults&&window.InsightAIVisual&&window.InsightAIInterpretation&&window.InsightAnalysisPeriodLock&&window.InsightMultiYearAnalysis&&window.InsightWeekdayAnalysis&&window.InsightSaleImpactAnalysis&&window.InsightEventImpactAnalysis&&window.InsightSeasonalityAnalysis&&window.InsightAnomalyExplanation&&window.InsightAnalysisBundle&&window.InsightSettings&&window.InsightDarkTheme&&document.getElementById('navSettings')&&document.getElementById('pageSettings'));
+  await page.waitForFunction(()=>window.InsightPagePeriodSync&&window.InsightSalesPeriodSelector&&window.InsightSalesCount&&window.InsightSaleResults&&window.InsightHourlyCustomers&&window.InsightEventResults&&window.InsightAIVisual&&window.InsightAIInterpretation&&window.InsightAnalysisPeriodLock&&window.InsightMultiYearAnalysis&&window.InsightWeekdayAnalysis&&window.InsightSaleImpactAnalysis&&window.InsightEventImpactAnalysis&&window.InsightSeasonalityAnalysis&&window.InsightAnomalyExplanation&&window.InsightAnalysisBundle&&window.InsightSettings&&window.InsightDarkTheme&&document.getElementById('navSettings')&&document.getElementById('pageSettings'));
   return errors;
 }
 
@@ -23,6 +23,42 @@ async function selectDashboardSeptember(page){
   });
   await expect.poll(()=>page.evaluate(()=>selMonth)).toBe('9月');
 }
+
+test('売上入力はコンパクトな年月セレクターで年・月を変更できる',async({page})=>{
+  const errors=await openInsight(page);
+  await page.locator('#nav2').click();
+  await expect(page.locator('#insightSalesPeriodBar')).toBeVisible();
+  await expect(page.locator('#insightSalesPeriodCurrent')).toContainText('年');
+  await expect(page.locator('#insightSalesPeriodToday')).toHaveText('今月へ');
+
+  const legacyVisible=await page.evaluate(()=>{
+    const page=document.getElementById('pageSales');
+    return Array.from(page.querySelectorAll('button,[role="button"]')).filter(node=>{
+      if(node.closest('#insightSalesPeriodBar')||node.closest('#insightSalesPeriodOverlay'))return false;
+      const text=(node.textContent||'').trim();
+      return (/^\d{4}年$/.test(text)||/^(?:[1-9]|1[0-2])月$/.test(text))&&node.offsetParent!==null;
+    }).length;
+  });
+  expect(legacyVisible).toBe(0);
+
+  await page.locator('#insightSalesPeriodCurrent').click();
+  await expect(page.locator('#insightSalesPeriodOverlay')).toBeVisible();
+  await expect(page.locator('#insightSalesPeriodMonths button')).toHaveCount(12);
+
+  const target=await page.evaluate(()=>{
+    const years=allStores.stores[allStores.current].years.map(Number).sort((a,b)=>a-b);
+    return {year:years[years.length-1],month:11};
+  });
+  await page.locator('#insightSalesPeriodYear').selectOption(String(target.year));
+  await page.locator('#insightSalesPeriodMonths button[data-month="11"]').click();
+  await page.locator('#insightSalesPeriodApply').click();
+  await expect(page.locator('#insightSalesPeriodOverlay')).toBeHidden();
+  await expect.poll(()=>page.evaluate(()=>String(editYear.sales))).toBe(String(target.year));
+  await expect.poll(()=>page.evaluate(()=>editMonth.sales)).toBe('11月');
+  await expect(page.locator('#insightSalesPeriodCurrent')).toContainText(String(target.year)+'年 11月');
+
+  expect(errors).toEqual([]);
+});
 
 test('選択月は主要ページを横断しても維持される',async({page})=>{
   const errors=await openInsight(page);
@@ -51,7 +87,7 @@ test('選択月は主要ページを横断しても維持される',async({page}
 test('トップページはビルド番号を持ち最新版確認をno-storeで行う',async({page})=>{
   const errors=await openInsight(page);
   const source=await page.evaluate(()=>fetch('/Index.html?e2e-shell-check=1',{cache:'no-store'}).then(r=>r.text()));
-  expect(source).toContain('name="insight-shell-version" content="20261003-analysis-bundle-1"');
+  expect(source).toContain('name="insight-shell-version" content="20261003-sales-period-ui-1"');
   expect(source).toContain("fetch('./Index.html?insight_probe='+Date.now(),{cache:'no-store'})");
   expect(source).toContain("location.replace('./Index.html?insight_build='+encodeURIComponent(m[1]))");
   expect(errors).toEqual([]);

@@ -46,6 +46,7 @@ jobs:
           - analysis_bundle.test.cjs
           - dark_theme.test.cjs
           - page_period_sync.test.cjs
+          - sales_period_selector.test.cjs
           - payload_browser_smoke.test.cjs
           - payload_patch_inventory.test.cjs
           - sale_results.test.cjs
