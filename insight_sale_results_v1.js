@@ -61,14 +61,6 @@
     var store=all.stores&&all.stores[storeId],value=store&&store.salesCounts&&store.salesCounts[date]&&store.salesCounts[date][categoryId];
     return value?salesApi.normalizeRecord(value):salesApi.emptyRecord();
   }
-  function segmentRecordAt(all,storeId,date,eventId,segmentId,salesApi){
-    return salesApi&&typeof salesApi.saleSegmentRecordAt==='function'?salesApi.saleSegmentRecordAt(all,storeId,date,eventId,segmentId):salesApi.emptyRecord();
-  }
-  function dedicatedSegments(event,categoryId,categoryName,eventsApi){
-    if(!event||!event.snapshot||!event.snapshot.sale||!eventsApi||typeof eventsApi.segmentsForCategory!=='function')return [];
-    var segments=eventsApi.segmentsForCategory(event.snapshot.sale,categoryId,categoryName);
-    return segments.length>1?segments:[];
-  }
   function hasRecord(record){
     return !!(record&&record.trips&&record.trips.some(function(t){return t.delivery!==null||t.sales!==null;}));
   }
@@ -125,12 +117,17 @@
     });
     var occurrences=[],groupsBySummary={};
 
-    function addOccurrence(event,start,end,summary,recordFactory,segment){
-      var days=eachDate(start,end).map(function(date){var record=recordFactory(date);return {date:date,record:record,hasRecord:hasRecord(record)};});
+    events.forEach(function(event){
+      var start=event.startDate<range.start?range.start:event.startDate;
+      var end=event.endDate>range.end?range.end:event.endDate;
+      if(start>end)return;
+      var summary=eventsApi.summary(event.snapshot,categoryId,category&&category.name),days=eachDate(start,end).map(function(date){
+        var record=recordAt(all,storeId,date,categoryId,salesApi);
+        return {date:date,record:record,hasRecord:hasRecord(record)};
+      });
       var occurrence={
-        id:(event.id||summary+'|'+start+'|'+end)+(segment?'|'+segment.id:''),
+        id:event.id||summary+'|'+start+'|'+end,
         summary:summary,
-        segmentId:segment&&segment.id||null,
         startDate:start,
         endDate:end,
         originalStartDate:event.startDate,
@@ -138,25 +135,13 @@
         days:days
       };
       var saleStats=stats(days.filter(function(day){return day.hasRecord;}).map(function(day){return day.record;}),salesApi,category);
-      Object.assign(occurrence,saleStats,segment?{normalCount:0,normalAverageSales:null,normalRatio:null}:normalComparison(all,storeId,categoryId,occurrence,range,deps,category));
+      Object.assign(occurrence,saleStats,normalComparison(all,storeId,categoryId,occurrence,range,deps,category));
       occurrences.push(occurrence);
+
       if(!groupsBySummary[summary])groupsBySummary[summary]={summary:summary,occurrences:[],daysByDate:{}};
-      var group=groupsBySummary[summary];group.occurrences.push(occurrence);
+      var group=groupsBySummary[summary];
+      group.occurrences.push(occurrence);
       days.forEach(function(day){if(!group.daysByDate[day.date])group.daysByDate[day.date]=day;});
-    }
-    events.forEach(function(event){
-      var start=event.startDate<range.start?range.start:event.startDate,end=event.endDate>range.end?range.end:event.endDate;
-      if(start>end)return;
-      var segments=dedicatedSegments(event,categoryId,category&&category.name,eventsApi);
-      if(segments.length){
-        segments.forEach(function(segment){
-          var summary=typeof eventsApi.segmentSummary==='function'?eventsApi.segmentSummary(event.snapshot,segment):eventsApi.summary(event.snapshot,categoryId,category&&category.name);
-          addOccurrence(event,start,end,summary,function(date){return segmentRecordAt(all,storeId,date,event.id,segment.id,salesApi);},segment);
-        });
-        return;
-      }
-      var summary=eventsApi.summary(event.snapshot,categoryId,category&&category.name);
-      addOccurrence(event,start,end,summary,function(date){return recordAt(all,storeId,date,categoryId,salesApi);},null);
     });
 
     var groups=Object.keys(groupsBySummary).map(function(key){
@@ -188,8 +173,7 @@
     collect:collect,
     total:total,
     stats:stats,
-    categoryMatches:categoryMatches,
-    dedicatedSegments:dedicatedSegments
+    categoryMatches:categoryMatches
   };
   if(typeof module!=='undefined'&&module.exports)module.exports=model;
   root.InsightSaleResults=model;
