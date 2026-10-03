@@ -24,7 +24,7 @@ test('売上・客数・廃棄の3ページを同じ操作方法へ統一する'
   assert.match(source,/className='sc-toolbar insight-input-period-toolbar'/);
   assert.match(source,/‹ 前月/);
   assert.match(source,/翌月 ›/);
-  assert.doesNotMatch(source,/今月へ|年月を選択|insightSalesPeriodOverlay|data-month/);
+  assert.doesNotMatch(source,/今月へ|年月を選択|insightSalesPeriodOverlay|data-month|hideLegacy|legacy-hidden|setTimeout|MutationObserver/);
 });
 
 test('未登録年度は販売数入力と同じ年度追加確認を経由する',()=>{
@@ -32,6 +32,14 @@ test('未登録年度は販売数入力と同じ年度追加確認を経由す�
   assert.match(source,/年度はダッシュボードに登録されていません/);
   assert.match(source,/InsightYearManager\.promoteCurrent/);
   assert.match(source,/既にある過去データは保持したまま/);
+});
+
+test('旧年月UIを後から隠さず、入力ページ更新フックで同期的に新UIを更新する',()=>{
+  const source=fs.readFileSync(path.join(__dirname,'..','insight_sales_period_selector_v1.js'),'utf8');
+  assert.match(source,/input:table:after/);
+  assert.match(source,/syncConfig\(config\)/);
+  assert.match(source,/removeLegacyPlaceholders/);
+  assert.doesNotMatch(source,/hideLegacy|legacy-hidden|setTimeout|queueMicrotask|MutationObserver/);
 });
 
 test('期間変更は既存同期処理を利用し保存処理を再実装しない',()=>{

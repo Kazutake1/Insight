@@ -24,15 +24,16 @@ async function selectDashboardSeptember(page){
   await expect.poll(()=>page.evaluate(()=>selMonth)).toBe('9月');
 }
 
-test.only('旧年月UIの本体描画ソースを診断する',async({page})=>{
-  await openInsight(page);
-  const probe=await page.evaluate(()=>window.__INSIGHT_PERIOD_SOURCE_PROBE__||null);
-  console.log('INSIGHT_PERIOD_SOURCE_PROBE',JSON.stringify(probe));
-  expect(probe).toBeTruthy();
-});
-
 test('売上・客数・廃棄は販売数入力と同じ前月・年月・翌月の操作に統一される',async({page})=>{
   const errors=await openInsight(page);
+  const legacyRenderer=await page.evaluate(()=>initInputPage.toString());
+  expect(legacyRenderer).not.toContain('iytab');
+  expect(legacyRenderer).not.toContain('mtab');
+  expect(legacyRenderer).not.toContain('add-year-form');
+  expect(legacyRenderer).not.toContain('salesYearRow');
+  expect(legacyRenderer).not.toContain('salesMonthTabs');
+  expect(legacyRenderer).toContain('renderTable(type)');
+
   const year=await page.evaluate(()=>Number(allStores.stores[allStores.current].years.map(Number).sort((a,b)=>a-b).slice(-1)[0]));
 
   for(const spec of [
@@ -64,6 +65,11 @@ test('売上・客数・廃棄は販売数入力と同じ前月・年月・翌�
       }).length;
     },spec.page);
     expect(legacyVisible).toBe(0);
+    const oldContainers=await page.evaluate(type=>{
+      const ids=type==='sales'?['salesYearRow','salesMonthTabs']:type==='kyaku'?['kyakuYearRow','kyakuMonthTabs']:['haikiYearRow','haikiMonthTabs'];
+      return ids.filter(id=>document.getElementById(id)).length;
+    },spec.type);
+    expect(oldContainers).toBe(0);
   }
 
   await page.locator('#navSalesCount').click();
@@ -103,7 +109,7 @@ test('選択月は主要ページを横断しても維持される',async({page}
 test('トップページはビルド番号を持ち最新版確認をno-storeで行う',async({page})=>{
   const errors=await openInsight(page);
   const source=await page.evaluate(()=>fetch('/Index.html?e2e-shell-check=1',{cache:'no-store'}).then(r=>r.text()));
-  expect(source).toContain('name="insight-shell-version" content="20261003-input-period-parity-2"');
+  expect(source).toContain('name="insight-shell-version" content="20261003-input-period-source-1"');
   expect(source).toContain("fetch('./Index.html?insight_probe='+Date.now(),{cache:'no-store'})");
   expect(source).toContain("location.replace('./Index.html?insight_build='+encodeURIComponent(m[1]))");
   expect(errors).toEqual([]);

@@ -5,19 +5,6 @@
 (function(root){
 'use strict';
 function apply(html){
-  try{
-    function around(token,radius){
-      var i=html.indexOf(token);
-      return i<0?null:html.slice(Math.max(0,i-radius),Math.min(html.length,i+radius));
-    }
-    root.__INSIGHT_PERIOD_SOURCE_PROBE__={
-      renderYearPills:around('function renderYearPills',5000),
-      initInputPage:around('function initInputPage',9000),
-      editMonthType:around('editMonth[type]',5000),
-      yearPill:around('year-pill',3000),
-      monthPill:around('month-pill',3000)
-    };
-  }catch(_){}
   function patch(search,replacement){
     if(html.indexOf(search)<0){
       throw new Error('Insight互換パッチの適用対象が見つかりません: '+String(search).slice(0,80));
@@ -48,6 +35,16 @@ patch("<div class=\"modal-bg\" id=\"modalBg\">\n  <div class=\"modal\">\n    <h2
 patch("let yearToDelete=null;\n",'');
 patch("function showDeleteYear(y){yearToDelete=y;\n  document.getElementById(\"modalMsg\").textContent=`${y}年のデータはすべて削除されます。この操作は元に戻せません。`;\n  document.getElementById(\"modalBg\").classList.add(\"show\");}\nfunction closeModal(){yearToDelete=null;document.getElementById(\"modalBg\").classList.remove(\"show\");}\nfunction confirmDeleteYear(){\n  if(!yearToDelete)return;\n  store.years=store.years.filter(y=>y!==yearToDelete);delete store.data[yearToDelete];\n  if(baseYear===yearToDelete)baseYear=store.years[store.years.length-1]||null;\n  if(cmpYear===yearToDelete)cmpYear=null;\n  [\"sales\",\"kyaku\",\"haiki\"].forEach(t=>{if(editYear[t]===yearToDelete)editYear[t]=baseYear||store.years[0];});\n  persist();closeModal();renderYearPills();\n  if(currentNav===1)refreshDash();else if(currentNav>1)initInputPage([\"\",\"\",\"sales\",\"kyaku\",\"haiki\"][currentNav]);\n}\n",'');
 patch("    if(store.years.length>1){\n      const del=document.createElement(\"button\");del.className=\"btn-del-year\";del.textContent=\"✕\";\n      del.onclick=()=>showDeleteYear(y);wrap.appendChild(del);\n    }\n",'');
+
+  // Input pages: remove the legacy year pills, inline year-add form and 12 month tabs before the payload executes.
+  // The replacement period UI is owned by insight_sales_period_selector_v1.js and matches sales-count navigation.
+  var legacyInputPeriodStart='  const yrId={sales:"salesYearRow",kyaku:"kyakuYearRow",haiki:"haikiYearRow"}[type];';
+  var legacyInputPeriodEnd='  renderTable(type);\n}';
+  var legacyInputStartAt=html.indexOf(legacyInputPeriodStart);
+  if(legacyInputStartAt<0)throw new Error('入力ページ旧年月UIの開始位置が見つかりません');
+  var legacyInputEndAt=html.indexOf(legacyInputPeriodEnd,legacyInputStartAt);
+  if(legacyInputEndAt<0)throw new Error('入力ページ旧年月UIの終了位置が見つかりません');
+  html=html.slice(0,legacyInputStartAt)+html.slice(legacyInputEndAt);
 
   return html;
 }

@@ -1,4 +1,4 @@
-/* Input period controls v2: match sales-count previous/next month controls on sales, customers and waste pages. */
+/* Input period controls v3: sales-count style navigation for sales, customers and waste pages. */
 (function(root){
   'use strict';
   if(root.InsightInputPeriodControls)return;
@@ -22,7 +22,7 @@
   }
 
   var model={
-    VERSION:2,
+    VERSION:3,
     monthNumber:monthNumber,
     validYear:validYear,
     shiftPeriod:shiftPeriod,
@@ -33,24 +33,25 @@
   root.InsightSalesPeriodSelector=model;
   if(!root.document)return;
 
-  var doc=root.document,scheduled=false;
+  var doc=root.document;
   var configs=[
-    {type:'sales',nav:2,pageId:'pageSales',label:'売上'},
-    {type:'kyaku',nav:3,pageId:'pageKyaku',label:'客数'},
-    {type:'haiki',nav:4,pageId:'pageHaiki',label:'廃棄'}
+    {type:'sales',pageId:'pageSales',yearId:'salesYearRow',monthId:'salesMonthTabs',label:'売上'},
+    {type:'kyaku',pageId:'pageKyaku',yearId:'kyakuYearRow',monthId:'kyakuMonthTabs',label:'客数'},
+    {type:'haiki',pageId:'pageHaiki',yearId:'haikiYearRow',monthId:'haikiMonthTabs',label:'廃棄'}
   ];
 
   var css=doc.createElement('style');
   css.id='insightInputPeriodControlsStyle';
-  css.textContent='.insight-input-period-legacy-hidden{display:none!important}.insight-input-period-toolbar{margin-bottom:10px}';
+  css.textContent='.insight-input-period-toolbar{margin-bottom:10px}';
   doc.head.appendChild(css);
 
   function currentStore(){
     try{return typeof allStores!=='undefined'&&allStores&&allStores.stores?allStores.stores[allStores.current]:null;}catch(_){return null;}
   }
   function registered(year){
-    if(!root.InsightYearManager)return false;
-    if(typeof root.InsightYearManager.isCurrentRegistered==='function')return root.InsightYearManager.isCurrentRegistered(String(year));
+    if(root.InsightYearManager&&typeof root.InsightYearManager.isCurrentRegistered==='function'){
+      return root.InsightYearManager.isCurrentRegistered(String(year));
+    }
     var st=currentStore();
     return !!(st&&Array.isArray(st.years)&&st.years.some(function(value){return String(value)===String(year);}));
   }
@@ -82,64 +83,12 @@
     try{if(typeof MONTHS!=='undefined'&&Array.isArray(MONTHS)&&MONTHS[month-1])return MONTHS[month-1];}catch(_){}
     return String(month)+'月';
   }
-  function apply(config,year,month){
-    year=validYear(year);month=monthNumber(month);
-    if(!year||!month)return false;
-    if(!ensureRegisteredYear(year,config.label))return false;
-    try{
-      if(root.InsightPagePeriodSync&&typeof root.InsightPagePeriodSync.setTarget==='function'&&typeof root.InsightPagePeriodSync.syncCurrentPage==='function'){
-        root.InsightPagePeriodSync.setTarget({year:year,month:month,source:'inputPeriodControls'});
-        root.InsightPagePeriodSync.syncCurrentPage();
-      }else{
-        editYear[config.type]=typeof editYear[config.type]==='number'?year:String(year);
-        editMonth[config.type]=monthLabel(month);
-        if(typeof initInputPage==='function')initInputPage(config.type);
-      }
-      scheduleSync();
-      return true;
-    }catch(_){return false;}
-  }
-  function change(config,delta){
-    var value=period(config),next=value&&shiftPeriod(value.year,value.month,delta);
-    return !!(next&&apply(config,next.year,next.month));
-  }
-
-  function text(node){return String(node&&node.textContent||'').trim();}
-  function directCommonParent(nodes){
-    if(!nodes.length)return null;
-    var parent=nodes[0].parentElement;
-    return parent&&nodes.every(function(node){return node.parentElement===parent;})?parent:null;
-  }
-  function safeContainer(node,page){
-    return !!(node&&node!==page&&!node.classList.contains('page-header')&&!node.classList.contains('table-card')&&!node.closest('.insight-input-period-toolbar'));
-  }
-  function hideLegacy(config){
-    var page=doc.getElementById(config.pageId);if(!page)return;
-    var controls=Array.prototype.filter.call(page.querySelectorAll('button,[role="button"]'),function(node){
-      return !node.closest('.insight-input-period-toolbar');
+  function removeLegacyPlaceholders(config){
+    [config.yearId,config.monthId].forEach(function(id){
+      var node=doc.getElementById(id);
+      if(node)node.remove();
     });
-    var years=controls.filter(function(node){return /^\d{4}年$/.test(text(node));});
-    var months=controls.filter(function(node){return /^(?:[1-9]|1[0-2])月$/.test(text(node));});
-    var yearParent=directCommonParent(years),monthParent=directCommonParent(months);
-    if(safeContainer(yearParent,page))yearParent.classList.add('insight-input-period-legacy-hidden');
-    else years.forEach(function(node){node.classList.add('insight-input-period-legacy-hidden');});
-    if(safeContainer(monthParent,page))monthParent.classList.add('insight-input-period-legacy-hidden');
-    else months.forEach(function(node){node.classList.add('insight-input-period-legacy-hidden');});
-
-    if(!safeContainer(yearParent,page)){
-      Array.prototype.forEach.call(page.querySelectorAll('input'),function(input){
-        var hint=String(input.placeholder||'')+' '+String(input.getAttribute('aria-label')||'');
-        if(/年度/.test(hint))input.classList.add('insight-input-period-legacy-hidden');
-      });
-      controls.forEach(function(button){
-        var value=text(button);
-        if(/年度追加/.test(value)||(value==='追加'&&button.parentElement&&button.parentElement.querySelector('input'))){
-          button.classList.add('insight-input-period-legacy-hidden');
-        }
-      });
-    }
   }
-
   function ensureToolbar(config){
     var page=doc.getElementById(config.pageId);if(!page)return null;
     var id='insightInputPeriodToolbar-'+config.type,toolbar=doc.getElementById(id);
@@ -157,24 +106,43 @@
     return toolbar;
   }
   function syncConfig(config){
-    var page=doc.getElementById(config.pageId);if(!page)return;
-    hideLegacy(config);
+    removeLegacyPlaceholders(config);
     var toolbar=ensureToolbar(config),value=period(config);
     if(!toolbar||!value)return;
     toolbar.querySelector('[data-period-current]').textContent=String(value.year)+'年 '+String(value.month)+'月';
   }
   function syncAll(){configs.forEach(syncConfig);}
-  function scheduleSync(){
-    if(scheduled)return;
-    scheduled=true;
-    setTimeout(function(){scheduled=false;syncAll();},0);
+
+  function apply(config,year,month){
+    year=validYear(year);month=monthNumber(month);
+    if(!year||!month)return false;
+    if(!ensureRegisteredYear(year,config.label))return false;
+    try{
+      if(root.InsightPagePeriodSync&&typeof root.InsightPagePeriodSync.setTarget==='function'&&typeof root.InsightPagePeriodSync.syncCurrentPage==='function'){
+        root.InsightPagePeriodSync.setTarget({year:year,month:month,source:'inputPeriodControls'});
+        root.InsightPagePeriodSync.syncCurrentPage();
+      }else{
+        editYear[config.type]=typeof editYear[config.type]==='number'?year:String(year);
+        editMonth[config.type]=monthLabel(month);
+        if(typeof initInputPage==='function')initInputPage(config.type);
+      }
+      syncConfig(config);
+      return true;
+    }catch(_){return false;}
+  }
+  function change(config,delta){
+    var value=period(config),next=value&&shiftPeriod(value.year,value.month,delta);
+    return !!(next&&apply(config,next.year,next.month));
   }
 
   if(root.InsightHooks){
     root.InsightHooks.on('input:table:after','input-period-controls',function(ctx){
-      if(['sales','kyaku','haiki'].indexOf(ctx.args[0])>=0)scheduleSync();
+      var type=ctx.args[0];
+      var config=configs.find(function(item){return item.type===type;});
+      if(config)syncConfig(config);
     },60);
   }
+
   model.apply=apply;
   model.change=change;
   model.sync=syncAll;

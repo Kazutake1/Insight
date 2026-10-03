@@ -17,7 +17,7 @@ test('payload互換パッチ11件はbootstrap moduleへ分離しIndexにはbody�
 
 test('トップページはキャッシュ抑止とビルド自己更新を持つ',()=>{
   const index=read('Index.html');
-  assert.match(index,/insight-shell-version" content="20261003-input-period-parity-2/);
+  assert.match(index,/insight-shell-version" content="20261003-input-period-source-1/);
   assert.match(index,/Cache-Control" content="no-cache, no-store, must-revalidate/);
   assert.match(index,/insight_probe=/);
   assert.match(index,/cache:'no-store'/);
@@ -293,22 +293,28 @@ test('全分析バンドルは履歴の後・AI解釈の前に読み込み外部
   assert.doesNotThrow(()=>new vm.Script(bundle),'analysis bundle module must be valid JavaScript');
 });
 
-test('売上・客数・廃棄の年月変更は販売数入力と同じ前月・年月・翌月方式を使う',()=>{
+test('売上・客数・廃棄の旧年月UIは本体実行前に削除し販売数入力方式だけを使う',()=>{
   const index=read('Index.html');
   const controls=read('insight_sales_period_selector_v1.js');
-  assert.match(index,/insight_sales_period_selector_v1\.js\?v=20261003-input-period-parity-2/);
+  const bootstrap=read('insight_bootstrap_patches_v1.js');
+  assert.match(index,/insight_bootstrap_patches_v1\.js\?v=20261003-input-period-source-1/);
+  assert.match(index,/insight_sales_period_selector_v1\.js\?v=20261003-input-period-source-1/);
   assert.ok(index.indexOf('insight_page_period_sync_v1.js')<index.indexOf('insight_sales_period_selector_v1.js'));
+  assert.match(bootstrap,/legacyInputPeriodStart/);
+  assert.match(bootstrap,/入力ページ旧年月UIの開始位置が見つかりません/);
   assert.match(controls,/pageId:'pageSales'/);
   assert.match(controls,/pageId:'pageKyaku'/);
   assert.match(controls,/pageId:'pageHaiki'/);
   assert.match(controls,/sc-toolbar insight-input-period-toolbar/);
   assert.match(controls,/‹ 前月/);
   assert.match(controls,/翌月 ›/);
-  assert.doesNotMatch(controls,/今月へ|年月を選択|insightSalesPeriodOverlay/);
+  assert.match(controls,/removeLegacyPlaceholders/);
+  assert.doesNotMatch(controls,/hideLegacy|legacy-hidden|setTimeout|MutationObserver|今月へ|年月を選択|insightSalesPeriodOverlay/);
   assert.match(controls,/InsightYearManager\.promoteCurrent/);
   assert.match(controls,/InsightPagePeriodSync\.setTarget/);
   assert.doesNotMatch(controls,/localStorage|InsightStorage\.writeSnapshot|InsightStorage\.transaction|\bfetch\s*\(|XMLHttpRequest|WebSocket/);
   assert.doesNotThrow(()=>new vm.Script(controls),'input period controls must be valid JavaScript');
+  assert.doesNotThrow(()=>new vm.Script(bootstrap),'bootstrap patches must be valid JavaScript');
 });
 
 test('保存データ健全性チェックは読み取り専用で不整合を可視化する',()=>{
