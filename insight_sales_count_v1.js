@@ -17,7 +17,7 @@
     if(!object(all.salesCountManagement))all.salesCountManagement={version:1,categories:copy(DEFAULT_CATEGORIES)};
     if(!Array.isArray(all.salesCountManagement.categories))all.salesCountManagement.categories=copy(DEFAULT_CATEGORIES);
     all.salesCountManagement.categories.forEach(function(category){if(!Array.isArray(category.aliases))category.aliases=[];if(!Array.isArray(category.activeTrips)||category.activeTrips.length!==3)category.activeTrips=[true,true,true];else category.activeTrips=category.activeTrips.map(function(v){return v!==false;});});
-    Object.keys(all.stores||{}).forEach(function(id){if(!object(all.stores[id].salesCounts))all.stores[id].salesCounts={};});
+    Object.keys(all.stores||{}).forEach(function(id){if(!object(all.stores[id].salesCounts))all.stores[id].salesCounts={};if(!object(all.stores[id].saleSegmentCounts))all.stores[id].saleSegmentCounts={};});
     return all;
   }
   function categoriesForSale(all,sale){
@@ -27,6 +27,7 @@
   }
   function categoryForSale(all,sale){return categoriesForSale(all,sale)[0]||null;}
   function emptyRecord(){return {trips:[{delivery:null,sales:null},{delivery:null,sales:null},{delivery:null,sales:null}]};}
+  function saleSegmentRecordAt(all,storeId,date,eventId,segmentId){ensure(all);var store=all.stores&&all.stores[storeId],value=store&&store.saleSegmentCounts&&store.saleSegmentCounts[date]&&store.saleSegmentCounts[date][eventId]&&store.saleSegmentCounts[date][eventId][segmentId];return value?normalizeRecord(value):emptyRecord();}
   function normalizeRecord(value){var out=emptyRecord(),src=value&&Array.isArray(value.trips)?value.trips:[];for(var i=0;i<3;i++){var t=src[i]||{};out.trips[i].delivery=t.delivery===null||t.delivery===undefined?null:Number(t.delivery);out.trips[i].sales=t.sales===null||t.sales===undefined?null:Number(t.sales);}return out;}
   function average(records,key,mask){
     mask=Array.isArray(mask)&&mask.length===3?mask:[true,true,true];
@@ -39,17 +40,21 @@
     ensure(all);var m=all.salesCountManagement,ids=new Set(),names=new Set(),labels=new Set();
     if(!object(m)||m.version!==1||!Array.isArray(m.categories)||!m.categories.length||!m.categories.some(function(c){return object(c)&&c.hidden===false;}))throw new Error('販売数カテゴリーマスターが不正です');
     m.categories.forEach(function(c){if(!object(c)||typeof c.id!=='string'||!c.id||ids.has(c.id)||typeof c.name!=='string'||!c.name.trim()||names.has(c.name)||typeof c.hidden!=='boolean'||!Array.isArray(c.aliases)||!Array.isArray(c.activeTrips)||c.activeTrips.length!==3||c.activeTrips.some(function(v){return typeof v!=='boolean';})||!c.activeTrips.some(Boolean))throw new Error('販売数カテゴリーが不正です');var values=[c.name].concat(c.aliases);if(values.some(function(v){return typeof v!=='string'||!v.trim()||labels.has(v);}))throw new Error('販売数カテゴリーの名称履歴が重複しています');values.forEach(function(v){labels.add(v);});ids.add(c.id);names.add(c.name);});
-    Object.keys(all.stores||{}).forEach(function(storeId){var data=all.stores[storeId].salesCounts;if(!object(data))throw new Error('販売数データが不正です');Object.keys(data).forEach(function(date){if(!validDateKey(date)||!object(data[date]))throw new Error('販売数の日付データが不正です');Object.keys(data[date]).forEach(function(catId){if(!ids.has(catId))throw new Error('販売数カテゴリーの識別番号が不正です');var r=data[date][catId];if(!object(r)||!Array.isArray(r.trips)||r.trips.length!==3)throw new Error('販売数の便データが不正です');r.trips.forEach(function(t){if(!object(t))throw new Error('販売数の便データが不正です');['delivery','sales'].forEach(function(k){var v=t[k];if(v!==null&&(!Number.isSafeInteger(v)||v<0))throw new Error('販売数の入力値が不正です');});});});});});
+    Object.keys(all.stores||{}).forEach(function(storeId){
+      function validateRecord(r,label){if(!object(r)||!Array.isArray(r.trips)||r.trips.length!==3)throw new Error(label+'の便データが不正です');r.trips.forEach(function(t){if(!object(t))throw new Error(label+'の便データが不正です');['delivery','sales'].forEach(function(k){var v=t[k];if(v!==null&&(!Number.isSafeInteger(v)||v<0))throw new Error(label+'の入力値が不正です');});});}
+      var data=all.stores[storeId].salesCounts;if(!object(data))throw new Error('販売数データが不正です');Object.keys(data).forEach(function(date){if(!validDateKey(date)||!object(data[date]))throw new Error('販売数の日付データが不正です');Object.keys(data[date]).forEach(function(catId){if(!ids.has(catId))throw new Error('販売数カテゴリーの識別番号が不正です');validateRecord(data[date][catId],'販売数');});});
+      var segmentData=all.stores[storeId].saleSegmentCounts;if(!object(segmentData))throw new Error('セール実績区分データが不正です');Object.keys(segmentData).forEach(function(date){if(!validDateKey(date)||!object(segmentData[date]))throw new Error('セール実績区分の日付データが不正です');Object.keys(segmentData[date]).forEach(function(eventId){if(typeof eventId!=='string'||!eventId||!object(segmentData[date][eventId]))throw new Error('セール実績区分のイベント識別番号が不正です');Object.keys(segmentData[date][eventId]).forEach(function(segmentId){if(typeof segmentId!=='string'||!segmentId)throw new Error('セール実績区分識別番号が不正です');validateRecord(segmentData[date][eventId][segmentId],'セール実績区分');});});});
+    });
     return all;
   }
-  var model={ensure:ensure,validate:validate,categoryForSale:categoryForSale,categoriesForSale:categoriesForSale,emptyRecord:emptyRecord,normalizeRecord:normalizeRecord,average:average,activeTrips:activeTrips,tripActive:tripActive,validDateKey:validDateKey,uniqueSaleRecords:uniqueSaleRecords};
+  var model={ensure:ensure,validate:validate,categoryForSale:categoryForSale,categoriesForSale:categoriesForSale,emptyRecord:emptyRecord,normalizeRecord:normalizeRecord,saleSegmentRecordAt:saleSegmentRecordAt,average:average,activeTrips:activeTrips,tripActive:tripActive,validDateKey:validDateKey,uniqueSaleRecords:uniqueSaleRecords};
   if(typeof module!=='undefined'&&module.exports)module.exports=model;
   if(!root.document)return;
   root.InsightSalesCount=model;
 
   function init(){
     if(root.__insightSalesCountV1)return;root.__insightSalesCountV1=true;ensure(allStores);
-    var doc=root.document,state={year:String(new Date().getFullYear()),month:new Date().getMonth()+1,categoryId:null,draft:{},dirty:false};
+    var doc=root.document,state={year:String(new Date().getFullYear()),month:new Date().getMonth()+1,categoryId:null,draft:{},segmentDraft:{},dirty:false};
     function el(tag,text,cls){var n=doc.createElement(tag);if(text!==undefined)n.textContent=text;if(cls)n.className=cls;return n;}
     function pad(v){return String(v).padStart(2,'0');}
     function monthPrefix(){return state.year+'-'+pad(state.month);}
@@ -61,17 +66,22 @@
     function confirmLeave(){return !state.dirty||confirm('販売数入力に未保存の変更があります。\n保存せずに移動しますか？');}
     function yearRegistered(year){return !!(root.InsightYearManager&&typeof root.InsightYearManager.isRegistered==='function'&&root.InsightYearManager.isRegistered(store,String(year)));}
     function ensureRegisteredYear(year){var y=String(year);if(yearRegistered(y))return true;if(!root.InsightYearManager||typeof root.InsightYearManager.promoteCurrent!=='function'){alert('この年度を追加する機能を使用できません。');return false;}if(!confirm(y+'年度はダッシュボードに登録されていません。\n年度を追加して販売数を入力しますか？\n\n既にある過去データは保持したまま、未入力日を正常な空データで補完します。'))return false;try{root.InsightYearManager.promoteCurrent(y);store=allStores.stores[allStores.current];if(typeof renderYearPills==='function')renderYearPills();if(typeof showToast==='function')showToast('✓ '+y+'年度を追加しました','#15803d','#f0fdf4');return true;}catch(error){alert('年度を追加できませんでした。\n'+(error&&error.message?error.message:error));return false;}}
-    function readMonth(){state.draft={};var prefix=monthPrefix(),data=store.salesCounts||{};Object.keys(data).forEach(function(date){if(date.slice(0,7)===prefix&&data[date][state.categoryId])state.draft[date]=normalizeRecord(data[date][state.categoryId]);});setDirty(false);}
+    function readMonth(){state.draft={};state.segmentDraft={};var prefix=monthPrefix(),data=store.salesCounts||{},segmentData=store.saleSegmentCounts||{};Object.keys(data).forEach(function(date){if(date.slice(0,7)===prefix&&data[date][state.categoryId])state.draft[date]=normalizeRecord(data[date][state.categoryId]);});Object.keys(segmentData).forEach(function(date){if(date.slice(0,7)===prefix)state.segmentDraft[date]=copy(segmentData[date]);});setDirty(false);}
     function record(date){return state.draft[date]||(state.draft[date]=emptyRecord());}
+    function segmentRecord(date,eventId,segmentId){if(!state.segmentDraft[date])state.segmentDraft[date]={};if(!state.segmentDraft[date][eventId])state.segmentDraft[date][eventId]={};return state.segmentDraft[date][eventId][segmentId]||(state.segmentDraft[date][eventId][segmentId]=emptyRecord());}
     function total(r,key,mask){mask=Array.isArray(mask)&&mask.length===3?mask:activeTrips(selectedCategory());var indexes=[0,1,2].filter(function(i){return mask[i]!==false;});var values=indexes.map(function(i){return r.trips[i][key];});return values.every(function(v){return v===null;})?null:values.reduce(function(sum,v){return sum+(v===null?0:v);},0);}
     function fmt(v){return v===null?'—':Number(v).toFixed(1).replace(/\.0$/,'');}
-    function persistTransaction(next){if(!root.InsightStorage)throw new Error('保存機能を初期化できませんでした。');validate(next);root.InsightStorage.writeSnapshot(next);allStores.salesCountManagement=next.salesCountManagement;Object.keys(next.stores).forEach(function(id){allStores.stores[id].salesCounts=next.stores[id].salesCounts;});store=allStores.stores[allStores.current];}
+    function persistTransaction(next){if(!root.InsightStorage)throw new Error('保存機能を初期化できませんでした。');validate(next);root.InsightStorage.writeSnapshot(next);allStores.salesCountManagement=next.salesCountManagement;Object.keys(next.stores).forEach(function(id){allStores.stores[id].salesCounts=next.stores[id].salesCounts;allStores.stores[id].saleSegmentCounts=next.stores[id].saleSegmentCounts;});store=allStores.stores[allStores.current];}
     function save(){
       if(!ensureRegisteredYear(state.year))return;
       var invalid=doc.querySelector('#pageSalesCount input:invalid');if(invalid){invalid.reportValidity();invalid.focus();return;}
       var mask=activeTrips(selectedCategory()),large=[];Object.keys(state.draft).forEach(function(date){state.draft[date].trips.forEach(function(t,i){if(mask[i]===false)return;['delivery','sales'].forEach(function(k){if(t[k]>=1000)large.push(date+' '+(i+1)+'便 '+(k==='delivery'?'納品':'販売')+' '+t[k]);});});});
+      Object.keys(state.segmentDraft).forEach(function(date){Object.keys(state.segmentDraft[date]||{}).forEach(function(eventId){Object.keys(state.segmentDraft[date][eventId]||{}).forEach(function(segmentId){normalizeRecord(state.segmentDraft[date][eventId][segmentId]).trips.forEach(function(t,i){if(mask[i]===false)return;['delivery','sales'].forEach(function(k){if(t[k]>=1000)large.push(date+' セール実績区分 '+(i+1)+'便 '+(k==='delivery'?'納品':'販売')+' '+t[k]);});});});});});
       if(large.length&&!confirm('4桁以上の入力があります。内容を確認して保存しますか？\n\n'+large.slice(0,8).join('\n')+(large.length>8?'\nほか '+(large.length-8)+'件':'')))return;
-      try{var next=copy(allStores);ensure(next);var nextStore=next.stores[allStores.current],prefix=monthPrefix();Object.keys(nextStore.salesCounts).forEach(function(date){if(date.slice(0,7)===prefix&&nextStore.salesCounts[date][state.categoryId]){delete nextStore.salesCounts[date][state.categoryId];if(!Object.keys(nextStore.salesCounts[date]).length)delete nextStore.salesCounts[date];}});Object.keys(state.draft).forEach(function(date){var r=normalizeRecord(state.draft[date]);if(r.trips.some(function(t){return t.delivery!==null||t.sales!==null;})){if(!nextStore.salesCounts[date])nextStore.salesCounts[date]={};nextStore.salesCounts[date][state.categoryId]=r;}});persistTransaction(next);setDirty(false);showToast('✓ 販売数を保存しました','#15803d','#f0fdf4');renderAnalysis();}catch(e){alert('販売数を保存できませんでした。\n'+e.message);}
+      try{var next=copy(allStores);ensure(next);var nextStore=next.stores[allStores.current],prefix=monthPrefix();Object.keys(nextStore.salesCounts).forEach(function(date){if(date.slice(0,7)===prefix&&nextStore.salesCounts[date][state.categoryId]){delete nextStore.salesCounts[date][state.categoryId];if(!Object.keys(nextStore.salesCounts[date]).length)delete nextStore.salesCounts[date];}});Object.keys(state.draft).forEach(function(date){var r=normalizeRecord(state.draft[date]);if(r.trips.some(function(t){return t.delivery!==null||t.sales!==null;})){if(!nextStore.salesCounts[date])nextStore.salesCounts[date]={};nextStore.salesCounts[date][state.categoryId]=r;}});
+      Object.keys(nextStore.saleSegmentCounts).forEach(function(date){if(date.slice(0,7)===prefix)delete nextStore.saleSegmentCounts[date];});
+      Object.keys(state.segmentDraft).forEach(function(date){var eventOut={};Object.keys(state.segmentDraft[date]||{}).forEach(function(eventId){var segmentOut={};Object.keys(state.segmentDraft[date][eventId]||{}).forEach(function(segmentId){var r=normalizeRecord(state.segmentDraft[date][eventId][segmentId]);if(r.trips.some(function(t){return t.delivery!==null||t.sales!==null;}))segmentOut[segmentId]=r;});if(Object.keys(segmentOut).length)eventOut[eventId]=segmentOut;});if(Object.keys(eventOut).length)nextStore.saleSegmentCounts[date]=eventOut;});
+      persistTransaction(next);setDirty(false);showToast('✓ 販売数を保存しました','#15803d','#f0fdf4');renderAnalysis();renderSaleSegments();}catch(e){alert('販売数を保存できませんでした。\n'+e.message);}
     }
     function notifyPeriodChange(){
       try{root.dispatchEvent(new CustomEvent('insight:sales-count-period-change',{detail:{year:state.year,month:state.month}}));}catch(_){}
