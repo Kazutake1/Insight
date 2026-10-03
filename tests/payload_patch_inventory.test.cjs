@@ -439,7 +439,8 @@ test('イベント実績は過去開催・日付カード・時間帯グラフ�
   assert.match(eventResults,/specialNames/);
   assert.match(eventResults,/\.er-toolbar \[hidden\]\{display:none!important\}/);
   assert.match(eventResults,/売上 /);
-  assert.match(eventResults,/Math\.trunc\(Number\(value\)\/1000\)\*1000/);
+  assert.match(eventResults,/Math\.trunc\(Number\(value\)\/1000\)/);
+  assert.match(eventResults,/\+'千円'/);
   assert.match(eventResults,/summaryMetric\('売上',salesYen\(/);
   assert.match(eventResults,/summaryMetric\('客単価',yen\(/);
   assert.match(eventResults,/客数 /);
@@ -454,7 +455,10 @@ test('イベント実績は過去開催・日付カード・時間帯グラフ�
   assert.match(eventResults,/\.er-hour-chart\{[^}]*gap:4px;[^}]*min-width:1340px/);
   assert.match(eventResults,/min-width:1340px/);
   assert.match(eventResults,/createReadOnlyDayCard/);
-  assert.match(eventResults,/カテゴリー別・便別実績/);
+  assert.match(eventResults,/カテゴリー実績/);
+  assert.doesNotMatch(eventResults,/カテゴリー別・便別実績/);
+  assert.match(eventResults,/grid-template-columns:repeat\(auto-fill,minmax\(230px,280px\)\)/);
+  assert.match(eventResults,/max-width:280px/);
   assert.match(eventResults,/hourly\.complete/);
   assert.doesNotMatch(eventResults,/廃棄額|廃棄率|暦日/);
   assert.doesNotMatch(eventResults,/localStorage|InsightStorage/);
