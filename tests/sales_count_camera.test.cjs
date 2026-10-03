@@ -25,7 +25,7 @@ test('画像は20MB以下のimageだけを受け付ける',()=>{
 });
 
 test('CAMERA-2は同一オリジンのローカルOCRを使用し画像を永続化しない',()=>{
-  assert.equal(camera.VERSION,10);
+  assert.equal(camera.VERSION,11);
   assert.deepEqual(camera.POLICY,{
     persistImages:false,
     externalTransmission:false,
@@ -139,6 +139,81 @@ test('固定表の数字セルは2回以上一致した値だけ採用する',()
   const unresolved=camera.fixedCellConsensus([a,b],slots);
   assert.equal(unresolved.cells.length,1);
   assert.equal(unresolved.unresolved,1);
+});
+
+test('日付が1日だけ欠落し列間隔が一致する場合だけ補完する',()=>{
+  const anchors=[
+    {iso:'2025-10-27',x:100,y:40},
+    {iso:'2025-10-29',x:300,y:40},
+    {iso:'2025-10-30',x:400,y:40},
+    {iso:'2025-10-31',x:500,y:40},
+    {iso:'2025-11-01',x:600,y:40},
+    {iso:'2025-11-02',x:700,y:40},
+    {iso:'2025-11-03',x:800,y:40}
+  ];
+  const recovered=camera.recoverSingleMissingDateAnchor(anchors);
+  assert.deepEqual(recovered.map(item=>item.iso),[
+    '2025-10-27','2025-10-28','2025-10-29','2025-10-30',
+    '2025-10-31','2025-11-01','2025-11-02','2025-11-03'
+  ]);
+  const inferred=recovered.find(item=>item.iso==='2025-10-28');
+  assert.equal(inferred.x,200);
+  assert.equal(inferred.recoveredDateGap,true);
+
+  const irregular=camera.recoverSingleMissingDateAnchor([
+    {iso:'2025-10-27',x:100,y:40},
+    {iso:'2025-10-29',x:245,y:40},
+    {iso:'2025-10-30',x:400,y:40},
+    {iso:'2025-10-31',x:500,y:40},
+    {iso:'2025-11-01',x:600,y:40}
+  ]);
+  assert.deepEqual(irregular.map(item=>item.iso),['2025-10-27','2025-10-29','2025-10-30','2025-10-31','2025-11-01']);
+});
+
+test('納品販売ラベルを読めなくてもカテゴリー直下の数値行Y座標から固定表を作る',()=>{
+  const w=(text,x,y,confidence=95)=>({text,confidence,bbox:{x0:x-8,y0:y-6,x1:x+8,y1:y+6}});
+  const lines=[
+    {index:0,text:'10/27 10/29 10/30 10/31 11/1 11/2 11/3',confidence:96,bbox:{x0:50,y0:28,x1:850,y1:52},words:[
+      w('10/27',100,40,98),w('10/29',300,40,98),w('10/30',400,40,98),w('10/31',500,40,98),w('11/1',600,40,98),w('11/2',700,40,98),w('11/3',800,40,98)
+    ]},
+    {index:1,text:'おにぎり',confidence:97,bbox:{x0:8,y0:88,x1:100,y1:112},words:[w('おにぎり',50,100,98)]},
+    {index:2,text:'xxxx',confidence:84,bbox:{x0:5,y0:122,x1:850,y1:140},words:[
+      w('10',66,131),w('20',100,131),w('30',134,131),
+      w('40',266,131),w('50',300,131),w('60',334,131),
+      w('70',366,131),w('80',400,131),w('90',434,131),
+      w('11',466,131),w('22',500,131),w('33',534,131),
+      w('44',566,131),w('55',600,131),w('66',634,131),
+      w('77',666,131),w('88',700,131),w('99',734,131),
+      w('12',766,131),w('23',800,131),w('34',834,131)
+    ]},
+    {index:3,text:'yyyy',confidence:83,bbox:{x0:5,y0:152,x1:850,y1:170},words:[
+      w('9',66,161),w('18',100,161),w('27',134,161),
+      w('36',266,161),w('45',300,161),w('54',334,161),
+      w('63',366,161),w('72',400,161),w('81',434,161),
+      w('14',466,161),w('25',500,161),w('35',534,161),
+      w('46',566,161),w('57',600,161),w('68',634,161),
+      w('79',666,161),w('89',700,161),w('98',734,161),
+      w('13',766,161),w('24',800,161),w('35',834,161)
+    ]},
+    {index:4,text:'zzzz',confidence:82,bbox:{x0:5,y0:182,x1:850,y1:200},words:[
+      w('1',66,191),w('2',100,191),w('3',134,191),w('4',266,191),w('5',300,191),w('6',334,191)
+    ]}
+  ];
+  const cats=[{id:'a',name:'おにぎり',aliases:[],hidden:false,activeTrips:[true,true,true]}];
+  const plan=camera.fixedGridPlan(lines,cats,'2025-11-01');
+  assert.ok(plan);
+  assert.deepEqual(plan.dates,[
+    '2025-10-27','2025-10-28','2025-10-29','2025-10-30',
+    '2025-10-31','2025-11-01','2025-11-02','2025-11-03'
+  ]);
+  assert.equal(plan.categories[0].delivery.source,'numeric-cluster');
+  assert.equal(plan.categories[0].sales.source,'numeric-cluster');
+  assert.equal(plan.categories[0].delivery.y,131);
+  assert.equal(plan.categories[0].sales.y,161);
+  const slots=camera.fixedGridSlots(plan);
+  assert.equal(slots.length,48);
+  assert.equal(slots.filter(slot=>slot.field==='delivery').length,24);
+  assert.equal(slots.filter(slot=>slot.field==='sales').length,24);
 });
 
 test('複数日画面は対象日の直接OCR失敗でも日付範囲から判定する',()=>{
