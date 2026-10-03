@@ -167,8 +167,7 @@
   function scheduleSync(){
     if(scheduled)return;
     scheduled=true;
-    var run=function(){scheduled=false;syncAll();};
-    if(typeof queueMicrotask==='function')queueMicrotask(run);else setTimeout(run,0);
+    setTimeout(function(){scheduled=false;syncAll();},0);
   }
 
   if(root.InsightHooks){
@@ -176,11 +175,6 @@
       if(['sales','kyaku','haiki'].indexOf(ctx.args[0])>=0)scheduleSync();
     },60);
   }
-  configs.forEach(function(config){
-    var page=doc.getElementById(config.pageId);
-    if(page&&typeof MutationObserver!=='undefined')new MutationObserver(scheduleSync).observe(page,{subtree:true,childList:true});
-  });
-
   model.apply=apply;
   model.change=change;
   model.sync=syncAll;

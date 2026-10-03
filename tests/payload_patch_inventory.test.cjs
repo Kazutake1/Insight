@@ -17,7 +17,7 @@ test('payload互換パッチ11件はbootstrap moduleへ分離しIndexにはbody�
 
 test('トップページはキャッシュ抑止とビルド自己更新を持つ',()=>{
   const index=read('Index.html');
-  assert.match(index,/insight-shell-version" content="20261003-input-period-parity-1/);
+  assert.match(index,/insight-shell-version" content="20261003-input-period-parity-2/);
   assert.match(index,/Cache-Control" content="no-cache, no-store, must-revalidate/);
   assert.match(index,/insight_probe=/);
   assert.match(index,/cache:'no-store'/);
@@ -296,7 +296,7 @@ test('全分析バンドルは履歴の後・AI解釈の前に読み込み外部
 test('売上・客数・廃棄の年月変更は販売数入力と同じ前月・年月・翌月方式を使う',()=>{
   const index=read('Index.html');
   const controls=read('insight_sales_period_selector_v1.js');
-  assert.match(index,/insight_sales_period_selector_v1\.js\?v=20261003-input-period-parity-1/);
+  assert.match(index,/insight_sales_period_selector_v1\.js\?v=20261003-input-period-parity-2/);
   assert.ok(index.indexOf('insight_page_period_sync_v1.js')<index.indexOf('insight_sales_period_selector_v1.js'));
   assert.match(controls,/pageId:'pageSales'/);
   assert.match(controls,/pageId:'pageKyaku'/);
