@@ -1,0 +1,11 @@
+Insight local OCR runtime
+
+Pinned packages:
+- tesseract.js 7.0.0
+- tesseract.js-core 7.0.0
+- @tesseract.js-data/jpn 1.0.0 (4.0.0_best_int/jpn.traineddata.gz)
+
+Runtime policy:
+- Assets are served from the same Insight origin.
+- OCR images are not uploaded to these projects or any external OCR service.
+- Tesseract language caching is disabled by Insight.
