@@ -12,7 +12,7 @@ test('old data receives safe defaults without changing existing store fields',()
   assert.deepEqual(all.salesCountManagement.categories.map(c=>c.name),['おにぎり','サンドイッチ','麺類']);
   assert.deepEqual(all.salesCountManagement.categories.map(c=>c.activeTrips),[[true,true,true],[true,true,true],[true,true,true]]);
   assert.deepEqual(all.stores.a.salesCounts,{});
-  assert.deepEqual(all.stores.a.saleSegmentCounts,{});
+  assert.equal(all.stores.a.saleSegmentCounts,undefined);
 });
 
 test('zero is averaged and null is excluded independently by trip',()=>{
