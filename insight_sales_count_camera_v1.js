@@ -1,4 +1,4 @@
-/* Sales-count camera capture v5: resilient multi-day local OCR, in-memory review only. */
+/* Sales-count camera capture v6: precision-first multi-day local OCR, in-memory review only. */
 (function(root){
   'use strict';
   if(root.InsightSalesCountCamera)return;
@@ -366,18 +366,36 @@
     return anchors;
   }
   function spatialDateAnchors(lines,referenceDate){
-    var rows=[];
+    var clusters=[];
     (Array.isArray(lines)?lines:[]).forEach(function(line,index){
-      var anchors=dateAnchorsForLine(line,index,referenceDate);
-      if(anchors.length)rows.push({anchors:anchors,y:lineCenterY(line)});
+      var anchors=dateAnchorsForLine(line,index,referenceDate).filter(function(anchor){return !anchor.approximate;});
+      if(!anchors.length)return;
+      var y=lineCenterY(line);
+      if(!Number.isFinite(y))return;
+      var cluster=clusters.find(function(item){return Math.abs(item.y-y)<=18;});
+      if(!cluster){cluster={y:y,anchors:[]};clusters.push(cluster);}
+      cluster.anchors.push.apply(cluster.anchors,anchors);
+      cluster.y=(cluster.y+y)/2;
     });
-    if(!rows.length)return [];
-    rows.sort(function(a,b){
-      if(b.anchors.length!==a.anchors.length)return b.anchors.length-a.anchors.length;
-      return (Number.isFinite(b.y)?b.y:-Infinity)-(Number.isFinite(a.y)?a.y:-Infinity);
+    if(!clusters.length)return [];
+    clusters.forEach(function(cluster){
+      var seen=new Set();
+      cluster.anchors=cluster.anchors.slice().sort(function(a,b){return a.x-b.x;}).filter(function(anchor){
+        if(seen.has(anchor.iso))return false;
+        seen.add(anchor.iso);
+        return true;
+      });
     });
-    var chosen=rows[0].anchors.slice().sort(function(a,b){return a.x-b.x;}),seen=new Set();
-    return chosen.filter(function(anchor){if(seen.has(anchor.iso))return false;seen.add(anchor.iso);return true;});
+    clusters.sort(function(a,b){return b.anchors.length-a.anchors.length||a.y-b.y;});
+    return clusters[0].anchors;
+  }
+  function dateSequenceFromLines(lines,referenceDate){
+    var best=[];
+    (Array.isArray(lines)?lines:[]).forEach(function(line){
+      var dates=extractDateCandidates(line&&line.text||'',referenceDate);
+      if(dates.length>best.length)best=dates;
+    });
+    return best;
   }
   function tripGroupsFromLineText(line,index){
     var text=normalizeText(line&&line.text).replace(/([123])\s*便/g,'$1');
@@ -397,7 +415,7 @@
     return groups;
   }
   function tripGroups(lines,firstCategoryY){
-    var rows=[];
+    var clusters=[];
     (Array.isArray(lines)?lines:[]).forEach(function(line,index){
       var y=lineCenterY(line);
       if(!Number.isFinite(y)||(Number.isFinite(firstCategoryY)&&y>=firstCategoryY-2))return;
@@ -407,16 +425,29 @@
       var groups=[];
       for(var i=0;i<=words.length-3;){
         if(words[i].text==='1'&&words[i+1].text==='2'&&words[i+2].text==='3'){
-          groups.push({x:(words[i].x+words[i+1].x+words[i+2].x)/3,tripXs:[words[i].x,words[i+1].x,words[i+2].x],y:y,lineIndex:Number.isInteger(line&&line.index)?line.index:index});
+          groups.push({x:(words[i].x+words[i+1].x+words[i+2].x)/3,tripXs:[words[i].x,words[i+1].x,words[i+2].x],y:y,lineIndex:Number.isInteger(line&&line.index)?line.index:index,approximate:false});
           i+=3;
         }else i++;
       }
       if(!groups.length)groups=tripGroupsFromLineText(line,index);
-      if(groups.length)rows.push({groups:groups,y:y});
+      if(!groups.length)return;
+      var cluster=clusters.find(function(item){return Math.abs(item.y-y)<=18;});
+      if(!cluster){cluster={y:y,groups:[]};clusters.push(cluster);}
+      cluster.groups.push.apply(cluster.groups,groups);
+      cluster.y=(cluster.y+y)/2;
     });
-    if(!rows.length)return [];
-    rows.sort(function(a,b){return b.groups.length-a.groups.length||b.y-a.y;});
-    return rows[0].groups;
+    if(!clusters.length)return [];
+    clusters.forEach(function(cluster){
+      cluster.groups=cluster.groups.slice().sort(function(a,b){return a.x-b.x;});
+      var dedup=[];
+      cluster.groups.forEach(function(group){
+        if(dedup.some(function(existing){return Math.abs(existing.x-group.x)<12;}))return;
+        dedup.push(group);
+      });
+      cluster.groups=dedup;
+    });
+    clusters.sort(function(a,b){return b.groups.length-a.groups.length||a.y-b.y;});
+    return clusters[0].groups;
   }
   function addIsoDays(iso,delta){
     var parts=targetDateParts(iso);
@@ -441,6 +472,14 @@
       var iso=addIsoDays(baseline.anchor.iso,index-baseline.index);
       return {iso:iso,x:group.x,y:baseline.anchor.y,raw:iso,confidence:baseline.anchor.confidence,lineIndex:baseline.anchor.lineIndex,inferred:index!==baseline.index,tripXs:group.tripXs.slice()};
     });
+  }
+  function metricLabelKind(value){
+    var text=compactForMatch(value),digit=text.search(/\d/);
+    var delivery=/(納品(?:数)?|納晶|納口)/.exec(text);
+    if(delivery&&((digit<0)||delivery.index<digit))return 'delivery';
+    var sales=/(販売(?:数)?|阪売|販壳|販充)/.exec(text);
+    if(sales&&((digit<0)||sales.index<digit))return 'sales';
+    return null;
   }
   function categoryAnchors(lines,categories){
     var active=(Array.isArray(categories)?categories:[]).filter(function(category){return category&&category.hidden!==true&&category.id&&category.name;});
@@ -473,40 +512,28 @@
     var anchors=(Array.isArray(dateAnchors)?dateAnchors:[]).slice().sort(function(a,b){return a.x-b.x;});
     if(!anchors.length)return [];
     var groups=tripGroups(lines,firstCategoryY);
-    var tripWords=spatialWords(lines).filter(function(word){
-      return /^[123]$/.test(word.text)&&word.y>(anchors[0].y+2)&&(!Number.isFinite(firstCategoryY)||word.y<firstCategoryY-2);
-    });
     return anchors.map(function(anchor,index){
       var prev=anchors[index-1],next=anchors[index+1];
       var left=prev?(prev.x+anchor.x)/2:(next?anchor.x-(next.x-anchor.x)/2:NaN);
       var right=next?(anchor.x+next.x)/2:(prev?anchor.x+(anchor.x-prev.x)/2:NaN);
       var nearestGroup=null,bestGroupDistance=Infinity;
-      groups.forEach(function(group){var distance=Math.abs(group.x-anchor.x);if(distance<bestGroupDistance){bestGroupDistance=distance;nearestGroup=group;}});
-      var tripXs=anchor.tripXs&&anchor.tripXs.length===3?anchor.tripXs.slice():(nearestGroup&&bestGroupDistance<Math.max(80,Number.isFinite(right-left)?(right-left)/2:80)?nearestGroup.tripXs.slice():[null,null,null]);
-      if(tripXs.some(function(value){return value===null;})){
-        var candidates=tripWords.filter(function(word){
-          if(Number.isFinite(left)&&word.x<left)return false;
-          if(Number.isFinite(right)&&word.x>=right)return false;
-          return true;
-        }).sort(function(a,b){return a.x-b.x;});
-        candidates.forEach(function(word){
-          var trip=Number(word.text)-1;
-          if(trip>=0&&trip<3&&tripXs[trip]===null)tripXs[trip]=word.x;
-        });
-      }
-      if(tripXs.some(function(value){return value===null;})){
-        if(Number.isFinite(left)&&Number.isFinite(right)){
-          var width=(right-left)/3;
-          for(var t=0;t<3;t++)if(tripXs[t]===null)tripXs[t]=left+width*(t+0.5);
-        }else{
-          var spacing=36;
-          tripXs=[anchor.x-spacing,anchor.x,anchor.x+spacing];
-        }
-      }
+      groups.forEach(function(group){
+        var distance=Math.abs(group.x-anchor.x);
+        if(distance<bestGroupDistance){bestGroupDistance=distance;nearestGroup=group;}
+      });
+      var tripXs=anchor.tripXs&&anchor.tripXs.length===3?anchor.tripXs.slice():(nearestGroup?nearestGroup.tripXs.slice():null);
+      if(!tripXs||tripXs.length!==3||tripXs.some(function(value){return !Number.isFinite(value);}))return null;
       if(!Number.isFinite(left))left=Math.min.apply(null,tripXs)-Math.max(18,(tripXs[2]-tripXs[0])/4);
       if(!Number.isFinite(right))right=Math.max.apply(null,tripXs)+Math.max(18,(tripXs[2]-tripXs[0])/4);
-      return {date:anchor.iso,x:anchor.x,left:left,right:right,tripXs:tripXs};
-    });
+      return {
+        date:anchor.iso,
+        x:anchor.x,
+        left:left,
+        right:right,
+        tripXs:tripXs,
+        approximate:!!anchor.approximate||!!(nearestGroup&&nearestGroup.approximate)
+      };
+    }).filter(Boolean);
   }
   function numericTextSequence(line){
     var text=normalizeText(line&&line.text),confidence=Number(line&&line.confidence),out=[],match;
@@ -531,18 +558,11 @@
     return rowNumberSequence(line).length;
   }
   function rowForCategory(lines,anchor,nextY,kind){
-    var rx=kind==='delivery'?/納\s*品(?:\s*数)?/:/販\s*売(?:\s*数)?/;
     var inRange=(Array.isArray(lines)?lines:[]).filter(function(line){
       var y=lineCenterY(line);
       return Number.isFinite(y)&&y>anchor.y&&(!Number.isFinite(nextY)||y<nextY);
     }).sort(function(a,b){return lineCenterY(a)-lineCenterY(b);});
-    var explicit=inRange.find(function(line){return rx.test(normalizeText(line.text));});
-    if(explicit)return explicit;
-    var numericRows=inRange.filter(function(line){
-      var text=normalizeText(line.text);
-      return numericWordCount(line)>=2&&!/廃\s*棄|欠\s*品/.test(text);
-    });
-    return kind==='delivery'?(numericRows[0]||null):(numericRows[1]||null);
+    return inRange.find(function(line){return metricLabelKind(line&&line.text)===kind;})||null;
   }
   function mapRowCells(row,columns,category,field){
     if(!row)return [];
@@ -565,7 +585,9 @@
           trip:trip+1,
           field:field,
           value:item.value,
-          confidence:item.confidence
+          confidence:item.confidence,
+          method:'bbox',
+          geometryApproximate:!!column.approximate
         });
       }
     });
@@ -594,7 +616,9 @@
               field:field,
               value:item.value,
               confidence:item.confidence,
-              fallback:true
+              fallback:true,
+              method:'line-sequence',
+              geometryApproximate:!!column.approximate
             });
           }
         });
@@ -606,9 +630,18 @@
     lines=Array.isArray(lines)?lines:[];
     var catAnchors=categoryAnchors(lines,categories);
     var firstCategoryY=catAnchors.length?catAnchors[0].y:NaN;
+    var groups=tripGroups(lines,firstCategoryY);
     var directDateAnchors=spatialDateAnchors(lines,referenceDate);
-    var dateAnchors=expandDateAnchorsWithTrips(directDateAnchors,tripGroups(lines,firstCategoryY));
+    var rowDates=dateSequenceFromLines(lines,referenceDate);
     var fallbackDates=extractDateCandidates(lines.map(function(line){return line.text;}).join('\n'),referenceDate);
+    var dateAnchors=directDateAnchors.slice();
+    if(rowDates.length&&groups.length&&rowDates.length===groups.length&&directDateAnchors.length!==groups.length){
+      dateAnchors=groups.map(function(group,index){
+        var exact=directDateAnchors.find(function(anchor){return anchor.iso===rowDates[index].iso;});
+        if(exact)return Object.assign({},exact,{x:group.x,tripXs:group.tripXs.slice(),approximate:!!group.approximate});
+        return {iso:rowDates[index].iso,x:group.x,y:group.y,raw:rowDates[index].raw,confidence:null,lineIndex:group.lineIndex,approximate:true,tripXs:group.tripXs.slice()};
+      });
+    }
     var dates=(dateAnchors.length?dateAnchors.map(function(anchor){return anchor.iso;}):fallbackDates.map(function(item){return item.iso;}));
     dates=Array.from(new Set(dates)).sort();
     var columns=dateColumns(dateAnchors,lines,firstCategoryY);
@@ -630,6 +663,55 @@
         dateAnchors.length&&!catAnchors.length?'登録カテゴリーの位置を確定できませんでした':null,
         dateAnchors.length&&catAnchors.length&&!cells.length?'納品数・販売数の位置を確定できませんでした':null
       ].filter(Boolean)
+    };
+  }
+  function consensusMultiDayResults(results){
+    results=(Array.isArray(results)?results:[]).filter(Boolean);
+    var dates=new Set(),categories=new Map(),groups=new Map(),warnings=[],disagreements=0,rejected=0;
+    results.forEach(function(result,resultIndex){
+      (result.dates||[]).forEach(function(date){dates.add(date);});
+      (result.categories||[]).forEach(function(category){if(category&&category.id&&!categories.has(category.id))categories.set(category.id,category);});
+      (result.warnings||[]).forEach(function(warning){warnings.push('OCR'+(resultIndex+1)+': '+warning);});
+      (result.cells||[]).forEach(function(cell){
+        var key=[cell.date,cell.categoryId,cell.trip,cell.field].join('|');
+        if(!groups.has(key))groups.set(key,[]);
+        groups.get(key).push(Object.assign({passIndex:resultIndex},cell));
+      });
+    });
+    var cells=[];
+    groups.forEach(function(candidates){
+      var values=new Map();
+      candidates.forEach(function(cell){
+        var key=String(cell.value);
+        if(!values.has(key))values.set(key,[]);
+        values.get(key).push(cell);
+      });
+      var agreed=Array.from(values.values()).filter(function(items){return items.length>=2;}).sort(function(a,b){return b.length-a.length;})[0]||null;
+      var chosen=null;
+      if(agreed){
+        var minConf=agreed.map(function(cell){return Number(cell.confidence);}).filter(Number.isFinite);
+        var confidence=minConf.length?Math.min.apply(null,minConf):null;
+        if(confidence===null||confidence>=75){
+          chosen=Object.assign({},agreed[0],{confidence:confidence,consensus:true});
+        }else rejected++;
+      }else if(values.size>1){
+        disagreements++;
+      }else if(candidates.length===1){
+        var only=candidates[0],conf=Number(only.confidence);
+        if(only.method==='bbox'&&!only.geometryApproximate&&Number.isFinite(conf)&&conf>=96){
+          chosen=Object.assign({},only,{consensus:false,strongSingle:true});
+        }else rejected++;
+      }else rejected++;
+      if(chosen)cells.push(chosen);
+    });
+    if(disagreements)warnings.push('OCR方式間で値が一致しない '+disagreements+'項目は空欄にしました');
+    if(rejected)warnings.push('信頼度または位置情報が不足した '+rejected+'項目は空欄にしました');
+    return {
+      dates:Array.from(dates).sort(),
+      categories:Array.from(categories.values()),
+      cells:cells,
+      spatial:results.some(function(result){return result.spatial;}),
+      warnings:Array.from(new Set(warnings))
     };
   }
   function mergeMultiDayResults(results){
@@ -679,7 +761,7 @@
   }
 
   var model={
-    VERSION:5,
+    VERSION:6,
     MAX_FILES:MAX_FILES,
     MAX_FILE_BYTES:MAX_FILE_BYTES,
     POLICY:POLICY,
@@ -697,6 +779,7 @@
     detectLabels:detectLabels,
     analyzeOcrData:analyzeOcrData,
     buildMultiDayData:buildMultiDayData,
+    consensusMultiDayResults:consensusMultiDayResults,
     mergeMultiDayResults:mergeMultiDayResults,
     spatialDateAnchors:spatialDateAnchors,
     tripGroups:tripGroups,
@@ -816,7 +899,14 @@
       if(!item.ocr||item.ocr.status!=='done')return;
       item.ocr.dateCandidates=extractDateCandidates(item.ocr.text,session.targetDate);
       item.ocr.targetDateMatched=evaluateTargetDate(item.ocr.dateCandidates,session.targetDate);
-      item.ocr.multiDay=buildMultiDayData(item.ocr.lines,categories(),session.targetDate);
+      if(Array.isArray(item.ocr.passes)&&item.ocr.passes.length){
+        item.ocr.passes.forEach(function(pass){
+          pass.dateCandidates=extractDateCandidates(pass.text,session.targetDate);
+          pass.targetDateMatched=evaluateTargetDate(pass.dateCandidates,session.targetDate);
+          pass.multiDay=buildMultiDayData(pass.lines,categories(),session.targetDate);
+        });
+        item.ocr.multiDay=consensusMultiDayResults(item.ocr.passes.map(function(pass){return pass.multiDay;}));
+      }else item.ocr.multiDay=buildMultiDayData(item.ocr.lines,categories(),session.targetDate);
     });
   }
   function renderControls(){
@@ -993,23 +1083,28 @@
         session.engineStatus='画像 '+(i+1)+' / '+session.items.length+' を読み取り中';
         renderItems();
         try{
+          session.engineStatus='画像 '+(i+1)+' / '+session.items.length+' を1回目解析中';
+          renderItems();
           var result=await worker.recognize(activeItem.file,{rotateAuto:true},{text:true,blocks:true});
-          var analyzed=analyzeOcrData(result&&result.data||{},categories(),session.targetDate);
-          analyzed.multiDay=buildMultiDayData(analyzed.lines,categories(),session.targetDate);
-          if(!analyzed.multiDay.cells.length&&worker&&typeof worker.setParameters==='function'){
-            session.engineStatus='画像 '+(i+1)+' / '+session.items.length+' を表形式で再解析中';
-            renderItems();
-            var blockPsm=root.Tesseract.PSM&&root.Tesseract.PSM.SINGLE_BLOCK!=null?root.Tesseract.PSM.SINGLE_BLOCK:'6';
-            await worker.setParameters({tessedit_pageseg_mode:blockPsm,preserve_interword_spaces:'1'});
-            var retryResult=await worker.recognize(activeItem.file,{rotateAuto:true},{text:true,blocks:true});
-            var retryAnalyzed=analyzeOcrData(retryResult&&retryResult.data||{},categories(),session.targetDate);
-            retryAnalyzed.multiDay=buildMultiDayData(retryAnalyzed.lines,categories(),session.targetDate);
-            var firstScore=analyzed.multiDay.cells.length*100+analyzed.multiDay.dates.length*10+analyzed.multiDay.categories.length;
-            var retryScore=retryAnalyzed.multiDay.cells.length*100+retryAnalyzed.multiDay.dates.length*10+retryAnalyzed.multiDay.categories.length;
-            if(retryScore>firstScore)analyzed=retryAnalyzed;
-            var sparsePsm=root.Tesseract.PSM&&root.Tesseract.PSM.SPARSE_TEXT!=null?root.Tesseract.PSM.SPARSE_TEXT:'11';
-            await worker.setParameters({tessedit_pageseg_mode:sparsePsm,preserve_interword_spaces:'1'});
-          }
+          var firstAnalyzed=analyzeOcrData(result&&result.data||{},categories(),session.targetDate);
+          firstAnalyzed.multiDay=buildMultiDayData(firstAnalyzed.lines,categories(),session.targetDate);
+
+          session.engineStatus='画像 '+(i+1)+' / '+session.items.length+' を2回目解析中';
+          renderItems();
+          var blockPsm=root.Tesseract.PSM&&root.Tesseract.PSM.SINGLE_BLOCK!=null?root.Tesseract.PSM.SINGLE_BLOCK:'6';
+          await worker.setParameters({tessedit_pageseg_mode:blockPsm,preserve_interword_spaces:'1'});
+          var retryResult=await worker.recognize(activeItem.file,{rotateAuto:true},{text:true,blocks:true});
+          var secondAnalyzed=analyzeOcrData(retryResult&&retryResult.data||{},categories(),session.targetDate);
+          secondAnalyzed.multiDay=buildMultiDayData(secondAnalyzed.lines,categories(),session.targetDate);
+
+          var consensus=consensusMultiDayResults([firstAnalyzed.multiDay,secondAnalyzed.multiDay]);
+          var firstScore=firstAnalyzed.dateCandidates.length*10+firstAnalyzed.matchedCategories.length;
+          var secondScore=secondAnalyzed.dateCandidates.length*10+secondAnalyzed.matchedCategories.length;
+          var analyzed=secondScore>firstScore?secondAnalyzed:firstAnalyzed;
+          analyzed.passes=[firstAnalyzed,secondAnalyzed];
+          analyzed.multiDay=consensus;
+          var sparsePsm=root.Tesseract.PSM&&root.Tesseract.PSM.SPARSE_TEXT!=null?root.Tesseract.PSM.SPARSE_TEXT:'11';
+          await worker.setParameters({tessedit_pageseg_mode:sparsePsm,preserve_interword_spaces:'1'});
           activeItem.ocr=Object.assign({status:'done',progress:1},analyzed);
         }catch(error){
           activeItem.ocr={status:'error',progress:0,error:error&&error.message?String(error.message):String(error)};
