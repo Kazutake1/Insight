@@ -287,7 +287,8 @@ test('全分析バンドルは履歴の後・AI解釈の前に読み込み外部
   assert.match(bundle,/externalTransmission:false/);
   assert.match(bundle,/analysis:\{/);
   assert.match(bundle,/reviews:\{/);
-  assert.match(bundle,/signals:signalsFrom/);
+  assert.match(bundle,/signals:signals/);
+  assert.match(bundle,/evidence:evidence/);
   assert.match(bundle,/diagnostics:diagnostics/);
   assert.doesNotMatch(bundle,/localStorage|InsightStorage|\bfetch\s*\(|XMLHttpRequest|WebSocket/);
   assert.doesNotThrow(()=>new vm.Script(bundle),'analysis bundle module must be valid JavaScript');
