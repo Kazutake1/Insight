@@ -172,7 +172,7 @@ test('設定ページはサイドバー下部の管理項目を集約する',()=
   assert.match(settings,/append\(backup,restore,health,csv,restoreFile,csvFile\)/);
   assert.match(settings,/insightSettingsDisplayActions/);
   assert.match(settings,/append\(dark\)/);
-  assert.match(settings,/sidebarActions\.replaceChildren\(nav\)/);
+  assert.match(settings,/sidebarActions\.replaceChildren\(themeWrap,nav\)/);
 });
 
 test('複数年度分析はAnalysisContextの後に読み込み読み取り専用で動作する',()=>{
