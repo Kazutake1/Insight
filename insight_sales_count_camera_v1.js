@@ -1,4 +1,4 @@
-/* Sales-count camera capture v7: precision-first fixed-grid multi-day local OCR, in-memory review only. */
+/* Sales-count camera capture v8: precision-first three-pass local OCR, in-memory review only. */
 (function(root){
   'use strict';
   if(root.InsightSalesCountCamera)return;
@@ -754,6 +754,12 @@
       warnings:Array.from(new Set(warnings))
     };
   }
+  function shouldRunThirdPass(results,consensus){
+    results=(Array.isArray(results)?results:[]).filter(Boolean);
+    var best=results.reduce(function(max,result){return Math.max(max,(result.cells||[]).length);},0);
+    var agreed=consensus&&Array.isArray(consensus.cells)?consensus.cells.length:0;
+    return best>agreed;
+  }
   function mergeMultiDayResults(results){
     var dates=new Set(),categories=new Map(),cells=new Map(),warnings=[];
     (Array.isArray(results)?results:[]).forEach(function(result,resultIndex){
@@ -801,7 +807,7 @@
   }
 
   var model={
-    VERSION:7,
+    VERSION:8,
     MAX_FILES:MAX_FILES,
     MAX_FILE_BYTES:MAX_FILE_BYTES,
     POLICY:POLICY,
@@ -820,6 +826,7 @@
     analyzeOcrData:analyzeOcrData,
     buildMultiDayData:buildMultiDayData,
     consensusMultiDayResults:consensusMultiDayResults,
+    shouldRunThirdPass:shouldRunThirdPass,
     mergeMultiDayResults:mergeMultiDayResults,
     spatialDateAnchors:spatialDateAnchors,
     tripGroups:tripGroups,
@@ -1137,12 +1144,28 @@
           var secondAnalyzed=analyzeOcrData(retryResult&&retryResult.data||{},categories(),session.targetDate);
           secondAnalyzed.multiDay=buildMultiDayData(secondAnalyzed.lines,categories(),session.targetDate);
 
-          var consensus=consensusMultiDayResults([firstAnalyzed.multiDay,secondAnalyzed.multiDay]);
-          var firstScore=firstAnalyzed.dateCandidates.length*10+firstAnalyzed.matchedCategories.length;
-          var secondScore=secondAnalyzed.dateCandidates.length*10+secondAnalyzed.matchedCategories.length;
-          var baseAnalyzed=secondScore>firstScore?secondAnalyzed:firstAnalyzed;
-          var analyzed=Object.assign({},baseAnalyzed,{
-            passes:[firstAnalyzed,secondAnalyzed],
+          var passes=[firstAnalyzed,secondAnalyzed];
+          var consensus=consensusMultiDayResults(passes.map(function(pass){return pass.multiDay;}));
+
+          if(shouldRunThirdPass(passes.map(function(pass){return pass.multiDay;}),consensus)){
+            session.engineStatus='画像 '+(i+1)+' / '+session.items.length+' を3回目解析中';
+            renderItems();
+            var autoPsm=root.Tesseract.PSM&&root.Tesseract.PSM.AUTO!=null?root.Tesseract.PSM.AUTO:'3';
+            await worker.setParameters({tessedit_pageseg_mode:autoPsm,preserve_interword_spaces:'1'});
+            var thirdResult=await worker.recognize(activeItem.file,{rotateAuto:true},{text:true,blocks:true});
+            var thirdAnalyzed=analyzeOcrData(thirdResult&&thirdResult.data||{},categories(),session.targetDate);
+            thirdAnalyzed.multiDay=buildMultiDayData(thirdAnalyzed.lines,categories(),session.targetDate);
+            passes.push(thirdAnalyzed);
+            consensus=consensusMultiDayResults(passes.map(function(pass){return pass.multiDay;}));
+          }
+
+          var bestAnalyzed=passes.slice().sort(function(a,b){
+            var aScore=(a.dateCandidates||[]).length*10+(a.matchedCategories||[]).length+(a.multiDay&&a.multiDay.cells?a.multiDay.cells.length:0);
+            var bScore=(b.dateCandidates||[]).length*10+(b.matchedCategories||[]).length+(b.multiDay&&b.multiDay.cells?b.multiDay.cells.length:0);
+            return bScore-aScore;
+          })[0]||firstAnalyzed;
+          var analyzed=Object.assign({},bestAnalyzed,{
+            passes:passes,
             multiDay:consensus
           });
           var sparsePsm=root.Tesseract.PSM&&root.Tesseract.PSM.SPARSE_TEXT!=null?root.Tesseract.PSM.SPARSE_TEXT:'11';
