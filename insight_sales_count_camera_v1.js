@@ -851,7 +851,8 @@
         '<input id="scCameraFiles" type="file" accept="image/*" multiple hidden>'+
         '<div class="sc-camera-summary"><strong id="scCameraStatus"></strong><span>外部OCR送信なし・自動保存なし</span></div>'+
         '<div id="scCameraList" class="sc-camera-list"></div>'+
-        '<div id="scCameraOcrStatus" class="sc-camera-ocr-summary">OCRはまだ実行していません</div>'+\n        '<div id="scCameraResults" class="sc-camera-results"></div>'+
+        '<div id="scCameraOcrStatus" class="sc-camera-ocr-summary">OCRはまだ実行していません</div>'+
+        '<div id="scCameraResults" class="sc-camera-results"></div>'+
         '<div class="sc-camera-next"><button id="scCameraRead" type="button" disabled>画像を読み取る</button></div>'+
       '</section>';
     doc.body.append(dialog);
