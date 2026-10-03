@@ -1565,10 +1565,12 @@
   function renderControls(){
     if(!dialog)return;
     var processing=session.processing,hasItems=session.items.length>0;
+    var readyForRead=hasItems&&session.items.every(function(item){return !!normalizeCropRect(item.crop);});
     ['#scCameraShoot','#scCameraLibrary','#scCameraClear','#scCameraRead'].forEach(function(selector){
       var button=dialog.querySelector(selector);
       if(!button)return;
-      if(selector==='#scCameraClear'||selector==='#scCameraRead')button.disabled=processing||!hasItems;
+      if(selector==='#scCameraClear')button.disabled=processing||!hasItems;
+      else if(selector==='#scCameraRead')button.disabled=processing||!readyForRead;
       else button.disabled=processing;
     });
     if(dateInput)dateInput.disabled=processing;
@@ -1690,6 +1692,7 @@
     if(ocrStatus){
       if(session.processing)ocrStatus.textContent=session.engineStatus||'OCR処理中…';
       else if(result.ocrDone||result.ocrErrors)ocrStatus.textContent='OCR完了 '+result.ocrDone+'件 / エラー '+result.ocrErrors+'件 / 検出日 '+result.detectedDates+'日 / 構造化 '+result.structuredCells+'項目';
+      else if(session.items.some(function(item){return !normalizeCropRect(item.crop);}))ocrStatus.textContent='各画像の「範囲指定」を完了してから読み取ってください';
       else ocrStatus.textContent='OCRはまだ実行していません';
     }
     renderResults();
