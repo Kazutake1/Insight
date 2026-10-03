@@ -233,6 +233,90 @@
     return {count:items.length,counts:counts,items:items.slice(0,12)};
   }
 
+  function evidenceDirection(item){
+    var text=String(item&&(
+      item.direction||item.trend||item.state||item.pattern||
+      item.comparison&&item.comparison.direction||item.position&&item.position.code||''
+    )||'').toLowerCase();
+    if(/down|low|decrease|decline|negative|worse|悪化|減少|低/.test(text))return 'down';
+    if(/up|high|increase|growth|positive|improv|上昇|増加|改善|高/.test(text))return 'up';
+    if(/flat|same|stable|neutral|横ばい|同等/.test(text))return 'flat';
+    return 'unknown';
+  }
+  function evidenceMetric(item){
+    return item&&(
+      item.metric||item.theme||item.type||item.key||
+      item.comparison&&item.comparison.metric||item.position&&item.position.metric
+    )||null;
+  }
+  function evidenceConfidence(item){
+    var value=item&&(item.confidence!=null?item.confidence:item.explanation&&item.explanation.confidence);
+    return value==null?null:value;
+  }
+  function evidenceItem(id,source,item,period,quality,extra){
+    item=item||{};
+    return Object.assign({
+      id:String(id),
+      source:String(source),
+      metric:evidenceMetric(item),
+      direction:evidenceDirection(item),
+      importance:item.level||item.rawLevel||'insight',
+      confidence:evidenceConfidence(item),
+      summary:String(item.summary||item.title||''),
+      period:copy(period||null),
+      causality:'association_only',
+      quality:copy(quality||{status:'ok',error:null})
+    },extra||{});
+  }
+  function evidenceFrom(bundleParts){
+    var period=bundleParts.period,diagnostics=bundleParts.diagnostics||{modules:{}},items=[];
+    function quality(name){
+      var d=diagnostics.modules&&diagnostics.modules[name];
+      return {status:d&&d.status||'unavailable',error:d&&d.error||null};
+    }
+    (bundleParts.signals&&Array.isArray(bundleParts.signals.items)?bundleParts.signals.items:[]).forEach(function(item,index){
+      items.push(evidenceItem('signal:'+String(item.source||'unknown')+':'+String(item.key||index),'signal',item,period,quality(
+        item.source==='daily'?'dailyAnomaly':item.source==='weekly'?'weeklyReview':'monthlyReview'
+      ),{origin:item.source||null}));
+    });
+    function analysisRows(name,value){
+      if(!value)return [];
+      if(Array.isArray(value))return value;
+      return Array.isArray(value.rows)?value.rows:Array.isArray(value.weekdays)?value.weekdays:Array.isArray(value.items)?value.items:[];
+    }
+    ['weekday','seasonality','multiyear'].forEach(function(name){
+      analysisRows(name,bundleParts.analysis&&bundleParts.analysis[name]).forEach(function(item,index){
+        items.push(evidenceItem(name+':'+String(item&&item.key||index),name,item,period,quality(name)));
+      });
+    });
+    [['saleImpact','saleImpacts'],['eventImpact','eventImpacts']].forEach(function(pair){
+      var source=pair[0],key=pair[1],rows=bundleParts.analysis&&bundleParts.analysis[key]||[];
+      rows.forEach(function(entry,index){
+        if(!entry||entry.status!=='ok'||!entry.impact)return;
+        var impact=entry.impact;
+        var metrics=impact.metrics||impact.kpis||impact.items;
+        if(Array.isArray(metrics)&&metrics.length){
+          metrics.forEach(function(item,metricIndex){
+            items.push(evidenceItem(source+':'+String(entry.id||index)+':'+String(item&&item.key||metricIndex),source,item,period,quality(source),{
+              event:{id:entry.id||null,title:entry.title||'',type:entry.type||null}
+            }));
+          });
+        }else{
+          items.push(evidenceItem(source+':'+String(entry.id||index),source,impact,period,quality(source),{
+            event:{id:entry.id||null,title:entry.title||'',type:entry.type||null}
+          }));
+        }
+      });
+    });
+    return {
+      version:1,
+      contract:'InsightAIEvidence',
+      policy:{providerNeutral:true,authoritativeKpi:false,causality:'association_only'},
+      items:items,
+      quality:{partial:!!diagnostics.partial,modules:copy(diagnostics.modules||{})}
+    };
+  }
+
   function build(options,overrides){
     options=options||{};overrides=overrides||{};
     var env=environment(overrides),selected=storeInfo(env,options.storeId),period=resolvePeriod(options,env);
@@ -275,6 +359,12 @@
     });
 
     var weekly=compactReview(weeklyRaw,'weekly'),monthly=compactReview(monthlyRaw,'monthly');
+    var signals=signalsFrom(daily,weekly,monthly);
+    var analysis={
+      multiyear:multiyear,weekday:weekday,seasonality:seasonality,anomaly:daily,
+      saleImpacts:impacts.sales,eventImpacts:impacts.events
+    };
+    var evidence=evidenceFrom({period:period,analysis:analysis,signals:signals,diagnostics:diagnostics});
     return {
       version:VERSION,
       meta:{contract:'InsightAnalysisBundle',generatedAt:nowIso(env.now),aiConnected:false},
@@ -282,15 +372,13 @@
       period:period,
       kpi:copy(core.metrics||null),
       facts:compactContext(core),
-      analysis:{
-        multiyear:multiyear,weekday:weekday,seasonality:seasonality,anomaly:daily,
-        saleImpacts:impacts.sales,eventImpacts:impacts.events
-      },
+      analysis:analysis,
       reviews:{
         weekly:weekly,monthly:monthly,
         history:{weekly:compactHistory(weeklyHistoryRaw),monthly:compactHistory(monthlyHistoryRaw)}
       },
-      signals:signalsFrom(daily,weekly,monthly),
+      signals:signals,
+      evidence:evidence,
       diagnostics:diagnostics,
       source:{
         savedOnly:true,readOnly:true,externalTransmission:false,
@@ -302,7 +390,7 @@
   var model={
     VERSION:VERSION,DEFAULT_HISTORY_COUNT:DEFAULT_HISTORY_COUNT,DEFAULT_IMPACT_WEEKS:DEFAULT_IMPACT_WEEKS,
     build:build,resolvePeriod:resolvePeriod,compactContext:compactContext,compactDaily:compactDaily,
-    compactReview:compactReview,compactHistory:compactHistory,signalsFrom:signalsFrom
+    compactReview:compactReview,compactHistory:compactHistory,signalsFrom:signalsFrom,evidenceFrom:evidenceFrom
   };
   if(typeof module!=='undefined'&&module.exports)module.exports=model;
   root.InsightAnalysisBundle=model;
