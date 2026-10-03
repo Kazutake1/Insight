@@ -1169,8 +1169,7 @@
       if(!item){cropDialog.close();return;}
       var normalized=normalizeCropRect(cropDraft);
       if(!normalized){alert('読取範囲をもう一度指定してください。');return;}
-      var isFull=normalized.x<0.002&&normalized.y<0.002&&normalized.w>0.996&&normalized.h>0.996;
-      item.crop=isFull?null:normalized;
+      item.crop=normalized;
       item.ocr=null;
       cropDialog.close();
       renderItems();
@@ -1242,7 +1241,6 @@
     if(!normalized)return item.file;
     var image=await loadImageForCrop(item);
     var pixel=cropPixelRect(normalized,image.naturalWidth,image.naturalHeight);
-    if(pixel.full)return item.file;
     var canvas=doc.createElement('canvas');
     canvas.width=pixel.w;canvas.height=pixel.h;
     var context=canvas.getContext('2d');
@@ -1414,6 +1412,10 @@
       if(!item.ocr||item.ocr.status!=='done')return;
       item.ocr.dateCandidates=extractDateCandidates(item.ocr.text,session.targetDate);
       item.ocr.targetDateMatched=evaluateTargetDate(item.ocr.dateCandidates,session.targetDate);
+      if(item.ocr.fixedGridResult){
+        item.ocr.multiDay=item.ocr.fixedGridResult;
+        return;
+      }
       if(Array.isArray(item.ocr.passes)&&item.ocr.passes.length){
         item.ocr.passes.forEach(function(pass){
           pass.dateCandidates=extractDateCandidates(pass.text,session.targetDate);
@@ -1653,12 +1655,20 @@
             var bScore=(b.dateCandidates||[]).length*10+(b.matchedCategories||[]).length+(b.multiDay&&b.multiDay.cells?b.multiDay.cells.length:0);
             return bScore-aScore;
           })[0]||firstAnalyzed;
+          var fixedGridResult=null;
+          if(activeItem.crop){
+            session.engineStatus='画像 '+(i+1)+' / '+session.items.length+' の数字セルを固定表として解析中';
+            renderItems();
+            fixedGridResult=await readFixedGridCells(worker,ocrInput,bestAnalyzed,categories(),session.targetDate);
+            if(fixedGridResult)consensus=fixedGridResult;
+          }
           var analyzed=Object.assign({},bestAnalyzed,{
             passes:passes,
-            multiDay:consensus
+            multiDay:consensus,
+            fixedGridResult:fixedGridResult
           });
           var sparsePsm=root.Tesseract.PSM&&root.Tesseract.PSM.SPARSE_TEXT!=null?root.Tesseract.PSM.SPARSE_TEXT:'11';
-          await worker.setParameters({tessedit_pageseg_mode:sparsePsm,preserve_interword_spaces:'1'});
+          await worker.setParameters({tessedit_pageseg_mode:sparsePsm,tessedit_char_whitelist:'',preserve_interword_spaces:'1'});
           activeItem.ocr=Object.assign({status:'done',progress:1},analyzed);
         }catch(error){
           activeItem.ocr={status:'error',progress:0,error:error&&error.message?String(error.message):String(error)};
