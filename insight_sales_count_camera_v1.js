@@ -865,7 +865,7 @@
         kind:metricLabelKind(line&&line.text)
       };
     }).filter(function(item){
-      return Number.isFinite(item.y)&&item.y>anchor.y&&(!Number.isFinite(nextY)||item.y<nextY)&&item.count>=2;
+      return Number.isFinite(item.y)&&item.y>anchor.y&&(!Number.isFinite(nextY)||item.y<nextY)&&(item.count>=2||item.kind==='delivery'||item.kind==='sales');
     }).sort(function(a,b){return a.y-b.y;});
     if(candidates.length<2)return null;
     var delivery=candidates.find(function(item){return item.kind==='delivery';})||null;
