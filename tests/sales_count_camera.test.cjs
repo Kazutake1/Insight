@@ -216,6 +216,22 @@ test('納品販売ラベルを読めなくてもカテゴリー直下の数値�
   assert.equal(slots.filter(slot=>slot.field==='sales').length,24);
 });
 
+test('数字や日本語ラベルを読めなくても2回の行座標一致から納品販売行を復元する',()=>{
+  const row=(y,pass)=>({
+    text:'???',confidence:20,bbox:{x0:10,y0:y-7,x1:820,y1:y+7},
+    words:[],geometryPass:pass
+  });
+  const lines=[
+    row(131,0),row(161,0),row(191,0),
+    row(132,1),row(162,1),row(192,1)
+  ];
+  const bands=camera.geometricLineBands(lines,100,Infinity);
+  assert.ok(bands);
+  assert.equal(bands.source,'geometric-line');
+  assert.ok(Math.abs(bands.delivery.y-131.5)<0.1);
+  assert.ok(Math.abs(bands.sales.y-161.5)<0.1);
+});
+
 test('OCR各回が不完全でも複数回の座標を統合して固定表を復元する',()=>{
   const w=(text,x,y,confidence=95)=>({text,confidence,bbox:{x0:x-8,y0:y-6,x1:x+8,y1:y+6}});
   const line=(index,text,y,words)=>({index,text,confidence:92,bbox:{x0:5,y0:y-9,x1:850,y1:y+9},words});
