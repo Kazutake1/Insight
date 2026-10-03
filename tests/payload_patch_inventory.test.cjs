@@ -164,7 +164,7 @@ test('STEP7で将来AI接続用の共通analysisContext境界を追加する',()
 test('設定ページはサイドバー下部の管理項目を集約する',()=>{
   const index=fs.readFileSync(path.join(root,'Index.html'),'utf8');
   const settings=fs.readFileSync(path.join(root,'insight_settings_v1.js'),'utf8');
-  assert.match(index,/insight_settings_v1\.js\?v=20261003-sidebar-theme-only/);
+  assert.match(index,/insight_settings_v1\.js\?v=20261003-nav-match/);
   assert.ok(index.indexOf('insight_data_health_v1.js')<index.indexOf('insight_settings_v1.js'));
   assert.match(settings,/nav\.id='navSettings'/);
   assert.match(settings,/page\.id='pageSettings'/);
