@@ -159,6 +159,8 @@ test('販売数入力のカメラ読取はローカルOCRし結果だけを一�
   await expect(page.locator('#scCameraStatus')).toHaveText('撮影済み 1 / 12枚');
   await expect(page.locator('#scCameraCropDialog')).toBeVisible();
   await expect(page.locator('#scCameraCropDialog')).toContainText('読取範囲を指定');
+  await expect(page.locator('.sc-camera-crop-handle')).toHaveCount(4);
+  await expect(page.locator('#scCameraCropDialog')).toContainText('四隅');
   await expect(page.locator('#scCropApply')).toBeVisible();
   await page.locator('#scCropApply').click();
   await expect(page.locator('#scCameraCropDialog')).not.toBeVisible();
