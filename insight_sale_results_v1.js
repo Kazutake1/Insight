@@ -121,7 +121,7 @@
       var start=event.startDate<range.start?range.start:event.startDate;
       var end=event.endDate>range.end?range.end:event.endDate;
       if(start>end)return;
-      var summary=eventsApi.summary(event.snapshot),days=eachDate(start,end).map(function(date){
+      var summary=eventsApi.summary(event.snapshot,categoryId,category&&category.name),days=eachDate(start,end).map(function(date){
         var record=recordAt(all,storeId,date,categoryId,salesApi);
         return {date:date,record:record,hasRecord:hasRecord(record)};
       });
