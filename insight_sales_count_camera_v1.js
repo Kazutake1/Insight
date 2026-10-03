@@ -1202,7 +1202,10 @@
     var button=doc.createElement('button');
     button.id='scCameraOpen';
     button.type='button';
-    button.textContent='カメラ読取';
+    button.className='sc-camera-open';
+    button.setAttribute('aria-label','カメラ読取');
+    button.title='カメラ読取';
+    button.innerHTML='<svg class="sc-camera-open-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 5l1.4-2h3.2L15 5h3a2 2 0 0 1 2 2v10a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V7a2 2 0 0 1 2-2h3z"/><circle cx="12" cy="12" r="3.5"/></svg>';
     button.onclick=open;
     toolbar.append(button);
   }
@@ -1214,6 +1217,7 @@
   var style=doc.createElement('style');
   style.id='scCameraStyle';
   style.textContent=
+    '.sc-camera-open{width:40px;height:40px;min-width:40px;padding:0!important;display:inline-flex;align-items:center;justify-content:center}.sc-camera-open-icon{width:21px;height:21px;display:block}'+
     '.sc-camera-dialog{width:min(720px,calc(100vw - 24px))}.sc-camera-dialog header p{margin:3px 0 0;font-size:11px;color:var(--text4)}'+
     '.sc-camera-body{padding-top:14px}.sc-camera-date{display:flex;align-items:center;gap:9px;font-size:13px;font-weight:700}.sc-camera-date input{min-width:170px}'+
     '.sc-camera-note{margin:12px 0;padding:10px 12px;border:1px solid var(--border);border-radius:10px;background:var(--surface2);font-size:11px;line-height:1.6;color:var(--text3)}'+
