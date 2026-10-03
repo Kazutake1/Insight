@@ -161,7 +161,6 @@ test('設定ボタンは他のサイドバーナビと文字・アイコン配�
     }
     return {settings:read('navSettings'),reference:read('navSalesCount')};
   });
-  console.log('sidebar-style-check',styles);
   expect(styles.settings).not.toBeNull();
   expect(styles.reference).not.toBeNull();
   expect(styles.settings).toEqual(styles.reference);
