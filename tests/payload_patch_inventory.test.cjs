@@ -17,7 +17,7 @@ test('payload互換パッチ11件はbootstrap moduleへ分離しIndexにはbody�
 
 test('トップページはキャッシュ抑止とビルド自己更新を持つ',()=>{
   const index=read('Index.html');
-  assert.match(index,/insight-shell-version" content="20261003-cross-analysis-2/);
+  assert.match(index,/insight-shell-version" content="20261003-ai-pipeline-1/);
   assert.match(index,/Cache-Control" content="no-cache, no-store, must-revalidate/);
   assert.match(index,/insight_probe=/);
   assert.match(index,/cache:'no-store'/);
@@ -147,7 +147,7 @@ test('分析AIの対象年月をサイドバー切替後も固定し各ページ
 test('STEP7で将来AI接続用の共通analysisContext境界を追加する',()=>{
   const index=read('Index.html');
   const aiContext=read('insight_ai_context_v1.js');
-  assert.match(index,/insight_ai_context_v1\.js\?v=20261003-cross-analysis-2/);
+  assert.match(index,/insight_ai_context_v1\.js\?v=20261003-ai-pipeline-1/);
   assert.ok(index.indexOf('insight_analysis_history_v1.js')<index.indexOf('insight_ai_interpretation_v1.js'));
   assert.ok(index.indexOf('insight_ai_interpretation_v1.js')<index.indexOf('insight_ai_context_v1.js'));
   assert.ok(index.indexOf('insight_ai_context_v1.js')<index.indexOf('insight_ai_page_comments_v1.js'));
@@ -645,4 +645,19 @@ test('曜日別平均も対象外便をダッシュ＋グレー表示に統一�
   assert.match(block,/\?'ー':fmt\(value\)/);
   assert.doesNotMatch(block,/対象外/);
   assert.match(sales,/\.sc-average-row b\.sc-not-applicable\{background:var\(--surface2\)!important;border-color:var\(--border\)!important;color:var\(--text4\)!important\}/);
+});
+
+
+test('分析AI互換コアはIndexインラインから分離し新パイプラインのフォールバックに限定する',()=>{
+  const index=read('Index.html');
+  const compat=read('insight_ai_compat_core_v1.js');
+  assert.match(index,/insight_ai_compat_core_v1\.js\?v=20261003-ai-pipeline-1/);
+  assert.ok(index.indexOf('insight_yoy_policy_v1.js')<index.indexOf('insight_ai_compat_core_v1.js'));
+  assert.ok(index.indexOf('insight_ai_compat_core_v1.js')<index.indexOf('insight_hooks_v1.js'));
+  assert.doesNotMatch(index,/var extra='<script>/);
+  assert.doesNotMatch(index,/window\.buildAIQuestionAnswer=function/);
+  assert.match(compat,/window\.buildAIQuestionAnswer=function/);
+  assert.match(compat,/window\.renderAIAnalysisPanel=function/);
+  assert.match(compat,/Primary analysis is owned by InsightAIPageComments \/ InsightAIInterpretation/);
+  assert.doesNotThrow(()=>new vm.Script(compat),'AI compatibility core must be valid JavaScript');
 });
