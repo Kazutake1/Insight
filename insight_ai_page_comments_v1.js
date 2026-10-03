@@ -355,23 +355,26 @@
     var events=review.current.conditions&&review.current.conditions.events||[];
     if(events.length)p.checks.push('登録イベント '+events.length+'件。数値変化との因果関係は断定せず照合してください。');
     if(m!=='salesCounts'&&root.InsightAIInterpretation&&typeof root.InsightAIInterpretation.monthly==='function'){
-      var cross=null;
+      var cross=null,evidence=null;
       try{
         if(root.InsightAnalysisBundle&&typeof root.InsightAnalysisBundle.build==='function'){
-          cross=root.InsightAnalysisBundle.build({
+          var analysisBundle=root.InsightAnalysisBundle.build({
             year:Number(c.year),month:info.monthNumber,throughDay:c.through,
             compareYear:c.prev,storeId:allStores.current
           });
+          evidence=root.InsightAIContext&&typeof root.InsightAIContext.compactEvidence==='function'?
+            root.InsightAIContext.compactEvidence(analysisBundle):
+            analysisBundle.evidence&&analysisBundle.evidence.contract==='InsightAIEvidence'?analysisBundle.evidence:null;
           cross=root.InsightAIContext&&typeof root.InsightAIContext.compactCrossAnalysis==='function'?
-            root.InsightAIContext.compactCrossAnalysis(cross):cross.analysis?{
-              period:cross.period,signals:cross.signals,weekday:cross.analysis.weekday,
-              seasonality:cross.analysis.seasonality,anomaly:cross.analysis.anomaly,
-              saleImpacts:cross.analysis.saleImpacts,eventImpacts:cross.analysis.eventImpacts,
-              diagnostics:cross.diagnostics
+            root.InsightAIContext.compactCrossAnalysis(analysisBundle):analysisBundle.analysis?{
+              period:analysisBundle.period,signals:analysisBundle.signals,weekday:analysisBundle.analysis.weekday,
+              seasonality:analysisBundle.analysis.seasonality,anomaly:analysisBundle.analysis.anomaly,
+              saleImpacts:analysisBundle.analysis.saleImpacts,eventImpacts:analysisBundle.analysis.eventImpacts,
+              diagnostics:analysisBundle.diagnostics
             }:null;
         }
-      }catch(_){cross=null;}
-      p.structured=root.InsightAIInterpretation.monthly(review,theme,cross);
+      }catch(_){cross=null;evidence=null;}
+      p.structured=root.InsightAIInterpretation.monthly(review,theme,cross,evidence);
     }
     savedNote(p);
     return p;
