@@ -35,6 +35,15 @@
       '#pageSettings #insightDataHealthButton{color:#15803d}',
       '.dark #pageSettings #insightDataHealthButton{color:#86efac}',
       '.insight-settings-actions .sidebar-btn-sub{font-size:9px;color:var(--text5)}',
+      '.insight-theme-toggle{display:flex;align-items:center;justify-content:space-between;gap:10px;width:100%;box-sizing:border-box;padding:10px 12px;margin:0 0 8px;border:0;background:transparent;color:var(--text3);font:600 12px/1.35 -apple-system,BlinkMacSystemFont,"Noto Sans JP",sans-serif}',
+      '.insight-theme-toggle-label{display:flex;align-items:center;gap:9px;min-width:0}',
+      '.insight-theme-switch{position:relative;width:42px;height:24px;flex:0 0 auto}',
+      '.insight-theme-switch input{position:absolute;opacity:0;pointer-events:none}',
+      '.insight-theme-switch-track{position:absolute;inset:0;border-radius:999px;background:var(--border);transition:.18s ease;cursor:pointer}',
+      '.insight-theme-switch-track:after{content:"";position:absolute;width:18px;height:18px;left:3px;top:3px;border-radius:50%;background:var(--surface);box-shadow:0 1px 3px rgba(0,0,0,.22);transition:.18s ease}',
+      '.insight-theme-switch input:checked+.insight-theme-switch-track{background:var(--text)}',
+      '.insight-theme-switch input:checked+.insight-theme-switch-track:after{transform:translateX(18px)}',
+      '.insight-theme-switch input:focus-visible+.insight-theme-switch-track{outline:2px solid var(--text3);outline-offset:2px}',
       '@media(max-width:800px){.insight-settings-content{max-width:none}.insight-settings-section{padding:13px}}'
     ].join('');
     doc.head.appendChild(style);
@@ -74,8 +83,26 @@
 
     main.appendChild(page);
     page.querySelector('#insightSettingsDataActions').append(backup,restore,health,csv,restoreFile,csvFile);
+    var themeWrap=doc.createElement('div');
+    themeWrap.className='insight-theme-toggle';
+    themeWrap.innerHTML='<span class="insight-theme-toggle-label">ダークモード</span><label class="insight-theme-switch" aria-label="ダークモード"><input id="insightThemeToggle" type="checkbox" role="switch"><span class="insight-theme-switch-track"></span></label>';
+    var themeInput=themeWrap.querySelector('#insightThemeToggle');
+    function syncThemeToggle(){
+      themeInput.checked=doc.documentElement.classList.contains('dark')||!!(doc.body&&doc.body.classList.contains('dark'));
+    }
+    syncThemeToggle();
+    themeInput.addEventListener('change',function(){
+      var before=doc.documentElement.classList.contains('dark')||!!(doc.body&&doc.body.classList.contains('dark'));
+      if(themeInput.checked!==before)dark.click();
+      setTimeout(syncThemeToggle,0);
+    });
+    var themeObserver=new MutationObserver(syncThemeToggle);
+    themeObserver.observe(doc.documentElement,{attributes:true,attributeFilter:['class']});
+    if(doc.body)themeObserver.observe(doc.body,{attributes:true,attributeFilter:['class']});
+    dark.hidden=true;
+    dark.setAttribute('aria-hidden','true');
     page.querySelector('#insightSettingsDisplayActions').append(dark);
-    sidebarActions.replaceChildren(nav);
+    sidebarActions.replaceChildren(themeWrap,nav);
 
     var originalGoto=root.gotoNav;
     root.gotoNav=function(target){
