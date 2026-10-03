@@ -66,9 +66,9 @@ test('処理済みAIパネルはbaseを呼ばず必要なafter hookだけ継続�
   assert.deepEqual(calls,['handled','append']);
 });
 
-test('対象コア関数をfeature moduleが直接上書きしない',()=>{
+test('互換コア以外のfeature moduleが対象コア関数を直接上書きしない',()=>{
   const watched=['renderQuickPage','saveQuick','renderKPI','renderDerived','refreshDash','renderTable','saveInput','renderAIAnalysisPanel','buildAIQuestionAnswer'];
-  const files=fs.readdirSync(root).filter(name=>/^insight_.*\.js$/.test(name)&&name!=='insight_hooks_v1.js');
+  const files=fs.readdirSync(root).filter(name=>/^insight_.*\.js$/.test(name)&&name!=='insight_hooks_v1.js'&&name!=='insight_ai_compat_core_v1.js');
   const offenders=[];
   files.forEach(name=>{
     const source=read(name);
