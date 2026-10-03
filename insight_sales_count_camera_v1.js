@@ -820,6 +820,39 @@
     return {x:x,y:y,w:right-x,h:bottom-y,full:x===0&&y===0&&right===width&&bottom===height};
   }
 
+  function normalizeQuad(quad){
+    if(!Array.isArray(quad)||quad.length!==4)return null;
+    var points=quad.map(function(point){
+      var x=Number(point&&point.x),y=Number(point&&point.y);
+      if(!Number.isFinite(x)||!Number.isFinite(y))return null;
+      return {x:Math.max(0,Math.min(1,x)),y:Math.max(0,Math.min(1,y))};
+    });
+    if(points.some(function(point){return !point;}))return null;
+    function edge(a,b){var dx=b.x-a.x,dy=b.y-a.y;return Math.sqrt(dx*dx+dy*dy);}
+    if(edge(points[0],points[1])<0.02||edge(points[1],points[2])<0.02||edge(points[2],points[3])<0.02||edge(points[3],points[0])<0.02)return null;
+    var crosses=[];
+    for(var i=0;i<4;i++){
+      var a=points[i],b=points[(i+1)%4],c=points[(i+2)%4];
+      crosses.push((b.x-a.x)*(c.y-b.y)-(b.y-a.y)*(c.x-b.x));
+    }
+    var sign=crosses[0]>=0?1:-1;
+    if(crosses.some(function(value){return Math.abs(value)<1e-5||(value>=0?1:-1)!==sign;}))return null;
+    var area=0;
+    for(var j=0;j<4;j++){
+      var p=points[j],q=points[(j+1)%4];
+      area+=p.x*q.y-q.x*p.y;
+    }
+    if(Math.abs(area)/2<0.002)return null;
+    return points;
+  }
+  function quadBoundingRect(quad){
+    var points=normalizeQuad(quad);
+    if(!points)return null;
+    var xs=points.map(function(point){return point.x;}),ys=points.map(function(point){return point.y;});
+    var left=Math.min.apply(null,xs),top=Math.min.apply(null,ys),right=Math.max.apply(null,xs),bottom=Math.max.apply(null,ys);
+    return normalizeCropRect({x:left,y:top,w:right-left,h:bottom-top});
+  }
+
   function fixedMetricRows(lines,anchor,nextY){
     var candidates=(Array.isArray(lines)?lines:[]).map(function(line){
       var y=lineCenterY(line),box=bboxOf(line),numbers=rowNumberSequence(line);
@@ -1004,6 +1037,8 @@
     shouldRunThirdPass:shouldRunThirdPass,
     normalizeCropRect:normalizeCropRect,
     cropPixelRect:cropPixelRect,
+    normalizeQuad:normalizeQuad,
+    quadBoundingRect:quadBoundingRect,
     fixedGridPlan:fixedGridPlan,
     fixedGridSlots:fixedGridSlots,
     fixedCellConsensus:fixedCellConsensus,
