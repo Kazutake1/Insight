@@ -25,7 +25,7 @@ test('画像は20MB以下のimageだけを受け付ける',()=>{
 });
 
 test('CAMERA-2は同一オリジンのローカルOCRを使用し画像を永続化しない',()=>{
-  assert.equal(camera.VERSION,9);
+  assert.equal(camera.VERSION,10);
   assert.deepEqual(camera.POLICY,{
     persistImages:false,
     externalTransmission:false,
@@ -54,6 +54,11 @@ test('CAMERA-2は同一オリジンのローカルOCRを使用し画像を永続
   assert.match(source,/sc-camera-crop-selection/);
   assert.match(source,/canvas\.toBlob/);
   assert.match(source,/worker\.recognize\(ocrInput/);
+  assert.match(source,/tessedit_char_whitelist:'0123456789'/);
+  assert.match(source,/fixedGridPlan/);
+  assert.match(source,/readFixedGridCells/);
+  assert.match(source,/sc-camera-crop-handle/);
+  assert.match(source,/warpQuadImage/);
   assert.doesNotMatch(source,/button\.textContent='カメラ読取'/);
   assert.match(source,/URL\.createObjectURL/);
   assert.match(source,/URL\.revokeObjectURL/);
@@ -78,6 +83,62 @@ test('OCR切り取り範囲は0-1へ正規化しピクセル座標へ変換す�
   assert.equal(camera.normalizeCropRect({x:0.2,y:0.2,w:0.001,h:0.5}),null);
   assert.deepEqual(camera.cropPixelRect({x:0.25,y:0.25,w:0.5,h:0.5},1000,800),{x:250,y:200,w:500,h:400,full:false});
   assert.deepEqual(camera.cropPixelRect(null,1000,800),{x:0,y:0,w:1000,h:800,full:true});
+});
+
+test('台形補正の四隅は交差を拒否し有効範囲を保持する',()=>{
+  const quad=camera.normalizeQuad([
+    {x:0.1,y:0.1},{x:0.9,y:0.15},{x:0.85,y:0.9},{x:0.12,y:0.85}
+  ]);
+  assert.ok(quad);
+  assert.deepEqual(camera.quadBoundingRect(quad),{x:0.1,y:0.1,w:0.8,h:0.8});
+  assert.equal(camera.normalizeQuad([
+    {x:0.1,y:0.1},{x:0.9,y:0.9},{x:0.9,y:0.1},{x:0.1,y:0.9}
+  ]),null);
+});
+
+test('固定表は日付列×3便×納品販売のセル座標を作る',()=>{
+  const w=(text,x,y,confidence=95)=>({text,confidence,bbox:{x0:x-8,y0:y-6,x1:x+8,y1:y+6}});
+  const lines=[
+    {index:0,text:'10/30 10/31',confidence:98,bbox:{x0:60,y0:30,x1:420,y1:50},words:[w('10/30',120,40,99),w('10/31',300,40,99)]},
+    {index:1,text:'1 2 3 1 2 3',confidence:95,bbox:{x0:55,y0:62,x1:365,y1:78},words:[w('1',70,70),w('2',120,70),w('3',170,70),w('1',250,70),w('2',300,70),w('3',350,70)]},
+    {index:2,text:'おにぎり',confidence:97,bbox:{x0:10,y0:92,x1:90,y1:108},words:[w('おにぎり',50,100)]},
+    {index:3,text:'納品数 10 20 30 40 50 60',confidence:93,bbox:{x0:10,y0:122,x1:370,y1:138},words:[w('納品数',30,130),w('10',70,130),w('20',120,130),w('30',170,130),w('40',250,130),w('50',300,130),w('60',350,130)]},
+    {index:4,text:'販売数 9 18 27 36 45 54',confidence:92,bbox:{x0:10,y0:152,x1:370,y1:168},words:[w('販売数',30,160),w('9',70,160),w('18',120,160),w('27',170,160),w('36',250,160),w('45',300,160),w('54',350,160)]},
+    {index:5,text:'廃棄数 1 2 3 4 5 6',confidence:92,bbox:{x0:10,y0:182,x1:370,y1:198},words:[w('廃棄数',30,190),w('1',70,190),w('2',120,190),w('3',170,190),w('4',250,190),w('5',300,190),w('6',350,190)]}
+  ];
+  const plan=camera.fixedGridPlan(lines,[{id:'a',name:'おにぎり',aliases:[],hidden:false,activeTrips:[true,true,true]}],'2025-11-01');
+  assert.deepEqual(plan.dates,['2025-10-30','2025-10-31']);
+  const slots=camera.fixedGridSlots(plan);
+  assert.equal(slots.length,12);
+  assert.equal(slots.filter(slot=>slot.field==='delivery').length,6);
+  assert.equal(slots.filter(slot=>slot.field==='sales').length,6);
+  assert.equal(slots.some(slot=>slot.field==='waste'),false);
+});
+
+test('固定表の数字セルは2回以上一致した値だけ採用する',()=>{
+  const slots=[
+    {key:'2025-11-01|a|1|delivery',date:'2025-11-01',categoryId:'a',categoryName:'おにぎり',trip:1,field:'delivery'},
+    {key:'2025-11-01|a|1|sales',date:'2025-11-01',categoryId:'a',categoryName:'おにぎり',trip:1,field:'sales'}
+  ];
+  const a=new Map([
+    [slots[0].key,{value:10,confidence:92}],
+    [slots[1].key,{value:9,confidence:91}]
+  ]);
+  const b=new Map([
+    [slots[0].key,{value:10,confidence:88}],
+    [slots[1].key,{value:806,confidence:80}]
+  ]);
+  const c=new Map([
+    [slots[0].key,{value:10,confidence:90}],
+    [slots[1].key,{value:9,confidence:87}]
+  ]);
+  const result=camera.fixedCellConsensus([a,b,c],slots);
+  assert.equal(result.cells.length,2);
+  assert.equal(result.cells.find(cell=>cell.field==='delivery').value,10);
+  assert.equal(result.cells.find(cell=>cell.field==='sales').value,9);
+  const unresolved=camera.fixedCellConsensus([a,b],slots);
+  assert.equal(unresolved.cells.length,1);
+  assert.equal(unresolved.unresolved,1);
 });
 
 test('複数日画面は対象日の直接OCR失敗でも日付範囲から判定する',()=>{
