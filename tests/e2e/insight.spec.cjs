@@ -132,7 +132,9 @@ test('サイドバー下部は設定だけを表示し管理項目は設定ペ�
   await expect(page.locator('#insightSettingsDataActions #insightDataHealthButton')).toBeVisible();
   await expect(page.locator('#insightSettingsDataActions')).toContainText('CSVインポート');
   await expect(page.locator('#insightSettingsDisplayActions')).toHaveCount(0);
-  await expect(page.locator('#pageSettings #darkModeBtn')).toBeHidden();
+  await expect(page.locator('#pageSettings #darkModeBtn')).toHaveCount(0);
+  await expect(page.locator('#insightThemeBridge #darkModeBtn')).toBeHidden();
+  await expect(sidebar.locator('.insight-theme-toggle')).toBeVisible();
   expect(errors).toEqual([]);
 });
 
@@ -169,10 +171,13 @@ test('設定ボタンは他のサイドバーナビと文字・アイコン配�
 
 test('ダークモードはFirefox系のプラム・紫・ワイン配色を使う',async({page})=>{
   const errors=await openInsight(page);
-  await page.locator('#navSettings').click();
+  const toggle=page.locator('.insight-theme-switch-track');
   const wasDark=await page.evaluate(()=>document.documentElement.classList.contains('dark')||document.body.classList.contains('dark'));
-  if(wasDark)await page.locator('#darkModeBtn').click();
-  await page.locator('#darkModeBtn').click();
+  if(wasDark){
+    await toggle.click();
+    await page.waitForFunction(()=>!(document.documentElement.classList.contains('dark')||document.body.classList.contains('dark')));
+  }
+  await toggle.click();
   await page.waitForFunction(()=>document.documentElement.classList.contains('dark')||document.body.classList.contains('dark'));
   const palette=await page.evaluate(()=>({
     bg:getComputedStyle(document.body).getPropertyValue('--bg').trim(),
