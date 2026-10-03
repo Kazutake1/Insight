@@ -6,7 +6,9 @@
   function monthNumber(value){
     if(Number.isInteger(Number(value))&&Number(value)>=1&&Number(value)<=12)return Number(value);
     var m=/^(\d{1,2})月$/.exec(String(value||''));
-    return m?Number(m[1]):null;
+    if(!m)return null;
+    var month=Number(m[1]);
+    return month>=1&&month<=12?month:null;
   }
   function validYear(value){
     var year=Number(value);
