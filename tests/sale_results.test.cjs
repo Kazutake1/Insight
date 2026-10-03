@@ -127,3 +127,26 @@ test('同一セールのカテゴリー別条件は別々の実績見出しと�
   assert.match(mid.groups[0].summary,/150円均一/);
   assert.doesNotMatch(low.groups[0].summary,/150円均一/);
 });
+
+
+test('同一カテゴリー内の複数値引き条件は1つのセール実績として集計する',()=>{
+  const all=fixture();sales.ensure(all);
+  all.eventManagement.events=[{id:'sale_multi',type:'sale',scope:'global',startDate:'2026-09-15',endDate:'2026-09-17',snapshot:{version:1,title:'おにぎりセール',note:'',sale:{
+    category:'おにぎり',categoryId:'cat_onigiri',method:'fixed',params:{maxPrice:179,price:100},
+    targets:[{categoryId:'cat_onigiri',category:'おにぎり',method:'fixed',params:{maxPrice:179,price:100}}],
+    segments:[
+      {id:'seg_low',categoryId:'cat_onigiri',category:'おにぎり',label:'179円以下',method:'fixed',params:{maxPrice:179,price:100}},
+      {id:'seg_mid',categoryId:'cat_onigiri',category:'おにぎり',label:'180〜239円',method:'fixed',params:{minPrice:180,maxPrice:239,price:150}},
+      {id:'seg_high',categoryId:'cat_onigiri',category:'おにぎり',label:'240〜359円',method:'fixed',params:{minPrice:240,maxPrice:359,price:250}}
+    ]
+  }}}];
+
+  const data=saleResults.collect(all,'storeA','cat_onigiri','12','2026-10-01',{events,sales});
+  assert.equal(data.groups.length,1);
+  assert.equal(data.occurrences.length,1);
+  assert.equal(data.groups[0].days.length,3);
+  assert.match(data.groups[0].summary,/179円以下→100円均一/);
+  assert.match(data.groups[0].summary,/180〜239円→150円均一/);
+  assert.match(data.groups[0].summary,/240〜359円→250円均一/);
+  assert.equal(data.groups[0].averageSales,144);
+});
