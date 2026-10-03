@@ -425,7 +425,7 @@ test('イベント実績は過去開催・日付カード・時間帯グラフ�
   const index=read('Index.html');
   const eventResults=read('insight_event_results_v1.js');
   const events=read('insight_events_v1.js');
-  assert.match(index,/insight_events_v1\.js\?v=20261003-multi-condition-sale/);
+  assert.match(index,/insight_events_v1\.js\?v=20261003-range-label/);
   assert.match(index,/insight_event_results_v1\.js\?v=20261002-single-day-summary/);
   assert.ok(index.indexOf('insight_analysis_context_v1.js')<index.indexOf('insight_event_results_v1.js'));
   assert.ok(index.indexOf('insight_event_results_v1.js')<index.indexOf('insight_daily_anomaly_v1.js'));
