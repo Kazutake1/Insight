@@ -961,7 +961,8 @@ test('イベント実績は過去開催→複数日→時間帯グラフ→カ�
 
     function metricsFor(date){
       const day=Number(date.slice(-2));
-      return {salesYen:100000+day*1000,customers:90+day,customerUnitPrice:(100000+day*1000)/(90+day),items:200+day/100,inputDays:1};
+      const salesYen=100000+day*1000+987;
+      return {salesYen,customers:90+day,customerUnitPrice:salesYen/(90+day),items:200+day/100,inputDays:1};
     }
     window.InsightAnalysisContext.buildDay=function(date){
       return {metrics:metricsFor(date),conditions:{daily:[]}};
@@ -1008,11 +1009,13 @@ test('イベント実績は過去開催→複数日→時間帯グラフ→カ�
   await expect(page.locator('.er-occurrence')).toHaveCount(2);
   await expect(page.locator('.er-occurrence').first()).toContainText('2026/9/12');
   await expect(page.locator('.er-occurrence').first()).toContainText('9/13');
-  await expect(page.locator('.er-occurrence').first()).toContainText('売上 225,000円');
+  await expect(page.locator('.er-occurrence').first()).toContainText('売上 226,000円');
   await expect(page.locator('.er-occurrence').first()).toContainText('客数 205人');
 
   await page.locator('.er-occurrence').first().click();
   await expect(page.locator('.er-overview-grid .er-summary-card')).toHaveCount(4);
+  await expect(page.locator('.er-overview-grid .er-summary-card').first()).toContainText('226,000円');
+  await expect(page.locator('.er-daily-summary .er-summary-card').first()).toContainText('112,000円');
   await expect(page.locator('.er-daily-summary')).toBeVisible();
   await expect(page.locator('.er-day-tab')).toHaveCount(2);
   await expect(page.locator('.er-day-tab').first()).toHaveClass(/active/);
