@@ -13,6 +13,17 @@
     if(typeof v!=='string'||!/^\d{4}-\d{2}-\d{2}$/.test(v)||v<'1000-01-01')return false;
     var d=new Date(v+'T12:00:00Z');return Number.isFinite(d.getTime())&&d.toISOString().slice(0,10)===v;
   }
+  function validateSaleCondition(method,params){
+    requireValue(typeof method==='string'&&method.trim().length>0,'セール方式を確認してください。');
+    requireValue(object(params),'セール条件が不正です。');
+    (FIELDS[method]||[]).forEach(function(f){
+      var v=params[f[0]],optionalFixedBound=method==='fixed'&&(f[0]==='minPrice'||f[0]==='maxPrice');
+      if(optionalFixedBound&&(v===undefined||v===null||v===''))return;
+      if(f.length===2){str(v,f[1]);return;}
+      requireValue(typeof v==='number'&&Number.isFinite(v)&&v>=f[2]&&(f[3]===undefined||v<=f[3])&&(f[0]==='percent'||Number.isSafeInteger(v)),f[1]+'を確認してください。');
+    });
+    if(method==='fixed'&&params.minPrice!==undefined&&params.maxPrice!==undefined)requireValue(params.minPrice<=params.maxPrice,'価格の下限は上限以下にしてください。');
+  }
   function validateSnapshot(s){
     requireValue(object(s)&&s.version===1,'イベント内容の形式が不正です。');
     str(s.title,'名称');str(s.note,'補足',true);if(s.location!==undefined)str(s.location,'イベント場所',true);
@@ -25,16 +36,11 @@
         var targetKeys=new Set();sale.targets.forEach(function(target){
           requireValue(object(target),'対象カテゴリが不正です。');str(target.category,'対象カテゴリ');
           if(target.categoryId!==undefined)str(target.categoryId,'対象カテゴリ識別番号');
+          if(target.method!==undefined||target.params!==undefined)validateSaleCondition(target.method,target.params);
           var key=target.categoryId||'name:'+target.category;requireValue(!targetKeys.has(key),'対象カテゴリが重複しています。');targetKeys.add(key);
         });
       }
-      (FIELDS[sale.method]||[]).forEach(function(f){
-        var v=sale.params[f[0]],optionalFixedBound=sale.method==='fixed'&&(f[0]==='minPrice'||f[0]==='maxPrice');
-        if(optionalFixedBound&&(v===undefined||v===null||v===''))return;
-        if(f.length===2){str(v,f[1]);return;}
-        requireValue(typeof v==='number'&&Number.isFinite(v)&&v>=f[2]&&(f[3]===undefined||v<=f[3])&&(f[0]==='percent'||Number.isSafeInteger(v)),f[1]+'を確認してください。');
-      });
-      if(sale.method==='fixed'&&sale.params.minPrice!==undefined&&sale.params.maxPrice!==undefined)requireValue(sale.params.minPrice<=sale.params.maxPrice,'価格の下限は上限以下にしてください。');
+      validateSaleCondition(sale.method,sale.params);
     }
     return s;
   }
@@ -73,19 +79,30 @@
     return all;
   }
   function categorySummary(sale){return Array.isArray(sale.targets)&&sale.targets.length?sale.targets.map(function(target){return target.category;}).join('・'):sale.category;}
-  function summary(s){
-    if(!s.sale)return s.title;
-    var a=s.sale,p=a.params,t='';
-    switch(a.method){
+  function conditionText(method,p){
+    p=p||{};var t='';
+    switch(method){
       case 'amount':t=p.amount+'円引き';break;
       case 'percent':t=p.percent+'%引き';break;
       case 'fixed':t=p.minPrice!==undefined&&p.maxPrice!==undefined?p.minPrice+'〜'+p.maxPrice+'円の商品を'+p.price+'円均一':p.minPrice!==undefined?p.minPrice+'円以上の商品を'+p.price+'円均一':p.maxPrice!==undefined?p.maxPrice+'円以下の商品を'+p.price+'円均一':p.price+'円均一';break;
       case 'multi':t=p.quantity+'個購入で'+p.amount+'円引き';break;
       case 'gift':t=p.quantity+'個購入で'+p.giftProduct+p.giftQuantity+p.giftUnit+(p.giftType==='商品無料'?'無料':'（'+p.giftType+'）');break;
       case 'other':t=p.text;break;
-      default:t=s.title;
+      default:t='';
     }
-    return categorySummary(a)+' '+t;
+    return t;
+  }
+  function targetForCategory(sale,categoryId,categoryName){
+    var targets=Array.isArray(sale&&sale.targets)?sale.targets:[];
+    return targets.find(function(target){return categoryId&&target.categoryId===categoryId||categoryName&&target.category===categoryName;})||null;
+  }
+  function summary(s,categoryId,categoryName){
+    if(!s.sale)return s.title;
+    var a=s.sale,target=targetForCategory(a,categoryId,categoryName);
+    if(target&&(target.method||target.params))return target.category+' '+conditionText(target.method||a.method,target.params||a.params);
+    var individualized=Array.isArray(a.targets)&&a.targets.some(function(item){return item&&item.method&&item.params;});
+    if(individualized)return a.targets.map(function(item){return item.category+' '+conditionText(item.method||a.method,item.params||a.params);}).join(' / ');
+    return categorySummary(a)+' '+conditionText(a.method,a.params);
   }
   function presets(all){return all.eventManagement?all.eventManagement.presets:[];}
   function specialPresets(all){var m=all&&all.eventManagement;return m&&Array.isArray(m.specialPresets)?m.specialPresets:[];}
@@ -111,7 +128,7 @@
     else{requireValue(!!all.stores[storeId],'対象店舗がありません。');(all.stores[storeId].events||(all.stores[storeId].events=[])).push(e);}
     validate(all);return e.id;
   }
-  var model={validate:validate,validateSnapshot:validateSnapshot,summary:summary,list:list,presets:presets,specialPresets:specialPresets,findDuplicateSpecial:findDuplicateSpecial,add:add,copy:copy};
+  var model={validate:validate,validateSnapshot:validateSnapshot,summary:summary,targetForCategory:targetForCategory,list:list,presets:presets,specialPresets:specialPresets,findDuplicateSpecial:findDuplicateSpecial,add:add,copy:copy};
   if(typeof module!=='undefined'&&module.exports)module.exports=model;
   if(!root.document)return;
   root.InsightEvents=model;
