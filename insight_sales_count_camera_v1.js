@@ -1100,9 +1100,11 @@
           var consensus=consensusMultiDayResults([firstAnalyzed.multiDay,secondAnalyzed.multiDay]);
           var firstScore=firstAnalyzed.dateCandidates.length*10+firstAnalyzed.matchedCategories.length;
           var secondScore=secondAnalyzed.dateCandidates.length*10+secondAnalyzed.matchedCategories.length;
-          var analyzed=secondScore>firstScore?secondAnalyzed:firstAnalyzed;
-          analyzed.passes=[firstAnalyzed,secondAnalyzed];
-          analyzed.multiDay=consensus;
+          var baseAnalyzed=secondScore>firstScore?secondAnalyzed:firstAnalyzed;
+          var analyzed=Object.assign({},baseAnalyzed,{
+            passes:[firstAnalyzed,secondAnalyzed],
+            multiDay:consensus
+          });
           var sparsePsm=root.Tesseract.PSM&&root.Tesseract.PSM.SPARSE_TEXT!=null?root.Tesseract.PSM.SPARSE_TEXT:'11';
           await worker.setParameters({tessedit_pageseg_mode:sparsePsm,preserve_interword_spaces:'1'});
           activeItem.ocr=Object.assign({status:'done',progress:1},analyzed);
