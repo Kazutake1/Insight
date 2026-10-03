@@ -10,19 +10,7 @@ async function openInsight(page){
   const errors=[];
   page.on('pageerror',error=>errors.push(error.message));
   await page.goto('/Index.html',{waitUntil:'domcontentloaded'});
-  try{
-    await expect(page.locator('#nav1')).toBeVisible();
-  }catch(error){
-    const diagnostic=await page.evaluate(()=>({
-      readyState:document.readyState,
-      bodyText:(document.body&&document.body.innerText||'').slice(0,1200),
-      bodyHtml:(document.body&&document.body.innerHTML||'').slice(0,1800),
-      shell:window.__INSIGHT_SHELL_VERSION__||null,
-      controls:!!window.InsightInputPeriodControls
-    }));
-    console.log('INSIGHT_E2E_BOOT_DIAGNOSTIC',JSON.stringify({diagnostic,errors}));
-    throw error;
-  }
+  await expect(page.locator('#nav1')).toBeVisible();
   await page.waitForFunction(()=>window.InsightPagePeriodSync&&window.InsightInputPeriodControls&&window.InsightSalesPeriodSelector&&window.InsightSalesCount&&window.InsightSaleResults&&window.InsightHourlyCustomers&&window.InsightEventResults&&window.InsightAIVisual&&window.InsightAIInterpretation&&window.InsightAnalysisPeriodLock&&window.InsightMultiYearAnalysis&&window.InsightWeekdayAnalysis&&window.InsightSaleImpactAnalysis&&window.InsightEventImpactAnalysis&&window.InsightSeasonalityAnalysis&&window.InsightAnomalyExplanation&&window.InsightAnalysisBundle&&window.InsightSettings&&window.InsightDarkTheme&&document.getElementById('navSettings')&&document.getElementById('pageSettings'));
   return errors;
 }
@@ -36,7 +24,7 @@ async function selectDashboardSeptember(page){
   await expect.poll(()=>page.evaluate(()=>selMonth)).toBe('9月');
 }
 
-test.only('売上・客数・廃棄は販売数入力と同じ前月・年月・翌月の操作に統一される',async({page})=>{
+test('売上・客数・廃棄は販売数入力と同じ前月・年月・翌月の操作に統一される',async({page})=>{
   const errors=await openInsight(page);
   const year=await page.evaluate(()=>Number(allStores.stores[allStores.current].years.map(Number).sort((a,b)=>a-b).slice(-1)[0]));
 
