@@ -118,3 +118,27 @@ test('統合処理は保存データを書き換えない',()=>{
   bundle.build({year:2026,month:10,throughDay:3,storeId:'a'},d);
   assert.equal(JSON.stringify(d.allStores),before);
 });
+
+
+test('AI Provider非依存の標準Evidence契約を追加する',()=>{
+  const result=bundle.build({year:2026,month:10,throughDay:3,compareYear:2025,storeId:'a'},deps());
+  assert.equal(result.evidence.version,1);
+  assert.equal(result.evidence.contract,'InsightAIEvidence');
+  assert.equal(result.evidence.policy.providerNeutral,true);
+  assert.equal(result.evidence.policy.authoritativeKpi,false);
+  assert.equal(result.evidence.policy.causality,'association_only');
+  assert.ok(Array.isArray(result.evidence.items));
+  assert.ok(result.evidence.items.length>=3);
+  const daily=result.evidence.items.find(x=>x.origin==='daily');
+  assert.equal(daily.source,'signal');
+  assert.equal(daily.causality,'association_only');
+  assert.equal(daily.quality.status,'ok');
+  assert.equal(result.evidence.quality.partial,false);
+});
+
+test('Evidenceは分析失敗を欠損と混同せずqualityへ保持する',()=>{
+  const result=bundle.build({year:2026,month:10,throughDay:3,storeId:'a'},deps({weekdayFails:true}));
+  assert.equal(result.evidence.quality.partial,true);
+  assert.equal(result.evidence.quality.modules.weekday.status,'error');
+  assert.match(result.evidence.quality.modules.weekday.error,/weekday failed/);
+});
