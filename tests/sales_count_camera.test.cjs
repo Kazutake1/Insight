@@ -65,8 +65,16 @@ test('CAMERA-2は同一オリジンのローカルOCRを使用し画像を永続
 });
 
 test('OCR切り取り範囲は0-1へ正規化しピクセル座標へ変換する',()=>{
-  assert.deepEqual(camera.normalizeCropRect({x:0.1,y:0.2,w:0.5,h:0.4}),{x:0.1,y:0.2,w:0.5,h:0.4000000000000001});
-  assert.deepEqual(camera.normalizeCropRect({x:-0.2,y:0.1,w:0.8,h:1.2}),{x:0,y:0.1,w:0.6000000000000001,h:0.9});
+  const crop=camera.normalizeCropRect({x:0.1,y:0.2,w:0.5,h:0.4});
+  assert.ok(Math.abs(crop.x-0.1)<1e-9);
+  assert.ok(Math.abs(crop.y-0.2)<1e-9);
+  assert.ok(Math.abs(crop.w-0.5)<1e-9);
+  assert.ok(Math.abs(crop.h-0.4)<1e-9);
+  const clamped=camera.normalizeCropRect({x:-0.2,y:0.1,w:0.8,h:1.2});
+  assert.ok(Math.abs(clamped.x-0)<1e-9);
+  assert.ok(Math.abs(clamped.y-0.1)<1e-9);
+  assert.ok(Math.abs(clamped.w-0.6)<1e-9);
+  assert.ok(Math.abs(clamped.h-0.9)<1e-9);
   assert.equal(camera.normalizeCropRect({x:0.2,y:0.2,w:0.001,h:0.5}),null);
   assert.deepEqual(camera.cropPixelRect({x:0.25,y:0.25,w:0.5,h:0.5},1000,800),{x:250,y:200,w:500,h:400,full:false});
   assert.deepEqual(camera.cropPixelRect(null,1000,800),{x:0,y:0,w:1000,h:800,full:true});
