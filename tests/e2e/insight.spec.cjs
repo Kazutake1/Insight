@@ -24,6 +24,13 @@ async function selectDashboardSeptember(page){
   await expect.poll(()=>page.evaluate(()=>selMonth)).toBe('9月');
 }
 
+test.only('旧年月UIの本体描画ソースを診断する',async({page})=>{
+  await openInsight(page);
+  const probe=await page.evaluate(()=>window.__INSIGHT_PERIOD_SOURCE_PROBE__||null);
+  console.log('INSIGHT_PERIOD_SOURCE_PROBE',JSON.stringify(probe));
+  expect(probe).toBeTruthy();
+});
+
 test('売上・客数・廃棄は販売数入力と同じ前月・年月・翌月の操作に統一される',async({page})=>{
   const errors=await openInsight(page);
   const year=await page.evaluate(()=>Number(allStores.stores[allStores.current].years.map(Number).sort((a,b)=>a-b).slice(-1)[0]));

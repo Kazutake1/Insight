@@ -5,6 +5,19 @@
 (function(root){
 'use strict';
 function apply(html){
+  try{
+    function around(token,radius){
+      var i=html.indexOf(token);
+      return i<0?null:html.slice(Math.max(0,i-radius),Math.min(html.length,i+radius));
+    }
+    root.__INSIGHT_PERIOD_SOURCE_PROBE__={
+      renderYearPills:around('function renderYearPills',5000),
+      initInputPage:around('function initInputPage',9000),
+      editMonthType:around('editMonth[type]',5000),
+      yearPill:around('year-pill',3000),
+      monthPill:around('month-pill',3000)
+    };
+  }catch(_){}
   function patch(search,replacement){
     if(html.indexOf(search)<0){
       throw new Error('Insight互換パッチの適用対象が見つかりません: '+String(search).slice(0,80));
