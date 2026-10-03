@@ -354,7 +354,25 @@
     else p.checks.push('3か月トレンドは各月を比較年同月と照合し、±1.5pt程度の変化は横ばいとして扱います。');
     var events=review.current.conditions&&review.current.conditions.events||[];
     if(events.length)p.checks.push('登録イベント '+events.length+'件。数値変化との因果関係は断定せず照合してください。');
-    if(m!=='salesCounts'&&root.InsightAIInterpretation&&typeof root.InsightAIInterpretation.monthly==='function')p.structured=root.InsightAIInterpretation.monthly(review,theme);
+    if(m!=='salesCounts'&&root.InsightAIInterpretation&&typeof root.InsightAIInterpretation.monthly==='function'){
+      var cross=null;
+      try{
+        if(root.InsightAnalysisBundle&&typeof root.InsightAnalysisBundle.build==='function'){
+          cross=root.InsightAnalysisBundle.build({
+            year:Number(c.year),month:info.monthNumber,throughDay:c.through,
+            compareYear:c.prev,storeId:allStores.current
+          });
+          cross=root.InsightAIContext&&typeof root.InsightAIContext.compactCrossAnalysis==='function'?
+            root.InsightAIContext.compactCrossAnalysis(cross):cross.analysis?{
+              period:cross.period,signals:cross.signals,weekday:cross.analysis.weekday,
+              seasonality:cross.analysis.seasonality,anomaly:cross.analysis.anomaly,
+              saleImpacts:cross.analysis.saleImpacts,eventImpacts:cross.analysis.eventImpacts,
+              diagnostics:cross.diagnostics
+            }:null;
+        }
+      }catch(_){cross=null;}
+      p.structured=root.InsightAIInterpretation.monthly(review,theme,cross);
+    }
     savedNote(p);
     return p;
   }
