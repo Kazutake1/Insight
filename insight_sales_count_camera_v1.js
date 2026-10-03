@@ -1055,7 +1055,7 @@
   var doc=root.document;
   var session={targetDate:'',items:[],processing:false,engineStatus:''};
   var dialog=null,list=null,status=null,ocrStatus=null,resultsBox=null,dateInput=null,cameraInput=null,libraryInput=null;
-  var cropDialog=null,cropImage=null,cropSelection=null,cropTargetId=null,cropDraft=null,cropPointerId=null,cropStart=null,cropBeforeDrag=null;
+  var cropDialog=null,cropImage=null,cropSelection=null,cropPolygon=null,cropHandles=[],cropTargetId=null,cropDraft=null,cropQuadDraft=null,cropPointerId=null,cropStart=null,cropBeforeDrag=null,cropBeforeQuad=null,cropHandleIndex=null;
   var nextId=1;
 
   function salesApi(){return root.InsightSalesCount;}
@@ -1148,13 +1148,31 @@
     renderItems();
     return true;
   }
+  function quadFromRect(rect){
+    rect=normalizeCropRect(rect)||{x:0,y:0,w:1,h:1};
+    return [
+      {x:rect.x,y:rect.y},
+      {x:rect.x+rect.w,y:rect.y},
+      {x:rect.x+rect.w,y:rect.y+rect.h},
+      {x:rect.x,y:rect.y+rect.h}
+    ];
+  }
   function renderCropSelection(){
     if(!cropSelection)return;
-    var rect=normalizeCropRect(cropDraft)||{x:0,y:0,w:1,h:1};
+    var quad=normalizeQuad(cropQuadDraft);
+    var rect=quadBoundingRect(quad)||normalizeCropRect(cropDraft)||{x:0,y:0,w:1,h:1};
+    if(!quad)quad=quadFromRect(rect);
     cropSelection.style.left=(rect.x*100)+'%';
     cropSelection.style.top=(rect.y*100)+'%';
     cropSelection.style.width=(rect.w*100)+'%';
     cropSelection.style.height=(rect.h*100)+'%';
+    if(cropPolygon)cropPolygon.setAttribute('points',quad.map(function(point){return (point.x*1000)+','+(point.y*1000);}).join(' '));
+    cropHandles.forEach(function(handle,index){
+      var point=quad[index];
+      if(!point)return;
+      handle.style.left=(point.x*100)+'%';
+      handle.style.top=(point.y*100)+'%';
+    });
   }
   function cropPoint(event){
     if(!cropImage)return null;
@@ -1169,13 +1187,30 @@
     if(!cropStart||!point)return;
     var left=Math.min(cropStart.x,point.x),top=Math.min(cropStart.y,point.y);
     cropDraft={x:left,y:top,w:Math.abs(point.x-cropStart.x),h:Math.abs(point.y-cropStart.y)};
+    var valid=normalizeCropRect(cropDraft);
+    if(valid)cropQuadDraft=quadFromRect(valid);
+    renderCropSelection();
+  }
+  function updateCropCorner(point){
+    if(cropHandleIndex===null||!point||!Array.isArray(cropQuadDraft))return;
+    var next=cropQuadDraft.map(function(item){return {x:item.x,y:item.y};});
+    next[cropHandleIndex]={x:point.x,y:point.y};
+    cropQuadDraft=next;
+    cropDraft=quadBoundingRect(next)||cropDraft;
     renderCropSelection();
   }
   function finishCropDrag(){
     if(cropPointerId===null)return;
-    var valid=normalizeCropRect(cropDraft);
-    cropDraft=valid||(cropBeforeDrag||{x:0,y:0,w:1,h:1});
-    cropPointerId=null;cropStart=null;cropBeforeDrag=null;
+    if(cropHandleIndex!==null){
+      var quad=normalizeQuad(cropQuadDraft);
+      if(!quad)cropQuadDraft=cropBeforeQuad||quadFromRect(cropBeforeDrag||{x:0,y:0,w:1,h:1});
+      cropDraft=quadBoundingRect(cropQuadDraft)||cropBeforeDrag||{x:0,y:0,w:1,h:1};
+    }else{
+      var valid=normalizeCropRect(cropDraft);
+      cropDraft=valid||(cropBeforeDrag||{x:0,y:0,w:1,h:1});
+      cropQuadDraft=quadFromRect(cropDraft);
+    }
+    cropPointerId=null;cropStart=null;cropBeforeDrag=null;cropBeforeQuad=null;cropHandleIndex=null;
     renderCropSelection();
   }
   function ensureCropDialog(){
