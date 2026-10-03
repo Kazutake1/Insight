@@ -131,7 +131,40 @@ test('サイドバー下部は設定だけを表示し管理項目は設定ペ�
   await expect(page.locator('#insightSettingsDataActions')).toContainText('データ復元');
   await expect(page.locator('#insightSettingsDataActions #insightDataHealthButton')).toBeVisible();
   await expect(page.locator('#insightSettingsDataActions')).toContainText('CSVインポート');
-  await expect(page.locator('#insightSettingsDisplayActions #darkModeBtn')).toBeVisible();
+  await expect(page.locator('#insightSettingsDisplayActions')).toHaveCount(0);
+  await expect(page.locator('#pageSettings #darkModeBtn')).toBeHidden();
+  expect(errors).toEqual([]);
+});
+
+test('設定ボタンは他のサイドバーナビと文字・アイコン配置を揃える',async({page})=>{
+  const errors=await openInsight(page);
+  const styles=await page.evaluate(()=>{
+    function read(id){
+      const button=document.getElementById(id);
+      const icon=button&&button.querySelector('.nav-icon');
+      if(!button||!icon)return null;
+      const cs=getComputedStyle(button),is=getComputedStyle(icon);
+      return {
+        fontSize:cs.fontSize,
+        fontWeight:cs.fontWeight,
+        lineHeight:cs.lineHeight,
+        letterSpacing:cs.letterSpacing,
+        gap:cs.gap,
+        alignItems:cs.alignItems,
+        paddingTop:cs.paddingTop,
+        paddingRight:cs.paddingRight,
+        paddingBottom:cs.paddingBottom,
+        paddingLeft:cs.paddingLeft,
+        iconWidth:is.width,
+        iconHeight:is.height
+      };
+    }
+    return {settings:read('navSettings'),reference:read('navSalesCount')};
+  });
+  console.log('sidebar-style-check',styles);
+  expect(styles.settings).not.toBeNull();
+  expect(styles.reference).not.toBeNull();
+  expect(styles.settings).toEqual(styles.reference);
   expect(errors).toEqual([]);
 });
 
