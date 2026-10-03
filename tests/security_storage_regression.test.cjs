@@ -119,12 +119,12 @@ test('Index.htmlは必要先だけを許可するCSPを定義する',()=>{
     "script-src 'self' 'unsafe-inline' https://unpkg.com https://cdnjs.cloudflare.com",
     "style-src 'self' 'unsafe-inline'",
     "connect-src 'self' https://geocoding-api.open-meteo.com https://api.open-meteo.com https://historical-forecast-api.open-meteo.com https://www.jma.go.jp",
-    "img-src 'self' data:",
+    "img-src 'self' data: blob:",
     "object-src 'none'",
     "base-uri 'self'",
     "form-action 'self'",
     "frame-src 'none'",
-    "worker-src 'none'",
+    "worker-src 'self'",
     "upgrade-insecure-requests"
   ].forEach(directive=>assert.ok(policy.includes(directive),'CSPに '+directive+' が含まれること'));
   assert.doesNotMatch(policy,/'unsafe-eval'/);
