@@ -427,7 +427,7 @@ test('イベント実績は過去開催・日付カード・時間帯グラフ�
   const eventResults=read('insight_event_results_v1.js');
   const events=read('insight_events_v1.js');
   assert.match(index,/insight_events_v1\.js\?v=20261003-concise-sale-label/);
-  assert.match(index,/insight_event_results_v1\.js\?v=20261002-single-day-summary/);
+  assert.match(index,/insight_event_results_v1\.js\?v=20261003-sales-thousand-trunc/);
   assert.ok(index.indexOf('insight_analysis_context_v1.js')<index.indexOf('insight_event_results_v1.js'));
   assert.ok(index.indexOf('insight_event_results_v1.js')<index.indexOf('insight_daily_anomaly_v1.js'));
   assert.match(eventResults,/過去開催一覧/);
@@ -439,6 +439,9 @@ test('イベント実績は過去開催・日付カード・時間帯グラフ�
   assert.match(eventResults,/specialNames/);
   assert.match(eventResults,/\.er-toolbar \[hidden\]\{display:none!important\}/);
   assert.match(eventResults,/売上 /);
+  assert.match(eventResults,/Math\.trunc\(Number\(value\)\/1000\)\*1000/);
+  assert.match(eventResults,/summaryMetric\('売上',salesYen\(/);
+  assert.match(eventResults,/summaryMetric\('客単価',yen\(/);
   assert.match(eventResults,/客数 /);
   assert.match(eventResults,/er-day-tab/);
   assert.match(eventResults,/時間帯別客数/);
