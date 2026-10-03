@@ -103,3 +103,19 @@ test('malformed periods, scope, duplicates and conditions are rejected',()=>{
   assert.throws(()=>events.validateSnapshot(snapshot('percent',{percent:101})));
   assert.throws(()=>events.validateSnapshot(snapshot('multi',{quantity:1.5,amount:50})));
 });
+
+
+test('複数カテゴリーはカテゴリーごとに異なる均一価格条件を保持できる',()=>{
+  const a=data(),snap={version:1,title:'おにぎり複数価格',note:'',sale:{
+    category:'おにぎり179円以下・おにぎり180〜239円',categoryId:'cat_low',method:'fixed',params:{maxPrice:179,price:100},
+    targets:[
+      {categoryId:'cat_low',category:'おにぎり179円以下',method:'fixed',params:{maxPrice:179,price:100}},
+      {categoryId:'cat_mid',category:'おにぎり180〜239円',method:'fixed',params:{minPrice:180,maxPrice:239,price:150}}
+    ]
+  }};
+  events.validateSnapshot(snap);
+  assert.equal(events.summary(snap,'cat_low'),'おにぎり179円以下 179円以下の商品を100円均一');
+  assert.equal(events.summary(snap,'cat_mid'),'おにぎり180〜239円 180〜239円の商品を150円均一');
+  assert.match(events.summary(snap),/100円均一/);
+  assert.match(events.summary(snap),/150円均一/);
+});
