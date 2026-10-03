@@ -1255,6 +1255,148 @@
     });
   }
 
+  function loadImageSource(source){
+    return new Promise(function(resolve,reject){
+      var url='';
+      try{url=root.URL.createObjectURL(source);}catch(_){}
+      if(!url){reject(new Error('OCR用画像を開けませんでした'));return;}
+      var image=new root.Image();
+      image.onload=function(){
+        try{root.URL.revokeObjectURL(url);}catch(_){}
+        resolve(image);
+      };
+      image.onerror=function(){
+        try{root.URL.revokeObjectURL(url);}catch(_){}
+        reject(new Error('OCR用画像を開けませんでした'));
+      };
+      image.src=url;
+    });
+  }
+  async function buildFixedCellSheet(source,slots){
+    slots=Array.isArray(slots)?slots:[];
+    if(!slots.length)throw new Error('固定表のセル位置を確定できませんでした');
+    var image=await loadImageSource(source);
+    var tileW=144,tileH=82,columns=Math.min(8,Math.max(1,slots.length));
+    var rows=Math.ceil(slots.length/columns);
+    var canvas=doc.createElement('canvas');
+    canvas.width=columns*tileW;
+    canvas.height=rows*tileH;
+    var context=canvas.getContext('2d',{willReadFrequently:true});
+    if(!context)throw new Error('数字セル画像を作成できませんでした');
+    context.fillStyle='#fff';
+    context.fillRect(0,0,canvas.width,canvas.height);
+    context.imageSmoothingEnabled=true;
+    context.imageSmoothingQuality='high';
+    var tiles=[];
+    slots.forEach(function(slot,index){
+      var col=index%columns,row=Math.floor(index/columns);
+      var tx=col*tileW,ty=row*tileH;
+      var sx=Math.max(0,Math.min(image.naturalWidth-1,Number(slot.x0)||0));
+      var sy=Math.max(0,Math.min(image.naturalHeight-1,Number(slot.y0)||0));
+      var ex=Math.max(sx+1,Math.min(image.naturalWidth,Number(slot.x1)||sx+1));
+      var ey=Math.max(sy+1,Math.min(image.naturalHeight,Number(slot.y1)||sy+1));
+      var padX=12,padY=10;
+      context.drawImage(image,sx,sy,ex-sx,ey-sy,tx+padX,ty+padY,tileW-padX*2,tileH-padY*2);
+      tiles.push({key:slot.key,index:index,x0:tx,y0:ty,x1:tx+tileW,y1:ty+tileH});
+    });
+    return {canvas:canvas,tiles:tiles,tileW:tileW,tileH:tileH};
+  }
+  function thresholdNumericCanvas(sourceCanvas){
+    var canvas=doc.createElement('canvas');
+    canvas.width=sourceCanvas.width;canvas.height=sourceCanvas.height;
+    var context=canvas.getContext('2d',{willReadFrequently:true});
+    if(!context)return sourceCanvas;
+    context.drawImage(sourceCanvas,0,0);
+    var imageData=context.getImageData(0,0,canvas.width,canvas.height),data=imageData.data;
+    var histogram=new Array(256).fill(0),total=0,sum=0;
+    for(var i=0;i<data.length;i+=4){
+      var gray=Math.max(0,Math.min(255,Math.round(data[i]*0.299+data[i+1]*0.587+data[i+2]*0.114)));
+      histogram[gray]++;total++;sum+=gray;
+    }
+    var sumB=0,wB=0,best=0,threshold=180;
+    for(var t=0;t<256;t++){
+      wB+=histogram[t];
+      if(!wB)continue;
+      var wF=total-wB;
+      if(!wF)break;
+      sumB+=t*histogram[t];
+      var mB=sumB/wB,mF=(sum-sumB)/wF;
+      var between=wB*wF*(mB-mF)*(mB-mF);
+      if(between>best){best=between;threshold=t;}
+    }
+    threshold=Math.max(110,Math.min(225,threshold));
+    for(var p=0;p<data.length;p+=4){
+      var g=Math.round(data[p]*0.299+data[p+1]*0.587+data[p+2]*0.114);
+      var value=g<=threshold?0:255;
+      data[p]=data[p+1]=data[p+2]=value;data[p+3]=255;
+    }
+    context.putImageData(imageData,0,0);
+    return canvas;
+  }
+  function parseFixedCellSheet(data,tiles){
+    var lines=extractLayout(data&&data.blocks||[]),groups=new Map();
+    lines.forEach(function(line){
+      (Array.isArray(line.words)?line.words:[]).forEach(function(word){
+        var text=normalizeText(word&&word.text).replace(/[^0-9]/g,'');
+        var box=word&&word.bbox,x=centerX(box),y=centerY(box);
+        if(!text||!Number.isFinite(x)||!Number.isFinite(y))return;
+        var tile=(tiles||[]).find(function(candidate){return x>=candidate.x0&&x<candidate.x1&&y>=candidate.y0&&y<candidate.y1;});
+        if(!tile)return;
+        if(!groups.has(tile.key))groups.set(tile.key,[]);
+        groups.get(tile.key).push({text:text,x:x,confidence:Number.isFinite(Number(word.confidence))?Number(word.confidence):null});
+      });
+    });
+    var out=new Map();
+    groups.forEach(function(items,key){
+      items.sort(function(a,b){return a.x-b.x;});
+      var digits=items.map(function(item){return item.text;}).join('');
+      var value=Number(digits);
+      if(!digits||!Number.isSafeInteger(value)||value<0)return;
+      var confidences=items.map(function(item){return item.confidence;}).filter(Number.isFinite);
+      out.set(key,{value:value,confidence:confidences.length?Math.min.apply(null,confidences):null});
+    });
+    return out;
+  }
+  async function recognizeFixedCellSheet(worker,canvas,tiles,psm){
+    await worker.setParameters({
+      tessedit_pageseg_mode:psm,
+      tessedit_char_whitelist:'0123456789',
+      preserve_interword_spaces:'1'
+    });
+    var result=await worker.recognize(canvas,{rotateAuto:false},{text:true,blocks:true});
+    return parseFixedCellSheet(result&&result.data||{},tiles);
+  }
+  async function readFixedGridCells(worker,source,analyzed,categoriesList,referenceDate){
+    var plan=fixedGridPlan(analyzed&&analyzed.lines,categoriesList,referenceDate);
+    if(!plan)return null;
+    var slots=fixedGridSlots(plan);
+    if(!slots.length)return null;
+    var sheet=await buildFixedCellSheet(source,slots);
+    var thresholded=thresholdNumericCanvas(sheet.canvas);
+    var sparsePsm=root.Tesseract.PSM&&root.Tesseract.PSM.SPARSE_TEXT!=null?root.Tesseract.PSM.SPARSE_TEXT:'11';
+    var blockPsm=root.Tesseract.PSM&&root.Tesseract.PSM.SINGLE_BLOCK!=null?root.Tesseract.PSM.SINGLE_BLOCK:'6';
+    var pass1=await recognizeFixedCellSheet(worker,sheet.canvas,sheet.tiles,sparsePsm);
+    var pass2=await recognizeFixedCellSheet(worker,thresholded,sheet.tiles,sparsePsm);
+    var passes=[pass1,pass2],merged=fixedCellConsensus(passes,slots);
+    if(merged.unresolved>0&&(pass1.size||pass2.size)){
+      var pass3=await recognizeFixedCellSheet(worker,thresholded,sheet.tiles,blockPsm);
+      passes.push(pass3);
+      merged=fixedCellConsensus(passes,slots);
+    }
+    var warnings=[];
+    if(merged.unresolved)warnings.push('固定表OCRで一致しなかった '+merged.unresolved+'項目は空欄にしました');
+    return {
+      dates:plan.dates.slice(),
+      categories:plan.categories.map(function(category){return {id:category.id,name:category.name,activeTrips:category.activeTrips.slice()};}),
+      cells:merged.cells,
+      spatial:true,
+      fixedGrid:true,
+      fixedGridTotal:merged.total,
+      fixedGridUnresolved:merged.unresolved,
+      warnings:warnings
+    };
+  }
+
   function currentBounds(){
     return periodBounds(getPeriod());
   }
