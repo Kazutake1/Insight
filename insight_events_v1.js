@@ -120,7 +120,11 @@
   }
   function summary(s,categoryId,categoryName){
     if(!s.sale)return s.title;
-    var a=s.sale,segments=segmentsForCategory(a,categoryId,categoryName);
+    var a=s.sale,allSegments=Array.isArray(a.segments)?a.segments:[],segments=segmentsForCategory(a,categoryId,categoryName);
+    if(!categoryId&&!categoryName&&allSegments.length){
+      var counts={};allSegments.forEach(function(segment){var key=segment.categoryId||'name:'+segment.category;counts[key]=(counts[key]||0)+1;});
+      if(Object.keys(counts).some(function(key){return counts[key]>1;}))return allSegments.map(function(segment){return segmentSummary(s,segment);}).join(' / ');
+    }
     if(segments.length>1)return segments.map(function(segment){return segmentSummary(s,segment);}).join(' / ');
     var target=targetForCategory(a,categoryId,categoryName);
     if(target&&(target.method||target.params))return target.category+' '+conditionText(target.method||a.method,target.params||a.params);
