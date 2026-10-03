@@ -113,19 +113,28 @@
     var segments=Array.isArray(sale&&sale.segments)?sale.segments:[];
     return segments.filter(function(segment){return categoryId&&segment.categoryId===categoryId||categoryName&&segment.category===categoryName;});
   }
+  function segmentDetail(segment){
+    if(!segment)return '';
+    var label=String(segment.label||'').trim(),params=segment.params||{};
+    if(label&&segment.method==='fixed'&&params.price!==undefined)return label+'→'+params.price+'円均一';
+    var condition=conditionText(segment.method,params);
+    return label?(label+(condition?'：'+condition:'')):condition;
+  }
   function segmentSummary(snapshot,segment){
     if(!segment)return snapshot&&snapshot.title||'';
-    var label=String(segment.label||'').trim(),condition=conditionText(segment.method,segment.params);
-    return segment.category+(label?' '+label:'')+(condition?'：'+condition:'');
+    var detail=segmentDetail(segment);
+    return segment.category+(detail?' '+detail:'');
   }
   function summary(s,categoryId,categoryName){
     if(!s.sale)return s.title;
     var a=s.sale,allSegments=Array.isArray(a.segments)?a.segments:[],segments=segmentsForCategory(a,categoryId,categoryName);
     if(!categoryId&&!categoryName&&allSegments.length){
-      var counts={};allSegments.forEach(function(segment){var key=segment.categoryId||'name:'+segment.category;counts[key]=(counts[key]||0)+1;});
-      if(Object.keys(counts).some(function(key){return counts[key]>1;}))return allSegments.map(function(segment){return segmentSummary(s,segment);}).join(' / ');
+      var groups={};allSegments.forEach(function(segment){var key=segment.categoryId||'name:'+segment.category;(groups[key]||(groups[key]={category:segment.category,items:[]})).items.push(segment);});
+      if(Object.keys(groups).some(function(key){return groups[key].items.length>1;})){
+        return Object.keys(groups).map(function(key){var group=groups[key];return group.category+' '+group.items.map(segmentDetail).join(' / ');}).join(' ・ ');
+      }
     }
-    if(segments.length>1)return segments.map(function(segment){return segmentSummary(s,segment);}).join(' / ');
+    if(segments.length>1)return (segments[0].category||categoryName||'')+' '+segments.map(segmentDetail).join(' / ');
     var target=targetForCategory(a,categoryId,categoryName);
     if(target&&(target.method||target.params))return target.category+' '+conditionText(target.method||a.method,target.params||a.params);
     var individualized=Array.isArray(a.targets)&&a.targets.some(function(item){return item&&item.method&&item.params;});
@@ -219,7 +228,7 @@
       });
       if(!options.length)CATEGORIES.forEach(function(c){addOption('legacy:'+c,c);});
       if(!selectedKeys.size&&options.length)selectedKeys.add(options[0].key);
-      parent.append(el('p','同じカテゴリー内に複数の値引きパターンがある場合は「＋ 値引きパターンを追加」で実績区分を分けられます。','ie-muted'));
+      parent.append(el('p','同じカテゴリー内に複数の値引きパターンがある場合は「＋ 値引きパターンを追加」で条件を追加できます。販売・納品実績はカテゴリー全体で1つとして集計します。','ie-muted'));
       var categoriesBox=el('fieldset',undefined,'ie-category-options'),legend=el('legend','対象カテゴリー・値引き条件'),categoryList=el('div',undefined,'ie-sale-target-list'),rows=[];categoriesBox.append(legend,categoryList);parent.append(categoriesBox);
       function matchesOption(item,option){return item&&(option.categoryId&&item.categoryId===option.categoryId||item.category===option.name);}
       function initialTarget(option){return initialTargets.find(function(target){return matchesOption(target,option);})||null;}
@@ -255,7 +264,7 @@
         var card=el('div',undefined,'ie-sale-pattern'),top=el('div',undefined,'ie-sale-pattern-top');
         var title=el('strong','値引きパターン '+(row.patterns.length+1)),remove=button('削除',function(){if(row.patterns.length<=1)return;var at=row.patterns.indexOf(pattern);if(at>=0)row.patterns.splice(at,1);card.remove();row.patterns.forEach(function(item,index){item.title.textContent='値引きパターン '+(index+1);});updateRemoveButtons(row);});
         top.append(title,remove);card.append(top);
-        var label=field(card,'実績区分名（任意・例：179円以下）','text',seed.label||'');
+        var label=field(card,'条件名（任意・例：179円以下）','text',seed.label||'');
         var methodLabel=el('label',undefined,'ie-sale-target-method'),methodText=el('span','セール方式'),method=methodSelect(seed.method||'amount');methodLabel.append(methodText,method);card.append(methodLabel);
         var params=el('div',undefined,'ie-sale-target-params'),pattern={id:seed.id||segmentId(),row:row,card:card,title:title,remove:remove,label:label,method:method,params:params,inputs:{}};card.append(params);row.patterns.push(pattern);row.patternWrap.append(card);
         method.onchange=function(){drawCondition(pattern,null);syncRow(row);};drawCondition(pattern,seed);updateRemoveButtons(row);syncRow(row);return pattern;
