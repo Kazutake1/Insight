@@ -237,6 +237,17 @@
       }
     };
   }
+  function compactEvidence(bundle){
+    var evidence=bundle&&bundle.evidence;
+    if(!evidence||evidence.contract!=='InsightAIEvidence'||!Array.isArray(evidence.items))return null;
+    return {
+      version:evidence.version||1,
+      contract:'InsightAIEvidence',
+      policy:copy(evidence.policy||null),
+      items:copy(evidence.items),
+      quality:copy(evidence.quality||null)
+    };
+  }
 
   function monthlyAnalysis(target,e,overrides){
     if(!e.monthly||typeof e.monthly.review!=='function')throw new Error('月次レビューを利用できません。');
@@ -245,14 +256,16 @@
       compareYear:target.compareYear,storeId:target.store.id
     },overrides);
     var items=typeof review.forTheme==='function'?review.forTheme(target.theme):review.display;
-    var cross=null;
+    var cross=null,evidence=null;
     if(e.bundle&&typeof e.bundle.build==='function'){
       try{
-        cross=compactCrossAnalysis(e.bundle.build({
+        var analysisBundle=e.bundle.build({
           year:target.year,month:target.month,throughDay:target.throughDay,
           compareYear:target.compareYear,storeId:target.store.id,referenceDate:target.referenceDate
-        },overrides));
-      }catch(_){cross=null;}
+        },overrides);
+        cross=compactCrossAnalysis(analysisBundle);
+        evidence=compactEvidence(analysisBundle);
+      }catch(_){cross=null;evidence=null;}
     }
     return {
       facts:compactFacts(review.current),
@@ -265,6 +278,7 @@
         trends:copy(review.trends||{}),
         grossMargin:copy(review.grossMargin||null),
         labor:copy(review.labor||null),
+        evidence:evidence,
         crossAnalysis:cross
       }
     };
@@ -421,7 +435,8 @@
     stripFreeText:stripFreeText,
     resolveTarget:resolveTarget,
     compactFacts:compactFacts,
-    compactCrossAnalysis:compactCrossAnalysis
+    compactCrossAnalysis:compactCrossAnalysis,
+    compactEvidence:compactEvidence
   };
 
   if(typeof module!=='undefined'&&module.exports)module.exports=model;
