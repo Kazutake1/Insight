@@ -12,6 +12,7 @@ test('old data receives safe defaults without changing existing store fields',()
   assert.deepEqual(all.salesCountManagement.categories.map(c=>c.name),['おにぎり','サンドイッチ','麺類']);
   assert.deepEqual(all.salesCountManagement.categories.map(c=>c.activeTrips),[[true,true,true],[true,true,true],[true,true,true]]);
   assert.deepEqual(all.stores.a.salesCounts,{});
+  assert.deepEqual(all.stores.a.saleSegmentCounts,{});
 });
 
 test('zero is averaged and null is excluded independently by trip',()=>{
@@ -147,4 +148,33 @@ test('曜日別平均の対象外便はダッシュ表示かつグレー表示�
   assert.match(block,/\?'ー':fmt\(value\)/);
   assert.doesNotMatch(block,/対象外/);
   assert.match(source,/\.sc-average-row b\.sc-not-applicable\{background:var\(--surface2\)!important;border-color:var\(--border\)!important;color:var\(--text4\)!important\}/);
+});
+
+
+test('セール実績区分は通常販売数とは別の店舗別データとして検証・取得できる',()=>{
+  const all=base();sales.ensure(all);
+  all.stores.a.saleSegmentCounts['2026-09-15']={
+    evt_sale:{
+      seg_low:{trips:[{delivery:10,sales:8},{delivery:20,sales:18},{delivery:30,sales:28}]},
+      seg_mid:{trips:[{delivery:5,sales:4},{delivery:8,sales:7},{delivery:12,sales:11}]}
+    }
+  };
+  assert.doesNotThrow(()=>sales.validate(all));
+  assert.equal(sales.saleSegmentRecordAt(all,'a','2026-09-15','evt_sale','seg_mid').trips[1].sales,7);
+  assert.deepEqual(all.stores.a.salesCounts,{});
+});
+
+test('セール実績区分の不正値は通常販売数と同様に拒否する',()=>{
+  const all=base();sales.ensure(all);
+  all.stores.a.saleSegmentCounts['2026-09-15']={evt_sale:{seg_low:{trips:[{delivery:-1,sales:1},{delivery:null,sales:null},{delivery:null,sales:null}]}}};
+  assert.throws(()=>sales.validate(all),/セール実績区分/);
+});
+
+test('販売数入力ページは同一カテゴリー複数値引き時だけ専用区分カードを表示する契約を持つ',()=>{
+  const source=fs.readFileSync(path.join(__dirname,'..','insight_sales_count_v1.js'),'utf8');
+  assert.match(source,/function renderSaleSegments\(/);
+  assert.match(source,/segments\.length>1/);
+  assert.match(source,/id="scSaleSegments"/);
+  assert.match(source,/saleSegmentCounts/);
+  assert.match(source,/createSegmentDayCard/);
 });
