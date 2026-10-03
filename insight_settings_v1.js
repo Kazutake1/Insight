@@ -21,6 +21,7 @@
     var style=doc.createElement('style');
     style.id='insightSettingsStyle';
     style.textContent=[
+      '.sidebar-btn.insight-settings-nav{font-size:13.5px;font-weight:500;line-height:normal;gap:9px;padding:11px 12px}',
       '.sidebar-btn.insight-settings-nav.active{background:var(--text);color:#fff}',
       '.sidebar-btn.insight-settings-nav.active .nav-icon{opacity:1}',
       '.dark .sidebar-btn.insight-settings-nav.active{background:#e0e0e8;color:#111}',
