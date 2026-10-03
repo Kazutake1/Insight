@@ -939,6 +939,35 @@
       return cluster;
     }).filter(function(cluster){return cluster.count>=2;}).sort(function(a,b){return a.y-b.y;});
   }
+  function geometricLineBands(lines,anchorY,nextY){
+    var rows=[];
+    (Array.isArray(lines)?lines:[]).forEach(function(line){
+      var y=lineCenterY(line),box=bboxOf(line);
+      if(!Number.isFinite(y)||!box||y<=anchorY+4||(Number.isFinite(nextY)&&y>=nextY))return;
+      var row=rows.find(function(item){return Math.abs(item.y-y)<=8;});
+      if(!row){row={y:y,tops:[],bottoms:[],passes:new Set(),samples:0};rows.push(row);}
+      row.samples++;
+      row.y=(row.y*(row.samples-1)+y)/row.samples;
+      if(Number.isFinite(Number(box.y0)))row.tops.push(Number(box.y0));
+      if(Number.isFinite(Number(box.y1)))row.bottoms.push(Number(box.y1));
+      if(Number.isInteger(line.geometryPass))row.passes.add(line.geometryPass);
+    });
+    rows=rows.filter(function(row){return row.passes.size>=2;}).sort(function(a,b){return a.y-b.y;});
+    if(rows.length<2)return null;
+    var first=rows[0],second=rows[1],spacing=second.y-first.y;
+    if(!(spacing>5))return null;
+    if(rows[2]){
+      var nextGap=rows[2].y-second.y;
+      if(nextGap>0&&(spacing<nextGap*0.45||spacing>nextGap*1.8))return null;
+    }
+    function band(row){
+      var top=row.tops.length?medianNumber(row.tops):row.y-spacing*0.32;
+      var bottom=row.bottoms.length?medianNumber(row.bottoms):row.y+spacing*0.32;
+      var pad=Math.max(2,spacing*0.28);
+      return {y:row.y,top:Math.max(anchorY+1,top-pad),bottom:bottom+pad,source:'geometric-line',count:row.samples};
+    }
+    return {delivery:band(first),sales:band(second),spacing:spacing,source:'geometric-line'};
+  }
   function fixedMetricRows(lines,anchor,nextY){
     var clusters=numericRowClusters(lines,anchor.y,nextY);
     if(clusters.length>=2){
@@ -959,6 +988,9 @@
         return {delivery:clusterBand(deliveryCluster),sales:clusterBand(salesCluster),spacing:spacing,source:'numeric-cluster'};
       }
     }
+
+    var geometric=geometricLineBands(lines,anchor.y,nextY);
+    if(geometric)return geometric;
 
     var candidates=(Array.isArray(lines)?lines:[]).map(function(line){
       var y=lineCenterY(line),box=bboxOf(line),numbers=rowNumberSequence(line);
@@ -1241,6 +1273,7 @@
     isoDayDistance:isoDayDistance,
     recoverSingleMissingDateAnchor:recoverSingleMissingDateAnchor,
     numericRowClusters:numericRowClusters,
+    geometricLineBands:geometricLineBands,
     fixedGridPlan:fixedGridPlan,
     mergeGeometryLines:mergeGeometryLines,
     mergedDateAnchors:mergedDateAnchors,
