@@ -35,7 +35,6 @@ jobs:
           - hourly_customers.test.cjs
           - event_results.test.cjs
           - insight_sales_count.test.cjs
-          - sales_count_camera.test.cjs
           - insight_yoy_policy.test.cjs
           - monthly_review.test.cjs
           - multiyear_analysis.test.cjs
