@@ -1751,6 +1751,8 @@
         session.engineStatus='画像 '+(i+1)+' / '+session.items.length+' を読み取り中';
         renderItems();
         try{
+          var sparsePsm=root.Tesseract.PSM&&root.Tesseract.PSM.SPARSE_TEXT!=null?root.Tesseract.PSM.SPARSE_TEXT:'11';
+          await worker.setParameters({tessedit_pageseg_mode:sparsePsm,tessedit_char_whitelist:'',preserve_interword_spaces:'1'});
           var ocrInput=activeItem.file;
           if(activeItem.crop){
             session.engineStatus='画像 '+(i+1)+' / '+session.items.length+' の指定範囲を準備中';
@@ -1759,7 +1761,7 @@
           }
           session.engineStatus='画像 '+(i+1)+' / '+session.items.length+' を1回目解析中';
           renderItems();
-          var result=await worker.recognize(ocrInput,{rotateAuto:true},{text:true,blocks:true});
+          var result=await worker.recognize(ocrInput,{rotateAuto:!activeItem.crop},{text:true,blocks:true});
           var firstAnalyzed=analyzeOcrData(result&&result.data||{},categories(),session.targetDate);
           firstAnalyzed.multiDay=buildMultiDayData(firstAnalyzed.lines,categories(),session.targetDate);
 
@@ -1767,7 +1769,7 @@
           renderItems();
           var blockPsm=root.Tesseract.PSM&&root.Tesseract.PSM.SINGLE_BLOCK!=null?root.Tesseract.PSM.SINGLE_BLOCK:'6';
           await worker.setParameters({tessedit_pageseg_mode:blockPsm,preserve_interword_spaces:'1'});
-          var retryResult=await worker.recognize(ocrInput,{rotateAuto:true},{text:true,blocks:true});
+          var retryResult=await worker.recognize(ocrInput,{rotateAuto:!activeItem.crop},{text:true,blocks:true});
           var secondAnalyzed=analyzeOcrData(retryResult&&retryResult.data||{},categories(),session.targetDate);
           secondAnalyzed.multiDay=buildMultiDayData(secondAnalyzed.lines,categories(),session.targetDate);
 
@@ -1779,7 +1781,7 @@
             renderItems();
             var autoPsm=root.Tesseract.PSM&&root.Tesseract.PSM.AUTO!=null?root.Tesseract.PSM.AUTO:'3';
             await worker.setParameters({tessedit_pageseg_mode:autoPsm,preserve_interword_spaces:'1'});
-            var thirdResult=await worker.recognize(ocrInput,{rotateAuto:true},{text:true,blocks:true});
+            var thirdResult=await worker.recognize(ocrInput,{rotateAuto:!activeItem.crop},{text:true,blocks:true});
             var thirdAnalyzed=analyzeOcrData(thirdResult&&thirdResult.data||{},categories(),session.targetDate);
             thirdAnalyzed.multiDay=buildMultiDayData(thirdAnalyzed.lines,categories(),session.targetDate);
             passes.push(thirdAnalyzed);
@@ -1803,7 +1805,6 @@
             multiDay:consensus,
             fixedGridResult:fixedGridResult
           });
-          var sparsePsm=root.Tesseract.PSM&&root.Tesseract.PSM.SPARSE_TEXT!=null?root.Tesseract.PSM.SPARSE_TEXT:'11';
           await worker.setParameters({tessedit_pageseg_mode:sparsePsm,tessedit_char_whitelist:'',preserve_interword_spaces:'1'});
           activeItem.ocr=Object.assign({status:'done',progress:1},analyzed);
         }catch(error){
