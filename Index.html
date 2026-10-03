@@ -6,13 +6,13 @@
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
-<meta name="insight-shell-version" content="20261003-cross-analysis-2">
+<meta name="insight-shell-version" content="20261003-ai-pipeline-1">
 <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline' https://unpkg.com https://cdnjs.cloudflare.com; style-src 'self' 'unsafe-inline'; connect-src 'self' https://geocoding-api.open-meteo.com https://api.open-meteo.com https://historical-forecast-api.open-meteo.com https://www.jma.go.jp; img-src 'self' data: blob:; font-src 'self' data:; object-src 'none'; base-uri 'self'; form-action 'self'; frame-src 'none'; worker-src 'self'; media-src 'none'; manifest-src 'self'; upgrade-insecure-requests">
 <meta name="theme-color" content="#1a1a1a">
 <title>Insight</title>
 <script>
 (function(){
-  var BUILD="20261003-cross-analysis-2";
+  var BUILD="20261003-ai-pipeline-1";
   window.__INSIGHT_SHELL_VERSION__=BUILD;
   try{
     var params=new URLSearchParams(location.search);
@@ -44,11 +44,10 @@ Promise.all(files.map(function(file){return fetch('./'+file+'?v=20260905-2',{cac
 var b64=parts.join('').replace(/\s/g,''),bin=atob(b64),bytes=new Uint8Array(bin.length);for(var i=0;i<bin.length;i++)bytes[i]=bin.charCodeAt(i);var html=pako.ungzip(bytes,{to:'string'});if(html.indexOf('<!DOCTYPE html>')!==0&&html.indexOf('<!doctype html>')!==0)throw new Error('HTMLデータの検証に失敗しました');
 if(!window.InsightBootstrapPatches||typeof window.InsightBootstrapPatches.apply!=="function")throw new Error('互換パッチを読み込めませんでした');
 html=window.InsightBootstrapPatches.apply(html);
-var extra='<script>(function(){function C(){var m=typeof selMonth==="string"?selMonth:"",y=typeof baseYear!=="undefined"?baseYear:null,p=typeof cmpYear!=="undefined"?cmpYear:null,d=getAIAnalysisThroughDay(y,m),r=null;try{if(window.InsightYearComparison&&y!=null&&m)r=window.InsightYearComparison.getPeriod(y,m,d,p)}catch(e){}return r&&r.comparison?r.comparison:null}function A(l,x){return x&&x.pct!=null?l+"は前年比"+formatPctForComment(x)+"です。":l+"は比較できるデータがありません。"}function P(l,x){return x&&x.point!=null?l+"は前年差"+formatPointForComment(x)+"です。":l+"は比較できるデータがありません。"}window.buildAIQuestionAnswer=function(q){q=String(q||"").trim();if(!q)return"質問を入力してください。";var c=C();if(!c)return"前年比較に必要なデータが不足しているため、この質問にはまだ回答できません。";if(/廃棄|ロス/.test(q))return[A("廃棄額",c.wasteYen),P("廃棄率",c.wasteRate),c.wasteRate&&c.wasteRate.direction==="up"?"廃棄カテゴリの内訳を確認してください。":"現在の傾向を継続して確認してください。"].join("\\n");if(/客数|来店/.test(q))return[A("客数",c.customers),A("売上",c.salesYen),c.customers&&c.customers.direction==="down"?"曜日や天気との関係を確認してください。":""].filter(Boolean).join("\\n");if(/客単価/.test(q))return[A("客単価",c.customerUnitPrice),A("1人当たり買上点数",c.itemsPerCustomer),A("1点当たり売上",c.salesPerItem)].join("\\n");if(/買上|点数/.test(q))return[A("買上点数",c.items),A("1人当たり買上点数",c.itemsPerCustomer),A("1点当たり売上",c.salesPerItem)].join("\\n");if(/売上/.test(q))return[A("売上",c.salesYen),A("客数",c.customers),A("客単価",c.customerUnitPrice),c.salesYen&&c.salesYen.direction==="down"?"売上低下に対して、客数と客単価のどちらの影響が大きいか確認してください。":""].filter(Boolean).join("\\n");var arr=[],ms=[["売上",c.salesYen],["客数",c.customers],["客単価",c.customerUnitPrice],["買上点数",c.items],["1人当たり買上点数",c.itemsPerCustomer],["1点当たり売上",c.salesPerItem]];if(/良い|改善|伸び|上が/.test(q)){ms.forEach(function(v){if(v[1]&&v[1].direction==="up")arr.push(A(v[0],v[1]))});if(c.wasteYen&&c.wasteYen.direction==="down")arr.push(A("廃棄額",c.wasteYen));if(c.wasteRate&&c.wasteRate.direction==="down")arr.push(P("廃棄率",c.wasteRate));return arr.length?arr.join("\\n"):"前年と比べて明確に改善している主要項目は、現在の比較データからは確認できません。"}if(/問題|悪い|注意|課題|下が/.test(q)){ms.forEach(function(v){if(v[1]&&v[1].direction==="down")arr.push(A(v[0],v[1]))});if(c.wasteYen&&c.wasteYen.direction==="up")arr.push(A("廃棄額",c.wasteYen));if(c.wasteRate&&c.wasteRate.direction==="up")arr.push(P("廃棄率",c.wasteRate));return arr.length?arr.join("\\n"):"前年と比べて明確に悪化している主要項目は、現在の比較データからは確認できません。"}if(/確認|何を|見る|すべき/.test(q)){if(c.salesYen&&c.salesYen.direction==="down")arr.push("売上低下に対して、客数と客単価のどちらの影響が大きいか確認してください。");if(c.customers&&c.customers.direction==="down")arr.push("客数の前年差について、曜日や天気との関係を確認してください。");if(c.customerUnitPrice&&c.customerUnitPrice.direction==="down")arr.push("客単価について、1人当たり買上点数と1点当たり売上の変化を確認してください。");if(c.wasteRate&&c.wasteRate.direction==="up")arr.push("廃棄率について、廃棄カテゴリの内訳を確認してください。");return arr.length?arr.join("\\n"):"現在の比較結果を継続して確認してください。"}if(/前年|去年|比較|今月|全体|状況|どう/.test(q))return[A("売上",c.salesYen),A("客数",c.customers),A("客単価",c.customerUnitPrice),A("買上点数",c.items),A("廃棄額",c.wasteYen),P("廃棄率",c.wasteRate)].join("\\n");return"現在のローカル分析では、売上・客数・客単価・買上点数・廃棄・前年比較に関する質問に回答できます。\\n例：『今月の問題点は？』『廃棄は改善している？』『客数はどう？』"};window.askAIAnalysisQuestion=function(){var i=document.getElementById("aiAnalysisQuestion"),a=document.getElementById("aiAnalysisAnswer");if(!i||!a)return;a.textContent=window.buildAIQuestionAnswer(i.value);a.hidden=false};var old=window.renderAIAnalysisPanel;window.renderAIAnalysisPanel=function(){var period=document.getElementById("aiAnalysisPeriod"),s=document.getElementById("aiAnalysisSummary"),g=document.getElementById("aiAnalysisGood"),n=document.getElementById("aiAnalysisCaution"),k=document.getElementById("aiAnalysisChecks");if(!period||!s||!g||!n||!k){if(old)old();return}var m=typeof selMonth==="string"?selMonth:"",y=typeof baseYear!=="undefined"?baseYear:null,p=typeof cmpYear!=="undefined"?cmpYear:null,d=getAIAnalysisThroughDay(y,m),r=null,z=null;try{if(window.ManagementCommentEngine&&y!=null&&m)r=window.ManagementCommentEngine.getPeriod(y,m,d,p);if(window.InsightYearComparison&&y!=null&&m)z=window.InsightYearComparison.getPeriod(y,m,d,p)}catch(e){}period.textContent=[y?y+"年度":null,m||null,d?d+"日まで":null,p?"（前年差："+p+"年度）":null].filter(Boolean).join(" ")||"対象期間を取得できません";[s,g,n,k].forEach(function(e){e.innerHTML=""});function add(e,t,emp){var x=document.createElement("p");x.className=emp?"ai-analysis-empty":"ai-analysis-comment";x.textContent=t;e.appendChild(x)}var c=z&&z.comparison?z.comparison:null,cs=r&&Array.isArray(r.comments)?r.comments:[];if(!c){add(s,"前年比較に必要なデータが不足しているため、経営コメントを表示できません。",1);add(g,"比較できるデータがありません。",1);add(n,"比較できるデータがありません。",1);add(k,"入力済みデータと比較対象年度を確認してください。",1);return}cs.length?cs.forEach(function(t){add(s,t)}):add(s,"前年比較に必要なデータが不足しています。",1);var good=[],bad=[],chk=[],ms=[["売上",c.salesYen],["客数",c.customers],["客単価",c.customerUnitPrice],["買上点数",c.items],["1人当たり買上点数",c.itemsPerCustomer],["1点当たり売上",c.salesPerItem]];ms.forEach(function(v){if(!v[1]||v[1].pct==null)return;if(v[1].direction==="up")good.push(A(v[0],v[1]));else if(v[1].direction==="down")bad.push(A(v[0],v[1]))});if(c.wasteYen&&c.wasteYen.pct!=null)if(c.wasteYen.direction==="down")good.push(A("廃棄額",c.wasteYen));else if(c.wasteYen.direction==="up")bad.push(A("廃棄額",c.wasteYen));if(c.wasteRate&&c.wasteRate.point!=null)if(c.wasteRate.direction==="down")good.push(P("廃棄率",c.wasteRate));else if(c.wasteRate.direction==="up")bad.push(P("廃棄率",c.wasteRate));good.forEach(function(t){add(g,t)});bad.forEach(function(t){add(n,t)});if(!good.length)add(g,"前年を上回る改善項目は現在の比較データからは確認できません。",1);if(!bad.length)add(n,"前年を下回る主要項目は現在の比較データからは確認できません。",1);if(c.salesYen&&c.salesYen.direction==="down")chk.push("売上低下に対して、客数と客単価のどちらの影響が大きいか確認してください。");if(c.customers&&c.customers.direction==="down")chk.push("客数の前年差について、曜日や天気との関係を確認してください。");if(c.customerUnitPrice&&c.customerUnitPrice.direction==="down")chk.push("客単価について、1人当たり買上点数と1点当たり売上の変化を確認してください。");if(c.wasteRate&&c.wasteRate.direction==="up")chk.push("廃棄率について、廃棄カテゴリの内訳を確認してください。");if(!chk.length)chk.push("現在の比較結果を継続して確認してください。");chk.forEach(function(t){add(k,t)})};document.addEventListener("keydown",function(e){if(e.key==="Enter"&&!e.shiftKey&&e.target&&e.target.id==="aiAnalysisQuestion"){e.preventDefault();window.askAIAnalysisQuestion()}})})();<\/script>';
 // STEP5 retained bootstrap boundary: feature modules still have to be inserted into the decompressed payload before document.write().
 var orderedFeatureLoads=[
   './insight_yoy_policy_v1.js?v=20260930-1',
-  {inline:extra},
+  './insight_ai_compat_core_v1.js?v=20261003-ai-pipeline-1',
   './insight_date_context_v1.js?v=20260930-1',
   './insight_hooks_v1.js?v=20260930-hooks2',
   './insight_storage_v1.js?v=20261003-restore-readback',
@@ -95,15 +94,12 @@ var orderedFeatureLoads=[
   './insight_analysis_history_v1.js?v=20261001-step6',
   './insight_analysis_bundle_v1.js?v=20261003-bundle-1',
   './insight_ai_interpretation_v1.js?v=20261001-decision-analysis',
-  './insight_ai_context_v1.js?v=20261003-cross-analysis-2',
+  './insight_ai_context_v1.js?v=20261003-ai-pipeline-1',
   './insight_ai_page_comments_v1.js?v=20261001-decision-analysis',
   './insight_settings_v1.js?v=20261003-theme-icons',
   './insight_dark_theme_v1.js?v=20261003-firefox-dark-1'
 ];
-var orderedFeatureHtml=orderedFeatureLoads.map(function(entry){
-  if(typeof entry==='string')return '<script src="'+entry+'"></scr'+'ipt>';
-  return entry&&entry.inline?entry.inline:'';
-}).join('');
+var orderedFeatureHtml=orderedFeatureLoads.map(function(entry){return '<script src="'+entry+'"></scr'+'ipt>';}).join('');
 html=html.replace('</body>',orderedFeatureHtml+'</body>');
 document.open();document.write(html);document.close();
 }).catch(fail);
