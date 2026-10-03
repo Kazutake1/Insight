@@ -23,3 +23,13 @@ test('テーマカラーはdark時だけプラム色へ同期する',()=>{
   assert.match(source,/darkActive\(\)\?PALETTE\.background/);
   assert.match(source,/dataset\.insightLightThemeColor/);
 });
+
+
+test('テーマ切替UIは設定ボタン直上のトグルスイッチとして提供する',()=>{
+  const settings=fs.readFileSync(path.join(__dirname,'..','insight_settings_v1.js'),'utf8');
+  assert.match(settings,/insight-theme-toggle/);
+  assert.match(settings,/id="insightThemeToggle" type="checkbox" role="switch"/);
+  assert.match(settings,/sidebarActions\.replaceChildren\(themeWrap,nav\)/);
+  assert.match(settings,/dark\.click\(\)/);
+  assert.match(settings,/dark\.hidden=true/);
+});
