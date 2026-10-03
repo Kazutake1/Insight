@@ -25,7 +25,7 @@ test('画像は20MB以下のimageだけを受け付ける',()=>{
 });
 
 test('CAMERA-2は同一オリジンのローカルOCRを使用し画像を永続化しない',()=>{
-  assert.equal(camera.VERSION,7);
+  assert.equal(camera.VERSION,8);
   assert.deepEqual(camera.POLICY,{
     persistImages:false,
     externalTransmission:false,
@@ -282,6 +282,47 @@ test('日付間隔が不規則な場合は便列を推測しない',()=>{
   ];
   const result=camera.buildMultiDayData(lines,[{id:'a',name:'おにぎり',aliases:[],hidden:false,activeTrips:[true,true,true]}],'2025-10-30');
   assert.equal(result.cells.length,0);
+});
+
+test('2方式で一致しないセルがあれば3回目OCRを実行対象にする',()=>{
+  const category={id:'a',name:'おにぎり',activeTrips:[true,true,true]};
+  const empty={dates:['2025-11-01'],categories:[category],warnings:[],cells:[]};
+  const second={dates:['2025-11-01'],categories:[category],warnings:[],cells:[
+    {date:'2025-11-01',categoryId:'a',categoryName:'おにぎり',trip:1,field:'delivery',value:10,confidence:90,method:'bbox',geometryApproximate:true},
+    {date:'2025-11-01',categoryId:'a',categoryName:'おにぎり',trip:1,field:'sales',value:9,confidence:90,method:'bbox',geometryApproximate:true}
+  ]};
+  const consensus=camera.consensusMultiDayResults([empty,second]);
+  assert.equal(consensus.cells.length,0);
+  assert.equal(camera.shouldRunThirdPass([empty,second],consensus),true);
+});
+
+test('OCR2とOCR3で同じ値ならOCR1が0項目でも採用する',()=>{
+  const category={id:'a',name:'おにぎり',activeTrips:[true,true,true]};
+  const empty={dates:['2025-11-01'],categories:[category],warnings:[],cells:[]};
+  const second={dates:['2025-11-01'],categories:[category],warnings:[],cells:[
+    {date:'2025-11-01',categoryId:'a',categoryName:'おにぎり',trip:1,field:'delivery',value:10,confidence:90,method:'bbox',geometryApproximate:true},
+    {date:'2025-11-01',categoryId:'a',categoryName:'おにぎり',trip:1,field:'sales',value:9,confidence:90,method:'bbox',geometryApproximate:true}
+  ]};
+  const third=JSON.parse(JSON.stringify(second));
+  third.cells[0].confidence=88;
+  third.cells[1].confidence=87;
+  const consensus=camera.consensusMultiDayResults([empty,second,third]);
+  assert.equal(consensus.cells.length,2);
+  assert.equal(consensus.cells.every(cell=>cell.consensus===true),true);
+  assert.equal(camera.shouldRunThirdPass([second,third],consensus),false);
+});
+
+test('3回目OCRでも一致しない値は空欄のままにする',()=>{
+  const category={id:'a',name:'おにぎり',activeTrips:[true,true,true]};
+  const empty={dates:['2025-11-01'],categories:[category],warnings:[],cells:[]};
+  const second={dates:['2025-11-01'],categories:[category],warnings:[],cells:[
+    {date:'2025-11-01',categoryId:'a',categoryName:'おにぎり',trip:1,field:'sales',value:9,confidence:90,method:'bbox',geometryApproximate:true}
+  ]};
+  const third=JSON.parse(JSON.stringify(second));
+  third.cells[0].value=806;
+  const consensus=camera.consensusMultiDayResults([empty,second,third]);
+  assert.equal(consensus.cells.length,0);
+  assert.ok(consensus.warnings.some(message=>message.includes('一致しない 1項目')));
 });
 
 test('対象外便は複数日OCR結果から除外する',()=>{
