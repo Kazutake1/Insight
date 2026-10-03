@@ -11,7 +11,7 @@ async function openInsight(page){
   page.on('pageerror',error=>errors.push(error.message));
   await page.goto('/Index.html',{waitUntil:'domcontentloaded'});
   await expect(page.locator('#nav1')).toBeVisible();
-  await page.waitForFunction(()=>window.InsightPagePeriodSync&&window.InsightSalesPeriodSelector&&window.InsightSalesCount&&window.InsightSaleResults&&window.InsightHourlyCustomers&&window.InsightEventResults&&window.InsightAIVisual&&window.InsightAIInterpretation&&window.InsightAnalysisPeriodLock&&window.InsightMultiYearAnalysis&&window.InsightWeekdayAnalysis&&window.InsightSaleImpactAnalysis&&window.InsightEventImpactAnalysis&&window.InsightSeasonalityAnalysis&&window.InsightAnomalyExplanation&&window.InsightAnalysisBundle&&window.InsightSettings&&window.InsightDarkTheme&&document.getElementById('navSettings')&&document.getElementById('pageSettings'));
+  await page.waitForFunction(()=>window.InsightPagePeriodSync&&window.InsightInputPeriodControls&&window.InsightSalesPeriodSelector&&window.InsightSalesCount&&window.InsightSaleResults&&window.InsightHourlyCustomers&&window.InsightEventResults&&window.InsightAIVisual&&window.InsightAIInterpretation&&window.InsightAnalysisPeriodLock&&window.InsightMultiYearAnalysis&&window.InsightWeekdayAnalysis&&window.InsightSaleImpactAnalysis&&window.InsightEventImpactAnalysis&&window.InsightSeasonalityAnalysis&&window.InsightAnomalyExplanation&&window.InsightAnalysisBundle&&window.InsightSettings&&window.InsightDarkTheme&&document.getElementById('navSettings')&&document.getElementById('pageSettings'));
   return errors;
 }
 
@@ -24,39 +24,48 @@ async function selectDashboardSeptember(page){
   await expect.poll(()=>page.evaluate(()=>selMonth)).toBe('9月');
 }
 
-test('売上入力はコンパクトな年月セレクターで年・月を変更できる',async({page})=>{
+test('売上・客数・廃棄は販売数入力と同じ前月・年月・翌月の操作に統一される',async({page})=>{
   const errors=await openInsight(page);
-  await page.locator('#nav2').click();
-  await expect(page.locator('#insightSalesPeriodBar')).toBeVisible();
-  await expect(page.locator('#insightSalesPeriodCurrent')).toContainText('年');
-  await expect(page.locator('#insightSalesPeriodToday')).toHaveText('今月へ');
+  const year=await page.evaluate(()=>Number(allStores.stores[allStores.current].years.map(Number).sort((a,b)=>a-b).slice(-1)[0]));
 
-  const legacyVisible=await page.evaluate(()=>{
-    const page=document.getElementById('pageSales');
-    return Array.from(page.querySelectorAll('button,[role="button"]')).filter(node=>{
-      if(node.closest('#insightSalesPeriodBar')||node.closest('#insightSalesPeriodOverlay'))return false;
-      const text=(node.textContent||'').trim();
-      return (/^\d{4}年$/.test(text)||/^(?:[1-9]|1[0-2])月$/.test(text))&&node.offsetParent!==null;
-    }).length;
-  });
-  expect(legacyVisible).toBe(0);
+  for(const spec of [
+    {nav:'#nav2',type:'sales',page:'#pageSales'},
+    {nav:'#nav3',type:'kyaku',page:'#pageKyaku'},
+    {nav:'#nav4',type:'haiki',page:'#pageHaiki'}
+  ]){
+    await page.locator(spec.nav).click();
+    await page.evaluate(({type,year})=>{
+      InsightPagePeriodSync.setTarget({year,month:9,source:'e2eInputPeriod'});
+      InsightPagePeriodSync.syncCurrentPage();
+    },{type:spec.type,year});
+    const toolbar=page.locator(spec.page+' .insight-input-period-toolbar');
+    await expect(toolbar).toBeVisible();
+    await expect(toolbar.locator('button').nth(0)).toHaveText('‹ 前月');
+    await expect(toolbar.locator('[data-period-current]')).toHaveText(String(year)+'年 9月');
+    await expect(toolbar.locator('button').nth(1)).toHaveText('翌月 ›');
+    await expect(toolbar).toHaveClass(/sc-toolbar/);
+    await toolbar.locator('button').nth(1).click();
+    await expect.poll(()=>page.evaluate(type=>editMonth[type],spec.type)).toBe('10月');
+    await expect(toolbar.locator('[data-period-current]')).toHaveText(String(year)+'年 10月');
 
-  await page.locator('#insightSalesPeriodCurrent').click();
-  await expect(page.locator('#insightSalesPeriodOverlay')).toBeVisible();
-  await expect(page.locator('#insightSalesPeriodMonths button')).toHaveCount(12);
+    const legacyVisible=await page.evaluate(pageSelector=>{
+      const root=document.querySelector(pageSelector);
+      return Array.from(root.querySelectorAll('button,[role="button"]')).filter(node=>{
+        if(node.closest('.insight-input-period-toolbar'))return false;
+        const text=(node.textContent||'').trim();
+        return (/^\d{4}年$/.test(text)||/^(?:[1-9]|1[0-2])月$/.test(text))&&node.offsetParent!==null;
+      }).length;
+    },spec.page);
+    expect(legacyVisible).toBe(0);
+  }
 
-  const target=await page.evaluate(()=>{
-    const years=allStores.stores[allStores.current].years.map(Number).sort((a,b)=>a-b);
-    return {year:years[years.length-1],month:11};
-  });
-  await page.locator('#insightSalesPeriodYear').selectOption(String(target.year));
-  await page.locator('#insightSalesPeriodMonths button[data-month="11"]').click();
-  await page.locator('#insightSalesPeriodApply').click();
-  await expect(page.locator('#insightSalesPeriodOverlay')).toBeHidden();
-  await expect.poll(()=>page.evaluate(()=>String(editYear.sales))).toBe(String(target.year));
-  await expect.poll(()=>page.evaluate(()=>editMonth.sales)).toBe('11月');
-  await expect(page.locator('#insightSalesPeriodCurrent')).toContainText(String(target.year)+'年 11月');
+  await page.locator('#navSalesCount').click();
+  const salesCountToolbar=page.locator('#pageSalesCount .sc-toolbar');
+  await expect(salesCountToolbar.locator('#scPrev')).toHaveText('‹ 前月');
+  await expect(salesCountToolbar.locator('#scNext')).toHaveText('翌月 ›');
 
+  await expect(page.locator('#insightSalesPeriodOverlay')).toHaveCount(0);
+  await expect(page.locator('#insightSalesPeriodToday')).toHaveCount(0);
   expect(errors).toEqual([]);
 });
 
@@ -87,7 +96,7 @@ test('選択月は主要ページを横断しても維持される',async({page}
 test('トップページはビルド番号を持ち最新版確認をno-storeで行う',async({page})=>{
   const errors=await openInsight(page);
   const source=await page.evaluate(()=>fetch('/Index.html?e2e-shell-check=1',{cache:'no-store'}).then(r=>r.text()));
-  expect(source).toContain('name="insight-shell-version" content="20261003-sales-period-ui-1"');
+  expect(source).toContain('name="insight-shell-version" content="20261003-input-period-parity-1"');
   expect(source).toContain("fetch('./Index.html?insight_probe='+Date.now(),{cache:'no-store'})");
   expect(source).toContain("location.replace('./Index.html?insight_build='+encodeURIComponent(m[1]))");
   expect(errors).toEqual([]);

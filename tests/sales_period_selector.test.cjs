@@ -2,30 +2,41 @@ const test=require('node:test');
 const assert=require('node:assert/strict');
 const fs=require('node:fs');
 const path=require('node:path');
-const selector=require('../insight_sales_period_selector_v1.js');
+const controls=require('../insight_sales_period_selector_v1.js');
 
 test('月表記を1〜12へ正規化できる',()=>{
-  assert.equal(selector.monthNumber('10月'),10);
-  assert.equal(selector.monthNumber(1),1);
-  assert.equal(selector.monthNumber('13月'),null);
+  assert.equal(controls.monthNumber('10月'),10);
+  assert.equal(controls.monthNumber(1),1);
+  assert.equal(controls.monthNumber('13月'),null);
 });
 
-test('前月・次月は登録済み年度だけを年またぎできる',()=>{
-  const years=['2024','2025','2026'];
-  assert.deepEqual(selector.adjacentPeriod(2025,12,1,years),{year:2026,month:1});
-  assert.deepEqual(selector.adjacentPeriod(2025,1,-1,years),{year:2024,month:12});
-  assert.equal(selector.adjacentPeriod(2024,1,-1,years),null);
-  assert.equal(selector.adjacentPeriod(2026,12,1,years),null);
+test('販売数入力と同じく前月・翌月は年をまたいで1か月移動する',()=>{
+  assert.deepEqual(controls.shiftPeriod(2025,12,1),{year:2026,month:1});
+  assert.deepEqual(controls.shiftPeriod(2025,1,-1),{year:2024,month:12});
+  assert.deepEqual(controls.adjacentPeriod(2026,10,-1),{year:2026,month:9});
 });
 
-test('年度一覧は重複を除き昇順へ正規化する',()=>{
-  assert.deepEqual(selector.normalizeYears(['2026','2024',2025,'2026','bad']),[2024,2025,2026]);
+test('売上・客数・廃棄の3ページを同じ操作方法へ統一する',()=>{
+  const source=fs.readFileSync(path.join(__dirname,'..','insight_sales_period_selector_v1.js'),'utf8');
+  assert.match(source,/type:'sales'.*pageId:'pageSales'.*label:'売上'/);
+  assert.match(source,/type:'kyaku'.*pageId:'pageKyaku'.*label:'客数'/);
+  assert.match(source,/type:'haiki'.*pageId:'pageHaiki'.*label:'廃棄'/);
+  assert.match(source,/className='sc-toolbar insight-input-period-toolbar'/);
+  assert.match(source,/‹ 前月/);
+  assert.match(source,/翌月 ›/);
+  assert.doesNotMatch(source,/今月へ|年月を選択|insightSalesPeriodOverlay|data-month/);
 });
 
-test('売上年月UIは既存の保存処理を再実装しない',()=>{
+test('未登録年度は販売数入力と同じ年度追加確認を経由する',()=>{
+  const source=fs.readFileSync(path.join(__dirname,'..','insight_sales_period_selector_v1.js'),'utf8');
+  assert.match(source,/年度はダッシュボードに登録されていません/);
+  assert.match(source,/InsightYearManager\.promoteCurrent/);
+  assert.match(source,/既にある過去データは保持したまま/);
+});
+
+test('期間変更は既存同期処理を利用し保存処理を再実装しない',()=>{
   const source=fs.readFileSync(path.join(__dirname,'..','insight_sales_period_selector_v1.js'),'utf8');
   assert.match(source,/InsightPagePeriodSync\.setTarget/);
-  assert.match(source,/root\.addYear/);
-  assert.match(source,/pageSales/);
+  assert.match(source,/InsightPagePeriodSync\.syncCurrentPage/);
   assert.doesNotMatch(source,/localStorage|InsightStorage\.writeSnapshot|InsightStorage\.transaction|\bfetch\s*\(|XMLHttpRequest|WebSocket/);
 });
