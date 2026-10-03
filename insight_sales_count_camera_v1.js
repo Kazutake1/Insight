@@ -1324,21 +1324,69 @@
       image.src=src;
     });
   }
+  function canvasBlob(canvas){
+    return new Promise(function(resolve,reject){
+      canvas.toBlob(function(blob){
+        if(blob)resolve(blob);else reject(new Error('切り取り画像を作成できませんでした'));
+      },'image/jpeg',0.98);
+    });
+  }
+  async function warpQuadImage(image,quad){
+    quad=normalizeQuad(quad);
+    if(!quad)throw new Error('台形補正の四隅を確定できませんでした');
+    var naturalW=Math.max(1,image.naturalWidth),naturalH=Math.max(1,image.naturalHeight);
+    var sourceScale=Math.min(1,2200/Math.max(naturalW,naturalH));
+    var sourceW=Math.max(1,Math.round(naturalW*sourceScale)),sourceH=Math.max(1,Math.round(naturalH*sourceScale));
+    var sourceCanvas=doc.createElement('canvas');
+    sourceCanvas.width=sourceW;sourceCanvas.height=sourceH;
+    var sourceContext=sourceCanvas.getContext('2d',{willReadFrequently:true});
+    if(!sourceContext)throw new Error('台形補正用画像を作成できませんでした');
+    sourceContext.drawImage(image,0,0,sourceW,sourceH);
+    var points=quad.map(function(point){return {x:point.x*sourceW,y:point.y*sourceH};});
+    function distance(a,b){var dx=b.x-a.x,dy=b.y-a.y;return Math.sqrt(dx*dx+dy*dy);}
+    var outW=Math.max(distance(points[0],points[1]),distance(points[3],points[2]));
+    var outH=Math.max(distance(points[0],points[3]),distance(points[1],points[2]));
+    var outputScale=Math.min(1,1800/Math.max(1,outW),1400/Math.max(1,outH));
+    if(outW*outH*outputScale*outputScale>2400000)outputScale=Math.min(outputScale,Math.sqrt(2400000/(outW*outH)));
+    outW=Math.max(80,Math.round(outW*outputScale));
+    outH=Math.max(80,Math.round(outH*outputScale));
+    var sourceData=sourceContext.getImageData(0,0,sourceW,sourceH).data;
+    var outputCanvas=doc.createElement('canvas');
+    outputCanvas.width=outW;outputCanvas.height=outH;
+    var outputContext=outputCanvas.getContext('2d',{willReadFrequently:true});
+    if(!outputContext)throw new Error('台形補正用画像を作成できませんでした');
+    var output=outputContext.createImageData(outW,outH),dst=output.data;
+    var tl=points[0],tr=points[1],br=points[2],bl=points[3];
+    for(var y=0;y<outH;y++){
+      var v=outH<=1?0:y/(outH-1);
+      for(var x=0;x<outW;x++){
+        var u=outW<=1?0:x/(outW-1);
+        var topX=tl.x+(tr.x-tl.x)*u,topY=tl.y+(tr.y-tl.y)*u;
+        var bottomX=bl.x+(br.x-bl.x)*u,bottomY=bl.y+(br.y-bl.y)*u;
+        var sx=Math.max(0,Math.min(sourceW-1,Math.round(topX+(bottomX-topX)*v)));
+        var sy=Math.max(0,Math.min(sourceH-1,Math.round(topY+(bottomY-topY)*v)));
+        var si=(sy*sourceW+sx)*4,di=(y*outW+x)*4;
+        dst[di]=sourceData[si];dst[di+1]=sourceData[si+1];dst[di+2]=sourceData[si+2];dst[di+3]=255;
+      }
+    }
+    outputContext.putImageData(output,0,0);
+    return outputCanvas;
+  }
   async function ocrSourceForItem(item){
-    var normalized=normalizeCropRect(item&&item.crop);
-    if(!normalized)return item.file;
+    var normalized=normalizeCropRect(item&&item.crop),quad=normalizeQuad(item&&item.cropQuad);
+    if(!normalized&&!quad)return item.file;
     var image=await loadImageForCrop(item);
+    if(quad){
+      var warped=await warpQuadImage(image,quad);
+      return await canvasBlob(warped);
+    }
     var pixel=cropPixelRect(normalized,image.naturalWidth,image.naturalHeight);
     var canvas=doc.createElement('canvas');
     canvas.width=pixel.w;canvas.height=pixel.h;
     var context=canvas.getContext('2d');
     if(!context)throw new Error('切り取り画像を作成できませんでした');
     context.drawImage(image,pixel.x,pixel.y,pixel.w,pixel.h,0,0,pixel.w,pixel.h);
-    return await new Promise(function(resolve,reject){
-      canvas.toBlob(function(blob){
-        if(blob)resolve(blob);else reject(new Error('切り取り画像を作成できませんでした'));
-      },'image/jpeg',0.98);
-    });
+    return await canvasBlob(canvas);
   }
 
   function loadImageSource(source){
