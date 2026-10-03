@@ -116,7 +116,7 @@
   function segmentDetail(segment){
     if(!segment)return '';
     var label=String(segment.label||'').trim(),params=segment.params||{};
-    if(segment.method==='fixed'&&params.minPrice!==undefined&&params.maxPrice!==undefined)label=params.minPrice+'円〜'+params.maxPrice+'円';
+    if(segment.method==='fixed'&&params.minPrice!==undefined&&params.maxPrice!==undefined)label=params.minPrice+'〜'+params.maxPrice+'円';
     if(label&&segment.method==='fixed'&&params.price!==undefined)return label+'→'+params.price+'円均一';
     var condition=conditionText(segment.method,params);
     return label?(label+(condition?'：'+condition:'')):condition;
@@ -132,10 +132,10 @@
     if(!categoryId&&!categoryName&&allSegments.length){
       var groups={};allSegments.forEach(function(segment){var key=segment.categoryId||'name:'+segment.category;(groups[key]||(groups[key]={category:segment.category,items:[]})).items.push(segment);});
       if(Object.keys(groups).some(function(key){return groups[key].items.length>1;})){
-        return Object.keys(groups).map(function(key){var group=groups[key];return group.category+' '+group.items.map(segmentDetail).join(' / ');}).join(' ・ ');
+        return Object.keys(groups).map(function(key){var group=groups[key];return group.category+'：'+group.items.map(segmentDetail).join(' / ');}).join(' ｜ ');
       }
     }
-    if(segments.length>1)return (segments[0].category||categoryName||'')+' '+segments.map(segmentDetail).join(' / ');
+    if(segments.length>1)return (segments[0].category||categoryName||'')+'：'+segments.map(segmentDetail).join(' / ');
     var target=targetForCategory(a,categoryId,categoryName);
     if(target&&(target.method||target.params))return target.category+' '+conditionText(target.method||a.method,target.params||a.params);
     var individualized=Array.isArray(a.targets)&&a.targets.some(function(item){return item&&item.method&&item.params;});
