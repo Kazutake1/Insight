@@ -516,6 +516,15 @@ test('分析AIコメントは文章列ではなく構造化カードで表示し
   assert.doesNotThrow(()=>new vm.Script(visual),'AI visual module must be valid JavaScript');
 });
 
+test('月次分析AIは標準Evidenceを解釈層へ渡し旧crossAnalysisも互換維持する',()=>{
+  const page=read('insight_ai_page_comments_v1.js');
+  assert.match(page,/compactEvidence\(analysisBundle\)/);
+  assert.match(page,/compactCrossAnalysis\(analysisBundle\)/);
+  assert.match(page,/InsightAIInterpretation\.monthly\(review,theme,cross,evidence\)/);
+  assert.match(page,/evidence=null/);
+});
+
+
 test('分析AIはダッシュボード再掲ではなく4ブロックの意思決定支援へ変換する',()=>{
   const index=read('Index.html');
   const interpretation=read('insight_ai_interpretation_v1.js');
