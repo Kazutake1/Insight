@@ -31,13 +31,26 @@
       var sale=s.sale;requireValue(object(sale)&&object(sale.params),'セール条件が不正です。');
       str(sale.category,'対象カテゴリ');str(sale.method,'セール方式');
       if(sale.categoryId!==undefined)str(sale.categoryId,'対象カテゴリ識別番号');
+      var targetKeys=new Set();
       if(sale.targets!==undefined){
         requireValue(Array.isArray(sale.targets)&&sale.targets.length>0,'対象カテゴリを1件以上選択してください。');
-        var targetKeys=new Set();sale.targets.forEach(function(target){
+        sale.targets.forEach(function(target){
           requireValue(object(target),'対象カテゴリが不正です。');str(target.category,'対象カテゴリ');
           if(target.categoryId!==undefined)str(target.categoryId,'対象カテゴリ識別番号');
           if(target.method!==undefined||target.params!==undefined)validateSaleCondition(target.method,target.params);
           var key=target.categoryId||'name:'+target.category;requireValue(!targetKeys.has(key),'対象カテゴリが重複しています。');targetKeys.add(key);
+        });
+      }
+      if(sale.segments!==undefined){
+        requireValue(Array.isArray(sale.segments)&&sale.segments.length>0,'セール実績区分を1件以上設定してください。');
+        var segmentIds=new Set();sale.segments.forEach(function(segment){
+          requireValue(object(segment),'セール実績区分が不正です。');str(segment.id,'セール実績区分識別番号');str(segment.category,'対象カテゴリ');
+          if(segment.categoryId!==undefined)str(segment.categoryId,'対象カテゴリ識別番号');
+          if(segment.label!==undefined)str(segment.label,'実績区分名',true);
+          requireValue(!segmentIds.has(segment.id),'セール実績区分の識別番号が重複しています。');segmentIds.add(segment.id);
+          var targetKey=segment.categoryId||'name:'+segment.category;
+          if(targetKeys.size)requireValue(targetKeys.has(targetKey),'セール実績区分の対象カテゴリが一致しません。');
+          validateSaleCondition(segment.method,segment.params);
         });
       }
       validateSaleCondition(sale.method,sale.params);
@@ -96,9 +109,20 @@
     var targets=Array.isArray(sale&&sale.targets)?sale.targets:[];
     return targets.find(function(target){return categoryId&&target.categoryId===categoryId||categoryName&&target.category===categoryName;})||null;
   }
+  function segmentsForCategory(sale,categoryId,categoryName){
+    var segments=Array.isArray(sale&&sale.segments)?sale.segments:[];
+    return segments.filter(function(segment){return categoryId&&segment.categoryId===categoryId||categoryName&&segment.category===categoryName;});
+  }
+  function segmentSummary(snapshot,segment){
+    if(!segment)return snapshot&&snapshot.title||'';
+    var label=String(segment.label||'').trim(),condition=conditionText(segment.method,segment.params);
+    return segment.category+(label?' '+label:'')+(condition?'：'+condition:'');
+  }
   function summary(s,categoryId,categoryName){
     if(!s.sale)return s.title;
-    var a=s.sale,target=targetForCategory(a,categoryId,categoryName);
+    var a=s.sale,segments=segmentsForCategory(a,categoryId,categoryName);
+    if(segments.length>1)return segments.map(function(segment){return segmentSummary(s,segment);}).join(' / ');
+    var target=targetForCategory(a,categoryId,categoryName);
     if(target&&(target.method||target.params))return target.category+' '+conditionText(target.method||a.method,target.params||a.params);
     var individualized=Array.isArray(a.targets)&&a.targets.some(function(item){return item&&item.method&&item.params;});
     if(individualized)return a.targets.map(function(item){return item.category+' '+conditionText(item.method||a.method,item.params||a.params);}).join(' / ');
@@ -121,6 +145,7 @@
     return copy(global.concat(local).filter(function(e){return e.startDate<=end&&e.endDate>=start;}));
   }
   function id(){return 'evt_'+(root.crypto&&root.crypto.randomUUID?root.crypto.randomUUID():Date.now().toString(36)+'_'+Math.random().toString(36).slice(2));}
+  function segmentId(){return 'seg_'+(root.crypto&&root.crypto.randomUUID?root.crypto.randomUUID():Date.now().toString(36)+'_'+Math.random().toString(36).slice(2));}
   function management(all){return all.eventManagement||(all.eventManagement={version:1,presets:[],events:[]});}
   function add(all,storeId,event){
     var e=copy(event);e.id=id();
@@ -128,7 +153,7 @@
     else{requireValue(!!all.stores[storeId],'対象店舗がありません。');(all.stores[storeId].events||(all.stores[storeId].events=[])).push(e);}
     validate(all);return e.id;
   }
-  var model={validate:validate,validateSnapshot:validateSnapshot,summary:summary,targetForCategory:targetForCategory,list:list,presets:presets,specialPresets:specialPresets,findDuplicateSpecial:findDuplicateSpecial,add:add,copy:copy};
+  var model={validate:validate,validateSnapshot:validateSnapshot,summary:summary,targetForCategory:targetForCategory,segmentsForCategory:segmentsForCategory,segmentSummary:segmentSummary,list:list,presets:presets,specialPresets:specialPresets,findDuplicateSpecial:findDuplicateSpecial,add:add,copy:copy};
   if(typeof module!=='undefined'&&module.exports)module.exports=model;
   if(!root.document)return;
   root.InsightEvents=model;
