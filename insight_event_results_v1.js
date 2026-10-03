@@ -165,6 +165,10 @@
       return Number(value).toLocaleString('ja-JP',{minimumFractionDigits:digits,maximumFractionDigits:digits});
     }
     function yen(value){return value===null?'—':numberText(value,0)+'円';}
+    function salesYen(value){
+      if(value===null||value===undefined||!Number.isFinite(Number(value)))return '—';
+      return numberText(Math.trunc(Number(value)/1000)*1000,0)+'円';
+    }
     function people(value){return value===null?'—':numberText(value,0)+'人';}
     function dateLabel(value,year){
       var date=parseIso(value);if(!date)return value;
@@ -231,7 +235,7 @@
         var button=el('button',undefined,'er-occurrence');button.type='button';button.dataset.occurrenceId=occurrence.id;
         button.append(el('strong',periodLabel(occurrence),'er-occurrence-date'));
         var metrics=el('div',undefined,'er-occurrence-metrics');
-        metrics.append(el('span','売上 '+yen(occurrence.metrics.salesYen)),el('span','客数 '+people(occurrence.metrics.customers)));
+        metrics.append(el('span','売上 '+salesYen(occurrence.metrics.salesYen)),el('span','客数 '+people(occurrence.metrics.customers)));
         button.append(metrics);
         button.onclick=function(){
           state.occurrenceId=occurrence.id;
@@ -296,7 +300,7 @@
       var wrap=el('div',undefined,'er-day-tabs');
       occurrence.days.forEach(function(day){
         var button=el('button',undefined,'er-day-tab'+(day.date===state.selectedDate?' active':''));button.type='button';button.dataset.date=day.date;
-        button.append(el('strong',dateLabel(day.date,false)),el('span','売上 '+yen(day.metrics.salesYen)),el('span','客数 '+people(day.metrics.customers)));
+        button.append(el('strong',dateLabel(day.date,false)),el('span','売上 '+salesYen(day.metrics.salesYen)),el('span','客数 '+people(day.metrics.customers)));
         var hourly=root.InsightHourlyCustomers.status(allStores,currentStoreId(),day.date);
         if(hourly.complete)button.append(el('small','時間帯データあり'));
         button.onclick=function(){state.selectedDate=day.date;render();};
@@ -312,7 +316,7 @@
       head.append(heading);
       var cards=el('div',undefined,'er-overview-grid');
       cards.append(
-        summaryMetric('売上',yen(occurrence.metrics.salesYen)),
+        summaryMetric('売上',salesYen(occurrence.metrics.salesYen)),
         summaryMetric('客数',people(occurrence.metrics.customers)),
         summaryMetric('客単価',yen(occurrence.metrics.customerUnitPrice)),
         summaryMetric('買上点数',occurrence.metrics.items===null?'—':numberText(occurrence.metrics.items,2))
@@ -328,7 +332,7 @@
         var daily=el('section',undefined,'er-section er-daily-summary');daily.append(el('h2',dateLabel(selected.date,true)));
         var dailyCards=el('div',undefined,'er-daily-grid');
         dailyCards.append(
-          summaryMetric('売上',yen(selected.metrics.salesYen)),
+          summaryMetric('売上',salesYen(selected.metrics.salesYen)),
           summaryMetric('客数',people(selected.metrics.customers)),
           summaryMetric('客単価',yen(selected.metrics.customerUnitPrice)),
           summaryMetric('買上点数',selected.metrics.items===null?'—':numberText(selected.metrics.items,2))
