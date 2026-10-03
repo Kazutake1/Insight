@@ -17,7 +17,7 @@ test('payload互換パッチ11件はbootstrap moduleへ分離しIndexにはbody�
 
 test('トップページはキャッシュ抑止とビルド自己更新を持つ',()=>{
   const index=read('Index.html');
-  assert.match(index,/insight-shell-version" content="20261003-firefox-dark-1/);
+  assert.match(index,/insight-shell-version" content="20261003-analysis-bundle-1/);
   assert.match(index,/Cache-Control" content="no-cache, no-store, must-revalidate/);
   assert.match(index,/insight_probe=/);
   assert.match(index,/cache:'no-store'/);
@@ -274,6 +274,23 @@ test('Firefox系ダークテーマは設定モジュールの後に読み込み�
   assert.match(theme,/\.dark\{/);
   assert.doesNotMatch(theme,/localStorage|InsightStorage|\bfetch\s*\(|XMLHttpRequest|WebSocket/);
   assert.doesNotThrow(()=>new vm.Script(theme),'dark theme module must be valid JavaScript');
+});
+
+test('全分析バンドルは履歴の後・AI解釈の前に読み込み外部通信せず標準化する',()=>{
+  const index=read('Index.html');
+  const bundle=read('insight_analysis_bundle_v1.js');
+  assert.match(index,/insight_analysis_bundle_v1\.js\?v=20261003-bundle-1/);
+  assert.ok(index.indexOf('insight_analysis_history_v1.js')<index.indexOf('insight_analysis_bundle_v1.js'));
+  assert.ok(index.indexOf('insight_analysis_bundle_v1.js')<index.indexOf('insight_ai_interpretation_v1.js'));
+  assert.match(bundle,/contract:'InsightAnalysisBundle'/);
+  assert.match(bundle,/aiConnected:false/);
+  assert.match(bundle,/externalTransmission:false/);
+  assert.match(bundle,/analysis:\{/);
+  assert.match(bundle,/reviews:\{/);
+  assert.match(bundle,/signals:signalsFrom/);
+  assert.match(bundle,/diagnostics:diagnostics/);
+  assert.doesNotMatch(bundle,/localStorage|InsightStorage|\bfetch\s*\(|XMLHttpRequest|WebSocket/);
+  assert.doesNotThrow(()=>new vm.Script(bundle),'analysis bundle module must be valid JavaScript');
 });
 
 test('保存データ健全性チェックは読み取り専用で不整合を可視化する',()=>{
