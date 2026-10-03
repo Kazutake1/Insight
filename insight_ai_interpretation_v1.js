@@ -146,13 +146,49 @@
     if(good.length)return ['【結論】'+period+'は優先度の高い悪化がなく、「'+good[0].title+'」が改善側です。'];
     return ['【結論】'+period+'は優先度の高い悪化項目は確認されていません。'];
   }
-  function interpretReview(review,kind,theme){
+  function crossEvidence(cross){
+    if(!cross)return [];
+    var lines=[],weekday=cross.weekday,season=cross.seasonality;
+    function add(prefix,text){if(text)lines.push('【'+prefix+'】'+String(text));}
+    if(weekday){
+      var rows=weekday.rows||weekday.weekdays||weekday.items||[];
+      var weak=Array.isArray(rows)?rows.filter(function(row){
+        var metrics=row&&row.metrics||{},customer=metrics.customers||metrics.customerCount||null;
+        var code=customer&&customer.position&&customer.position.code;
+        return code==='low'||customer&&customer.direction==='down';
+      }).slice(0,2):[];
+      if(weak.length)add('補強',weak.map(function(row){return (row.weekdayLabel||row.label||'特定曜日')+'曜日の客数が弱い';}).join(' / ')+'。');
+    }
+    if(season&&season.metrics){
+      var sales=season.metrics.sales||season.metrics.salesYen,customers=season.metrics.customers;
+      [sales,customers].forEach(function(metric){
+        if(!metric||!metric.relationship)return;
+        var code=metric.relationship.code,label=metric.relationship.label;
+        if(code==='current_only_low'||code==='current_only_high')add('説明しにくい要因','現在の変化は例年の季節性だけでは説明しにくい（'+label+'）。');
+        else if(code==='recurring_low'||code==='recurring_high')add('補強','例年の季節傾向と同方向（'+label+'）。');
+      });
+    }
+    function impactLines(list,label){
+      (Array.isArray(list)?list:[]).forEach(function(entry){
+        if(!entry||entry.status!=='ok'||!entry.impact)return;
+        var impact=entry.impact,kpi=impact.kpi&&impact.kpi.metrics||{},sales=kpi.sales||kpi.salesYen||kpi.customers;
+        var direction=sales&&sales.pattern&&sales.pattern.duringVsBefore&&sales.pattern.duringVsBefore.direction||
+          sales&&sales.comparison&&sales.comparison.direction||null;
+        if(direction==='up'||direction==='down')add('補強',label+(entry.title?'「'+entry.title+'」':'')+'の実績変化は'+(direction==='up'?'上向き':'下向き')+'。');
+      });
+    }
+    impactLines(cross.saleImpacts,'セール');
+    impactLines(cross.eventImpacts,'イベント');
+    return uniq(lines).slice(0,3);
+  }
+
+  function interpretReview(review,kind,theme,cross){
     var items=pickItems(review,theme),relations=[];
     salesRelation(review,kind,relations);
     basketRelation(review,kind,relations);
     wasteSupplyRelation(review,kind,relations);
     if(theme==='dashboard'||theme==='daily'||!theme)contextRelation(review,relations);
-    relations=uniq(relations).slice(0,4);
+    relations=uniq(relations.concat(crossEvidence(cross))).slice(0,5);
     var checks=checksFor(items,review,relations);
     return {
       conclusion:conclusion(items,kind),
@@ -161,8 +197,8 @@
       checks:checks
     };
   }
-  function monthly(review,theme){return interpretReview(review,'month',theme);}
-  function weekly(review,theme){return interpretReview(review,'week',theme);}
+  function monthly(review,theme,cross){return interpretReview(review,'month',theme,cross);}
+  function weekly(review,theme,cross){return interpretReview(review,'week',theme,cross);}
   function daily(anomaly,panel){
     var display=anomaly&&Array.isArray(anomaly.display)?anomaly.display:[],opportunities=anomaly&&Array.isArray(anomaly.opportunities)?anomaly.opportunities:[];
     var items=display.slice(0,4);
@@ -195,7 +231,7 @@
     return {conclusion:[conclusionLine],priorities:priorities.slice(0,5),relations:uniq(relations).slice(0,4),checks:uniq(checks).slice(0,4)};
   }
 
-  var model={VERSION:VERSION,monthly:monthly,weekly:weekly,daily:daily,pickItems:pickItems,itemPriority:itemPriority};
+  var model={VERSION:VERSION,monthly:monthly,weekly:weekly,daily:daily,pickItems:pickItems,itemPriority:itemPriority,crossEvidence:crossEvidence};
   if(typeof module!=='undefined'&&module.exports)module.exports=model;
   root.InsightAIInterpretation=model;
 })(typeof window!=='undefined'?window:globalThis);
