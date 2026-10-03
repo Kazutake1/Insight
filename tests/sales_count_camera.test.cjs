@@ -25,7 +25,7 @@ test('画像は20MB以下のimageだけを受け付ける',()=>{
 });
 
 test('CAMERA-2は同一オリジンのローカルOCRを使用し画像を永続化しない',()=>{
-  assert.equal(camera.VERSION,8);
+  assert.equal(camera.VERSION,9);
   assert.deepEqual(camera.POLICY,{
     persistImages:false,
     externalTransmission:false,
@@ -50,6 +50,10 @@ test('CAMERA-2は同一オリジンのローカルOCRを使用し画像を永続
   assert.match(source,/className='sc-camera-open'/);
   assert.match(source,/aria-label','カメラ読取'/);
   assert.match(source,/sc-camera-open-icon/);
+  assert.match(source,/読取範囲を指定/);
+  assert.match(source,/sc-camera-crop-selection/);
+  assert.match(source,/canvas\.toBlob/);
+  assert.match(source,/worker\.recognize\(ocrInput/);
   assert.doesNotMatch(source,/button\.textContent='カメラ読取'/);
   assert.match(source,/URL\.createObjectURL/);
   assert.match(source,/URL\.revokeObjectURL/);
@@ -58,6 +62,14 @@ test('CAMERA-2は同一オリジンのローカルOCRを使用し画像を永続
   assert.match(source,/vendor\/ocr\//);
   assert.doesNotMatch(source,/cdn\.jsdelivr|unpkg\.com|projectnaptha/);
   assert.doesNotMatch(source,/localStorage|sessionStorage|indexedDB|InsightStorage|\bfetch\s*\(|XMLHttpRequest|WebSocket/);
+});
+
+test('OCR切り取り範囲は0-1へ正規化しピクセル座標へ変換する',()=>{
+  assert.deepEqual(camera.normalizeCropRect({x:0.1,y:0.2,w:0.5,h:0.4}),{x:0.1,y:0.2,w:0.5,h:0.4000000000000001});
+  assert.deepEqual(camera.normalizeCropRect({x:-0.2,y:0.1,w:0.8,h:1.2}),{x:0,y:0.1,w:0.6000000000000001,h:0.9});
+  assert.equal(camera.normalizeCropRect({x:0.2,y:0.2,w:0.001,h:0.5}),null);
+  assert.deepEqual(camera.cropPixelRect({x:0.25,y:0.25,w:0.5,h:0.5},1000,800),{x:250,y:200,w:500,h:400,full:false});
+  assert.deepEqual(camera.cropPixelRect(null,1000,800),{x:0,y:0,w:1000,h:800,full:true});
 });
 
 test('複数日画面は対象日の直接OCR失敗でも日付範囲から判定する',()=>{
