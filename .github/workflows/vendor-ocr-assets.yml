@@ -31,7 +31,7 @@ jobs:
           mkdir -p "$work"
           cd "$work"
           npm init -y >/dev/null 2>&1
-          npm install --ignore-scripts --no-audit --no-fund --save-exact             tesseract.js@7.0.0             tesseract.js-core@7.0.0             @tesseract.js-data/jpn@1.0.0
+          npm install --ignore-scripts --no-audit --no-fund --save-exact tesseract.js@7.0.0 tesseract.js-core@7.0.0 @tesseract.js-data/jpn@1.0.0
 
       - name: Copy local OCR runtime
         shell: bash
@@ -65,21 +65,21 @@ jobs:
             fi
           done
 
-          cat > vendor/ocr/NOTICE.txt <<'EOF'
-Insight local OCR runtime
+          printf '%s\n' \
+            'Insight local OCR runtime' \
+            '' \
+            'Pinned packages:' \
+            '- tesseract.js 7.0.0' \
+            '- tesseract.js-core 7.0.0' \
+            '- @tesseract.js-data/jpn 1.0.0 (4.0.0_best_int/jpn.traineddata.gz)' \
+            '' \
+            'Runtime policy:' \
+            '- Assets are served from the same Insight origin.' \
+            '- OCR images are not uploaded to these projects or any external OCR service.' \
+            '- Tesseract language caching is disabled by Insight.' \
+            > vendor/ocr/NOTICE.txt
 
-Pinned packages:
-- tesseract.js 7.0.0
-- tesseract.js-core 7.0.0
-- @tesseract.js-data/jpn 1.0.0 (4.0.0_best_int/jpn.traineddata.gz)
-
-Runtime policy:
-- Assets are served from the same Insight origin.
-- OCR images are not uploaded to these projects or any external OCR service.
-- Tesseract language caching is disabled by Insight so recognized image data and OCR cache are not written to IndexedDB by the OCR integration.
-EOF
-
-          find vendor/ocr -type f ! -name SHA256SUMS.txt -print0             | sort -z             | xargs -0 sha256sum > vendor/ocr/SHA256SUMS.txt
+          find vendor/ocr -type f ! -name SHA256SUMS.txt -print0 | sort -z | xargs -0 sha256sum > vendor/ocr/SHA256SUMS.txt
 
       - name: Commit vendored OCR assets
         shell: bash
