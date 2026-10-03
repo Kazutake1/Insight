@@ -154,7 +154,7 @@
       #insightEvents{margin-top:10px;font-size:12px}#insightEvents .ie-head{display:flex;align-items:center;justify-content:space-between;gap:8px;margin-bottom:6px}
       #insightEvents button,.ie-dialog button{border:1px solid var(--border);border-radius:9px;background:var(--surface2);color:var(--text);padding:7px 10px;font:inherit;cursor:pointer}
       #insightEvents .ie-list{display:flex;flex-wrap:wrap;gap:6px}.ie-chip{display:flex;align-items:center;gap:6px;max-width:100%;background:var(--surface2);border:1px solid var(--border);border-radius:9px;padding:4px 7px}.ie-chip span{overflow-wrap:anywhere}.ie-chip small{color:var(--text4);white-space:nowrap}#insightEvents .ie-chip button{padding:0 5px;border:0;font-size:17px}#insightEvents .ie-chip .ie-summary{font-size:12px;text-align:left;overflow-wrap:anywhere;min-width:0;padding:0}#insightEvents .ie-chip .ie-edit{font-size:11px;padding:2px 6px;border:1px solid var(--border);border-radius:7px}#insightEvents .ie-chip .ie-note-row{flex-basis:100%;display:flex;align-items:flex-start;gap:6px;min-width:0}#insightEvents .ie-chip .ie-note{flex:1 1 auto;min-width:0;font-size:11px;line-height:1.45;color:var(--text3);white-space:pre-wrap;overflow-wrap:anywhere;padding:2px 0 1px}
-      .ie-dialog{position:fixed;inset:0;margin:auto;box-sizing:border-box;width:min(520px,calc(100vw - 24px));max-height:88vh;overflow:auto;border:1px solid var(--border);border-radius:18px;padding:20px;background:var(--surface);color:var(--text);font:12px/1.55 -apple-system,BlinkMacSystemFont,'Noto Sans JP',sans-serif;box-shadow:0 12px 40px #0003}.ie-dialog::backdrop{background:#0005}.ie-dialog h2{font-size:16px;margin:0}.ie-dialog header{display:flex;align-items:center;justify-content:space-between;margin-bottom:12px}.ie-dialog label{display:flex;flex-direction:column;gap:4px;margin:10px 0}.ie-dialog input,.ie-dialog select,.ie-dialog textarea{width:100%;box-sizing:border-box;border:1px solid var(--border);border-radius:9px;padding:9px;background:var(--input-bg,var(--surface2));color:var(--text);font:inherit}.ie-dialog textarea{min-height:64px;resize:vertical}.ie-category-options{border:1px solid var(--border);border-radius:11px;padding:8px 10px;margin:10px 0}.ie-category-options legend{font-weight:700;padding:0 4px}.ie-category-list{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:3px 10px}.ie-dialog .ie-category-option{display:flex;flex-direction:row;align-items:center;gap:7px;margin:0;padding:5px 2px}.ie-dialog .ie-category-option input{width:auto;margin:0;accent-color:#15803d}.ie-dates{display:grid;grid-template-columns:1fr 1fr;gap:10px}.ie-actions{display:flex;justify-content:flex-end;gap:8px;margin-top:16px}.ie-dialog .ie-primary{background:var(--text);color:var(--surface)}.ie-muted{font-size:11px;color:var(--text4);margin:5px 0}.ie-presets{display:flex;flex-wrap:wrap;gap:6px}.ie-preset-row{border-bottom:1px solid var(--border);padding:10px 0}.ie-preset-row div{display:flex;gap:6px;flex-wrap:wrap;margin-top:6px}.ie-dialog button:disabled{opacity:.4;cursor:default}@media(max-width:520px){.ie-category-list{grid-template-columns:1fr}}
+      .ie-dialog{position:fixed;inset:0;margin:auto;box-sizing:border-box;width:min(520px,calc(100vw - 24px));max-height:88vh;overflow:auto;border:1px solid var(--border);border-radius:18px;padding:20px;background:var(--surface);color:var(--text);font:12px/1.55 -apple-system,BlinkMacSystemFont,'Noto Sans JP',sans-serif;box-shadow:0 12px 40px #0003}.ie-dialog::backdrop{background:#0005}.ie-dialog h2{font-size:16px;margin:0}.ie-dialog header{display:flex;align-items:center;justify-content:space-between;margin-bottom:12px}.ie-dialog label{display:flex;flex-direction:column;gap:4px;margin:10px 0}.ie-dialog input,.ie-dialog select,.ie-dialog textarea{width:100%;box-sizing:border-box;border:1px solid var(--border);border-radius:9px;padding:9px;background:var(--input-bg,var(--surface2));color:var(--text);font:inherit}.ie-dialog textarea{min-height:64px;resize:vertical}.ie-category-options{border:1px solid var(--border);border-radius:11px;padding:8px 10px;margin:10px 0}.ie-category-options legend{font-weight:700;padding:0 4px}.ie-category-list{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:3px 10px}.ie-sale-target-list{display:grid;gap:10px}.ie-sale-target{border:1px solid var(--border);border-radius:10px;padding:9px;background:var(--surface2)}.ie-sale-target-head{display:flex!important;flex-direction:row!important;align-items:center;gap:7px!important;margin:0 0 7px!important}.ie-sale-target-head input{width:auto!important}.ie-sale-target-method{margin:5px 0!important}.ie-sale-target-params{padding-left:12px;border-left:2px solid var(--border)}.ie-dialog .ie-category-option{display:flex;flex-direction:row;align-items:center;gap:7px;margin:0;padding:5px 2px}.ie-dialog .ie-category-option input{width:auto;margin:0;accent-color:#15803d}.ie-dates{display:grid;grid-template-columns:1fr 1fr;gap:10px}.ie-actions{display:flex;justify-content:flex-end;gap:8px;margin-top:16px}.ie-dialog .ie-primary{background:var(--text);color:var(--surface)}.ie-muted{font-size:11px;color:var(--text4);margin:5px 0}.ie-presets{display:flex;flex-wrap:wrap;gap:6px}.ie-preset-row{border-bottom:1px solid var(--border);padding:10px 0}.ie-preset-row div{display:flex;gap:6px;flex-wrap:wrap;margin-top:6px}.ie-dialog button:disabled{opacity:.4;cursor:default}@media(max-width:520px){.ie-category-list{grid-template-columns:1fr}}
       .ie-dialog.ie-event-add{position:fixed;inset:0;margin:auto}
       .ie-dialog.ie-preset-editor{position:fixed;inset:0;margin:auto}
     `;doc.head.appendChild(style);
@@ -184,29 +184,38 @@
       });
       if(!options.length)CATEGORIES.forEach(function(c){addOption('legacy:'+c,c);});
       if(!selectedKeys.size&&options.length)selectedKeys.add(options[0].key);
-      var categoriesBox=el('fieldset',undefined,'ie-category-options'),legend=el('legend','対象カテゴリー（複数選択可）'),categoryList=el('div',undefined,'ie-category-list'),categoryInputs=[];categoriesBox.append(legend,categoryList);parent.append(categoriesBox);
-      options.forEach(function(option){var label=el('label',undefined,'ie-category-option'),input=el('input');input.type='checkbox';input.value=option.key;input.checked=selectedKeys.has(option.key);input.setAttribute('aria-label','対象カテゴリー '+option.name);label.append(input,el('span',option.name));categoryList.append(label);categoryInputs.push({input:input,option:option});});
-      var methods=Object.assign({},METHODS);if(initial&&!methods[initial.method])methods[initial.method]=initial.method+'（既存方式）';
-      var method=select(parent,'セール方式',methods,initial?initial.method:'amount');var params=el('div');parent.append(params);var inputs={};
-      function draw(){params.replaceChildren();inputs={};(FIELDS[method.value]||[]).forEach(function(f){
-        var value=initial&&method.value===initial.method?initial.params[f[0]]:f[0]==='giftType'?'商品無料':f[0]==='giftUnit'?'本':'';
-        var input=field(params,f[1],f.length===2?'text':'number',value),optionalFixedBound=method.value==='fixed'&&(f[0]==='minPrice'||f[0]==='maxPrice');input.required=!optionalFixedBound;
-        if(f.length>2){input.min=f[2];input.step=f[0]==='percent'?'0.1':'1';if(f[3]!==undefined)input.max=f[3];}inputs[f[0]]=input;
-      });}
-      method.onchange=draw;draw();
-      var note=field(parent,'補足（任意）','textarea',snapshot?snapshot.note:'');
-      return function(){
-        var p=initial&&method.value===initial.method?copy(initial.params):{};
-        (FIELDS[method.value]||[]).forEach(function(f){
-          var raw=inputs[f[0]].value.trim(),optionalFixedBound=method.value==='fixed'&&(f[0]==='minPrice'||f[0]==='maxPrice');
-          if(optionalFixedBound&&raw===''){delete p[f[0]];return;}
-          requireValue(raw!=='',f[1]+'を入力してください。');p[f[0]]=f.length===2?raw:Number(raw);
+      parent.append(el('p','対象カテゴリーごとに値引き条件を設定できます。','ie-muted'));
+      var categoriesBox=el('fieldset',undefined,'ie-category-options'),legend=el('legend','対象カテゴリー・値引き条件'),categoryList=el('div',undefined,'ie-sale-target-list'),rows=[];categoriesBox.append(legend,categoryList);parent.append(categoriesBox);
+      function initialTarget(option){return initialTargets.find(function(target){return target.categoryId===option.categoryId||target.category===option.name;})||null;}
+      function drawCondition(row,condition){
+        row.params.replaceChildren();row.inputs={};
+        (FIELDS[row.method.value]||[]).forEach(function(f){
+          var value=condition&&row.method.value===condition.method?condition.params&&condition.params[f[0]]:f[0]==='giftType'?'商品無料':f[0]==='giftUnit'?'本':'';
+          var input=field(row.params,f[1],f.length===2?'text':'number',value),optionalFixedBound=row.method.value==='fixed'&&(f[0]==='minPrice'||f[0]==='maxPrice');input.required=row.check.checked&&!optionalFixedBound;
+          if(f.length>2){input.min=f[2];input.step=f[0]==='percent'?'0.1':'1';if(f[3]!==undefined)input.max=f[3];}row.inputs[f[0]]=input;
         });
-        var chosen=categoryInputs.filter(function(item){return item.input.checked;}).map(function(item){return item.option;});requireValue(chosen.length>0,'対象カテゴリーを1件以上選択してください。');
-        var categoryNames=chosen.map(function(item){return item.name;}),targets=chosen.map(function(item){var target={category:item.name};if(item.categoryId)target.categoryId=item.categoryId;return target;});
-        var sale={category:categoryNames.join('・'),method:method.value,params:p,targets:targets};if(targets[0].categoryId)sale.categoryId=targets[0].categoryId;
-        var s={version:1,title:categoryNames.join('・'),note:note.value.trim(),sale:sale};
-        validateSnapshot(s);return s;
+      }
+      options.forEach(function(option){
+        var target=initialTarget(option),condition={method:target&&target.method||initial&&initial.method||'amount',params:copy(target&&target.params||initial&&initial.params||{})};
+        var rowEl=el('div',undefined,'ie-sale-target'),head=el('label',undefined,'ie-sale-target-head'),check=el('input');check.type='checkbox';check.checked=selectedKeys.has(option.key);check.setAttribute('aria-label','対象カテゴリー '+option.name);head.append(check,el('strong',option.name));
+        var methodLabel=el('label',undefined,'ie-sale-target-method'),methodText=el('span','セール方式'),method=el('select');Object.keys(METHODS).forEach(function(key){var op=el('option',METHODS[key]);op.value=key;method.append(op);});if(condition.method&&!METHODS[condition.method]){var legacy=el('option',condition.method+'（既存方式）');legacy.value=condition.method;method.append(legacy);}method.value=condition.method;methodLabel.append(methodText,method);
+        var params=el('div',undefined,'ie-sale-target-params'),row={option:option,check:check,method:method,params:params,inputs:{}};
+        rowEl.append(head,methodLabel,params);categoryList.append(rowEl);rows.push(row);
+        function sync(){method.disabled=!check.checked;params.style.display=check.checked?'':'none';Object.keys(row.inputs).forEach(function(key){row.inputs[key].disabled=!check.checked;});}
+        check.onchange=function(){sync();};method.onchange=function(){drawCondition(row,null);sync();};drawCondition(row,condition);sync();
+      });
+      var note=field(parent,'補足（任意）','textarea',snapshot?snapshot.note:'');
+      function readCondition(row){
+        var p={};(FIELDS[row.method.value]||[]).forEach(function(f){var raw=row.inputs[f[0]].value.trim(),optionalFixedBound=row.method.value==='fixed'&&(f[0]==='minPrice'||f[0]==='maxPrice');if(optionalFixedBound&&raw==='')return;requireValue(raw!=='',row.option.name+'：'+f[1]+'を入力してください。');p[f[0]]=f.length===2?raw:Number(raw);});
+        validateSaleCondition(row.method.value,p);return {method:row.method.value,params:p};
+      }
+      return function(){
+        var chosen=rows.filter(function(row){return row.check.checked;});requireValue(chosen.length>0,'対象カテゴリーを1件以上選択してください。');
+        var targets=chosen.map(function(row){var condition=readCondition(row),target={category:row.option.name,method:condition.method,params:condition.params};if(row.option.categoryId)target.categoryId=row.option.categoryId;return target;});
+        var first=targets[0],categoryNames=targets.map(function(target){return target.category;});
+        var sale={category:categoryNames.join('・'),method:first.method,params:copy(first.params),targets:targets};if(first.categoryId)sale.categoryId=first.categoryId;
+        var title=targets.map(function(target){return target.category+' '+conditionText(target.method,target.params);}).join(' / ');
+        var result={version:1,title:title,note:note.value.trim(),sale:sale};validateSnapshot(result);return result;
       };
     }
     function render(){
