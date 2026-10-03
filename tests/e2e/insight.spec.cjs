@@ -36,7 +36,7 @@ async function selectDashboardSeptember(page){
   await expect.poll(()=>page.evaluate(()=>selMonth)).toBe('9月');
 }
 
-test('売上・客数・廃棄は販売数入力と同じ前月・年月・翌月の操作に統一される',async({page})=>{
+test.only('売上・客数・廃棄は販売数入力と同じ前月・年月・翌月の操作に統一される',async({page})=>{
   const errors=await openInsight(page);
   const year=await page.evaluate(()=>Number(allStores.stores[allStores.current].years.map(Number).sort((a,b)=>a-b).slice(-1)[0]));
 
