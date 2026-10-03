@@ -108,3 +108,20 @@ test('日次は即時警告を結論と優先事項へ変換し客数主因候�
   assert.ok(result.relations.some(x=>/主因候補は客数 -15\.0%/.test(x)));
   assert.ok(result.relations.some(x=>/天気 雨/.test(x)));
 });
+
+
+test('横断分析から曜日・季節性の根拠を関連性へ追加する',()=>{
+  const cross={
+    weekday:{rows:[{weekdayLabel:'火',metrics:{customers:{position:{code:'low'}}}}]},
+    seasonality:{metrics:{customers:{relationship:{code:'current_only_low',label:'今年のみ低水準'}}}},
+    saleImpacts:[],eventImpacts:[]
+  };
+  const result=interpretation.monthly(monthlyReview(),'dashboard',cross);
+  assert.ok(result.relations.some(x=>/補強/.test(x)&&/火曜日の客数が弱い/.test(x)));
+  assert.ok(result.relations.some(x=>/説明しにくい要因/.test(x)&&/季節性だけでは説明しにくい/.test(x)));
+});
+
+test('横断分析がなくても従来の解釈結果を維持する',()=>{
+  const result=interpretation.monthly(monthlyReview(),'dashboard');
+  assert.ok(result.relations.some(x=>/主因候補は客数/.test(x)));
+});
