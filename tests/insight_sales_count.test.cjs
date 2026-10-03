@@ -152,7 +152,7 @@ test('曜日別平均の対象外便はダッシュ表示かつグレー表示�
 
 
 test('セール実績区分は通常販売数とは別の店舗別データとして検証・取得できる',()=>{
-  const all=base();sales.ensure(all);
+  const all=base();sales.ensure(all);all.stores.a.saleSegmentCounts={};
   all.stores.a.saleSegmentCounts['2026-09-15']={
     evt_sale:{
       seg_low:{trips:[{delivery:10,sales:8},{delivery:20,sales:18},{delivery:30,sales:28}]},
@@ -165,7 +165,7 @@ test('セール実績区分は通常販売数とは別の店舗別データと�
 });
 
 test('セール実績区分の不正値は通常販売数と同様に拒否する',()=>{
-  const all=base();sales.ensure(all);
+  const all=base();sales.ensure(all);all.stores.a.saleSegmentCounts={};
   all.stores.a.saleSegmentCounts['2026-09-15']={evt_sale:{seg_low:{trips:[{delivery:-1,sales:1},{delivery:null,sales:null},{delivery:null,sales:null}]}}};
   assert.throws(()=>sales.validate(all),/セール実績区分/);
 });
