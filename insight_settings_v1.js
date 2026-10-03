@@ -78,7 +78,6 @@
     page.innerHTML='<div class="page-header"><div class="page-title">設定</div></div>'+
       '<div class="insight-settings-content">'+
         '<section class="insight-settings-section"><h2>データ管理</h2><p>バックアップ、復元、保存データの状態確認、CSVインポートを管理します。</p><div id="insightSettingsDataActions" class="insight-settings-actions"></div></section>'+
-        '<section class="insight-settings-section"><h2>表示設定</h2><p>Insightの表示方法を変更します。</p><div id="insightSettingsDisplayActions" class="insight-settings-actions"></div></section>'+
       '</div>';
 
     main.appendChild(page);
@@ -101,7 +100,7 @@
     if(doc.body)themeObserver.observe(doc.body,{attributes:true,attributeFilter:['class']});
     dark.hidden=true;
     dark.setAttribute('aria-hidden','true');
-    page.querySelector('#insightSettingsDisplayActions').append(dark);
+    page.append(dark);
     sidebarActions.replaceChildren(themeWrap,nav);
 
     var originalGoto=root.gotoNav;
