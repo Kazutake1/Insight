@@ -56,6 +56,25 @@ test('CAMERA-2は同一オリジンのローカルOCRを使用し画像を永続
   assert.doesNotMatch(source,/localStorage|sessionStorage|indexedDB|InsightStorage|\bfetch\s*\(|XMLHttpRequest|WebSocket/);
 });
 
+test('複数日画面は対象日の直接OCR失敗でも日付範囲から判定する',()=>{
+  assert.equal(camera.evaluateTargetDate([
+    {iso:'2025-10-30'},{iso:'2025-10-31'},{iso:'2025-11-02'},{iso:'2025-11-03'}
+  ],'2025-11-01'),true);
+  assert.equal(camera.evaluateTargetDate([
+    {iso:'2025-11-02'},{iso:'2025-11-03'},{iso:'2025-11-04'}
+  ],'2025-11-01'),true);
+  assert.equal(camera.evaluateTargetDate([{iso:'2025-10-03'}],'2025-11-01'),null);
+  assert.equal(camera.evaluateTargetDate([
+    {iso:'2025-10-01'},{iso:'2025-10-02'},{iso:'2025-10-03'},{iso:'2025-10-04'}
+  ],'2025-11-01'),false);
+});
+
+test('月日だけのOCRは対象日基準で年跨ぎを補完する',()=>{
+  const dates=camera.extractDateCandidates('12/30 12/31 1/2 1/3','2026-01-01');
+  assert.deepEqual(dates.map(x=>x.iso),['2025-12-30','2025-12-31','2026-01-02','2026-01-03']);
+  assert.equal(camera.evaluateTargetDate(dates,'2026-01-01'),true);
+});
+
 test('OCRレイアウトから行・単語・座標を抽出できる',()=>{
   const lines=camera.extractLayout([
     {paragraphs:[{lines:[

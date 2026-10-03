@@ -118,23 +118,64 @@
     if(date.getUTCFullYear()!==year||date.getUTCMonth()!==month-1||date.getUTCDate()!==day)return null;
     return String(year)+'-'+pad(month)+'-'+pad(day);
   }
+  function targetDateParts(targetDate){
+    var match=/^(\d{4})-(\d{2})-(\d{2})$/.exec(String(targetDate||''));
+    return match?{year:Number(match[1]),month:Number(match[2]),day:Number(match[3])}:null;
+  }
+  function inferYearForMonth(month,targetDate){
+    var target=targetDateParts(targetDate);
+    month=Number(month);
+    if(!target||!Number.isInteger(month)||month<1||month>12)return new Date().getFullYear();
+    var year=target.year;
+    var delta=month-target.month;
+    if(delta>6)year--;
+    else if(delta<-6)year++;
+    return year;
+  }
   function extractDateCandidates(text,targetDate){
     text=normalizeText(text);
-    var target=/^(\d{4})-(\d{2})-(\d{2})$/.exec(String(targetDate||''));
-    var fallbackYear=target?Number(target[1]):new Date().getFullYear();
+    var target=targetDateParts(targetDate);
     var found=[];
-    function add(year,month,day,raw){
+    function add(year,month,day,raw,precision){
       var iso=validIso(year,month,day);
-      if(iso&&!found.some(function(item){return item.iso===iso;}))found.push({iso:iso,raw:normalizeText(raw)});
+      if(iso&&!found.some(function(item){return item.iso===iso;}))found.push({iso:iso,raw:normalizeText(raw),precision:precision||'monthDay'});
     }
     var full=/(\d{4})\s*(?:年|[\/.\-])\s*(\d{1,2})\s*(?:月|[\/.\-])\s*(\d{1,2})\s*日?/g;
     var match;
-    while((match=full.exec(text)))add(match[1],match[2],match[3],match[0]);
+    while((match=full.exec(text)))add(match[1],match[2],match[3],match[0],'full');
     var japanese=/(\d{1,2})\s*月\s*(\d{1,2})\s*日/g;
-    while((match=japanese.exec(text)))add(fallbackYear,match[1],match[2],match[0]);
+    while((match=japanese.exec(text)))add(target?inferYearForMonth(match[1],targetDate):new Date().getFullYear(),match[1],match[2],match[0],'monthDay');
     var shortDate=/(?:^|[^\d])(\d{1,2})\s*[\/.\-]\s*(\d{1,2})(?!\d)/g;
-    while((match=shortDate.exec(text)))add(fallbackYear,match[1],match[2],match[0]);
+    while((match=shortDate.exec(text)))add(target?inferYearForMonth(match[1],targetDate):new Date().getFullYear(),match[1],match[2],match[0],'monthDay');
     return found;
+  }
+  function dateStamp(iso){
+    var parts=targetDateParts(iso);
+    return parts?Date.UTC(parts.year,parts.month-1,parts.day):NaN;
+  }
+  function evaluateTargetDate(dateCandidates,targetDate){
+    var targetStamp=dateStamp(targetDate);
+    if(!Number.isFinite(targetStamp))return null;
+    var candidates=(Array.isArray(dateCandidates)?dateCandidates:[]).filter(function(item){return item&&Number.isFinite(dateStamp(item.iso));});
+    if(candidates.some(function(item){return item.iso===targetDate;}))return true;
+    if(!candidates.length)return null;
+
+    var oneDay=86400000;
+    var stamps=Array.from(new Set(candidates.map(function(item){return dateStamp(item.iso);}))).sort(function(a,b){return a-b;});
+    var clusters=[],current=[];
+    stamps.forEach(function(stamp){
+      if(!current.length||stamp-current[current.length-1]<=3*oneDay)current.push(stamp);
+      else{clusters.push(current);current=[stamp];}
+    });
+    if(current.length)clusters.push(current);
+
+    var reliable=clusters.filter(function(cluster){return cluster.length>=3;});
+    for(var i=0;i<reliable.length;i++){
+      var cluster=reliable[i],min=cluster[0]-oneDay,max=cluster[cluster.length-1]+oneDay;
+      if(targetStamp>=min&&targetStamp<=max)return true;
+    }
+    if(reliable.length)return false;
+    return null;
   }
   function textLines(text){
     return String(text==null?'':text).replace(/\r/g,'').split('\n').map(function(line){return normalizeText(line);}).filter(Boolean);
@@ -218,7 +259,7 @@
       numberCandidates:numbers,
       matchedCategories:matched,
       dateCandidates:dates,
-      targetDateMatched:dates.length?dates.some(function(item){return item.iso===targetDate;}):null,
+      targetDateMatched:evaluateTargetDate(dates,targetDate),
       labels:detectLabels(text,lines)
     };
   }
@@ -245,6 +286,7 @@
     normalizeText:normalizeText,
     extractLayout:extractLayout,
     extractDateCandidates:extractDateCandidates,
+    evaluateTargetDate:evaluateTargetDate,
     extractNumberCandidates:extractNumberCandidates,
     matchCategories:matchCategories,
     detectLabels:detectLabels,
@@ -358,7 +400,7 @@
     session.items.forEach(function(item){
       if(!item.ocr||item.ocr.status!=='done')return;
       item.ocr.dateCandidates=extractDateCandidates(item.ocr.text,session.targetDate);
-      item.ocr.targetDateMatched=item.ocr.dateCandidates.length?item.ocr.dateCandidates.some(function(candidate){return candidate.iso===session.targetDate;}):null;
+      item.ocr.targetDateMatched=evaluateTargetDate(item.ocr.dateCandidates,session.targetDate);
     });
   }
   function renderControls(){
@@ -413,7 +455,7 @@
         if(item.ocr&&item.ocr.status==='done'&&item.ocr.targetDateMatched===false){
           var warn=doc.createElement('span');
           warn.className='sc-camera-warning';
-          warn.textContent='対象日と画像内の日付候補が一致しません';
+          warn.textContent='対象日が画像内の日付範囲外の可能性があります';
           meta.append(warn);
         }
         var remove=doc.createElement('button');
