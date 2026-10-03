@@ -146,6 +146,22 @@
     if(good.length)return ['【結論】'+period+'は優先度の高い悪化がなく、「'+good[0].title+'」が改善側です。'];
     return ['【結論】'+period+'は優先度の高い悪化項目は確認されていません。'];
   }
+  function standardEvidence(evidence){
+    if(!evidence||evidence.contract!=='InsightAIEvidence'||!Array.isArray(evidence.items))return [];
+    var lines=[];
+    evidence.items.forEach(function(item){
+      if(!item||!item.summary)return;
+      var source=String(item.source||''),direction=item.direction||'unknown',summary=String(item.summary);
+      if(source==='weekday'){
+        lines.push('【補強】'+summary+(direction==='down'?'（下向き）':direction==='up'?'（上向き）':'')+'。');
+      }else if(source==='seasonality'){
+        lines.push('【'+(direction==='unknown'?'説明しにくい要因':'補強')+'】'+summary+'。');
+      }else if(source==='saleImpact'||source==='eventImpact'){
+        lines.push('【補強】'+summary+(direction==='down'?'（下向き）':direction==='up'?'（上向き）':'')+'。');
+      }
+    });
+    return uniq(lines).slice(0,3);
+  }
   function crossEvidence(cross){
     if(!cross)return [];
     var lines=[],weekday=cross.weekday,season=cross.seasonality;
@@ -182,13 +198,14 @@
     return uniq(lines).slice(0,3);
   }
 
-  function interpretReview(review,kind,theme,cross){
+  function interpretReview(review,kind,theme,cross,evidenceContract){
     var items=pickItems(review,theme),relations=[];
     salesRelation(review,kind,relations);
     basketRelation(review,kind,relations);
     wasteSupplyRelation(review,kind,relations);
     if(theme==='dashboard'||theme==='daily'||!theme)contextRelation(review,relations);
-    var evidence=crossEvidence(cross);
+    var evidence=standardEvidence(evidenceContract);
+    if(!evidence.length)evidence=crossEvidence(cross);
     relations=uniq(relations).slice(0,Math.max(0,5-evidence.length)).concat(evidence).slice(0,5);
     var checks=checksFor(items,review,relations);
     return {
@@ -198,8 +215,8 @@
       checks:checks
     };
   }
-  function monthly(review,theme,cross){return interpretReview(review,'month',theme,cross);}
-  function weekly(review,theme,cross){return interpretReview(review,'week',theme,cross);}
+  function monthly(review,theme,cross,evidence){return interpretReview(review,'month',theme,cross,evidence);}
+  function weekly(review,theme,cross,evidence){return interpretReview(review,'week',theme,cross,evidence);}
   function daily(anomaly,panel){
     var display=anomaly&&Array.isArray(anomaly.display)?anomaly.display:[],opportunities=anomaly&&Array.isArray(anomaly.opportunities)?anomaly.opportunities:[];
     var items=display.slice(0,4);
@@ -232,7 +249,7 @@
     return {conclusion:[conclusionLine],priorities:priorities.slice(0,5),relations:uniq(relations).slice(0,4),checks:uniq(checks).slice(0,4)};
   }
 
-  var model={VERSION:VERSION,monthly:monthly,weekly:weekly,daily:daily,pickItems:pickItems,itemPriority:itemPriority,crossEvidence:crossEvidence};
+  var model={VERSION:VERSION,monthly:monthly,weekly:weekly,daily:daily,pickItems:pickItems,itemPriority:itemPriority,crossEvidence:crossEvidence,standardEvidence:standardEvidence};
   if(typeof module!=='undefined'&&module.exports)module.exports=model;
   root.InsightAIInterpretation=model;
 })(typeof window!=='undefined'?window:globalThis);
