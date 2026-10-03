@@ -442,7 +442,9 @@ test('イベント実績は過去開催・日付カード・時間帯グラフ�
   assert.match(eventResults,/Math\.trunc\(Number\(value\)\/1000\)/);
   assert.match(eventResults,/\+'千円'/);
   assert.match(eventResults,/summaryMetric\('売上',salesYen\(/);
-  assert.match(eventResults,/summaryMetric\('客単価',yen\(/);
+  assert.doesNotMatch(eventResults,/summaryMetric\('客単価'/);
+  assert.doesNotMatch(eventResults,/summaryMetric\('買上点数'/);
+  assert.match(eventResults,/grid-template-columns:repeat\(2,minmax\(115px,1fr\)\)/);
   assert.match(eventResults,/客数 /);
   assert.match(eventResults,/er-day-tab/);
   assert.match(eventResults,/時間帯別客数/);
