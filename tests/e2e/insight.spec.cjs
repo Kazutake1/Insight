@@ -11,7 +11,7 @@ async function openInsight(page){
   page.on('pageerror',error=>errors.push(error.message));
   await page.goto('/Index.html',{waitUntil:'domcontentloaded'});
   await expect(page.locator('#nav1')).toBeVisible();
-  await page.waitForFunction(()=>window.InsightPagePeriodSync&&window.InsightInputPeriodControls&&window.InsightSalesPeriodSelector&&window.InsightSalesCount&&window.InsightSalesCountCamera&&window.InsightSaleResults&&window.InsightHourlyCustomers&&window.InsightEventResults&&window.InsightAIVisual&&window.InsightAIInterpretation&&window.InsightAnalysisPeriodLock&&window.InsightMultiYearAnalysis&&window.InsightWeekdayAnalysis&&window.InsightSaleImpactAnalysis&&window.InsightEventImpactAnalysis&&window.InsightSeasonalityAnalysis&&window.InsightAnomalyExplanation&&window.InsightAnalysisBundle&&window.InsightSettings&&window.InsightDarkTheme&&document.getElementById('navSettings')&&document.getElementById('pageSettings'));
+  await page.waitForFunction(()=>window.InsightPagePeriodSync&&window.InsightInputPeriodControls&&window.InsightSalesPeriodSelector&&window.InsightSalesCount&&window.InsightSaleResults&&window.InsightHourlyCustomers&&window.InsightEventResults&&window.InsightAIVisual&&window.InsightAIInterpretation&&window.InsightAnalysisPeriodLock&&window.InsightMultiYearAnalysis&&window.InsightWeekdayAnalysis&&window.InsightSaleImpactAnalysis&&window.InsightEventImpactAnalysis&&window.InsightSeasonalityAnalysis&&window.InsightAnomalyExplanation&&window.InsightAnalysisBundle&&window.InsightSettings&&window.InsightDarkTheme&&document.getElementById('navSettings')&&document.getElementById('pageSettings'));
   return errors;
 }
 
@@ -82,124 +82,6 @@ test('売上・客数・廃棄は販売数入力と同じ前月・年月・翌�
   expect(errors).toEqual([]);
 });
 
-test('販売数入力のカメラ読取はローカルOCRし結果だけを一時保持する',async({page})=>{
-  const errors=await openInsight(page);
-  await page.locator('#navSalesCount').click();
-  await expect(page.locator('#scCameraOpen')).toBeVisible();
-  const before=await page.evaluate(()=>JSON.stringify(allStores));
-
-  await page.evaluate(()=>{
-    const original=window.Tesseract;
-    window.__originalTesseract=original;
-    window.__ocrCreateOptions=null;
-    window.Tesseract={
-      PSM:{SPARSE_TEXT:'11',SINGLE_BLOCK:'6',AUTO:'3'},
-      createWorker:async(langs,oem,options)=>{
-        window.__ocrCreateOptions={langs,oem,options:{
-          workerPath:options.workerPath,
-          corePath:options.corePath,
-          langPath:options.langPath,
-          cacheMethod:options.cacheMethod,
-          workerBlobURL:options.workerBlobURL
-        }};
-        if(options.logger)options.logger({status:'loading language traineddata',progress:0.5});
-        let params={};
-        return {
-          setParameters:async(next)=>{params={...params,...next};},
-          recognize:async(input)=>{
-            if(options.logger)options.logger({status:'recognizing text',progress:0.8});
-            const w=(text,x,y,confidence=95)=>({text,confidence,bbox:{x0:x-10,y0:y-8,x1:x+10,y1:y+8}});
-            if(params.tessedit_char_whitelist==='0123456789'){
-              const values=['10','20','30','40','50','60','9','18','27','36','45','54'];
-              const words=values.map((value,index)=>{
-                const col=index%8,row=Math.floor(index/8);
-                return w(value,col*144+72,row*82+41,96);
-              });
-              return {data:{
-                text:values.join(' '),
-                confidence:96,
-                blocks:[{paragraphs:[{lines:[
-                  {text:values.slice(0,8).join(' '),confidence:96,bbox:{x0:0,y0:0,x1:1152,y1:82},words:words.slice(0,8)},
-                  {text:values.slice(8).join(' '),confidence:96,bbox:{x0:0,y0:82,x1:576,y1:164},words:words.slice(8)}
-                ]}]}]
-              }};
-            }
-            return {data:{
-              text:'10/3 10/4\n1 2 3 1 2 3\nおにぎり\n納品数 10 20 30 40 50 60\n販売数 9 18 27 36 45 54',
-              confidence:92,
-              blocks:[{paragraphs:[{lines:[
-                {text:'10/3 10/4',confidence:95,bbox:{x0:70,y0:32,x1:330,y1:48},words:[w('10/3',120,40),w('10/4',300,40)]},
-                {text:'1 2 3 1 2 3',confidence:95,bbox:{x0:55,y0:62,x1:365,y1:78},words:[w('1',70,70),w('2',120,70),w('3',170,70),w('1',250,70),w('2',300,70),w('3',350,70)]},
-                {text:'おにぎり',confidence:97,bbox:{x0:10,y0:92,x1:90,y1:108},words:[w('おにぎり',50,100)]},
-                {text:'納品数 10 20 30 40 50 60',confidence:93,bbox:{x0:10,y0:122,x1:370,y1:138},words:[w('納品数',30,130),w('10',70,130),w('20',120,130),w('30',170,130),w('40',250,130),w('50',300,130),w('60',350,130)]},
-                {text:'販売数 9 18 27 36 45 54',confidence:92,bbox:{x0:10,y0:152,x1:370,y1:168},words:[w('販売数',30,160),w('9',70,160),w('18',120,160),w('27',170,160),w('36',250,160),w('45',300,160),w('54',350,160)]}
-              ]}]}]
-            }};
-          },
-          terminate:async()=>{}
-        };
-      }
-    };
-  });
-
-  await page.locator('#scCameraOpen').click();
-  await expect(page.locator('#scCameraDialog')).toBeVisible();
-
-  const bounds=await page.evaluate(()=>window.InsightSalesCountCamera.periodBounds(window.InsightSalesCount.getPeriod()));
-  await expect(page.locator('#scCameraDate')).toHaveAttribute('min',bounds.min);
-  await expect(page.locator('#scCameraDate')).toHaveAttribute('max',bounds.max);
-  await page.locator('#scCameraDate').fill(bounds.min.slice(0,8)+'03');
-  await expect(page.locator('#scCameraCapture')).toHaveAttribute('accept','image/*');
-  await expect(page.locator('#scCameraCapture')).toHaveAttribute('capture','environment');
-  await expect(page.locator('#scCameraFiles')).toHaveAttribute('multiple','');
-
-  const png=Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+A8AAQUBAScY42YAAAAASUVORK5CYII=','base64');
-  await page.locator('#scCameraCapture').setInputFiles({name:'capture.png',mimeType:'image/png',buffer:png});
-  await expect(page.locator('.sc-camera-item')).toHaveCount(1);
-  await expect(page.locator('#scCameraStatus')).toHaveText('撮影済み 1 / 12枚');
-  await expect(page.locator('#scCameraCropDialog')).toBeVisible();
-  await expect(page.locator('#scCameraRead')).toBeDisabled();
-  await expect(page.locator('#scCameraCropDialog')).toContainText('読取範囲を指定');
-  await expect(page.locator('.sc-camera-crop-handle')).toHaveCount(4);
-  await expect(page.locator('#scCameraCropDialog')).toContainText('四隅');
-  await expect(page.locator('#scCropApply')).toBeVisible();
-  await page.locator('#scCropApply').click();
-  await expect(page.locator('#scCameraCropDialog')).not.toBeVisible();
-  await expect(page.locator('#scCameraRead')).toBeEnabled();
-
-  await page.locator('#scCameraRead').click();
-  await expect.poll(()=>page.evaluate(()=>window.InsightSalesCountCamera.getSessionSummary().ocrDone)).toBe(1);
-  const summary=await page.evaluate(()=>window.InsightSalesCountCamera.getSessionSummary());
-  expect(summary.count).toBe(1);
-  expect(summary.matchedCategories).toBeGreaterThanOrEqual(1);
-  expect(summary.numberCandidates).toBeGreaterThanOrEqual(12);
-  expect(summary.detectedDates).toBe(2);
-  expect(summary.structuredCells).toBe(12);
-  await expect(page.locator('.sc-camera-ocr-state')).toContainText('2日');
-  await expect(page.locator('#scCameraDateLabel')).toContainText('基準日');
-  await expect(page.locator('.sc-camera-result-day')).toHaveCount(2);
-  await expect(page.locator('.sc-camera-result-head')).toContainText('2日');
-
-  const ocrConfig=await page.evaluate(()=>window.__ocrCreateOptions);
-  expect(ocrConfig.langs).toBe('jpn');
-  expect(ocrConfig.options.cacheMethod).toBe('none');
-  expect(ocrConfig.options.workerBlobURL).toBe(false);
-  for(const key of ['workerPath','corePath','langPath']){
-    const url=new URL(ocrConfig.options[key]);
-    expect(url.origin).toBe(new URL(page.url()).origin);
-    expect(url.pathname).toContain('/vendor/ocr');
-  }
-
-  const afterOcr=await page.evaluate(()=>JSON.stringify(allStores));
-  expect(afterOcr).toBe(before);
-
-  page.once('dialog',dialog=>dialog.accept());
-  await page.locator('#scCameraClose').click();
-  await expect(page.locator('#scCameraDialog')).toHaveCount(0);
-  expect(await page.evaluate(()=>window.InsightSalesCountCamera.getSessionSummary().count)).toBe(0);
-  expect(errors).toEqual([]);
-});
-
 test('選択月は主要ページを横断しても維持される',async({page})=>{
   const errors=await openInsight(page);
   await selectDashboardSeptember(page);
@@ -227,7 +109,7 @@ test('選択月は主要ページを横断しても維持される',async({page}
 test('トップページはビルド番号を持ち最新版確認をno-storeで行う',async({page})=>{
   const errors=await openInsight(page);
   const source=await page.evaluate(()=>fetch('/Index.html?e2e-shell-check=1',{cache:'no-store'}).then(r=>r.text()));
-  expect(source).toContain('name="insight-shell-version" content="20261003-camera-geometric-grid-1"');
+  expect(source).toContain('name="insight-shell-version" content="20261003-camera-removed-1"');
   expect(source).toContain("fetch('./Index.html?insight_probe='+Date.now(),{cache:'no-store'})");
   expect(source).toContain("location.replace('./Index.html?insight_build='+encodeURIComponent(m[1]))");
   expect(errors).toEqual([]);
