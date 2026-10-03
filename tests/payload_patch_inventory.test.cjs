@@ -456,9 +456,10 @@ test('イベント実績は過去開催・日付カード・時間帯グラフ�
   assert.match(eventResults,/min-width:1340px/);
   assert.match(eventResults,/createReadOnlyDayCard/);
   assert.match(eventResults,/カテゴリー実績/);
+  assert.match(eventResults,/grid-template-columns:repeat\(4,minmax\(0,1fr\)\)/);
+  assert.match(eventResults,/@media\(max-width:1000px\)\{\.er-category-grid\{grid-template-columns:repeat\(2,minmax\(0,1fr\)\)\}\}/);
+  assert.doesNotMatch(eventResults,/max-width:280px/);
   assert.doesNotMatch(eventResults,/カテゴリー別・便別実績/);
-  assert.match(eventResults,/grid-template-columns:repeat\(auto-fill,minmax\(230px,280px\)\)/);
-  assert.match(eventResults,/max-width:280px/);
   assert.match(eventResults,/hourly\.complete/);
   assert.doesNotMatch(eventResults,/廃棄額|廃棄率|暦日/);
   assert.doesNotMatch(eventResults,/localStorage|InsightStorage/);
