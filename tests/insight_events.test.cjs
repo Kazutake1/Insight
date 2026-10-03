@@ -119,3 +119,23 @@ test('複数カテゴリーはカテゴリーごとに異なる均一価格条�
   assert.match(events.summary(snap),/100円均一/);
   assert.match(events.summary(snap),/150円均一/);
 });
+
+
+test('同一カテゴリーに複数のセール実績区分を保持できる',()=>{
+  const snap={version:1,title:'おにぎりセール',note:'',sale:{
+    category:'おにぎり',categoryId:'cat_onigiri',method:'fixed',params:{maxPrice:179,price:100},
+    targets:[{categoryId:'cat_onigiri',category:'おにぎり',method:'fixed',params:{maxPrice:179,price:100}}],
+    segments:[
+      {id:'seg_low',categoryId:'cat_onigiri',category:'おにぎり',label:'179円以下',method:'fixed',params:{maxPrice:179,price:100}},
+      {id:'seg_mid',categoryId:'cat_onigiri',category:'おにぎり',label:'180〜239円',method:'fixed',params:{minPrice:180,maxPrice:239,price:150}},
+      {id:'seg_high',categoryId:'cat_onigiri',category:'おにぎり',label:'240〜359円',method:'fixed',params:{minPrice:240,maxPrice:359,price:200}}
+    ]
+  }};
+  assert.doesNotThrow(()=>events.validateSnapshot(snap));
+  assert.equal(events.segmentsForCategory(snap.sale,'cat_onigiri','おにぎり').length,3);
+  assert.match(events.segmentSummary(snap,snap.sale.segments[1]),/180〜239円/);
+  assert.match(events.segmentSummary(snap,snap.sale.segments[1]),/150円均一/);
+  assert.match(events.summary(snap),/100円均一/);
+  assert.match(events.summary(snap),/150円均一/);
+  assert.match(events.summary(snap),/200円均一/);
+});
