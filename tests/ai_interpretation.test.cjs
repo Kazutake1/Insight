@@ -125,3 +125,25 @@ test('横断分析がなくても従来の解釈結果を維持する',()=>{
   const result=interpretation.monthly(monthlyReview(),'dashboard');
   assert.ok(result.relations.some(x=>/主因候補は客数/.test(x)));
 });
+
+
+test('標準Evidenceがある場合は横断分析固有形式より優先する',()=>{
+  const cross={weekday:{rows:[{weekdayLabel:'火',metrics:{customers:{position:{code:'low'}}}}]},saleImpacts:[],eventImpacts:[]};
+  const evidence={
+    contract:'InsightAIEvidence',
+    items:[
+      {id:'weekday:1',source:'weekday',metric:'customers',direction:'down',summary:'水曜日の客数が弱い',causality:'association_only'},
+      {id:'seasonality:1',source:'seasonality',metric:'customers',direction:'unknown',summary:'今年の客数低下は例年の季節傾向だけでは説明しにくい',causality:'association_only'}
+    ]
+  };
+  const result=interpretation.monthly(monthlyReview(),'dashboard',cross,evidence);
+  assert.ok(result.relations.some(x=>/水曜日の客数が弱い/.test(x)));
+  assert.ok(result.relations.some(x=>/例年の季節傾向だけでは説明しにくい/.test(x)));
+  assert.ok(!result.relations.some(x=>/火曜日の客数が弱い/.test(x)));
+});
+
+test('標準Evidenceが無効なら従来crossAnalysisへフォールバックする',()=>{
+  const cross={weekday:{rows:[{weekdayLabel:'火',metrics:{customers:{position:{code:'low'}}}}]},saleImpacts:[],eventImpacts:[]};
+  const result=interpretation.monthly(monthlyReview(),'dashboard',cross,{contract:'unknown',items:[]});
+  assert.ok(result.relations.some(x=>/火曜日の客数が弱い/.test(x)));
+});
