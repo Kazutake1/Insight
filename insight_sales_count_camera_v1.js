@@ -1,4 +1,4 @@
-/* Sales-count camera capture v4: resilient multi-day local OCR, in-memory review only. */
+/* Sales-count camera capture v5: resilient multi-day local OCR, in-memory review only. */
 (function(root){
   'use strict';
   if(root.InsightSalesCountCamera)return;
@@ -315,6 +315,30 @@
       y1:Math.max.apply(null,boxes.map(function(box){return Number(box.y1);}))
     };
   }
+  function dateAnchorsFromLineText(line,index,referenceDate){
+    var text=normalizeText(line&&line.text),box=bboxOf(line);
+    if(!text||!box)return [];
+    var out=[];
+    function add(raw,start,end){
+      var iso=parseDateToken(raw,referenceDate);
+      if(!iso||out.some(function(item){return item.iso===iso;}))return;
+      var mid=(start+end)/2;
+      var x=box.x0+(box.x1-box.x0)*(mid/Math.max(1,text.length));
+      var y=centerY(box),confidence=Number(line&&line.confidence);
+      if(!Number.isFinite(x)||!Number.isFinite(y))return;
+      out.push({iso:iso,x:x,y:y,raw:normalizeText(raw),confidence:Number.isFinite(confidence)?confidence:null,lineIndex:Number.isInteger(line&&line.index)?line.index:index,span:null,approximate:true});
+    }
+    var match,rxFull=/(\d{4}\s*(?:年|[\/.\-])\s*\d{1,2}\s*(?:月|[\/.\-])\s*\d{1,2}\s*日?)/g;
+    while((match=rxFull.exec(text)))add(match[1],match.index,match.index+match[1].length);
+    var rxJp=/(\d{1,2}\s*月\s*\d{1,2}\s*日?)/g;
+    while((match=rxJp.exec(text)))add(match[1],match.index,match.index+match[1].length);
+    var rxShort=/(^|[^\d])(\d{1,2}\s*[\/.\-]\s*\d{1,2})(?!\d)/g;
+    while((match=rxShort.exec(text))){
+      var offset=match[0].indexOf(match[2]);
+      add(match[2],match.index+offset,match.index+offset+match[2].length);
+    }
+    return out;
+  }
   function dateAnchorsForLine(line,index,referenceDate){
     var words=(Array.isArray(line&&line.words)?line.words:[]).filter(function(word){return word&&word.bbox&&normalizeText(word.text);}).slice().sort(function(a,b){return centerX(a.bbox)-centerX(b.bbox);});
     var anchors=[];
@@ -336,6 +360,9 @@
         if(/[\/\.\-年月日]/.test(joined))add(slice,joined);
       }
     }
+    dateAnchorsFromLineText(line,index,referenceDate).forEach(function(candidate){
+      if(!anchors.some(function(anchor){return anchor.iso===candidate.iso;}))anchors.push(candidate);
+    });
     return anchors;
   }
   function spatialDateAnchors(lines,referenceDate){
@@ -352,6 +379,23 @@
     var chosen=rows[0].anchors.slice().sort(function(a,b){return a.x-b.x;}),seen=new Set();
     return chosen.filter(function(anchor){if(seen.has(anchor.iso))return false;seen.add(anchor.iso);return true;});
   }
+  function tripGroupsFromLineText(line,index){
+    var text=normalizeText(line&&line.text).replace(/([123])\s*便/g,'$1');
+    var box=bboxOf(line);
+    if(!text||!box||/[^123\s]/.test(text))return [];
+    var tokens=text.split(/\s+/).filter(Boolean);
+    if(tokens.length<3||tokens.length%3!==0)return [];
+    for(var i=0;i<tokens.length;i++)if(tokens[i]!==String(i%3+1))return [];
+    var step=(box.x1-box.x0)/tokens.length;
+    if(!(step>0))return [];
+    var xs=tokens.map(function(_,i){return box.x0+step*(i+0.5);});
+    var y=centerY(box),groups=[];
+    if(!Number.isFinite(y))return [];
+    for(var start=0;start<xs.length;start+=3){
+      groups.push({x:(xs[start]+xs[start+1]+xs[start+2])/3,tripXs:[xs[start],xs[start+1],xs[start+2]],y:y,lineIndex:Number.isInteger(line&&line.index)?line.index:index,approximate:true});
+    }
+    return groups;
+  }
   function tripGroups(lines,firstCategoryY){
     var rows=[];
     (Array.isArray(lines)?lines:[]).forEach(function(line,index){
@@ -367,6 +411,7 @@
           i+=3;
         }else i++;
       }
+      if(!groups.length)groups=tripGroupsFromLineText(line,index);
       if(groups.length)rows.push({groups:groups,y:y});
     });
     if(!rows.length)return [];
@@ -463,8 +508,27 @@
       return {date:anchor.iso,x:anchor.x,left:left,right:right,tripXs:tripXs};
     });
   }
+  function numericTextSequence(line){
+    var text=normalizeText(line&&line.text),confidence=Number(line&&line.confidence),out=[],match;
+    var rx=/(?:^|\s)(\d[\d,]*)(?=\s|$)/g;
+    while((match=rx.exec(text))){
+      var value=Number(match[1].replace(/,/g,''));
+      if(Number.isSafeInteger(value)&&value>=0)out.push({value:value,confidence:Number.isFinite(confidence)?confidence:null,source:'line'});
+    }
+    return out;
+  }
+  function numericWordSequence(line){
+    return (Array.isArray(line&&line.words)?line.words:[]).map(function(word){
+      var value=wordNumber(word),confidence=Number(word&&word.confidence);
+      return value===null?null:{value:value,confidence:Number.isFinite(confidence)?confidence:null,source:'word'};
+    }).filter(Boolean);
+  }
+  function rowNumberSequence(line){
+    var words=numericWordSequence(line),text=numericTextSequence(line);
+    return text.length>words.length?text:words;
+  }
   function numericWordCount(line){
-    return (Array.isArray(line&&line.words)?line.words:[]).reduce(function(count,word){return count+(wordNumber(word)!==null?1:0);},0);
+    return rowNumberSequence(line).length;
   }
   function rowForCategory(lines,anchor,nextY,kind){
     var rx=kind==='delivery'?/納\s*品(?:\s*数)?/:/販\s*売(?:\s*数)?/;
@@ -505,6 +569,37 @@
         });
       }
     });
+    var sequence=rowNumberSequence(row),expected=(columns||[]).length*3;
+    if(expected>0&&sequence.length===expected){
+      var positioned=Array.from(byKey.values());
+      var consistent=positioned.every(function(cell){
+        var columnIndex=(columns||[]).findIndex(function(column){return column.date===cell.date;});
+        if(columnIndex<0)return false;
+        var item=sequence[columnIndex*3+(cell.trip-1)];
+        return !!item&&item.value===cell.value;
+      });
+      if(consistent){
+        (columns||[]).forEach(function(column,columnIndex){
+          for(var trip=0;trip<3;trip++){
+            if(category.activeTrips&&category.activeTrips[trip]===false)continue;
+            var key=column.date+'|'+trip+'|'+field;
+            if(byKey.has(key))continue;
+            var item=sequence[columnIndex*3+trip];
+            if(!item)continue;
+            byKey.set(key,{
+              date:column.date,
+              categoryId:category.id,
+              categoryName:category.name,
+              trip:trip+1,
+              field:field,
+              value:item.value,
+              confidence:item.confidence,
+              fallback:true
+            });
+          }
+        });
+      }
+    }
     return Array.from(byKey.values());
   }
   function buildMultiDayData(lines,categories,referenceDate){
@@ -584,7 +679,7 @@
   }
 
   var model={
-    VERSION:4,
+    VERSION:5,
     MAX_FILES:MAX_FILES,
     MAX_FILE_BYTES:MAX_FILE_BYTES,
     POLICY:POLICY,
