@@ -496,7 +496,7 @@
       var dayGap=isoDayDistance(prev.iso,next.iso),xGap=next.x-prev.x;
       if(dayGap!==2||!(xGap>0))continue;
       var half=xGap/2;
-      if(half<unit*0.68||half>unit*1.32)continue;
+      if(half<unit*0.8||half>unit*1.2)continue;
       candidates.push({index:j,prev:prev,next:next});
     }
     if(candidates.length!==1)return anchors;
