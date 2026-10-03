@@ -107,10 +107,17 @@ test('販売数入力のカメラ読取はローカルOCRし結果だけを一�
           setParameters:async()=>{},
           recognize:async()=>{
             if(options.logger)options.logger({status:'recognizing text',progress:0.8});
+            const w=(text,x,y,confidence=95)=>({text,confidence,bbox:{x0:x-10,y0:y-8,x1:x+10,y1:y+8}});
             return {data:{
-              text:'10月3日\nおにぎり\n1便 2便 3便\n納品数 10 20 30\n販売数 9 18 27\n未登録商品 1 2',
+              text:'10/3 10/4\n1 2 3 1 2 3\nおにぎり\n納品数 10 20 30 40 50 60\n販売数 9 18 27 36 45 54',
               confidence:92,
-              blocks:null
+              blocks:[{paragraphs:[{lines:[
+                {text:'10/3 10/4',confidence:95,bbox:{x0:70,y0:32,x1:330,y1:48},words:[w('10/3',120,40),w('10/4',300,40)]},
+                {text:'1 2 3 1 2 3',confidence:95,bbox:{x0:55,y0:62,x1:365,y1:78},words:[w('1',70,70),w('2',120,70),w('3',170,70),w('1',250,70),w('2',300,70),w('3',350,70)]},
+                {text:'おにぎり',confidence:97,bbox:{x0:10,y0:92,x1:90,y1:108},words:[w('おにぎり',50,100)]},
+                {text:'納品数 10 20 30 40 50 60',confidence:93,bbox:{x0:10,y0:122,x1:370,y1:138},words:[w('納品数',30,130),w('10',70,130),w('20',120,130),w('30',170,130),w('40',250,130),w('50',300,130),w('60',350,130)]},
+                {text:'販売数 9 18 27 36 45 54',confidence:92,bbox:{x0:10,y0:152,x1:370,y1:168},words:[w('販売数',30,160),w('9',70,160),w('18',120,160),w('27',170,160),w('36',250,160),w('45',300,160),w('54',350,160)]}
+              ]}]}]
             }};
           },
           terminate:async()=>{}
@@ -141,8 +148,13 @@ test('販売数入力のカメラ読取はローカルOCRし結果だけを一�
   const summary=await page.evaluate(()=>window.InsightSalesCountCamera.getSessionSummary());
   expect(summary.count).toBe(1);
   expect(summary.matchedCategories).toBeGreaterThanOrEqual(1);
-  expect(summary.numberCandidates).toBeGreaterThanOrEqual(6);
-  await expect(page.locator('.sc-camera-ocr-state')).toContainText('完了');
+  expect(summary.numberCandidates).toBeGreaterThanOrEqual(12);
+  expect(summary.detectedDates).toBe(2);
+  expect(summary.structuredCells).toBe(12);
+  await expect(page.locator('.sc-camera-ocr-state')).toContainText('2日');
+  await expect(page.locator('#scCameraDateLabel')).toContainText('基準日');
+  await expect(page.locator('.sc-camera-result-day')).toHaveCount(2);
+  await expect(page.locator('.sc-camera-result-head')).toContainText('2日');
 
   const ocrConfig=await page.evaluate(()=>window.__ocrCreateOptions);
   expect(ocrConfig.langs).toBe('jpn');
@@ -191,7 +203,7 @@ test('選択月は主要ページを横断しても維持される',async({page}
 test('トップページはビルド番号を持ち最新版確認をno-storeで行う',async({page})=>{
   const errors=await openInsight(page);
   const source=await page.evaluate(()=>fetch('/Index.html?e2e-shell-check=1',{cache:'no-store'}).then(r=>r.text()));
-  expect(source).toContain('name="insight-shell-version" content="20261003-camera-date-match-1"');
+  expect(source).toContain('name="insight-shell-version" content="20261003-camera-multiday-1"');
   expect(source).toContain("fetch('./Index.html?insight_probe='+Date.now(),{cache:'no-store'})");
   expect(source).toContain("location.replace('./Index.html?insight_build='+encodeURIComponent(m[1]))");
   expect(errors).toEqual([]);

@@ -25,7 +25,7 @@ test('画像は20MB以下のimageだけを受け付ける',()=>{
 });
 
 test('CAMERA-2は同一オリジンのローカルOCRを使用し画像を永続化しない',()=>{
-  assert.equal(camera.VERSION,2);
+  assert.equal(camera.VERSION,3);
   assert.deepEqual(camera.POLICY,{
     persistImages:false,
     externalTransmission:false,
@@ -116,6 +116,56 @@ test('OCR結果から日付・登録カテゴリー・納品販売ラベル・�
   assert.deepEqual(result.labels.trips.map(x=>x.found),[true,true,true]);
   assert.ok(result.numberCandidates.some(x=>x.value===10));
   assert.ok(result.numberCandidates.some(x=>x.value===27));
+});
+
+test('複数日表を日付×カテゴリー×3便×納品販売へ構造化する',()=>{
+  function w(text,x,y,confidence=95){return {text,confidence,bbox:{x0:x-10,y0:y-8,x1:x+10,y1:y+8}};}
+  const lines=[
+    {index:0,text:'11/1(土) 11/2(日)',confidence:95,bbox:{x0:70,y0:32,x1:330,y1:48},words:[w('11/1(土)',120,40),w('11/2(日)',300,40)]},
+    {index:1,text:'1 2 3 1 2 3',confidence:95,bbox:{x0:55,y0:62,x1:365,y1:78},words:[w('1',70,70),w('2',120,70),w('3',170,70),w('1',250,70),w('2',300,70),w('3',350,70)]},
+    {index:2,text:'おにぎり',confidence:97,bbox:{x0:10,y0:92,x1:90,y1:108},words:[w('おにぎり',50,100)]},
+    {index:3,text:'納品数 10 20 30 40 50 60',confidence:93,bbox:{x0:10,y0:122,x1:370,y1:138},words:[w('納品数',30,130),w('10',70,130),w('20',120,130),w('30',170,130),w('40',250,130),w('50',300,130),w('60',350,130)]},
+    {index:4,text:'販売数 9 18 27 36 45 54',confidence:92,bbox:{x0:10,y0:152,x1:370,y1:168},words:[w('販売数',30,160),w('9',70,160),w('18',120,160),w('27',170,160),w('36',250,160),w('45',300,160),w('54',350,160)]}
+  ];
+  const categories=[{id:'cat_onigiri',name:'おにぎり',aliases:[],hidden:false,activeTrips:[true,true,true]}];
+  const result=camera.buildMultiDayData(lines,categories,'2025-11-01');
+  assert.deepEqual(result.dates,['2025-11-01','2025-11-02']);
+  assert.equal(result.categories.length,1);
+  assert.equal(result.cells.length,12);
+  assert.equal(result.cells.find(x=>x.date==='2025-11-01'&&x.trip===1&&x.field==='delivery').value,10);
+  assert.equal(result.cells.find(x=>x.date==='2025-11-02'&&x.trip===3&&x.field==='sales').value,54);
+});
+
+test('対象外便は複数日OCR結果から除外する',()=>{
+  function w(text,x,y){return {text,confidence:95,bbox:{x0:x-8,y0:y-7,x1:x+8,y1:y+7}};}
+  const lines=[
+    {index:0,text:'11/1',bbox:{x0:80,y0:30,x1:160,y1:50},words:[w('11/1',120,40)]},
+    {index:1,text:'1 2 3',bbox:{x0:50,y0:60,x1:190,y1:80},words:[w('1',70,70),w('2',120,70),w('3',170,70)]},
+    {index:2,text:'おにぎり',bbox:{x0:10,y0:90,x1:90,y1:110},words:[w('おにぎり',50,100)]},
+    {index:3,text:'納品数 10 20 30',bbox:{x0:10,y0:120,x1:190,y1:140},words:[w('納品数',30,130),w('10',70,130),w('20',120,130),w('30',170,130)]},
+    {index:4,text:'販売数 9 18 27',bbox:{x0:10,y0:150,x1:190,y1:170},words:[w('販売数',30,160),w('9',70,160),w('18',120,160),w('27',170,160)]}
+  ];
+  const result=camera.buildMultiDayData(lines,[{id:'a',name:'おにぎり',hidden:false,aliases:[],activeTrips:[true,false,true]}],'2025-11-01');
+  assert.equal(result.cells.some(x=>x.trip===2),false);
+  assert.equal(result.cells.length,4);
+});
+
+test('複数画像の同一値は統合し不一致だけ要確認にする',()=>{
+  const a={dates:['2025-11-01'],categories:[{id:'a',name:'おにぎり',activeTrips:[true,true,true]}],warnings:[],cells:[
+    {date:'2025-11-01',categoryId:'a',categoryName:'おにぎり',trip:1,field:'delivery',value:10,confidence:90},
+    {date:'2025-11-01',categoryId:'a',categoryName:'おにぎり',trip:1,field:'sales',value:9,confidence:92}
+  ]};
+  const b=JSON.parse(JSON.stringify(a));
+  b.cells[1].value=8;
+  const merged=camera.mergeMultiDayResults([a,b]);
+  const delivery=merged.cells.find(x=>x.field==='delivery');
+  const sales=merged.cells.find(x=>x.field==='sales');
+  assert.equal(delivery.conflict,false);
+  assert.equal(delivery.value,10);
+  assert.equal(sales.conflict,true);
+  assert.equal(sales.value,null);
+  assert.deepEqual(sales.values,[9,8]);
+  assert.equal(merged.reviewCount,1);
 });
 
 test('ローカルOCRランタイム資産はリポジトリ内に固定されている',()=>{

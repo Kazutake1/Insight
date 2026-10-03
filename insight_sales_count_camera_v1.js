@@ -1,4 +1,4 @@
-/* Sales-count camera capture v2: same-origin local OCR, in-memory results only. */
+/* Sales-count camera capture v3: same-origin multi-day local OCR, in-memory review only. */
 (function(root){
   'use strict';
   if(root.InsightSalesCountCamera)return;
@@ -263,6 +263,229 @@
       labels:detectLabels(text,lines)
     };
   }
+  function centerX(box){return box?(Number(box.x0)+Number(box.x1))/2:NaN;}
+  function centerY(box){return box?(Number(box.y0)+Number(box.y1))/2:NaN;}
+  function lineCenterY(line){
+    var y=centerY(line&&line.bbox);
+    if(Number.isFinite(y))return y;
+    var ys=(line&&Array.isArray(line.words)?line.words:[]).map(function(word){return centerY(word.bbox);}).filter(Number.isFinite);
+    return ys.length?ys.reduce(function(sum,value){return sum+value;},0)/ys.length:NaN;
+  }
+  function parseDateToken(value,referenceDate){
+    var text=normalizeText(value).replace(/[（）()\[\]]/g,' ');
+    var match=/(\d{4})\s*(?:年|[\/.\-])\s*(\d{1,2})\s*(?:月|[\/.\-])\s*(\d{1,2})/.exec(text);
+    if(match)return validIso(match[1],match[2],match[3]);
+    match=/(\d{1,2})\s*月\s*(\d{1,2})\s*日?/.exec(text);
+    if(match)return validIso(inferYearForMonth(match[1],referenceDate),match[1],match[2]);
+    match=/(?:^|[^\d])(\d{1,2})\s*[\/.\-]\s*(\d{1,2})(?!\d)/.exec(text);
+    if(match)return validIso(inferYearForMonth(match[1],referenceDate),match[1],match[2]);
+    return null;
+  }
+  function wordNumber(word){
+    var text=normalizeText(word&&word.text).replace(/,/g,'');
+    if(!/^\d+$/.test(text))return null;
+    var value=Number(text);
+    return Number.isSafeInteger(value)&&value>=0?value:null;
+  }
+  function spatialWords(lines){
+    var out=[];
+    (Array.isArray(lines)?lines:[]).forEach(function(line,index){
+      (Array.isArray(line&&line.words)?line.words:[]).forEach(function(word){
+        var x=centerX(word.bbox),y=centerY(word.bbox);
+        if(!Number.isFinite(x)||!Number.isFinite(y))return;
+        out.push({
+          text:normalizeText(word.text),
+          confidence:Number.isFinite(Number(word.confidence))?Number(word.confidence):null,
+          bbox:word.bbox,
+          x:x,
+          y:y,
+          lineIndex:Number.isInteger(line.index)?line.index:index
+        });
+      });
+    });
+    return out;
+  }
+  function spatialDateAnchors(lines,referenceDate){
+    var rows=[];
+    (Array.isArray(lines)?lines:[]).forEach(function(line,index){
+      var anchors=[];
+      (Array.isArray(line&&line.words)?line.words:[]).forEach(function(word){
+        var iso=parseDateToken(word.text,referenceDate),x=centerX(word.bbox),y=centerY(word.bbox);
+        if(!iso||!Number.isFinite(x)||!Number.isFinite(y))return;
+        anchors.push({iso:iso,x:x,y:y,raw:normalizeText(word.text),confidence:Number.isFinite(Number(word.confidence))?Number(word.confidence):null,lineIndex:Number.isInteger(line.index)?line.index:index});
+      });
+      if(anchors.length)rows.push({anchors:anchors,y:lineCenterY(line)});
+    });
+    if(!rows.length)return [];
+    rows.sort(function(a,b){
+      if(b.anchors.length!==a.anchors.length)return b.anchors.length-a.anchors.length;
+      return (Number.isFinite(b.y)?b.y:-Infinity)-(Number.isFinite(a.y)?a.y:-Infinity);
+    });
+    var chosen=rows[0].anchors.slice().sort(function(a,b){return a.x-b.x;}),seen=new Set();
+    return chosen.filter(function(anchor){if(seen.has(anchor.iso))return false;seen.add(anchor.iso);return true;});
+  }
+  function categoryAnchors(lines,categories){
+    var active=(Array.isArray(categories)?categories:[]).filter(function(category){return category&&category.hidden!==true&&category.id&&category.name;});
+    var out=[];
+    (Array.isArray(lines)?lines:[]).forEach(function(line,index){
+      var compact=compactForMatch(line&&line.text),y=lineCenterY(line);
+      if(!compact||!Number.isFinite(y))return;
+      active.forEach(function(category){
+        var labels=[category.name].concat(Array.isArray(category.aliases)?category.aliases:[]).filter(Boolean);
+        var matched=labels.find(function(label){var needle=compactForMatch(label);return needle&&compact.indexOf(needle)>=0;});
+        if(!matched)return;
+        out.push({
+          id:category.id,
+          name:String(category.name),
+          matchedLabel:matched,
+          activeTrips:Array.isArray(category.activeTrips)&&category.activeTrips.length===3?category.activeTrips.map(function(v){return v!==false;}):[true,true,true],
+          y:y,
+          lineIndex:Number.isInteger(line.index)?line.index:index
+        });
+      });
+    });
+    var dedup=[];
+    out.sort(function(a,b){return a.y-b.y;}).forEach(function(anchor){
+      if(dedup.some(function(existing){return existing.id===anchor.id&&Math.abs(existing.y-anchor.y)<4;}))return;
+      dedup.push(anchor);
+    });
+    return dedup;
+  }
+  function dateColumns(dateAnchors,lines,firstCategoryY){
+    var anchors=(Array.isArray(dateAnchors)?dateAnchors:[]).slice().sort(function(a,b){return a.x-b.x;});
+    if(!anchors.length)return [];
+    var tripWords=spatialWords(lines).filter(function(word){
+      return /^[123]$/.test(word.text)&&word.y>(anchors[0].y+2)&&(!Number.isFinite(firstCategoryY)||word.y<firstCategoryY-2);
+    });
+    return anchors.map(function(anchor,index){
+      var prev=anchors[index-1],next=anchors[index+1];
+      var left=prev?(prev.x+anchor.x)/2:(next?anchor.x-(next.x-anchor.x)/2:NaN);
+      var right=next?(anchor.x+next.x)/2:(prev?anchor.x+(anchor.x-prev.x)/2:NaN);
+      var candidates=tripWords.filter(function(word){
+        if(Number.isFinite(left)&&word.x<left)return false;
+        if(Number.isFinite(right)&&word.x>=right)return false;
+        return true;
+      }).sort(function(a,b){return a.x-b.x;});
+      var tripXs=[null,null,null];
+      candidates.forEach(function(word){
+        var trip=Number(word.text)-1;
+        if(trip>=0&&trip<3&&tripXs[trip]===null)tripXs[trip]=word.x;
+      });
+      if(tripXs.some(function(value){return value===null;})){
+        if(Number.isFinite(left)&&Number.isFinite(right)){
+          var width=(right-left)/3;
+          for(var t=0;t<3;t++)if(tripXs[t]===null)tripXs[t]=left+width*(t+0.5);
+        }else{
+          var spacing=36;
+          tripXs=[anchor.x-spacing,anchor.x,anchor.x+spacing];
+        }
+      }
+      if(!Number.isFinite(left))left=Math.min.apply(null,tripXs)-Math.max(18,(tripXs[2]-tripXs[0])/4);
+      if(!Number.isFinite(right))right=Math.max.apply(null,tripXs)+Math.max(18,(tripXs[2]-tripXs[0])/4);
+      return {date:anchor.iso,x:anchor.x,left:left,right:right,tripXs:tripXs};
+    });
+  }
+  function rowForCategory(lines,anchor,nextY,kind){
+    var rx=kind==='delivery'?/納\s*品(?:\s*数)?/:/販\s*売(?:\s*数)?/;
+    var candidates=(Array.isArray(lines)?lines:[]).filter(function(line){
+      var y=lineCenterY(line);
+      return Number.isFinite(y)&&y>anchor.y&&(!Number.isFinite(nextY)||y<nextY)&&rx.test(normalizeText(line.text));
+    });
+    candidates.sort(function(a,b){return lineCenterY(a)-lineCenterY(b);});
+    return candidates[0]||null;
+  }
+  function mapRowCells(row,columns,category,field){
+    if(!row)return [];
+    var words=(Array.isArray(row.words)?row.words:[]).map(function(word){
+      return {word:word,value:wordNumber(word),x:centerX(word.bbox),confidence:Number.isFinite(Number(word.confidence))?Number(word.confidence):null};
+    }).filter(function(item){return item.value!==null&&Number.isFinite(item.x);});
+    var byKey=new Map();
+    words.forEach(function(item){
+      var column=(columns||[]).find(function(candidate){return item.x>=candidate.left&&item.x<candidate.right;});
+      if(!column)return;
+      var trip=0,best=Infinity;
+      column.tripXs.forEach(function(x,index){var distance=Math.abs(item.x-x);if(distance<best){best=distance;trip=index;}});
+      if(category.activeTrips&&category.activeTrips[trip]===false)return;
+      var key=column.date+'|'+trip+'|'+field,existing=byKey.get(key);
+      if(!existing||((item.confidence==null?-1:item.confidence)>(existing.confidence==null?-1:existing.confidence))){
+        byKey.set(key,{
+          date:column.date,
+          categoryId:category.id,
+          categoryName:category.name,
+          trip:trip+1,
+          field:field,
+          value:item.value,
+          confidence:item.confidence
+        });
+      }
+    });
+    return Array.from(byKey.values());
+  }
+  function buildMultiDayData(lines,categories,referenceDate){
+    lines=Array.isArray(lines)?lines:[];
+    var dateAnchors=spatialDateAnchors(lines,referenceDate);
+    var fallbackDates=extractDateCandidates(lines.map(function(line){return line.text;}).join('\n'),referenceDate);
+    var dates=(dateAnchors.length?dateAnchors.map(function(anchor){return anchor.iso;}):fallbackDates.map(function(item){return item.iso;}));
+    dates=Array.from(new Set(dates)).sort();
+    var catAnchors=categoryAnchors(lines,categories);
+    var firstCategoryY=catAnchors.length?catAnchors[0].y:NaN;
+    var columns=dateColumns(dateAnchors,lines,firstCategoryY);
+    var cells=[];
+    catAnchors.forEach(function(category,index){
+      var next=catAnchors[index+1],nextY=next?next.y:Infinity;
+      var delivery=rowForCategory(lines,category,nextY,'delivery');
+      var sales=rowForCategory(lines,category,nextY,'sales');
+      cells.push.apply(cells,mapRowCells(delivery,columns,category,'delivery'));
+      cells.push.apply(cells,mapRowCells(sales,columns,category,'sales'));
+    });
+    return {
+      dates:dates,
+      categories:catAnchors.map(function(category){return {id:category.id,name:category.name,activeTrips:category.activeTrips.slice()};}),
+      cells:cells,
+      spatial:dateAnchors.length>0&&columns.length>0,
+      warnings:[
+        !dateAnchors.length?'日付列の位置を確定できませんでした':null,
+        dateAnchors.length&&!catAnchors.length?'登録カテゴリーの位置を確定できませんでした':null,
+        dateAnchors.length&&catAnchors.length&&!cells.length?'納品数・販売数の位置を確定できませんでした':null
+      ].filter(Boolean)
+    };
+  }
+  function mergeMultiDayResults(results){
+    var dates=new Set(),categories=new Map(),cells=new Map(),warnings=[];
+    (Array.isArray(results)?results:[]).forEach(function(result,resultIndex){
+      if(!result)return;
+      (result.dates||[]).forEach(function(date){dates.add(date);});
+      (result.categories||[]).forEach(function(category){if(category&&category.id&&!categories.has(category.id))categories.set(category.id,category);});
+      (result.warnings||[]).forEach(function(warning){warnings.push('画像 '+(resultIndex+1)+': '+warning);});
+      (result.cells||[]).forEach(function(cell){
+        var key=[cell.date,cell.categoryId,cell.trip,cell.field].join('|');
+        if(!cells.has(key))cells.set(key,{date:cell.date,categoryId:cell.categoryId,categoryName:cell.categoryName,trip:cell.trip,field:cell.field,values:[],confidences:[],sources:0});
+        var merged=cells.get(key);
+        merged.sources++;
+        if(merged.values.indexOf(cell.value)<0)merged.values.push(cell.value);
+        if(Number.isFinite(Number(cell.confidence)))merged.confidences.push(Number(cell.confidence));
+      });
+    });
+    var mergedCells=Array.from(cells.values()).map(function(cell){
+      var unique=cell.values.slice(),conf=cell.confidences.length?Math.min.apply(null,cell.confidences):null;
+      return Object.assign(cell,{
+        conflict:unique.length>1,
+        value:unique.length===1?unique[0]:null,
+        confidence:conf,
+        needsReview:unique.length>1||(conf!==null&&conf<70)
+      });
+    }).sort(function(a,b){
+      return a.date.localeCompare(b.date)||a.categoryName.localeCompare(b.categoryName)||a.trip-b.trip||a.field.localeCompare(b.field);
+    });
+    return {
+      dates:Array.from(dates).sort(),
+      categories:Array.from(categories.values()),
+      cells:mergedCells,
+      warnings:Array.from(new Set(warnings)),
+      reviewCount:mergedCells.filter(function(cell){return cell.needsReview;}).length
+    };
+  }
+
   function localOcrAssets(baseHref){
     var base=new URL('./vendor/ocr/',baseHref);
     return {
@@ -274,7 +497,7 @@
   }
 
   var model={
-    VERSION:2,
+    VERSION:3,
     MAX_FILES:MAX_FILES,
     MAX_FILE_BYTES:MAX_FILE_BYTES,
     POLICY:POLICY,
@@ -291,6 +514,8 @@
     matchCategories:matchCategories,
     detectLabels:detectLabels,
     analyzeOcrData:analyzeOcrData,
+    buildMultiDayData:buildMultiDayData,
+    mergeMultiDayResults:mergeMultiDayResults,
     localOcrAssets:localOcrAssets
   };
   if(typeof module!=='undefined'&&module.exports)module.exports=model;
@@ -299,7 +524,7 @@
 
   var doc=root.document;
   var session={targetDate:'',items:[],processing:false,engineStatus:''};
-  var dialog=null,list=null,status=null,ocrStatus=null,dateInput=null,cameraInput=null,libraryInput=null;
+  var dialog=null,list=null,status=null,ocrStatus=null,resultsBox=null,dateInput=null,cameraInput=null,libraryInput=null;
   var nextId=1;
 
   function salesApi(){return root.InsightSalesCount;}
@@ -324,8 +549,10 @@
         numberCount+=(item.ocr.numberCandidates||[]).length;
       }else if(item.ocr&&item.ocr.status==='error')errors++;
     });
+    var merged=mergeMultiDayResults(session.items.filter(function(item){return item.ocr&&item.ocr.status==='done';}).map(function(item){return item.ocr.multiDay;}));
     return {
       targetDate:session.targetDate,
+      referenceDate:session.targetDate,
       count:session.items.length,
       totalBytes:session.items.reduce(function(sum,item){return sum+item.file.size;},0),
       names:session.items.map(function(item){return item.file.name||'';}),
@@ -334,7 +561,10 @@
       ocrErrors:errors,
       ocrPending:Math.max(0,session.items.length-done-errors),
       matchedCategories:matchedIds.size,
-      numberCandidates:numberCount
+      numberCandidates:numberCount,
+      detectedDates:merged.dates.length,
+      structuredCells:merged.cells.length,
+      reviewCount:merged.reviewCount
     };
   }
   function revoke(item){
@@ -401,6 +631,7 @@
       if(!item.ocr||item.ocr.status!=='done')return;
       item.ocr.dateCandidates=extractDateCandidates(item.ocr.text,session.targetDate);
       item.ocr.targetDateMatched=evaluateTargetDate(item.ocr.dateCandidates,session.targetDate);
+      item.ocr.multiDay=buildMultiDayData(item.ocr.lines,categories(),session.targetDate);
     });
   }
   function renderControls(){
@@ -419,8 +650,60 @@
     if(!item.ocr)return '未読取';
     if(item.ocr.status==='processing')return '読取中 '+Math.round((item.ocr.progress||0)*100)+'%';
     if(item.ocr.status==='error')return 'OCR失敗';
-    if(item.ocr.status==='done')return '完了: カテゴリー候補 '+(item.ocr.matchedCategories||[]).length+'件 / 数字候補 '+(item.ocr.numberCandidates||[]).length+'件';
+    if(item.ocr.status==='done'){var multi=item.ocr.multiDay||{dates:[],categories:[],cells:[]};return '完了: '+multi.dates.length+'日 / '+multi.categories.length+'カテゴリー / '+multi.cells.length+'項目';}
     return '未読取';
+  }
+  function valueLabel(cell){
+    if(!cell)return '—';
+    if(cell.conflict)return '⚠ '+cell.values.join(' / ');
+    return String(cell.value);
+  }
+  function renderResults(){
+    if(!resultsBox)return;
+    resultsBox.replaceChildren();
+    var merged=mergeMultiDayResults(session.items.filter(function(item){return item.ocr&&item.ocr.status==='done';}).map(function(item){return item.ocr.multiDay;}));
+    if(!merged.dates.length&&!merged.cells.length)return;
+    var head=doc.createElement('div');
+    head.className='sc-camera-result-head';
+    head.textContent='読取結果：'+merged.dates.length+'日 / '+merged.categories.length+'カテゴリー / '+merged.cells.length+'項目'+(merged.reviewCount?' / 要確認 '+merged.reviewCount+'件':'');
+    resultsBox.append(head);
+    if(merged.warnings.length){
+      var warnings=doc.createElement('div');
+      warnings.className='sc-camera-result-warnings';
+      merged.warnings.forEach(function(message){var p=doc.createElement('div');p.textContent=message;warnings.append(p);});
+      resultsBox.append(warnings);
+    }
+    merged.dates.forEach(function(date){
+      var day=doc.createElement('section');
+      day.className='sc-camera-result-day';
+      var title=doc.createElement('h3');
+      title.textContent=date.replace(/^(\d{4})-(\d{2})-(\d{2})$/,'$1/$2/$3');
+      day.append(title);
+      var categoryIds=Array.from(new Set(merged.cells.filter(function(cell){return cell.date===date;}).map(function(cell){return cell.categoryId;})));
+      if(!categoryIds.length){
+        var empty=doc.createElement('p');empty.className='sc-camera-result-empty';empty.textContent='日付は認識しましたが、納品数・販売数の位置を確定できませんでした。';day.append(empty);
+      }
+      categoryIds.forEach(function(categoryId){
+        var category=merged.categories.find(function(item){return item.id===categoryId;})||{id:categoryId,name:categoryId,activeTrips:[true,true,true]};
+        var block=doc.createElement('div');block.className='sc-camera-result-category';
+        var name=doc.createElement('strong');name.textContent=category.name;block.append(name);
+        var grid=doc.createElement('div');grid.className='sc-camera-result-grid';
+        ['','1便','2便','3便'].forEach(function(label){var node=doc.createElement('span');node.className='sc-camera-result-label';node.textContent=label;grid.append(node);});
+        ['delivery','sales'].forEach(function(field){
+          var rowLabel=doc.createElement('span');rowLabel.className='sc-camera-result-label';rowLabel.textContent=field==='delivery'?'納品':'販売';grid.append(rowLabel);
+          [1,2,3].forEach(function(trip){
+            var cell=merged.cells.find(function(item){return item.date===date&&item.categoryId===categoryId&&item.trip===trip&&item.field===field;});
+            var node=doc.createElement('span');
+            node.className='sc-camera-result-value'+(cell&&cell.needsReview?' needs-review':'');
+            if(category.activeTrips&&category.activeTrips[trip-1]===false){node.textContent='ー';node.classList.add('not-applicable');}
+            else node.textContent=valueLabel(cell);
+            grid.append(node);
+          });
+        });
+        block.append(grid);day.append(block);
+      });
+      resultsBox.append(day);
+    });
   }
   function renderItems(){
     if(!list||!status)return;
@@ -452,12 +735,6 @@
         state.className='sc-camera-ocr-state '+(item.ocr&&item.ocr.status==='error'?'is-error':'');
         state.textContent=itemStatus(item);
         meta.append(title,size,state);
-        if(item.ocr&&item.ocr.status==='done'&&item.ocr.targetDateMatched===false){
-          var warn=doc.createElement('span');
-          warn.className='sc-camera-warning';
-          warn.textContent='対象日が画像内の日付範囲外の可能性があります';
-          meta.append(warn);
-        }
         var remove=doc.createElement('button');
         remove.type='button';
         remove.className='sc-camera-remove';
@@ -472,9 +749,10 @@
     status.textContent='撮影済み '+String(session.items.length)+' / '+String(MAX_FILES)+'枚';
     if(ocrStatus){
       if(session.processing)ocrStatus.textContent=session.engineStatus||'OCR処理中…';
-      else if(result.ocrDone||result.ocrErrors)ocrStatus.textContent='OCR完了 '+result.ocrDone+'件 / エラー '+result.ocrErrors+'件 / カテゴリー候補 '+result.matchedCategories+'件 / 数字候補 '+result.numberCandidates+'件';
+      else if(result.ocrDone||result.ocrErrors)ocrStatus.textContent='OCR完了 '+result.ocrDone+'件 / エラー '+result.ocrErrors+'件 / 検出日 '+result.detectedDates+'日 / 構造化 '+result.structuredCells+'項目';
       else ocrStatus.textContent='OCRはまだ実行していません';
     }
+    renderResults();
     renderControls();
   }
   function requestClose(){
@@ -485,7 +763,7 @@
   function closeAndClear(){
     resetSession();
     if(dialog&&dialog.parentNode)dialog.remove();
-    dialog=null;list=null;status=null;ocrStatus=null;dateInput=null;cameraInput=null;libraryInput=null;
+    dialog=null;list=null;status=null;ocrStatus=null;resultsBox=null;dateInput=null;cameraInput=null;libraryInput=null;
   }
   function ocrOptions(logger){
     var assets=localOcrAssets(doc.baseURI||root.location.href);
@@ -532,6 +810,7 @@
         try{
           var result=await worker.recognize(activeItem.file,{rotateAuto:true},{text:true,blocks:true});
           var analyzed=analyzeOcrData(result&&result.data||{},categories(),session.targetDate);
+          analyzed.multiDay=buildMultiDayData(analyzed.lines,categories(),session.targetDate);
           activeItem.ocr=Object.assign({status:'done',progress:1},analyzed);
         }catch(error){
           activeItem.ocr={status:'error',progress:0,error:error&&error.message?String(error.message):String(error)};
@@ -559,10 +838,10 @@
     dialog.id='scCameraDialog';
     dialog.className='sc-dialog sc-camera-dialog';
     dialog.innerHTML=
-      '<header><div><h2>カメラ読取</h2><p>対象日の画面を撮影し、端末内で文字と数字を読み取ります。</p></div><button type="button" id="scCameraClose">閉じる</button></header>'+
+      '<header><div><h2>カメラ読取</h2><p>画面内の複数日をまとめて端末内で読み取ります。</p></div><button type="button" id="scCameraClose">閉じる</button></header>'+
       '<section class="sc-camera-body">'+
-        '<label class="sc-camera-date">対象日 <input id="scCameraDate" type="date"></label>'+
-        '<p class="sc-camera-note">画像は外部OCRサービスへ送信しません。画像とOCR結果はこの画面を閉じるまでメモリ上だけで保持し、販売数入力への反映・保存はまだ行いません。</p>'+
+        '<label class="sc-camera-date" id="scCameraDateLabel">基準日（年判定用） <input id="scCameraDate" type="date"></label>'+
+        '<p class="sc-camera-note">基準日は年を判定するためだけに使います。この日だけに限定せず、画像内の複数日をまとめて読み取ります。画像は外部OCRサービスへ送信せず、結果もこの画面を閉じるまでメモリ上だけで保持します。</p>'+
         '<div class="sc-camera-actions">'+
           '<button type="button" id="scCameraShoot">カメラで撮影</button>'+
           '<button type="button" id="scCameraLibrary">写真から追加</button>'+
@@ -572,7 +851,7 @@
         '<input id="scCameraFiles" type="file" accept="image/*" multiple hidden>'+
         '<div class="sc-camera-summary"><strong id="scCameraStatus"></strong><span>外部OCR送信なし・自動保存なし</span></div>'+
         '<div id="scCameraList" class="sc-camera-list"></div>'+
-        '<div id="scCameraOcrStatus" class="sc-camera-ocr-summary">OCRはまだ実行していません</div>'+
+        '<div id="scCameraOcrStatus" class="sc-camera-ocr-summary">OCRはまだ実行していません</div>'+\n        '<div id="scCameraResults" class="sc-camera-results"></div>'+
         '<div class="sc-camera-next"><button id="scCameraRead" type="button" disabled>画像を読み取る</button></div>'+
       '</section>';
     doc.body.append(dialog);
@@ -580,6 +859,7 @@
     list=dialog.querySelector('#scCameraList');
     status=dialog.querySelector('#scCameraStatus');
     ocrStatus=dialog.querySelector('#scCameraOcrStatus');
+    resultsBox=dialog.querySelector('#scCameraResults');
     dateInput=dialog.querySelector('#scCameraDate');
     cameraInput=dialog.querySelector('#scCameraCapture');
     libraryInput=dialog.querySelector('#scCameraFiles');
@@ -599,7 +879,7 @@
       if(!bounds||value<bounds.min||value>bounds.max){
         session.targetDate=defaultTargetDate(getPeriod());
         dateInput.value=session.targetDate;
-        alert('対象日は表示中の月から選択してください。');
+        alert('基準日は表示中の月から選択してください。');
         refreshDateMatches();
         renderItems();
         return;
@@ -646,7 +926,7 @@
     '.sc-camera-thumb{width:76px;height:58px;border-radius:8px;overflow:hidden;background:var(--input-bg)}.sc-camera-thumb img{width:100%;height:100%;object-fit:cover;display:block}'+
     '.sc-camera-meta{display:flex;flex-direction:column;gap:4px;min-width:0}.sc-camera-meta strong{font-size:12px}.sc-camera-meta span{font-size:10px;color:var(--text4)}'+
     '.sc-camera-ocr-state.is-error,.sc-camera-warning{color:#b45309!important;font-weight:700}.sc-camera-ocr-summary{margin-top:10px;padding:9px 11px;border-radius:9px;background:var(--surface2);font-size:11px;color:var(--text3)}'+
-    '.sc-camera-remove{min-width:58px}.sc-camera-next{margin-top:12px;padding-top:12px;border-top:1px solid var(--border);display:flex;justify-content:flex-end}.sc-camera-next button{min-height:40px}.sc-camera-next button:disabled{opacity:.5}'+
+    '.sc-camera-remove{min-width:58px}.sc-camera-next{margin-top:12px;padding-top:12px;border-top:1px solid var(--border);display:flex;justify-content:flex-end}.sc-camera-next button{min-height:40px}.sc-camera-next button:disabled{opacity:.5}.sc-camera-results{margin-top:12px;display:grid;gap:10px}.sc-camera-result-head{font-size:12px;font-weight:800;padding:10px 12px;border-radius:10px;background:var(--surface2);border:1px solid var(--border)}.sc-camera-result-warnings{font-size:11px;line-height:1.6;color:#b45309}.sc-camera-result-day{border:1px solid var(--border);border-radius:12px;padding:10px;background:var(--surface2)}.sc-camera-result-day h3{margin:0 0 8px;font-size:13px}.sc-camera-result-category+.sc-camera-result-category{margin-top:10px;padding-top:10px;border-top:1px solid var(--border)}.sc-camera-result-category>strong{display:block;font-size:12px;margin-bottom:6px}.sc-camera-result-grid{display:grid;grid-template-columns:54px repeat(3,minmax(52px,1fr));gap:4px;align-items:center}.sc-camera-result-label,.sc-camera-result-value{font-size:11px;text-align:center;padding:6px 3px;border-radius:7px}.sc-camera-result-label{color:var(--text4);font-weight:700}.sc-camera-result-value{background:var(--surface);border:1px solid var(--border);font-weight:800}.sc-camera-result-value.needs-review{border-color:#f59e0b;color:#b45309}.sc-camera-result-value.not-applicable{background:var(--input-bg);color:var(--text4)}.sc-camera-result-empty{margin:0;font-size:11px;color:var(--text4)}'+
     '@media(max-width:600px){.sc-camera-summary{flex-direction:column}.sc-camera-item{grid-template-columns:64px minmax(0,1fr) auto}.sc-camera-thumb{width:64px;height:50px}}';
   doc.head.append(style);
 
@@ -657,6 +937,7 @@
   model.removeItem=removeItem;
   model.readImages=readImages;
   model.getSessionSummary=summary;
+  model.getMultiDayResults=function(){return mergeMultiDayResults(session.items.filter(function(item){return item.ocr&&item.ocr.status==='done';}).map(function(item){return item.ocr.multiDay;}));};
 
   if(doc.readyState==='loading')doc.addEventListener('DOMContentLoaded',init);else setTimeout(init,0);
 })(typeof window!=='undefined'?window:globalThis);
