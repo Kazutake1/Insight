@@ -1060,8 +1060,11 @@ test('イベント実績は過去開催→複数日→時間帯グラフ→カ�
   await expect(page.locator('.er-sales-section > h2')).toHaveText('カテゴリー実績');
   await expect(page.locator('.er-category-card')).toHaveCount(2);
   await expect(page.locator('.er-category-card .sc-day')).toHaveCount(2);
-  const categoryWidths=await page.locator('.er-category-card').evaluateAll(cards=>cards.map(card=>Math.round(card.getBoundingClientRect().width)));
-  expect(categoryWidths.every(width=>width<=280)).toBe(true);
+  const categoryGrid=await page.locator('.er-category-grid').evaluate(grid=>({
+    columns:getComputedStyle(grid).gridTemplateColumns.split(' ').filter(Boolean).length,
+    width:Math.round(grid.getBoundingClientRect().width)
+  }));
+  expect(categoryGrid.columns).toBe(4);
   const readOnly=await page.locator('.er-category-card input').evaluateAll(inputs=>inputs.every(input=>input.readOnly));
   expect(readOnly).toBe(true);
 
