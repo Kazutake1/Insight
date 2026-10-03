@@ -1,4 +1,4 @@
-/* Sales-count camera capture v6: precision-first multi-day local OCR, in-memory review only. */
+/* Sales-count camera capture v7: precision-first fixed-grid multi-day local OCR, in-memory review only. */
 (function(root){
   'use strict';
   if(root.InsightSalesCountCamera)return;
@@ -475,10 +475,9 @@
   }
   function metricLabelKind(value){
     var text=compactForMatch(value),digit=text.search(/\d/);
-    var delivery=/(納品(?:数)?|納晶|納口)/.exec(text);
-    if(delivery&&((digit<0)||delivery.index<digit))return 'delivery';
-    var sales=/(販売(?:数)?|阪売|販壳|販充)/.exec(text);
-    if(sales&&((digit<0)||sales.index<digit))return 'sales';
+    var label=digit<0?text:text.slice(0,digit);
+    if(/納/.test(label)&&/(品|晶|口|ロ)/.test(label))return 'delivery';
+    if(/(販|阪)/.test(label)&&/(売|壳|充)/.test(label))return 'sales';
     return null;
   }
   function categoryAnchors(lines,categories){
@@ -508,10 +507,40 @@
     });
     return dedup;
   }
+  function regularDateGrid(anchors){
+    anchors=(Array.isArray(anchors)?anchors:[]).slice().sort(function(a,b){return a.x-b.x;});
+    if(anchors.length<2)return null;
+    var gaps=[];
+    for(var i=1;i<anchors.length;i++){
+      if(addIsoDays(anchors[i-1].iso,1)!==anchors[i].iso)return null;
+      var gap=anchors[i].x-anchors[i-1].x;
+      if(!(gap>0))return null;
+      gaps.push(gap);
+    }
+    var sorted=gaps.slice().sort(function(a,b){return a-b;});
+    var median=sorted[Math.floor(sorted.length/2)];
+    if(!(median>0))return null;
+    if(gaps.some(function(gap){return gap<median*0.55||gap>median*1.8;}))return null;
+    return {anchors:anchors,spacing:median};
+  }
+  function tripXsFromDateGrid(grid,index){
+    if(!grid||!grid.anchors[index])return null;
+    var anchors=grid.anchors,anchor=anchors[index],spacing=grid.spacing;
+    var left=index>0?(anchors[index-1].x+anchor.x)/2:anchor.x-spacing/2;
+    var right=index<anchors.length-1?(anchor.x+anchors[index+1].x)/2:anchor.x+spacing/2;
+    var width=right-left;
+    if(!(width>0))return null;
+    return {
+      left:left,
+      right:right,
+      xs:[left+width/6,left+width/2,left+width*5/6]
+    };
+  }
   function dateColumns(dateAnchors,lines,firstCategoryY){
     var anchors=(Array.isArray(dateAnchors)?dateAnchors:[]).slice().sort(function(a,b){return a.x-b.x;});
     if(!anchors.length)return [];
     var groups=tripGroups(lines,firstCategoryY);
+    var grid=regularDateGrid(anchors);
     return anchors.map(function(anchor,index){
       var prev=anchors[index-1],next=anchors[index+1];
       var left=prev?(prev.x+anchor.x)/2:(next?anchor.x-(next.x-anchor.x)/2:NaN);
@@ -522,6 +551,16 @@
         if(distance<bestGroupDistance){bestGroupDistance=distance;nearestGroup=group;}
       });
       var tripXs=anchor.tripXs&&anchor.tripXs.length===3?anchor.tripXs.slice():(nearestGroup?nearestGroup.tripXs.slice():null);
+      var layoutSource=tripXs?'trip-header':null;
+      if(!tripXs&&grid){
+        var derived=tripXsFromDateGrid(grid,index);
+        if(derived){
+          tripXs=derived.xs;
+          left=derived.left;
+          right=derived.right;
+          layoutSource='date-grid';
+        }
+      }
       if(!tripXs||tripXs.length!==3||tripXs.some(function(value){return !Number.isFinite(value);}))return null;
       if(!Number.isFinite(left))left=Math.min.apply(null,tripXs)-Math.max(18,(tripXs[2]-tripXs[0])/4);
       if(!Number.isFinite(right))right=Math.max.apply(null,tripXs)+Math.max(18,(tripXs[2]-tripXs[0])/4);
@@ -531,7 +570,8 @@
         left:left,
         right:right,
         tripXs:tripXs,
-        approximate:!!anchor.approximate||!!(nearestGroup&&nearestGroup.approximate)
+        approximate:!!anchor.approximate||!!(nearestGroup&&nearestGroup.approximate)||layoutSource==='date-grid',
+        layoutSource:layoutSource
       };
     }).filter(Boolean);
   }
@@ -761,7 +801,7 @@
   }
 
   var model={
-    VERSION:6,
+    VERSION:7,
     MAX_FILES:MAX_FILES,
     MAX_FILE_BYTES:MAX_FILE_BYTES,
     POLICY:POLICY,
