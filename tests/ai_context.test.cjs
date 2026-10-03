@@ -77,6 +77,20 @@ function deps(view={period:'month'}){
         forTheme(theme){return theme==='customers'?this.items:this.display;}
       };}
     },
+    AnalysisBundle:{
+      build(){return {
+        period:{year:2026,month:9,throughDay:30},
+        signals:{count:2,counts:{important:1,attention:1},items:[{source:'monthly',key:'customers',level:'attention',title:'客数悪化'}]},
+        analysis:{
+          weekday:{summary:'水曜日の客数が弱い'},
+          seasonality:{summary:'例年の季節性では説明しにくい'},
+          anomaly:{hasAlert:true},
+          saleImpacts:[{id:'sale1',status:'ok',impact:{summary:'影響あり'}}],
+          eventImpacts:[{id:'event1',status:'ok',impact:{summary:'影響小'}}]
+        },
+        diagnostics:{partial:false,modules:{}}
+      };}
+    },
     AnalysisHistory:{
       build(){
         const entry={
@@ -111,6 +125,11 @@ test('共通AIコンテキストは決定論的数値を正として月次レビ
   assert.equal(context.analysis.kind,'monthly');
   assert.equal(context.analysis.findings[0].key,'customers');
   assert.equal(context.facts.metrics.salesYen,3000000);
+  assert.equal(context.analysis.crossAnalysis.signals.count,2);
+  assert.match(context.analysis.crossAnalysis.weekday.summary,/水曜日/);
+  assert.equal(context.analysis.crossAnalysis.saleImpacts[0].id,'sale1');
+  assert.equal(context.analysis.crossAnalysis.policy.causality,'notAsserted');
+  assert.ok(context.provenance.engines.includes('InsightAnalysisBundle'));
   assert.deepEqual(JSON.parse(JSON.stringify(context)),context);
 });
 
@@ -174,4 +193,14 @@ test('AI接続準備モジュール自身は通信・保存処理を持たない
   assert.doesNotMatch(source,/\bfetch\s*\(|XMLHttpRequest|WebSocket|localStorage|InsightStorage/);
   assert.doesNotMatch(source,/https?:\/\//);
   assert.match(source,/externalTransmission:false/);
+});
+
+
+test('横断分析が失敗しても既存の月次AIコンテキストは維持する',()=>{
+  const d=deps({period:'month'});
+  d.AnalysisBundle={build(){throw new Error('bundle failed');}};
+  const context=ai.build({period:'month',theme:'customers'},d);
+  assert.equal(context.analysis.kind,'monthly');
+  assert.equal(context.analysis.findings[0].key,'customers');
+  assert.equal(context.analysis.crossAnalysis,null);
 });
