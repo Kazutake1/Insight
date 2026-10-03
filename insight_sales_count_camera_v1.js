@@ -1221,27 +1221,32 @@
     cropDialog.innerHTML=
       '<header><div><h2>読取範囲を指定</h2><p>OCRに必要な表だけを囲んでください。</p></div><button type="button" id="scCropClose">閉じる</button></header>'+
       '<section class="sc-camera-crop-body">'+
-        '<p class="sc-camera-crop-note">日付、1便・2便・3便、カテゴリー名、納品数、販売数が入るように画像上をドラッグしてください。廃棄数や欠品率、画面外のボタンや余白はできるだけ含めない方が読み取りやすくなります。</p>'+
-        '<div class="sc-camera-crop-viewport"><div id="scCropStage" class="sc-camera-crop-stage"><img id="scCropImage" alt="読取範囲を指定する画像"><div id="scCropSelection" class="sc-camera-crop-selection" aria-hidden="true"></div></div></div>'+
+        '<p class="sc-camera-crop-note">日付、1便・2便・3便、カテゴリー名、納品数、販売数が入るように表を囲んでください。囲んだ後は四隅の丸を動かし、写真の表の四隅に合わせると台形の傾きを補正できます。</p>'+
+        '<div class="sc-camera-crop-viewport"><div id="scCropStage" class="sc-camera-crop-stage"><img id="scCropImage" alt="読取範囲を指定する画像"><div id="scCropSelection" class="sc-camera-crop-selection" aria-hidden="true"></div><svg class="sc-camera-crop-overlay" viewBox="0 0 1000 1000" preserveAspectRatio="none" aria-hidden="true"><polygon id="scCropPolygon" points="0,0 1000,0 1000,1000 0,1000"></polygon></svg><button type="button" class="sc-camera-crop-handle" data-crop-corner="0" aria-label="左上の角"></button><button type="button" class="sc-camera-crop-handle" data-crop-corner="1" aria-label="右上の角"></button><button type="button" class="sc-camera-crop-handle" data-crop-corner="2" aria-label="右下の角"></button><button type="button" class="sc-camera-crop-handle" data-crop-corner="3" aria-label="左下の角"></button></div></div>'+
         '<div class="sc-camera-crop-actions"><button type="button" id="scCropReset">画像全体に戻す</button><div><button type="button" id="scCropCancel">キャンセル</button><button type="button" id="scCropApply" class="primary">この範囲を使う</button></div></div>'+
       '</section>';
     doc.body.append(cropDialog);
     cropImage=cropDialog.querySelector('#scCropImage');
     cropSelection=cropDialog.querySelector('#scCropSelection');
+    cropPolygon=cropDialog.querySelector('#scCropPolygon');
+    cropHandles=Array.from(cropDialog.querySelectorAll('.sc-camera-crop-handle'));
     var stage=cropDialog.querySelector('#scCropStage');
     function cancel(){cropDialog.close();}
     cropDialog.querySelector('#scCropClose').onclick=cancel;
     cropDialog.querySelector('#scCropCancel').onclick=cancel;
     cropDialog.querySelector('#scCropReset').onclick=function(){
       cropDraft={x:0,y:0,w:1,h:1};
+      cropQuadDraft=quadFromRect(cropDraft);
       renderCropSelection();
     };
     cropDialog.querySelector('#scCropApply').onclick=function(){
       var item=session.items.find(function(candidate){return candidate.id===cropTargetId;});
       if(!item){cropDialog.close();return;}
-      var normalized=normalizeCropRect(cropDraft);
-      if(!normalized){alert('読取範囲をもう一度指定してください。');return;}
+      var quad=normalizeQuad(cropQuadDraft);
+      var normalized=quadBoundingRect(quad);
+      if(!quad||!normalized){alert('四隅が交差しないように、読取範囲をもう一度指定してください。');return;}
       item.crop=normalized;
+      item.cropQuad=quad;
       item.ocr=null;
       cropDialog.close();
       renderItems();
@@ -1250,22 +1255,32 @@
       if(event.button!==undefined&&event.button!==0)return;
       var point=cropPoint(event);
       if(!point)return;
+      var handle=event.target&&event.target.closest?event.target.closest('.sc-camera-crop-handle'):null;
       cropPointerId=event.pointerId;
-      cropStart=point;
-      cropBeforeDrag=normalizeCropRect(cropDraft)||{x:0,y:0,w:1,h:1};
-      cropDraft={x:point.x,y:point.y,w:0,h:0};
+      cropBeforeDrag=normalizeCropRect(cropDraft)||quadBoundingRect(cropQuadDraft)||{x:0,y:0,w:1,h:1};
+      cropBeforeQuad=normalizeQuad(cropQuadDraft)||quadFromRect(cropBeforeDrag);
+      cropHandleIndex=handle?Number(handle.getAttribute('data-crop-corner')):null;
+      if(cropHandleIndex===null){
+        cropStart=point;
+        cropDraft={x:point.x,y:point.y,w:0,h:0};
+        cropQuadDraft=quadFromRect({x:point.x,y:point.y,w:0.02,h:0.02});
+      }else{
+        cropStart=null;
+      }
       try{stage.setPointerCapture(event.pointerId);}catch(_){}
       event.preventDefault();
       renderCropSelection();
     });
     stage.addEventListener('pointermove',function(event){
       if(cropPointerId===null||event.pointerId!==cropPointerId)return;
-      updateCropDraft(cropPoint(event));
+      var point=cropPoint(event);
+      if(cropHandleIndex!==null)updateCropCorner(point);else updateCropDraft(point);
       event.preventDefault();
     });
     stage.addEventListener('pointerup',function(event){
       if(cropPointerId===null||event.pointerId!==cropPointerId)return;
-      updateCropDraft(cropPoint(event));
+      var point=cropPoint(event);
+      if(cropHandleIndex!==null)updateCropCorner(point);else updateCropDraft(point);
       try{stage.releasePointerCapture(event.pointerId);}catch(_){}
       finishCropDrag();
       event.preventDefault();
@@ -1273,7 +1288,7 @@
     stage.addEventListener('pointercancel',finishCropDrag);
     cropImage.addEventListener('load',renderCropSelection);
     cropDialog.addEventListener('close',function(){
-      cropTargetId=null;cropDraft=null;cropPointerId=null;cropStart=null;cropBeforeDrag=null;
+      cropTargetId=null;cropDraft=null;cropQuadDraft=null;cropPointerId=null;cropStart=null;cropBeforeDrag=null;cropBeforeQuad=null;cropHandleIndex=null;
       if(cropImage)cropImage.removeAttribute('src');
     });
   }
@@ -1284,6 +1299,7 @@
     ensureCropDialog();
     cropTargetId=item.id;
     cropDraft=normalizeCropRect(item.crop)||{x:0,y:0,w:1,h:1};
+    cropQuadDraft=normalizeQuad(item.cropQuad)||quadFromRect(cropDraft);
     cropImage.src=item.url;
     renderCropSelection();
     if(!cropDialog.open)cropDialog.showModal();
