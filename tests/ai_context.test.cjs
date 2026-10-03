@@ -88,7 +88,13 @@ function deps(view={period:'month'}){
           saleImpacts:[{id:'sale1',status:'ok',impact:{summary:'影響あり'}}],
           eventImpacts:[{id:'event1',status:'ok',impact:{summary:'影響小'}}]
         },
-        diagnostics:{partial:false,modules:{}}
+        diagnostics:{partial:false,modules:{}},
+        evidence:{
+          version:1,contract:'InsightAIEvidence',
+          policy:{providerNeutral:true,authoritativeKpi:false,causality:'association_only'},
+          items:[{id:'signal:monthly:customers',source:'signal',metric:'customers',direction:'down',importance:'attention',confidence:null,summary:'客数悪化',causality:'association_only',quality:{status:'ok',error:null}}],
+          quality:{partial:false,modules:{}}
+        }
       };}
     },
     AnalysisHistory:{
@@ -129,6 +135,10 @@ test('共通AIコンテキストは決定論的数値を正として月次レビ
   assert.match(context.analysis.crossAnalysis.weekday.summary,/水曜日/);
   assert.equal(context.analysis.crossAnalysis.saleImpacts[0].id,'sale1');
   assert.equal(context.analysis.crossAnalysis.policy.causality,'notAsserted');
+  assert.equal(context.analysis.evidence.contract,'InsightAIEvidence');
+  assert.equal(context.analysis.evidence.policy.providerNeutral,true);
+  assert.equal(context.analysis.evidence.items[0].metric,'customers');
+  assert.equal(context.analysis.evidence.items[0].causality,'association_only');
   assert.ok(context.provenance.engines.includes('InsightAnalysisBundle'));
   assert.deepEqual(JSON.parse(JSON.stringify(context)),context);
 });
@@ -203,4 +213,14 @@ test('横断分析が失敗しても既存の月次AIコンテキストは維持
   assert.equal(context.analysis.kind,'monthly');
   assert.equal(context.analysis.findings[0].key,'customers');
   assert.equal(context.analysis.crossAnalysis,null);
+  assert.equal(context.analysis.evidence,null);
+});
+
+test('Evidence契約が不正でも既存の横断分析コンテキストを維持する',()=>{
+  const d=deps({period:'month'});
+  const original=d.AnalysisBundle.build;
+  d.AnalysisBundle={build(){const value=original();value.evidence={contract:'unknown',items:[]};return value;}};
+  const context=ai.build({period:'month',theme:'customers'},d);
+  assert.equal(context.analysis.evidence,null);
+  assert.equal(context.analysis.crossAnalysis.signals.count,2);
 });
