@@ -1,4 +1,4 @@
-/* Sales-count camera capture v8: precision-first three-pass local OCR, in-memory review only. */
+/* Sales-count camera capture v9: in-memory crop selection + precision-first local OCR. */
 (function(root){
   'use strict';
   if(root.InsightSalesCountCamera)return;
@@ -796,6 +796,30 @@
     };
   }
 
+  function normalizeCropRect(crop){
+    if(!crop)return null;
+    var x=Number(crop.x),y=Number(crop.y),w=Number(crop.w),h=Number(crop.h);
+    if(![x,y,w,h].every(Number.isFinite))return null;
+    var left=Math.max(0,Math.min(1,x));
+    var top=Math.max(0,Math.min(1,y));
+    var right=Math.max(left,Math.min(1,x+w));
+    var bottom=Math.max(top,Math.min(1,y+h));
+    var width=right-left,height=bottom-top;
+    if(width<0.02||height<0.02)return null;
+    return {x:left,y:top,w:width,h:height};
+  }
+  function cropPixelRect(crop,width,height){
+    width=Math.max(1,Math.floor(Number(width)||0));
+    height=Math.max(1,Math.floor(Number(height)||0));
+    var normalized=normalizeCropRect(crop);
+    if(!normalized)return {x:0,y:0,w:width,h:height,full:true};
+    var x=Math.max(0,Math.min(width-1,Math.floor(normalized.x*width)));
+    var y=Math.max(0,Math.min(height-1,Math.floor(normalized.y*height)));
+    var right=Math.max(x+1,Math.min(width,Math.ceil((normalized.x+normalized.w)*width)));
+    var bottom=Math.max(y+1,Math.min(height,Math.ceil((normalized.y+normalized.h)*height)));
+    return {x:x,y:y,w:right-x,h:bottom-y,full:x===0&&y===0&&right===width&&bottom===height};
+  }
+
   function localOcrAssets(baseHref){
     var base=new URL('./vendor/ocr/',baseHref);
     return {
@@ -807,7 +831,7 @@
   }
 
   var model={
-    VERSION:8,
+    VERSION:9,
     MAX_FILES:MAX_FILES,
     MAX_FILE_BYTES:MAX_FILE_BYTES,
     POLICY:POLICY,
@@ -827,6 +851,8 @@
     buildMultiDayData:buildMultiDayData,
     consensusMultiDayResults:consensusMultiDayResults,
     shouldRunThirdPass:shouldRunThirdPass,
+    normalizeCropRect:normalizeCropRect,
+    cropPixelRect:cropPixelRect,
     mergeMultiDayResults:mergeMultiDayResults,
     spatialDateAnchors:spatialDateAnchors,
     tripGroups:tripGroups,
@@ -840,6 +866,7 @@
   var doc=root.document;
   var session={targetDate:'',items:[],processing:false,engineStatus:''};
   var dialog=null,list=null,status=null,ocrStatus=null,resultsBox=null,dateInput=null,cameraInput=null,libraryInput=null;
+  var cropDialog=null,cropImage=null,cropSelection=null,cropTargetId=null,cropDraft=null,cropPointerId=null,cropStart=null,cropBeforeDrag=null;
   var nextId=1;
 
   function salesApi(){return root.InsightSalesCount;}
@@ -914,10 +941,12 @@
       if(issue){errors.push(issue);return;}
       var url='';
       try{url=root.URL.createObjectURL(file);}catch(_){}
-      session.items.push({id:nextId++,file:file,url:url,ocr:null});
+      session.items.push({id:nextId++,file:file,url:url,ocr:null,crop:null});
     });
+    var added=session.items.slice(Math.max(0,session.items.length-incoming.length));
     renderItems();
     if(errors.length)alert(Array.from(new Set(errors)).join('\n'));
+    if(added.length===1&&root.setTimeout)root.setTimeout(function(){openCropEditor(added[0].id);},0);
     return summary();
   }
   function removeItem(id){
@@ -929,6 +958,150 @@
     renderItems();
     return true;
   }
+  function renderCropSelection(){
+    if(!cropSelection)return;
+    var rect=normalizeCropRect(cropDraft)||{x:0,y:0,w:1,h:1};
+    cropSelection.style.left=(rect.x*100)+'%';
+    cropSelection.style.top=(rect.y*100)+'%';
+    cropSelection.style.width=(rect.w*100)+'%';
+    cropSelection.style.height=(rect.h*100)+'%';
+  }
+  function cropPoint(event){
+    if(!cropImage)return null;
+    var rect=cropImage.getBoundingClientRect();
+    if(!(rect.width>0&&rect.height>0))return null;
+    return {
+      x:Math.max(0,Math.min(1,(event.clientX-rect.left)/rect.width)),
+      y:Math.max(0,Math.min(1,(event.clientY-rect.top)/rect.height))
+    };
+  }
+  function updateCropDraft(point){
+    if(!cropStart||!point)return;
+    var left=Math.min(cropStart.x,point.x),top=Math.min(cropStart.y,point.y);
+    cropDraft={x:left,y:top,w:Math.abs(point.x-cropStart.x),h:Math.abs(point.y-cropStart.y)};
+    renderCropSelection();
+  }
+  function finishCropDrag(){
+    if(cropPointerId===null)return;
+    var valid=normalizeCropRect(cropDraft);
+    cropDraft=valid||(cropBeforeDrag||{x:0,y:0,w:1,h:1});
+    cropPointerId=null;cropStart=null;cropBeforeDrag=null;
+    renderCropSelection();
+  }
+  function ensureCropDialog(){
+    if(cropDialog&&cropDialog.isConnected)return;
+    cropDialog=doc.createElement('dialog');
+    cropDialog.id='scCameraCropDialog';
+    cropDialog.className='sc-dialog sc-camera-crop-dialog';
+    cropDialog.innerHTML=
+      '<header><div><h2>読取範囲を指定</h2><p>OCRに必要な表だけを囲んでください。</p></div><button type="button" id="scCropClose">閉じる</button></header>'+
+      '<section class="sc-camera-crop-body">'+
+        '<p class="sc-camera-crop-note">日付、1便・2便・3便、カテゴリー名、納品数、販売数が入るように画像上をドラッグしてください。廃棄数や欠品率、画面外のボタンや余白はできるだけ含めない方が読み取りやすくなります。</p>'+
+        '<div class="sc-camera-crop-viewport"><div id="scCropStage" class="sc-camera-crop-stage"><img id="scCropImage" alt="読取範囲を指定する画像"><div id="scCropSelection" class="sc-camera-crop-selection" aria-hidden="true"></div></div></div>'+
+        '<div class="sc-camera-crop-actions"><button type="button" id="scCropReset">画像全体に戻す</button><div><button type="button" id="scCropCancel">キャンセル</button><button type="button" id="scCropApply" class="primary">この範囲を使う</button></div></div>'+
+      '</section>';
+    doc.body.append(cropDialog);
+    cropImage=cropDialog.querySelector('#scCropImage');
+    cropSelection=cropDialog.querySelector('#scCropSelection');
+    var stage=cropDialog.querySelector('#scCropStage');
+    function cancel(){cropDialog.close();}
+    cropDialog.querySelector('#scCropClose').onclick=cancel;
+    cropDialog.querySelector('#scCropCancel').onclick=cancel;
+    cropDialog.querySelector('#scCropReset').onclick=function(){
+      cropDraft={x:0,y:0,w:1,h:1};
+      renderCropSelection();
+    };
+    cropDialog.querySelector('#scCropApply').onclick=function(){
+      var item=session.items.find(function(candidate){return candidate.id===cropTargetId;});
+      if(!item){cropDialog.close();return;}
+      var normalized=normalizeCropRect(cropDraft);
+      if(!normalized){alert('読取範囲をもう一度指定してください。');return;}
+      var isFull=normalized.x<0.002&&normalized.y<0.002&&normalized.w>0.996&&normalized.h>0.996;
+      item.crop=isFull?null:normalized;
+      item.ocr=null;
+      cropDialog.close();
+      renderItems();
+    };
+    stage.addEventListener('pointerdown',function(event){
+      if(event.button!==undefined&&event.button!==0)return;
+      var point=cropPoint(event);
+      if(!point)return;
+      cropPointerId=event.pointerId;
+      cropStart=point;
+      cropBeforeDrag=normalizeCropRect(cropDraft)||{x:0,y:0,w:1,h:1};
+      cropDraft={x:point.x,y:point.y,w:0,h:0};
+      try{stage.setPointerCapture(event.pointerId);}catch(_){}
+      event.preventDefault();
+      renderCropSelection();
+    });
+    stage.addEventListener('pointermove',function(event){
+      if(cropPointerId===null||event.pointerId!==cropPointerId)return;
+      updateCropDraft(cropPoint(event));
+      event.preventDefault();
+    });
+    stage.addEventListener('pointerup',function(event){
+      if(cropPointerId===null||event.pointerId!==cropPointerId)return;
+      updateCropDraft(cropPoint(event));
+      try{stage.releasePointerCapture(event.pointerId);}catch(_){}
+      finishCropDrag();
+      event.preventDefault();
+    });
+    stage.addEventListener('pointercancel',finishCropDrag);
+    cropImage.addEventListener('load',renderCropSelection);
+    cropDialog.addEventListener('close',function(){
+      cropTargetId=null;cropDraft=null;cropPointerId=null;cropStart=null;cropBeforeDrag=null;
+      if(cropImage)cropImage.removeAttribute('src');
+    });
+  }
+  function openCropEditor(id){
+    if(session.processing)return false;
+    var item=session.items.find(function(candidate){return candidate.id===Number(id);});
+    if(!item||!item.url)return false;
+    ensureCropDialog();
+    cropTargetId=item.id;
+    cropDraft=normalizeCropRect(item.crop)||{x:0,y:0,w:1,h:1};
+    cropImage.src=item.url;
+    renderCropSelection();
+    if(!cropDialog.open)cropDialog.showModal();
+    return true;
+  }
+  function loadImageForCrop(item){
+    return new Promise(function(resolve,reject){
+      var tempUrl='',src=item&&item.url;
+      try{
+        if(!src&&item&&item.file){tempUrl=root.URL.createObjectURL(item.file);src=tempUrl;}
+      }catch(_){}
+      if(!src){reject(new Error('画像を開けませんでした'));return;}
+      var image=new root.Image();
+      image.onload=function(){
+        if(tempUrl){try{root.URL.revokeObjectURL(tempUrl);}catch(_){}}
+        resolve(image);
+      };
+      image.onerror=function(){
+        if(tempUrl){try{root.URL.revokeObjectURL(tempUrl);}catch(_){}}
+        reject(new Error('切り取り画像を作成できませんでした'));
+      };
+      image.src=src;
+    });
+  }
+  async function ocrSourceForItem(item){
+    var normalized=normalizeCropRect(item&&item.crop);
+    if(!normalized)return item.file;
+    var image=await loadImageForCrop(item);
+    var pixel=cropPixelRect(normalized,image.naturalWidth,image.naturalHeight);
+    if(pixel.full)return item.file;
+    var canvas=doc.createElement('canvas');
+    canvas.width=pixel.w;canvas.height=pixel.h;
+    var context=canvas.getContext('2d');
+    if(!context)throw new Error('切り取り画像を作成できませんでした');
+    context.drawImage(image,pixel.x,pixel.y,pixel.w,pixel.h,0,0,pixel.w,pixel.h);
+    return await new Promise(function(resolve,reject){
+      canvas.toBlob(function(blob){
+        if(blob)resolve(blob);else reject(new Error('切り取り画像を作成できませんでした'));
+      },'image/jpeg',0.98);
+    });
+  }
+
   function currentBounds(){
     return periodBounds(getPeriod());
   }
@@ -966,7 +1139,7 @@
       else button.disabled=processing;
     });
     if(dateInput)dateInput.disabled=processing;
-    dialog.querySelectorAll('.sc-camera-remove').forEach(function(button){button.disabled=processing;});
+    dialog.querySelectorAll('.sc-camera-remove,.sc-camera-crop-button').forEach(function(button){button.disabled=processing;});
   }
   function itemStatus(item){
     if(!item.ocr)return '未読取';
@@ -1053,17 +1226,29 @@
         title.textContent='撮影画像 '+String(index+1);
         var size=doc.createElement('span');
         size.textContent=(item.file.size/1024/1024).toFixed(1)+' MB';
+        var cropState=doc.createElement('span');
+        cropState.className='sc-camera-crop-state'+(item.crop?' is-set':'');
+        cropState.textContent=item.crop?'読取範囲を指定済み':'画像全体を読み取り';
         var state=doc.createElement('span');
         state.className='sc-camera-ocr-state '+(item.ocr&&item.ocr.status==='error'?'is-error':'');
         state.textContent=itemStatus(item);
-        meta.append(title,size,state);
+        meta.append(title,size,cropState,state);
+        var actions=doc.createElement('div');
+        actions.className='sc-camera-item-actions';
+        var cropButton=doc.createElement('button');
+        cropButton.type='button';
+        cropButton.className='sc-camera-crop-button';
+        cropButton.textContent='範囲指定';
+        cropButton.setAttribute('aria-label','撮影画像 '+String(index+1)+' の読取範囲を指定');
+        cropButton.onclick=function(){openCropEditor(item.id);};
         var remove=doc.createElement('button');
         remove.type='button';
         remove.className='sc-camera-remove';
         remove.textContent='削除';
         remove.setAttribute('aria-label','撮影画像 '+String(index+1)+' を削除');
         remove.onclick=function(){removeItem(item.id);};
-        row.append(thumb,meta,remove);
+        actions.append(cropButton,remove);
+        row.append(thumb,meta,actions);
         list.append(row);
       });
     }
@@ -1085,6 +1270,9 @@
   function closeAndClear(){
     resetSession();
     if(dialog&&dialog.parentNode)dialog.remove();
+    if(cropDialog&&cropDialog.open)cropDialog.close();
+    if(cropDialog&&cropDialog.parentNode)cropDialog.remove();
+    cropDialog=null;cropImage=null;cropSelection=null;cropTargetId=null;cropDraft=null;
     dialog=null;list=null;status=null;ocrStatus=null;resultsBox=null;dateInput=null;cameraInput=null;libraryInput=null;
   }
   function ocrOptions(logger){
@@ -1130,9 +1318,15 @@
         session.engineStatus='画像 '+(i+1)+' / '+session.items.length+' を読み取り中';
         renderItems();
         try{
+          var ocrInput=activeItem.file;
+          if(activeItem.crop){
+            session.engineStatus='画像 '+(i+1)+' / '+session.items.length+' の指定範囲を準備中';
+            renderItems();
+            ocrInput=await ocrSourceForItem(activeItem);
+          }
           session.engineStatus='画像 '+(i+1)+' / '+session.items.length+' を1回目解析中';
           renderItems();
-          var result=await worker.recognize(activeItem.file,{rotateAuto:true},{text:true,blocks:true});
+          var result=await worker.recognize(ocrInput,{rotateAuto:true},{text:true,blocks:true});
           var firstAnalyzed=analyzeOcrData(result&&result.data||{},categories(),session.targetDate);
           firstAnalyzed.multiDay=buildMultiDayData(firstAnalyzed.lines,categories(),session.targetDate);
 
@@ -1140,7 +1334,7 @@
           renderItems();
           var blockPsm=root.Tesseract.PSM&&root.Tesseract.PSM.SINGLE_BLOCK!=null?root.Tesseract.PSM.SINGLE_BLOCK:'6';
           await worker.setParameters({tessedit_pageseg_mode:blockPsm,preserve_interword_spaces:'1'});
-          var retryResult=await worker.recognize(activeItem.file,{rotateAuto:true},{text:true,blocks:true});
+          var retryResult=await worker.recognize(ocrInput,{rotateAuto:true},{text:true,blocks:true});
           var secondAnalyzed=analyzeOcrData(retryResult&&retryResult.data||{},categories(),session.targetDate);
           secondAnalyzed.multiDay=buildMultiDayData(secondAnalyzed.lines,categories(),session.targetDate);
 
@@ -1152,7 +1346,7 @@
             renderItems();
             var autoPsm=root.Tesseract.PSM&&root.Tesseract.PSM.AUTO!=null?root.Tesseract.PSM.AUTO:'3';
             await worker.setParameters({tessedit_pageseg_mode:autoPsm,preserve_interword_spaces:'1'});
-            var thirdResult=await worker.recognize(activeItem.file,{rotateAuto:true},{text:true,blocks:true});
+            var thirdResult=await worker.recognize(ocrInput,{rotateAuto:true},{text:true,blocks:true});
             var thirdAnalyzed=analyzeOcrData(thirdResult&&thirdResult.data||{},categories(),session.targetDate);
             thirdAnalyzed.multiDay=buildMultiDayData(thirdAnalyzed.lines,categories(),session.targetDate);
             passes.push(thirdAnalyzed);
@@ -1288,10 +1482,12 @@
     '.sc-camera-list{display:grid;gap:8px}.sc-camera-empty{padding:22px;border:1px dashed var(--border);border-radius:10px;text-align:center;color:var(--text4);font-size:12px}'+
     '.sc-camera-item{display:grid;grid-template-columns:76px minmax(0,1fr) auto;gap:10px;align-items:center;padding:8px;border:1px solid var(--border);border-radius:11px;background:var(--surface2)}'+
     '.sc-camera-thumb{width:76px;height:58px;border-radius:8px;overflow:hidden;background:var(--input-bg)}.sc-camera-thumb img{width:100%;height:100%;object-fit:cover;display:block}'+
-    '.sc-camera-meta{display:flex;flex-direction:column;gap:4px;min-width:0}.sc-camera-meta strong{font-size:12px}.sc-camera-meta span{font-size:10px;color:var(--text4)}'+
+    '.sc-camera-meta{display:flex;flex-direction:column;gap:4px;min-width:0}.sc-camera-meta strong{font-size:12px}.sc-camera-meta span{font-size:10px;color:var(--text4)}.sc-camera-crop-state.is-set{color:#15803d!important;font-weight:800}'+
+    '.sc-camera-item-actions{display:flex;gap:6px;align-items:center}.sc-camera-crop-button{white-space:nowrap}'+
+    '.sc-camera-crop-dialog{width:min(980px,calc(100vw - 24px));max-height:94vh}.sc-camera-crop-dialog header p{margin:3px 0 0;font-size:11px;color:var(--text4)}.sc-camera-crop-body{padding-top:12px}.sc-camera-crop-note{margin:0 0 10px;font-size:11px;line-height:1.6;color:var(--text3)}.sc-camera-crop-viewport{display:flex;justify-content:center;max-height:66vh;overflow:auto;background:var(--input-bg);border:1px solid var(--border);border-radius:12px;padding:8px}.sc-camera-crop-stage{position:relative;display:inline-block;line-height:0;touch-action:none;user-select:none}.sc-camera-crop-stage img{display:block;max-width:min(900px,calc(100vw - 80px));max-height:62vh;width:auto;height:auto}.sc-camera-crop-selection{position:absolute;box-sizing:border-box;border:3px solid #f59e0b;background:#f59e0b22;box-shadow:0 0 0 9999px #0005;pointer-events:none}.sc-camera-crop-actions{display:flex;justify-content:space-between;gap:10px;align-items:center;margin-top:12px}.sc-camera-crop-actions>div{display:flex;gap:8px}'+
     '.sc-camera-ocr-state.is-error,.sc-camera-warning{color:#b45309!important;font-weight:700}.sc-camera-ocr-summary{margin-top:10px;padding:9px 11px;border-radius:9px;background:var(--surface2);font-size:11px;color:var(--text3)}'+
     '.sc-camera-remove{min-width:58px}.sc-camera-next{margin-top:12px;padding-top:12px;border-top:1px solid var(--border);display:flex;justify-content:flex-end}.sc-camera-next button{min-height:40px}.sc-camera-next button:disabled{opacity:.5}.sc-camera-results{margin-top:12px;display:grid;gap:10px}.sc-camera-result-head{font-size:12px;font-weight:800;padding:10px 12px;border-radius:10px;background:var(--surface2);border:1px solid var(--border)}.sc-camera-result-warnings{font-size:11px;line-height:1.6;color:#b45309}.sc-camera-result-day{border:1px solid var(--border);border-radius:12px;padding:10px;background:var(--surface2)}.sc-camera-result-day h3{margin:0 0 8px;font-size:13px}.sc-camera-result-category+.sc-camera-result-category{margin-top:10px;padding-top:10px;border-top:1px solid var(--border)}.sc-camera-result-category>strong{display:block;font-size:12px;margin-bottom:6px}.sc-camera-result-grid{display:grid;grid-template-columns:54px repeat(3,minmax(52px,1fr));gap:4px;align-items:center}.sc-camera-result-label,.sc-camera-result-value{font-size:11px;text-align:center;padding:6px 3px;border-radius:7px}.sc-camera-result-label{color:var(--text4);font-weight:700}.sc-camera-result-value{background:var(--surface);border:1px solid var(--border);font-weight:800}.sc-camera-result-value.needs-review{border-color:#f59e0b;color:#b45309}.sc-camera-result-value.not-applicable{background:var(--input-bg);color:var(--text4)}.sc-camera-result-empty{margin:0;font-size:11px;color:var(--text4)}'+
-    '@media(max-width:600px){.sc-camera-summary{flex-direction:column}.sc-camera-item{grid-template-columns:64px minmax(0,1fr) auto}.sc-camera-thumb{width:64px;height:50px}}';
+    '@media(max-width:600px){.sc-camera-summary{flex-direction:column}.sc-camera-item{grid-template-columns:64px minmax(0,1fr)}.sc-camera-thumb{width:64px;height:50px}.sc-camera-item-actions{grid-column:1/-1;justify-content:flex-end}.sc-camera-crop-actions{align-items:stretch;flex-direction:column}.sc-camera-crop-actions>div{display:grid;grid-template-columns:1fr 1fr}.sc-camera-crop-stage img{max-width:calc(100vw - 56px)}}';
   doc.head.append(style);
 
   model.open=open;
@@ -1299,6 +1495,7 @@
   model.clear=clearItems;
   model.addFiles=addFiles;
   model.removeItem=removeItem;
+  model.openCropEditor=openCropEditor;
   model.readImages=readImages;
   model.getSessionSummary=summary;
   model.getMultiDayResults=function(){return mergeMultiDayResults(session.items.filter(function(item){return item.ocr&&item.ocr.status==='done';}).map(function(item){return item.ocr.multiDay;}));};
