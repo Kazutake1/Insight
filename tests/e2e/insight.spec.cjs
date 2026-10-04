@@ -1609,7 +1609,7 @@ test('分析AIは結論・重要ポイント・関連性・次に確認するこ
   expect(errors).toEqual([]);
 });
 
-test('販売数入力の平日・日祝平均は保存済み通常日を分類し重複セールUIを表示しない',async({page})=>{
+test('販売数入力の平日・日祝平均は保存済み通常日を分類し比較カードを2種だけ表示する',async({page})=>{
   const errors=await openInsight(page);
   await page.locator('#navSalesCount').click();
   await page.evaluate(()=>{
@@ -1629,12 +1629,13 @@ test('販売数入力の平日・日祝平均は保存済み通常日を分類�
     InsightSalesCount.reloadFromStore();
   });
   const cards=page.locator('#scAnalysis .sc-comparisons > section');
-  await expect(cards).toHaveCount(3);
-  await expect(cards.locator('h3')).toHaveText(['同曜日・通常日平均','平日平均','日曜日・祝日平均']);
+  await expect(cards).toHaveCount(2);
+  await expect(cards.locator('h3')).toHaveText(['平日平均','日曜日・祝日平均']);
   await expect(page.locator('#scAnalysis h3',{hasText:'セール実績'})).toHaveCount(0);
   await expect(page.locator('#scAnalysis h3',{hasText:'セール日平均'})).toHaveCount(0);
-  await expect(cards.nth(1)).toContainText('月〜金（祝日を除く）');
-  const weekday=cards.nth(1),holiday=cards.nth(2);
+  await expect(page.locator('#scAnalysis h3',{hasText:'同曜日・通常日平均'})).toHaveCount(0);
+  await expect(cards.nth(0)).toContainText('月〜金（祝日を除く）');
+  const weekday=cards.nth(0),holiday=cards.nth(1);
   await expect(weekday.locator('thead th')).toHaveText(['','1便','2便','3便','1日合計']);
   for(const row of [0,1]){
     await expect(weekday.locator('tbody tr').nth(row).locator('td')).toHaveText(['5','10','5','30']);
