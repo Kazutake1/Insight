@@ -60,15 +60,16 @@ test('共通保存処理は失敗時に成功表示へ進ませない',()=>{
   assert.equal(prevented,true);
 });
 
-test('セール実績の店舗名はHTMLではなく文字列として描画する',()=>{
-  const source=fs.readFileSync(path.join(root,'insight_sales_count_v1.js'),'utf8');
-  const start=source.indexOf('function renderAnalysis()');
-  const end=source.indexOf('function disp(',start);
-  assert.ok(start>=0&&end>start,'セール実績描画処理が存在すること');
+test('セール実績の内容はHTMLではなく文字列として描画する',()=>{
+  const source=fs.readFileSync(path.join(root,'insight_sale_results_v1.js'),'utf8');
+  const start=source.indexOf('function renderList(data)');
+  const end=source.indexOf('function render()',start);
+  assert.ok(start>=0&&end>start,'セール実績一覧の描画処理が存在すること');
   const render=source.slice(start,end);
-  assert.match(render,/values=\[x\.date,[\s\S]*x\.store/);
-  assert.match(render,/tr\.append\(el\('td',String\(value\)\)\)/);
-  assert.doesNotMatch(render,/innerHTML=[^;]*x\.store/);
+  assert.match(source,/function el\(tag,text,cls\)\{[^}]*node\.textContent=text/);
+  assert.match(render,/occurrence\.summary/);
+  assert.match(render,/var td=el\('td',String\(value\)\)/);
+  assert.doesNotMatch(render,/innerHTML=[^;]*occurrence\.summary/);
 });
 
 test('天気地点名はHTMLとして解釈せず文字列として描画する',()=>{
