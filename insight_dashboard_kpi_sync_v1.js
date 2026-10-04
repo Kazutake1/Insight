@@ -77,6 +77,11 @@
     });
   }
 
+  function stripCardMeta(){
+    var row=document.getElementById('kpiRow');if(!row)return;
+    row.querySelectorAll('.kpi-label>span,.kpi-prev').forEach(function(node){node.remove();});
+  }
+
   function cardByLabel(label){
     var row=document.getElementById('kpiRow');if(!row)return null;
     var cards=row.querySelectorAll('.kpi-card');
@@ -112,13 +117,14 @@
     var c=context();if(!c)return;
     patchPrimaryCards(c);
     patchDerivedCards(c);
+    stripCardMeta();
   }
 
   if(root.InsightHooks){
     root.InsightHooks.on('dashboard:kpi:after','dashboard-kpi-sync',function(){
-      var c=context();patchPrimaryCards(c);patchDerivedCards(c);
+      var c=context();patchPrimaryCards(c);patchDerivedCards(c);stripCardMeta();
     },40);
-    root.InsightHooks.on('dashboard:derived:after','dashboard-derived-sync',function(){patchDerivedCards(context());},40);
+    root.InsightHooks.on('dashboard:derived:after','dashboard-derived-sync',function(){patchDerivedCards(context());stripCardMeta();},40);
     root.InsightHooks.on('dashboard:refresh:after','dashboard-refresh-sync',function(){patch();},40);
   }
 
