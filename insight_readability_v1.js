@@ -96,4 +96,5 @@
     '.ai-analysis-question-answer{font-size:13px!important;line-height:1.6!important}'
   ].join('');
   doc.head.appendChild(style);
+  root.InsightReadability={VERSION:1};
 })(typeof window!=='undefined'?window:globalThis);
