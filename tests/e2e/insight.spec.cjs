@@ -617,6 +617,8 @@ test('セール実績は内容別に表示し販売数入力と同じカード�
   await expect(page.locator('.sr-group')).toHaveCount(1);
   await expect(page.locator('.sr-group-head h2')).toContainText('おにぎり 20円引き');
   await expect(page.locator('.sr-group .sc-day')).toHaveCount(8);
+  const saleResultTotalFont=await page.locator('.sr-group .sc-totals b').first().evaluate(el=>getComputedStyle(el).fontSize);
+  expect(saleResultTotalFont).toBe('14px');
 
   const layout=await page.evaluate(()=>{
     const cards=Array.from(document.querySelectorAll('.sr-group .sc-day'));
@@ -1070,6 +1072,8 @@ test('イベント実績は過去開催→複数日→時間帯グラフ→カ�
     width:Math.round(grid.getBoundingClientRect().width)
   }));
   expect(categoryGrid.columns).toBe(4);
+  const eventTotalFont=await page.locator('.er-category-card .sc-totals b').first().evaluate(el=>getComputedStyle(el).fontSize);
+  expect(eventTotalFont).toBe('14px');
   const readOnly=await page.locator('.er-category-card input').evaluateAll(inputs=>inputs.every(input=>input.readOnly));
   expect(readOnly).toBe(true);
 
@@ -1237,7 +1241,10 @@ test('販売数AI分析は入力カードと同じデザインで便別平均と
       aiChildren:Array.from(aiCard.children).map(node=>node.className),
       aiClass:aiCard.className,
       allReadOnly:[aiCard].concat(weekdayCards).every(card=>Array.from(card.querySelectorAll('input')).every(input=>input.readOnly)),
-      weekdayTitles:weekdayCards.map(card=>card.querySelector('.sc-day-num').textContent)
+      weekdayTitles:weekdayCards.map(card=>card.querySelector('.sc-day-num').textContent),
+      inputTotalFont:getComputedStyle(inputCard.querySelector('.sc-totals b')).fontSize,
+      weekdayAverageTotalFont:getComputedStyle(document.querySelector('#scAverages .sc-average-totals b')).fontSize,
+      aiTotalFont:getComputedStyle(aiCard.querySelector('.sc-totals b')).fontSize
     };
   });
 
@@ -1245,6 +1252,9 @@ test('販売数AI分析は入力カードと同じデザインで便別平均と
   expect(structure.aiClass).toContain('sc-day');
   expect(structure.allReadOnly).toBe(true);
   expect(structure.weekdayTitles).toEqual(['日曜日','月曜日','火曜日','水曜日','木曜日','金曜日','土曜日']);
+  expect(structure.inputTotalFont).toBe('14px');
+  expect(structure.weekdayAverageTotalFont).toBe('14px');
+  expect(structure.aiTotalFont).toBe('14px');
   expect(errors).toEqual([]);
 });
 
