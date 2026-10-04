@@ -1159,13 +1159,16 @@ test('イベント実績は過去開催→複数日→時間帯グラフ→カ�
   await expect(page.locator('.er-overview-grid .er-summary-card').first()).toContainText('226千円');
   await expect(page.locator('.er-overview-grid')).not.toContainText('客単価');
   await expect(page.locator('.er-overview-grid')).not.toContainText('買上点数');
-  await expect(page.locator('.er-daily-summary .er-summary-card')).toHaveCount(2);
-  await expect(page.locator('.er-daily-summary .er-summary-card').first()).toContainText('112千円');
-  await expect(page.locator('.er-daily-summary')).not.toContainText('客単価');
-  await expect(page.locator('.er-daily-summary')).not.toContainText('買上点数');
-  await expect(page.locator('.er-daily-summary')).toBeVisible();
+  await expect(page.locator('.er-daily-summary')).toHaveCount(0);
   await expect(page.locator('.er-day-tab')).toHaveCount(2);
   await expect(page.locator('.er-day-tab').first()).toHaveClass(/active/);
+  const dayCardStyle=await page.locator('.er-day-tab').first().evaluate(card=>({
+    width:getComputedStyle(card).width,
+    padding:getComputedStyle(card).padding,
+    dateFont:getComputedStyle(card.querySelector('strong')).fontSize,
+    metricFont:getComputedStyle(card.querySelector('span')).fontSize
+  }));
+  expect(dayCardStyle).toEqual({width:'210px',padding:'13px 15px',dateFont:'15px',metricFont:'13.5px'});
   await expect(page.locator('.er-hourly-section')).toBeVisible();
   await expect(page.locator('.er-peak')).toContainText('18時台 186人');
   await expect(page.locator('.er-hour-item')).toHaveCount(24);
