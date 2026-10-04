@@ -126,7 +126,7 @@ test('分析AIの対象年月をサイドバー切替後も固定し各ページ
   const lock=read('insight_analysis_period_lock_v1.js');
   const salesCount=read('insight_sales_count_v1.js');
   assert.match(index,/insight_analysis_period_lock_v1\.js\?v=20261001-sync-owner/);
-  assert.match(index,/insight_sales_count_v1\.js\?v=20261003-multi-condition-sale/);
+  assert.match(index,/insight_sales_count_v1\.js\?v=20261004-larger-totals/);
   assert.match(presentation,/aiAnalysisTarget/);
   assert.match(presentation,/!window\.InsightPagePeriodSync&&window\.InsightAnalysisPeriodLock/);
   assert.match(pageAI,/InsightAnalysisPeriodLock\.getContext/);
@@ -495,7 +495,7 @@ test('セール実績ページは販売数入力直後に読み込み同一日�
   const index=read('Index.html');
   const saleResults=read('insight_sale_results_v1.js');
   const sales=read('insight_sales_count_v1.js');
-  assert.match(index,/insight_sales_count_v1\.js\?v=20261003-multi-condition-sale/);
+  assert.match(index,/insight_sales_count_v1\.js\?v=20261004-larger-totals/);
   assert.match(index,/insight_sale_results_v1\.js\?v=20261003-multi-condition-sale/);
   assert.ok(index.indexOf('insight_sales_count_v1.js')<index.indexOf('insight_sale_results_v1.js'));
   assert.ok(index.indexOf('insight_sale_results_v1.js')<index.indexOf('insight_page_period_sync_v1.js'));
@@ -505,6 +505,9 @@ test('セール実績ページは販売数入力直後に読み込み同一日�
   assert.match(saleResults,/grid-template-columns:repeat\(7,minmax\(0,1fr\)\)/);
   assert.match(saleResults,/\.sr-day-grid>\.sc-day\{min-width:0\}/);
   assert.match(sales,/model\.createReadOnlyDayCard=createReadOnlyDayCard/);
+  assert.match(sales,/\.sc-totals b\{font-size:14px;text-align:center\}/);
+  assert.match(sales,/\.sc-average-totals b\{font-size:14px;text-align:center\}/);
+  assert.match(sales,/\.sc-totals b,\.sc-average-totals b\{font-size:14px\}/);
   assert.doesNotMatch(saleResults,/localStorage|InsightStorage/);
   assert.doesNotThrow(()=>new vm.Script(saleResults),'sale results module must be valid JavaScript');
 });
@@ -641,7 +644,7 @@ test('販売数カテゴリーの対象便設定を全関連層で共有する',
   const analysis=read('insight_analysis_context_v1.js');
   const saleResults=read('insight_sale_results_v1.js');
   const pageAI=read('insight_ai_page_comments_v1.js');
-  assert.match(index,/insight_sales_count_v1\.js\?v=20261003-multi-condition-sale/);
+  assert.match(index,/insight_sales_count_v1\.js\?v=20261004-larger-totals/);
   assert.match(index,/insight_sale_results_v1\.js\?v=20261003-multi-condition-sale/);
   assert.match(index,/insight_analysis_context_v1\.js\?v=20261001-active-trips/);
   assert.match(index,/insight_ai_page_comments_v1\.js\?v=20261001-decision-analysis/);
