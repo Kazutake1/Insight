@@ -213,11 +213,11 @@
       data.groups.forEach(function(group){
         var section=el('section',undefined,'sr-group'),head=el('div',undefined,'sr-group-head'),title=el('h2',group.summary),statsRow=el('div',undefined,'sr-group-stats');
         [
-          '開催日数 '+group.days.length+'日',
-          '平均納品 '+fmt(group.averageDelivery,1),
-          '平均販売 '+fmt(group.averageSales,1),
-          '平均消化率 '+(group.sellThrough===null?'—':fmt(group.sellThrough,1)+'%')
-        ].forEach(function(text){statsRow.append(el('span',text));});
+          ['開催日数',group.days.length+'日'],
+          ['平均納品',fmt(group.averageDelivery,1)],
+          ['平均販売',fmt(group.averageSales,1)],
+          ['消化率',group.sellThrough===null?'—':fmt(group.sellThrough,1)+'%']
+        ].forEach(function(item){var stat=el('div',undefined,'sr-stat');stat.append(el('span',item[0]),el('strong',item[1]));statsRow.append(stat);});
         head.append(title,statsRow);
         var rows=el('div',undefined,'sr-occurrence-grids'),category=selectedCategory();
         group.occurrences.forEach(function(occurrence){
@@ -275,13 +275,13 @@
 
     var style=el('style');style.id='insightSaleResultsStyle';style.textContent=
       '.sr-page{overflow:auto}.sr-toolbar{display:flex;align-items:center;justify-content:space-between;gap:14px;flex-wrap:wrap;margin-bottom:16px;padding:12px 14px;border:1px solid var(--border);border-radius:12px;background:var(--surface)}'+
-      '.sr-filter{display:flex;align-items:center;gap:10px}.sr-filter-label{font-size:12px;font-weight:700;color:var(--text3)}.sr-period-tabs{display:flex;gap:4px;padding:3px;border:1px solid var(--border);border-radius:10px;background:var(--surface2)}'+
-      '.sr-period-tabs button,.sr-category-label select{border:0;border-radius:7px;background:transparent;color:var(--text3);padding:7px 11px;font:700 11px/1 -apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif}.sr-period-tabs button.active{background:var(--text);color:var(--surface)}'+
-      '.sr-category-label{display:flex;align-items:center;gap:7px;font-size:12px;font-weight:700;color:var(--text3)}.sr-category-label select{min-width:150px;border:1px solid var(--border);background:var(--surface2);color:var(--text)}'+
-      '.sr-group{margin:0 0 18px;padding:14px;border:1px solid var(--border);border-radius:14px;background:var(--surface)}.sr-group-head{display:flex;align-items:flex-end;justify-content:space-between;gap:14px;margin-bottom:10px}.sr-group-head h2{margin:0;font-size:15px;color:var(--text)}'+
-      '.sr-group-stats{display:flex;gap:12px;flex-wrap:wrap;justify-content:flex-end;color:var(--text3);font-size:10.5px;font-weight:700}.sr-occurrence-grids{display:grid;gap:9px}.sr-day-grid{display:grid;grid-template-columns:repeat(7,minmax(0,1fr));gap:9px;width:100%;box-sizing:border-box}.sr-day-grid>.sc-day{min-width:0}.sr-empty{padding:24px;border:1px solid var(--border);border-radius:12px;background:var(--surface);color:var(--text4);font-size:12px;text-align:center}'+
-      '.sr-list-section{margin-top:18px;padding:14px;border:1px solid var(--border);border-radius:14px;background:var(--surface)}.sr-list-section h2{font-size:15px;margin:0 0 10px}.sr-table-scroll{overflow:auto}.sr-list-table{width:100%;border-collapse:collapse;font-size:11px}.sr-list-table th,.sr-list-table td{padding:8px;border-bottom:1px solid var(--border);text-align:right;white-space:nowrap}.sr-list-table th:first-child,.sr-list-table td:first-child,.sr-list-table th:nth-child(2),.sr-list-table td:nth-child(2){text-align:left}.sr-positive{color:#15803d;font-weight:800}.sr-negative{color:#b42318;font-weight:800}'+
-      '@media(max-width:1200px){.sr-day-grid{grid-template-columns:repeat(7,minmax(0,1fr));gap:7px}.sr-group{padding:12px}.sr-group-head{align-items:flex-start;flex-direction:column}.sr-group-stats{justify-content:flex-start}}'+
+      '.sr-filter{display:flex;align-items:center;gap:10px}.sr-filter-label{font-size:13px;font-weight:700;color:var(--text3)}.sr-period-tabs{display:flex;gap:4px;padding:3px;border:1px solid var(--border);border-radius:10px;background:var(--surface2)}'+
+      '.sr-period-tabs button,.sr-category-label select{border:0;border-radius:7px;background:transparent;color:var(--text3);padding:7px 11px;font:700 13px/1 -apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif}.sr-period-tabs button.active{background:var(--text);color:var(--surface)}'+
+      '.sr-category-label{display:flex;align-items:center;gap:7px;font-size:13px;font-weight:700;color:var(--text3)}.sr-category-label select{min-width:150px;border:1px solid var(--border);background:var(--surface2);color:var(--text)}'+
+      '.sr-group{margin:0 0 18px;padding:14px;border:1px solid var(--border);border-radius:14px;background:var(--surface)}.sr-group-head{display:flex;align-items:flex-end;justify-content:space-between;gap:14px;margin-bottom:10px}.sr-group-head h2{margin:0;font-size:17px;color:var(--text)}'+
+      '.sr-group-stats{display:grid;grid-template-columns:repeat(4,minmax(88px,1fr));gap:8px;justify-content:end}.sr-stat{border:1px solid var(--border);border-radius:10px;background:var(--surface2);padding:7px 9px;min-width:0}.sr-stat span{display:block;color:var(--text4);font-size:12px;font-weight:700}.sr-stat strong{display:block;margin-top:3px;color:var(--text);font-size:16px;font-weight:800}.sr-occurrence-grids{display:grid;gap:9px}.sr-day-grid{display:grid;grid-template-columns:repeat(7,minmax(0,1fr));gap:9px;width:100%;box-sizing:border-box}.sr-day-grid>.sc-day{min-width:0}.sr-empty{padding:24px;border:1px solid var(--border);border-radius:12px;background:var(--surface);color:var(--text4);font-size:12px;text-align:center}'+
+      '.sr-list-section{margin-top:18px;padding:14px;border:1px solid var(--border);border-radius:14px;background:var(--surface)}.sr-list-section h2{font-size:17px;margin:0 0 10px}.sr-table-scroll{overflow:auto}.sr-list-table{width:100%;border-collapse:collapse;font-size:12.5px}.sr-list-table th,.sr-list-table td{padding:8px;border-bottom:1px solid var(--border);text-align:right;white-space:nowrap}.sr-list-table th:first-child,.sr-list-table td:first-child,.sr-list-table th:nth-child(2),.sr-list-table td:nth-child(2){text-align:left}.sr-positive{color:#15803d;font-weight:800}.sr-negative{color:#b42318;font-weight:800}'+
+      '@media(max-width:1200px){.sr-day-grid{grid-template-columns:repeat(7,minmax(0,1fr));gap:7px}.sr-group{padding:12px}.sr-group-head{align-items:flex-start;flex-direction:column}.sr-group-stats{width:100%;grid-template-columns:repeat(4,minmax(88px,1fr))}}'+
       '@media(max-width:800px){.sr-toolbar{align-items:stretch}.sr-filter,.sr-category-label{width:100%}.sr-period-tabs{flex:1}.sr-period-tabs button{flex:1;padding-left:6px;padding-right:6px}.sr-category-label select{flex:1}}';
     doc.head.appendChild(style);
     if(!buildPage())return;
