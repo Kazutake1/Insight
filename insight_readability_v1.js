@@ -7,9 +7,11 @@
   var style=doc.createElement('style');
   style.id='insightReadabilityStyle';
   style.textContent=[
-    '#pageDash .kpi-card{height:110px!important;min-height:110px!important;max-height:110px!important;box-sizing:border-box!important}',
+    '#pageDash .kpi-card{height:110px!important;min-height:110px!important;max-height:110px!important;box-sizing:border-box!important;position:relative!important}',
     '#pageDash .kpi-label{font-size:13px!important;line-height:1.35}',
     '#pageDash .kpi-label>span{display:none!important}',
+    '#pageDash .kpi-value{position:absolute!important;left:46%!important;top:42px!important;transform:translateX(-50%)!important;width:calc(100% - 24px)!important;text-align:center!important;margin:0!important}',
+    '#pageDash .kpi-yoy{position:absolute!important;left:46%!important;top:76px!important;transform:translateX(-50%)!important;width:calc(100% - 24px)!important;display:flex!important;justify-content:center!important;align-items:center!important;margin:0!important}',
     '#pageDash .kpi-unit{font-size:12px!important}',
     '#pageDash .kpi-badge{font-size:12px!important}',
     '#pageDash .qs-title{font-size:15px!important}',
