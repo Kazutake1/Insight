@@ -463,7 +463,7 @@ test('イベント実績は過去開催・日付カード・時間帯グラフ�
   assert.match(eventResults,/er-demand-grid/);
   assert.match(eventResults,/前回：用意 /);
   assert.match(eventResults,/grid-template-columns:repeat\(4,minmax\(0,1fr\)\)/);
-  assert.match(eventResults,/@media\(max-width:1000px\)\{\.er-category-grid\{grid-template-columns:repeat\(2,minmax\(0,1fr\)\)\}\}/);
+  assert.match(eventResults,/@media\(max-width:1000px\)\{\.er-category-grid,\.er-demand-grid\{grid-template-columns:repeat\(2,minmax\(0,1fr\)\)\}\}/);
   assert.doesNotMatch(eventResults,/max-width:280px/);
   assert.doesNotMatch(eventResults,/カテゴリー別・便別実績/);
   assert.match(eventResults,/hourly\.complete/);
