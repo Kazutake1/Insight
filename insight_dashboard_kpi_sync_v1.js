@@ -58,8 +58,7 @@
     var box=document.createElement('div');box.className='kpi-yoy';
     var badge=document.createElement('span');badge.className='kpi-badge '+(positive?'up':'dn');
     badge.textContent=(display.up?'▲':'▼')+' '+display.text;
-    var prev=document.createElement('span');prev.className='kpi-prev';prev.textContent=String(compareYear)+'年比';
-    box.append(badge,prev);card.appendChild(box);
+    box.append(badge);card.appendChild(box);
   }
 
   function patchPrimaryCards(c){

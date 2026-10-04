@@ -143,13 +143,32 @@ test('STEP17の文字階層をダッシュボード・入力・販売数・分�
 
   await page.locator('#nav1').click();
   await expect(page.locator('#pageDash .kpi-label').first()).toBeVisible();
+  await expect(page.locator('#pageDash .kpi-label>span')).toHaveCount(0);
+  await expect(page.locator('#pageDash .kpi-prev')).toHaveCount(0);
   const dashboardType=await page.evaluate(()=>{
     const label=document.querySelector('#pageDash .kpi-label');
-    const prev=document.querySelector('#pageDash .kpi-prev');
-    return {kpiLabel:getComputedStyle(label).fontSize,kpiPrev:prev?getComputedStyle(prev).fontSize:null};
+    const cards=Array.from(document.querySelectorAll('#pageDash .kpi-card'));
+    return {
+      kpiLabel:getComputedStyle(label).fontSize,
+      cards:cards.map(card=>({
+        height:getComputedStyle(card).height,
+        boxSizing:getComputedStyle(card).boxSizing,
+        client:card.clientHeight,
+        scroll:card.scrollHeight,
+        text:String(card.innerText||'')
+      }))
+    };
   });
   expect(dashboardType.kpiLabel).toBe('13px');
-  if(dashboardType.kpiPrev!==null)expect(dashboardType.kpiPrev).toBe('11.5px');
+  expect(dashboardType.cards.length).toBeGreaterThan(0);
+  dashboardType.cards.forEach(card=>{
+    expect(card.height).toBe('110px');
+    expect(card.boxSizing).toBe('border-box');
+    expect(card.scroll).toBeLessThanOrEqual(card.client+2);
+    expect(card.text).not.toMatch(/\d{1,2}月1日平均/);
+    expect(card.text.split('\n').map(line=>line.trim())).not.toContainEqual(expect.stringMatching(/^\d{1,2}月$/));
+    expect(card.text).not.toMatch(/\d{4}年比/);
+  });
 
   await page.locator('#nav2').click();
   await expect(page.locator('#pageSales #issRow .iss-card')).toBeVisible();

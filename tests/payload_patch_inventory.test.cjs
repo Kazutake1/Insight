@@ -47,13 +47,25 @@ test('AI表示CSSはIndexの文字列置換ではなくpresentation moduleが所
   assert.doesNotMatch(presentation,/var selected=!open&&currentNav===i;/);
 });
 
+test('ダッシュボードKPIカードは補助月表示と年比ラベルを削除し数値バッジを維持する',()=>{
+  const index=read('Index.html');
+  const sync=read('insight_dashboard_kpi_sync_v1.js');
+  assert.match(index,/insight_dashboard_kpi_sync_v1\.js\?v=20261005-compact-cards/);
+  assert.match(sync,/box\.append\(badge\);card\.appendChild\(box\)/);
+  assert.doesNotMatch(sync,/kpi-prev|年比/);
+  assert.match(sync,/badge\.textContent=\(display\.up\?'▲':'▼'\)\+' '\+display\.text/);
+});
+
 test('STEP17の可読性CSSは独立moduleで主要ページへ横展開する',()=>{
   const index=read('Index.html');
   const readability=read('insight_readability_v1.js');
-  assert.match(index,/insight_readability_v1\.js\?v=20261004-step17/);
+  assert.match(index,/insight_readability_v1\.js\?v=20261005-dashboard-cards/);
   assert.ok(index.indexOf('insight_dark_theme_v1.js')<index.indexOf('insight_readability_v1.js'));
   assert.match(readability,/insightReadabilityStyle/);
+  assert.match(readability,/#pageDash \.kpi-card\{height:110px!important;min-height:110px!important;max-height:110px!important;box-sizing:border-box!important\}/);
   assert.match(readability,/#pageDash \.kpi-label\{font-size:13px!important/);
+  assert.match(readability,/#pageDash \.kpi-label>span\{display:none!important\}/);
+  assert.doesNotMatch(readability,/#pageDash \.kpi-prev/);
   assert.match(readability,/#pageSales #issRow \.iss-stat,#pageKyaku #ikyRow \.iky-stat\{font-size:13px!important/);
   assert.match(readability,/#iwcRow \.iwc-kpi-value\{font-size:16px!important/);
   assert.match(readability,/#pageSalesCount \.sc-col-head,#pageSalesCount \.sc-average-head\{font-size:12\.5px!important/);
