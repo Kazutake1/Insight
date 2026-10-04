@@ -11,7 +11,7 @@ async function openInsight(page){
   page.on('pageerror',error=>errors.push(error.message));
   await page.goto('/Index.html',{waitUntil:'domcontentloaded'});
   await expect(page.locator('#nav1')).toBeVisible();
-  await page.waitForFunction(()=>window.InsightPagePeriodSync&&window.InsightInputPeriodControls&&window.InsightSalesPeriodSelector&&window.InsightSalesCount&&window.InsightSaleResults&&window.InsightHourlyCustomers&&window.InsightEventResults&&window.InsightAIVisual&&window.InsightAIInterpretation&&window.InsightAnalysisPeriodLock&&window.InsightMultiYearAnalysis&&window.InsightWeekdayAnalysis&&window.InsightSaleImpactAnalysis&&window.InsightEventImpactAnalysis&&window.InsightSeasonalityAnalysis&&window.InsightAnomalyExplanation&&window.InsightAnalysisBundle&&window.InsightSettings&&window.InsightDarkTheme&&document.getElementById('navSettings')&&document.getElementById('pageSettings'));
+  await page.waitForFunction(()=>window.InsightPagePeriodSync&&window.InsightInputPeriodControls&&window.InsightSalesPeriodSelector&&window.InsightSalesCount&&window.InsightSaleResults&&window.InsightHourlyCustomers&&window.InsightEventResults&&window.InsightAIVisual&&window.InsightAIInterpretation&&window.InsightAnalysisPeriodLock&&window.InsightMultiYearAnalysis&&window.InsightWeekdayAnalysis&&window.InsightSaleImpactAnalysis&&window.InsightEventImpactAnalysis&&window.InsightSeasonalityAnalysis&&window.InsightAnomalyExplanation&&window.InsightAnalysisBundle&&window.InsightSettings&&window.InsightDarkTheme&&window.InsightReadability&&document.getElementById('navSettings')&&document.getElementById('pageSettings'));
   return errors;
 }
 
@@ -135,6 +135,78 @@ test('サイドバー下部は設定だけを表示し管理項目は設定ペ�
   await expect(page.locator('#pageSettings #darkModeBtn')).toHaveCount(0);
   await expect(page.locator('#insightThemeBridge #darkModeBtn')).toBeHidden();
   await expect(sidebar.locator('.insight-theme-toggle')).toBeVisible();
+  expect(errors).toEqual([]);
+});
+
+test('STEP17の文字階層をダッシュボード・入力・販売数・分析AI・設定へ横展開する',async({page})=>{
+  const errors=await openInsight(page);
+
+  await page.locator('#nav1').click();
+  const dashboardType=await page.evaluate(()=>({
+    kpiLabel:getComputedStyle(document.querySelector('#pageDash .kpi-label')).fontSize,
+    kpiPrev:getComputedStyle(document.querySelector('#pageDash .kpi-prev')).fontSize
+  }));
+  expect(dashboardType).toEqual({kpiLabel:'13px',kpiPrev:'11.5px'});
+
+  await page.locator('#nav2').click();
+  await expect(page.locator('#pageSales #issRow .iss-card')).toBeVisible();
+  const salesType=await page.evaluate(()=>({
+    title:getComputedStyle(document.querySelector('#pageSales #issRow .iss-title')).fontSize,
+    label:getComputedStyle(document.querySelector('#pageSales #issRow .iss-stat')).fontSize,
+    value:getComputedStyle(document.querySelector('#pageSales #issRow .iss-stat strong')).fontSize,
+    note:getComputedStyle(document.querySelector('#pageSales #issRow .iss-note')).fontSize
+  }));
+  expect(salesType).toEqual({title:'15px',label:'13px',value:'20px',note:'12px'});
+
+  await page.locator('#nav3').click();
+  await expect(page.locator('#pageKyaku #ikyRow .iky-card')).toBeVisible();
+  const customerType=await page.evaluate(()=>({
+    title:getComputedStyle(document.querySelector('#pageKyaku #ikyRow .iky-title')).fontSize,
+    label:getComputedStyle(document.querySelector('#pageKyaku #ikyRow .iky-stat')).fontSize,
+    value:getComputedStyle(document.querySelector('#pageKyaku #ikyRow .iky-stat strong')).fontSize,
+    note:getComputedStyle(document.querySelector('#pageKyaku #ikyRow .iky-note')).fontSize
+  }));
+  expect(customerType).toEqual({title:'15px',label:'13px',value:'20px',note:'12px'});
+
+  await page.locator('#nav4').click();
+  await expect(page.locator('#iwcRow .iwc-card')).toHaveCount(2);
+  const wasteType=await page.evaluate(()=>({
+    title:getComputedStyle(document.querySelector('#iwcRow .iwc-title')).fontSize,
+    kpiLabel:getComputedStyle(document.querySelector('#iwcRow .iwc-kpi-label')).fontSize,
+    kpiValue:getComputedStyle(document.querySelector('#iwcRow .iwc-kpi-value')).fontSize,
+    cards:Array.from(document.querySelectorAll('#iwcRow .iwc-card')).map(card=>({client:card.clientHeight,scroll:card.scrollHeight}))
+  }));
+  expect(wasteType.title).toBe('14px');
+  expect(wasteType.kpiLabel).toBe('11.5px');
+  expect(wasteType.kpiValue).toBe('16px');
+  wasteType.cards.forEach(card=>expect(card.scroll).toBeLessThanOrEqual(card.client+2));
+
+  await page.locator('#navSalesCount').click();
+  const salesCountType=await page.evaluate(()=>({
+    toolbar:getComputedStyle(document.querySelector('#pageSalesCount .sc-toolbar')).fontSize,
+    tripLabel:getComputedStyle(document.querySelector('#pageSalesCount .sc-col-head')).fontSize,
+    input:getComputedStyle(document.querySelector('#pageSalesCount .sc-trip input')).fontSize,
+    averageTitle:getComputedStyle(document.querySelector('#pageSalesCount .sc-average-title')).fontSize
+  }));
+  expect(salesCountType).toEqual({toolbar:'13.5px',tripLabel:'12.5px',input:'13.5px',averageTitle:'16px'});
+
+  await page.locator('#aiAnalysisToggle').click();
+  await expect(page.locator('body')).toHaveClass(/ai-analysis-open/);
+  const aiType=await page.evaluate(()=>({
+    cardTitle:getComputedStyle(document.querySelector('.ai-analysis-workspace .ai-analysis-card-title')).fontSize,
+    period:getComputedStyle(document.querySelector('.ai-workspace-period-btn')).fontSize,
+    question:getComputedStyle(document.querySelector('.ai-analysis-question-input')).fontSize
+  }));
+  expect(aiType).toEqual({cardTitle:'13px',period:'13px',question:'14px'});
+  await page.locator('#aiAnalysisClose').click();
+
+  await page.locator('#navSettings').click();
+  const settingsType=await page.evaluate(()=>({
+    heading:getComputedStyle(document.querySelector('#pageSettings .insight-settings-section h2')).fontSize,
+    help:getComputedStyle(document.querySelector('#pageSettings .insight-settings-section>p')).fontSize,
+    action:getComputedStyle(document.querySelector('#pageSettings .insight-settings-actions .sidebar-btn')).fontSize
+  }));
+  expect(settingsType).toEqual({heading:'17px',help:'13px',action:'14px'});
   expect(errors).toEqual([]);
 });
 
