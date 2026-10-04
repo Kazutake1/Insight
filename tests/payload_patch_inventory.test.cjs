@@ -47,22 +47,23 @@ test('AI表示CSSはIndexの文字列置換ではなくpresentation moduleが所
   assert.doesNotMatch(presentation,/var selected=!open&&currentNav===i;/);
 });
 
-test('ダッシュボードKPIカードは補助月表示と年比ラベルを削除し数値バッジを維持する',()=>{
+test('ダッシュボードKPIカードは補助月表示を削除し年比ラベルと数値バッジを表示する',()=>{
   const index=read('Index.html');
   const sync=read('insight_dashboard_kpi_sync_v1.js');
-  assert.match(index,/insight_dashboard_kpi_sync_v1\.js\?v=20261005-compact-cards-3/);
-  assert.match(sync,/box\.append\(badge\);card\.appendChild\(box\)/);
+  assert.match(index,/insight_dashboard_kpi_sync_v1\.js\?v=20261005-compact-cards-4/);
+  assert.match(sync,/box\.append\(badge,prev\);card\.appendChild\(box\)/);
+  assert.match(sync,/prev\.textContent=String\(compareYear\)\+'年比'/);
   assert.match(sync,/function stripCardMeta\(\)/);
-  assert.match(sync,/querySelectorAll\('\.kpi-label>span,\.kpi-prev'\)/);
+  assert.match(sync,/querySelectorAll\('\.kpi-label>span'\)/);
+  assert.doesNotMatch(sync,/querySelectorAll\('\.kpi-label>span,\.kpi-prev'\)/);
   assert.match(sync,/if\(node&&node\.parentNode\)node\.parentNode\.removeChild\(node\)/);
-  assert.doesNotMatch(sync,/prev\.textContent=String\(compareYear\)\+'年比'/);
   assert.match(sync,/badge\.textContent=\(display\.up\?'▲':'▼'\)\+' '\+display\.text/);
 });
 
 test('STEP17の可読性CSSは独立moduleで主要ページへ横展開する',()=>{
   const index=read('Index.html');
   const readability=read('insight_readability_v1.js');
-  assert.match(index,/insight_readability_v1\.js\?v=20261005-kpi-reference-card/);
+  assert.match(index,/insight_readability_v1\.js\?v=20261005-kpi-reference-card-yoy/);
   assert.ok(index.indexOf('insight_dark_theme_v1.js')<index.indexOf('insight_readability_v1.js'));
   assert.match(readability,/insightReadabilityStyle/);
   assert.match(readability,/#pageDash \.kpi-card\{[^}]*height:110px!important;[^}]*border-radius:16px!important;[^}]*box-shadow:0 5px 16px rgba\(15,23,42,\.08\)!important/);
@@ -71,7 +72,7 @@ test('STEP17の可読性CSSは独立moduleで主要ページへ横展開する',
   assert.match(readability,/#pageDash \.kpi-value\{[^}]*left:16px!important;top:39px!important;[^}]*text-align:left!important;[^}]*font-size:24px!important/);
   assert.match(readability,/#pageDash \.kpi-yoy\{[^}]*left:0!important;right:0!important;bottom:0!important;height:31px!important;[^}]*justify-content:flex-start!important;[^}]*border-top:1px solid var\(--border\)!important/);
   assert.match(readability,/#pageDash \.kpi-badge\{[^}]*background:transparent!important;[^}]*padding:0!important/);
-  assert.doesNotMatch(readability,/#pageDash \.kpi-prev/);
+  assert.match(readability,/#pageDash \.kpi-prev\{[^}]*margin-left:7px!important;[^}]*font-size:11\.5px!important;[^}]*color:var\(--text4\)!important/);
   assert.match(readability,/#pageSales #issRow \.iss-stat,#pageKyaku #ikyRow \.iky-stat\{font-size:13px!important/);
   assert.match(readability,/#iwcRow \.iwc-kpi-value\{font-size:16px!important/);
   assert.match(readability,/#pageSalesCount \.sc-col-head,#pageSalesCount \.sc-average-head\{font-size:12\.5px!important/);

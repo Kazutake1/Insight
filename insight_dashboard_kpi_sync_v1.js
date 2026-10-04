@@ -58,7 +58,8 @@
     var box=document.createElement('div');box.className='kpi-yoy';
     var badge=document.createElement('span');badge.className='kpi-badge '+(positive?'up':'dn');
     badge.textContent=(display.up?'▲':'▼')+' '+display.text;
-    box.append(badge);card.appendChild(box);
+    var prev=document.createElement('span');prev.className='kpi-prev';prev.textContent=String(compareYear)+'年比';
+    box.append(badge,prev);card.appendChild(box);
   }
 
   function patchPrimaryCards(c){
@@ -79,7 +80,7 @@
 
   function stripCardMeta(){
     var row=document.getElementById('kpiRow');if(!row)return;
-    row.querySelectorAll('.kpi-label>span,.kpi-prev').forEach(function(node){
+    row.querySelectorAll('.kpi-label>span').forEach(function(node){
       if(node&&node.parentNode)node.parentNode.removeChild(node);
     });
   }

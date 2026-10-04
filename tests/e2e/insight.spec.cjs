@@ -144,7 +144,6 @@ test('STEP17の文字階層をダッシュボード・入力・販売数・分�
   await page.locator('#nav1').click();
   await expect(page.locator('#pageDash .kpi-label').first()).toBeVisible();
   await expect(page.locator('#pageDash .kpi-label>span')).toHaveCount(0);
-  await expect(page.locator('#pageDash .kpi-prev')).toHaveCount(0);
   const dashboardType=await page.evaluate(()=>{
     const label=document.querySelector('#pageDash .kpi-label');
     const cards=Array.from(document.querySelectorAll('#pageDash .kpi-card'));
@@ -185,7 +184,9 @@ test('STEP17の文字階層をダッシュボード・入力・販売数・分�
             height:getComputedStyle(yoy).height,
             justifyContent:getComputedStyle(yoy).justifyContent,
             backgroundColor:getComputedStyle(yoy).backgroundColor,
-            borderTopWidth:getComputedStyle(yoy).borderTopWidth
+            borderTopWidth:getComputedStyle(yoy).borderTopWidth,
+            prevText:yoy.querySelector('.kpi-prev')?yoy.querySelector('.kpi-prev').textContent:'',
+            prevFontSize:yoy.querySelector('.kpi-prev')?getComputedStyle(yoy.querySelector('.kpi-prev')).fontSize:null
           }:null
         };
       })
@@ -218,10 +219,11 @@ test('STEP17の文字階層をダッシュボード・入力・販売数・分�
       expect(card.yoy.height).toBe('31px');
       expect(card.yoy.justifyContent).toBe('flex-start');
       expect(card.yoy.borderTopWidth).toBe('1px');
+      expect(card.yoy.prevText).toMatch(/^\d{4}年比$/);
+      expect(card.yoy.prevFontSize).toBe('11.5px');
     }
     expect(card.text).not.toMatch(/\d{1,2}月1日平均/);
     expect(card.text.split('\n').map(line=>line.trim())).not.toContainEqual(expect.stringMatching(/^\d{1,2}月$/));
-    expect(card.text).not.toMatch(/\d{4}年比/);
   });
 
   await page.locator('#nav2').click();

@@ -14,6 +14,7 @@
     '#pageDash .kpi-yoy{position:absolute!important;left:0!important;right:0!important;bottom:0!important;height:31px!important;box-sizing:border-box!important;display:flex!important;justify-content:flex-start!important;align-items:center!important;margin:0!important;padding:0 16px!important;border-top:1px solid var(--border)!important;background:var(--surface2)!important}',
     '#pageDash .kpi-unit{font-size:12px!important}',
     '#pageDash .kpi-badge{font-size:12px!important;font-weight:700!important;background:transparent!important;border:0!important;border-radius:0!important;padding:0!important;box-shadow:none!important}',
+    '#pageDash .kpi-prev{margin-left:7px!important;font-size:11.5px!important;font-weight:500!important;color:var(--text4)!important;white-space:nowrap!important}',
     '#pageDash .qs-title{font-size:15px!important}',
     '.ops-field-title{font-size:13px!important}',
     '.ops-memo,.ops-stockout{font-size:14px!important;line-height:1.5}',
