@@ -68,6 +68,23 @@
     });
     return Object.keys(latest).sort(function(a,b){return latest[b].localeCompare(latest[a])||a.localeCompare(b,'ja');});
   }
+  function normalizeDemand(items){
+    return (Array.isArray(items)?items:[]).map(function(item){
+      var prepared=item&&item.prepared!==undefined&&item.prepared!==null?finite(item.prepared):null;
+      var sold=item&&item.sold!==undefined&&item.sold!==null?finite(item.sold):null;
+      return {id:text(item&&item.id),name:text(item&&item.name),prepared:prepared,sold:sold,sellThrough:prepared!==null&&prepared>0&&sold!==null?sold/prepared*100:null};
+    }).filter(function(item){return item.id&&item.name;});
+  }
+  function demandComparison(occurrences,occurrence){
+    var items=occurrence&&Array.isArray(occurrence.specialDemand)?occurrence.specialDemand:[],index=(occurrences||[]).findIndex(function(item){return item.id===occurrence.id;});
+    return items.map(function(item){
+      var previous=null;
+      for(var i=index+1;i<(occurrences||[]).length&&!previous;i++){
+        previous=((occurrences[i]&&occurrences[i].specialDemand)||[]).find(function(old){return old.id===item.id||old.name===item.name;})||null;
+      }
+      return {current:copy(item),previous:previous?copy(previous):null};
+    });
+  }
   function emptyMetrics(){return {salesYen:null,customers:null,customerUnitPrice:null,items:null,inputDays:0};}
   function normalizeMetrics(metrics){
     metrics=metrics||{};
@@ -118,6 +135,7 @@
       endDate:event.endDate,
       note:event.snapshot&&event.snapshot.note||'',
       metrics:metrics,
+      specialDemand:normalizeDemand(event.snapshot&&event.snapshot.specialDemand),
       days:days
     };
   }
@@ -146,7 +164,7 @@
     };
   }
 
-  var model={VERSION:3,LEGACY_LOCATION:LEGACY_LOCATION,eachDate:eachDate,eventLocation:eventLocation,storeEventsByType:storeEventsByType,nearbyEvents:nearbyEvents,specialEvents:specialEvents,locations:locations,eventNames:eventNames,specialNames:specialNames,aggregateDays:aggregateDays,occurrenceResult:occurrenceResult,collect:collect,collectSpecial:collectSpecial};
+  var model={VERSION:3,LEGACY_LOCATION:LEGACY_LOCATION,eachDate:eachDate,eventLocation:eventLocation,storeEventsByType:storeEventsByType,nearbyEvents:nearbyEvents,specialEvents:specialEvents,locations:locations,eventNames:eventNames,specialNames:specialNames,normalizeDemand:normalizeDemand,demandComparison:demandComparison,aggregateDays:aggregateDays,occurrenceResult:occurrenceResult,collect:collect,collectSpecial:collectSpecial};
   if(typeof module!=='undefined'&&module.exports)module.exports=model;
   root.InsightEventResults=model;
   if(!root.document)return;
@@ -295,6 +313,23 @@
       });
       section.append(grid);return section;
     }
+    function specialDemandSection(data,occurrence){
+      var comparisons=demandComparison(data.occurrences,occurrence);if(!comparisons.length)return null;
+      var section=el('section',undefined,'er-section er-demand-section');section.append(el('h2','特需商品'));
+      var grid=el('div',undefined,'er-demand-grid');
+      comparisons.forEach(function(entry){
+        var item=entry.current,card=el('article',undefined,'er-demand-card');card.append(el('h3',item.name));
+        var metrics=el('div',undefined,'er-demand-metrics');
+        metrics.append(summaryMetric('用意数',item.prepared===null?'—':numberText(item.prepared,0)),summaryMetric('販売数',item.sold===null?'—':numberText(item.sold,0)),summaryMetric('消化率',item.sellThrough===null?'—':numberText(item.sellThrough,1)+'%'));
+        card.append(metrics);
+        if(entry.previous){
+          var old=entry.previous,previous='前回：用意 '+(old.prepared===null?'—':numberText(old.prepared,0))+'　販売 '+(old.sold===null?'—':numberText(old.sold,0))+'　消化率 '+(old.sellThrough===null?'—':numberText(old.sellThrough,1)+'%');
+          card.append(el('p',previous,'er-demand-previous'));
+        }
+        grid.append(card);
+      });
+      section.append(grid);return section;
+    }
     function renderDayTabs(occurrence){
       if(occurrence.days.length<=1)return null;
       var wrap=el('div',undefined,'er-day-tabs');
@@ -337,6 +372,7 @@
       }
       var hourly=hourlySection(selected.date);if(hourly)results.append(hourly);
       var sales=salesCategoriesSection(selected.date);if(sales)results.append(sales);
+      var demand=specialDemandSection(data,occurrence);if(demand)results.append(demand);
     }
     function render(){
       var available=renderSelectors();
@@ -383,7 +419,8 @@
       '.er-day-tabs{display:flex;gap:8px;overflow-x:auto;padding:1px 1px 10px}.er-day-tab{flex:0 0 180px;display:flex;flex-direction:column;align-items:flex-start;gap:4px;border:1px solid var(--border);border-radius:12px;background:var(--surface);color:var(--text);padding:10px 11px;text-align:left;cursor:pointer}.er-day-tab.active{border-color:var(--text);box-shadow:inset 0 0 0 1px var(--text)}.er-day-tab strong{font-size:11.5px}.er-day-tab span{font-size:10.5px;color:var(--text3);font-weight:700}.er-day-tab small{margin-top:2px;color:#15803d;font-size:9px;font-weight:800}'+
       '.er-daily-summary h2{margin-bottom:10px}.er-section-head{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:10px}.er-peak{font-size:11px;color:var(--text3)}.er-hour-scroll{overflow-x:auto;padding:4px 0 8px}.er-hour-chart{display:flex;align-items:flex-end;gap:4px;min-width:1340px;height:205px;padding:8px 6px 0;border-bottom:1px solid var(--border)}.er-hour-item{width:52px;flex:0 0 52px;display:flex;flex-direction:column;align-items:center;justify-content:flex-end;height:100%;gap:4px}.er-hour-plot{position:relative;height:150px;width:44px;display:flex;align-items:flex-end;justify-content:center;border:0;padding:0;background:transparent;color:inherit;cursor:pointer;overflow:visible}.er-hour-plot:focus-visible{outline:2px solid #3b82f6;outline-offset:2px;border-radius:6px}.er-hour-bar{width:28px;min-height:2px;border-radius:5px 5px 2px 2px;background:#3b82f6;pointer-events:none}.er-hour-value{position:absolute;left:50%;bottom:calc(var(--er-bar-height,2px) + 6px);transform:translateX(-50%);z-index:2;padding:3px 6px;border-radius:6px;background:var(--text);color:var(--surface);font-size:10.5px;font-weight:800;line-height:1.2;white-space:nowrap;pointer-events:none}.er-hour-value[hidden]{display:none!important}.er-hour-item>span{font-size:11.5px;font-weight:700;color:var(--text3)}'+
       '.er-sales-section>h2{margin-bottom:10px}.er-category-grid{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:10px}.er-category-card{min-width:0;width:100%;border:1px solid var(--border);border-radius:12px;background:var(--surface2);padding:9px;box-sizing:border-box}.er-category-card>h3{margin:0 0 7px;font-size:12px}.er-category-card .sc-day{width:auto;min-width:0;background:var(--surface)}.er-category-card .sc-day-title{display:none}.er-category-card input{pointer-events:none}'+
-      '@media(max-width:1000px){.er-category-grid{grid-template-columns:repeat(2,minmax(0,1fr))}}@media(max-width:800px){.er-toolbar{align-items:stretch}.er-toolbar label{min-width:0;width:100%}.er-arrow{display:none}.er-occurrence{grid-template-columns:1fr}.er-occurrence-metrics{justify-content:flex-start}.er-overview-grid,.er-daily-grid{grid-template-columns:repeat(2,minmax(0,1fr));width:100%}.er-category-grid{grid-template-columns:1fr}}';
+      '.er-demand-section>h2{margin-bottom:10px}.er-demand-grid{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:10px}.er-demand-card{min-width:0;border:1px solid var(--border);border-radius:12px;background:var(--surface2);padding:10px;box-sizing:border-box}.er-demand-card>h3{margin:0 0 8px;font-size:13px}.er-demand-metrics{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:6px}.er-demand-metrics .er-summary-card{padding:7px 8px}.er-demand-previous{margin:8px 0 0;color:var(--text4);font-size:10.5px;line-height:1.4}'+
+      '@media(max-width:1000px){.er-category-grid,.er-demand-grid{grid-template-columns:repeat(2,minmax(0,1fr))}}@media(max-width:800px){.er-toolbar{align-items:stretch}.er-toolbar label{min-width:0;width:100%}.er-arrow{display:none}.er-occurrence{grid-template-columns:1fr}.er-occurrence-metrics{justify-content:flex-start}.er-overview-grid,.er-daily-grid{grid-template-columns:repeat(2,minmax(0,1fr));width:100%}.er-category-grid,.er-demand-grid{grid-template-columns:1fr}}';
     doc.head.append(style);
     if(!buildPage())return;
     render();
