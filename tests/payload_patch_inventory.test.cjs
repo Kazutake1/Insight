@@ -496,13 +496,16 @@ test('セール実績ページは販売数入力直後に読み込み同一日�
   const saleResults=read('insight_sale_results_v1.js');
   const sales=read('insight_sales_count_v1.js');
   assert.match(index,/insight_sales_count_v1\.js\?v=20261004-larger-totals/);
-  assert.match(index,/insight_sale_results_v1\.js\?v=20261003-multi-condition-sale/);
+  assert.match(index,/insight_sale_results_v1\.js\?v=20261004-occurrence-rows/);
   assert.ok(index.indexOf('insight_sales_count_v1.js')<index.indexOf('insight_sale_results_v1.js'));
   assert.ok(index.indexOf('insight_sale_results_v1.js')<index.indexOf('insight_page_period_sync_v1.js'));
   assert.match(saleResults,/id='navSaleResults'|nav\.id='navSaleResults'/);
   assert.match(saleResults,/page\.id='pageSaleResults'/);
   assert.match(saleResults,/InsightSalesCount\.createReadOnlyDayCard/);
   assert.match(saleResults,/grid-template-columns:repeat\(7,minmax\(0,1fr\)\)/);
+  assert.match(saleResults,/group\.occurrences\.forEach\(function\(occurrence\)/);
+  assert.match(saleResults,/sr-occurrence-grids/);
+  assert.match(saleResults,/\.sr-occurrence-grids\{display:grid;gap:9px\}/);
   assert.match(saleResults,/\.sr-day-grid>\.sc-day\{min-width:0\}/);
   assert.match(sales,/model\.createReadOnlyDayCard=createReadOnlyDayCard/);
   assert.match(sales,/\.sc-totals b\{font-size:14px;text-align:center\}/);
@@ -645,7 +648,7 @@ test('販売数カテゴリーの対象便設定を全関連層で共有する',
   const saleResults=read('insight_sale_results_v1.js');
   const pageAI=read('insight_ai_page_comments_v1.js');
   assert.match(index,/insight_sales_count_v1\.js\?v=20261004-larger-totals/);
-  assert.match(index,/insight_sale_results_v1\.js\?v=20261003-multi-condition-sale/);
+  assert.match(index,/insight_sale_results_v1\.js\?v=20261004-occurrence-rows/);
   assert.match(index,/insight_analysis_context_v1\.js\?v=20261001-active-trips/);
   assert.match(index,/insight_ai_page_comments_v1\.js\?v=20261001-decision-analysis/);
   assert.match(sales,/activeTrips:\[true,true,true\]/);
