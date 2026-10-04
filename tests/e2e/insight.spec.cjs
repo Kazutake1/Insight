@@ -732,9 +732,12 @@ test('セール実績は内容別に表示し開催回ごとに行を分けて7�
   expect(saleTypography.statValue).toBe('16px');
   expect(saleTypography.headAlignItems).toBe('flex-start');
   expect(Math.abs(saleTypography.headingTop-saleTypography.statsTop)).toBeLessThanOrEqual(1);
-  await expect(page.locator('.sr-group-stats .sr-stat')).toHaveCount(4);
-  await expect(page.locator('.sr-group-stats .sr-stat').nth(0)).toContainText('開催日数');
-  await expect(page.locator('.sr-group-stats .sr-stat').nth(3)).toContainText('消化率');
+  const stats=page.locator('.sr-group-stats .sr-stat');
+  await expect(stats).toHaveCount(3);
+  await expect(stats).toHaveText([/平均納品/,/平均販売/,/消化率/]);
+  await expect(page.locator('.sr-group-stats')).not.toContainText('開催日数');
+  const statGridColumns=await page.locator('.sr-group-stats').evaluate(el=>getComputedStyle(el).gridTemplateColumns.split(' ').length);
+  expect(statGridColumns).toBe(3);
   await expect(page.locator('.sr-group .sr-day-grid')).toHaveCount(2);
   await expect(page.locator('.sr-group .sr-day-grid').nth(0).locator('.sc-day')).toHaveCount(8);
   await expect(page.locator('.sr-group .sr-day-grid').nth(1).locator('.sc-day')).toHaveCount(3);
