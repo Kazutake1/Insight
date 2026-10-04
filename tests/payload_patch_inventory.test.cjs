@@ -605,7 +605,7 @@ test('分析AIはダッシュボード再掲ではなく4ブロックの意思�
   const presentation=read('insight_ai_presentation_v1.js');
   assert.match(index,/insight_ai_interpretation_v1\.js\?v=20261001-decision-analysis/);
   assert.match(index,/insight_ai_page_comments_v1\.js\?v=20261001-decision-analysis/);
-  assert.match(index,/insight_ai_presentation_v1\.js\?v=20261001-decision-analysis/);
+  assert.match(index,/insight_ai_presentation_v1\.js\?v=20261004-remove-hint/);
   assert.match(index,/insight_ai_visual_v1\.js\?v=20261001-decision-analysis/);
   assert.ok(index.indexOf('insight_analysis_history_v1.js')<index.indexOf('insight_ai_interpretation_v1.js'));
   assert.ok(index.indexOf('insight_ai_interpretation_v1.js')<index.indexOf('insight_ai_page_comments_v1.js'));
@@ -662,7 +662,7 @@ test('互換パッチ11件はfail-fast bootstrapに集約しfeature挿入境界�
 
 test('分析AI workspace assetはcache bustされている',()=>{
   const index=read('Index.html');
-  assert.match(index,/insight_ai_presentation_v1\.js\?v=20261001-decision-analysis/);
+  assert.match(index,/insight_ai_presentation_v1\.js\?v=20261004-remove-hint/);
   assert.match(index,/insight_ops_v1\.js\?v=20260930-step5-2/);
 });
 
