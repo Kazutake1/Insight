@@ -162,19 +162,30 @@ test('STEP17の文字階層をダッシュボード・入力・販売数・分�
           scroll:card.scrollHeight,
           text:String(card.innerText||''),
           labelPosition:label?getComputedStyle(label).position:null,
+          cardStyle:{
+            overflow:getComputedStyle(card).overflow,
+            borderRadius:getComputedStyle(card).borderRadius,
+            backgroundColor:getComputedStyle(card).backgroundColor,
+            boxShadow:getComputedStyle(card).boxShadow
+          },
           value:value?{
             position:getComputedStyle(value).position,
             left:getComputedStyle(value).left,
             top:getComputedStyle(value).top,
             textAlign:getComputedStyle(value).textAlign,
-            transform:getComputedStyle(value).transform
+            transform:getComputedStyle(value).transform,
+            fontSize:getComputedStyle(value).fontSize,
+            fontWeight:getComputedStyle(value).fontWeight
           }:null,
           yoy:yoy?{
             position:getComputedStyle(yoy).position,
             left:getComputedStyle(yoy).left,
-            top:getComputedStyle(yoy).top,
+            right:getComputedStyle(yoy).right,
+            bottom:getComputedStyle(yoy).bottom,
+            height:getComputedStyle(yoy).height,
             justifyContent:getComputedStyle(yoy).justifyContent,
-            transform:getComputedStyle(yoy).transform
+            backgroundColor:getComputedStyle(yoy).backgroundColor,
+            borderTopWidth:getComputedStyle(yoy).borderTopWidth
           }:null
         };
       })
@@ -187,17 +198,26 @@ test('STEP17の文字階層をダッシュボード・入力・販売数・分�
     expect(card.boxSizing).toBe('border-box');
     expect(card.position).toBe('relative');
     expect(card.scroll).toBeLessThanOrEqual(card.client+2);
-    expect(card.labelPosition).not.toBe('absolute');
+    expect(card.labelPosition).toBe('absolute');
+    expect(card.cardStyle.overflow).toBe('hidden');
+    expect(card.cardStyle.borderRadius).toBe('16px');
+    expect(card.cardStyle.boxShadow).not.toBe('none');
     expect(card.value).not.toBeNull();
     expect(card.value.position).toBe('absolute');
-    expect(card.value.top).toBe('42px');
-    expect(card.value.textAlign).toBe('center');
-    expect(card.value.transform).not.toBe('none');
+    expect(card.value.left).toBe('16px');
+    expect(card.value.top).toBe('39px');
+    expect(card.value.textAlign).toBe('left');
+    expect(card.value.transform).toBe('none');
+    expect(card.value.fontSize).toBe('24px');
+    expect(Number(card.value.fontWeight)).toBeGreaterThanOrEqual(700);
     if(card.yoy){
       expect(card.yoy.position).toBe('absolute');
-      expect(card.yoy.top).toBe('76px');
-      expect(card.yoy.justifyContent).toBe('center');
-      expect(card.yoy.transform).not.toBe('none');
+      expect(card.yoy.left).toBe('0px');
+      expect(card.yoy.right).toBe('0px');
+      expect(card.yoy.bottom).toBe('0px');
+      expect(card.yoy.height).toBe('31px');
+      expect(card.yoy.justifyContent).toBe('flex-start');
+      expect(card.yoy.borderTopWidth).toBe('1px');
     }
     expect(card.text).not.toMatch(/\d{1,2}月1日平均/);
     expect(card.text.split('\n').map(line=>line.trim())).not.toContainEqual(expect.stringMatching(/^\d{1,2}月$/));

@@ -62,14 +62,15 @@ test('ダッシュボードKPIカードは補助月表示と年比ラベルを�
 test('STEP17の可読性CSSは独立moduleで主要ページへ横展開する',()=>{
   const index=read('Index.html');
   const readability=read('insight_readability_v1.js');
-  assert.match(index,/insight_readability_v1\.js\?v=20261005-dashboard-card-align/);
+  assert.match(index,/insight_readability_v1\.js\?v=20261005-kpi-reference-card/);
   assert.ok(index.indexOf('insight_dark_theme_v1.js')<index.indexOf('insight_readability_v1.js'));
   assert.match(readability,/insightReadabilityStyle/);
-  assert.match(readability,/#pageDash \.kpi-card\{height:110px!important;min-height:110px!important;max-height:110px!important;box-sizing:border-box!important;position:relative!important\}/);
-  assert.match(readability,/#pageDash \.kpi-label\{font-size:13px!important/);
+  assert.match(readability,/#pageDash \.kpi-card\{[^}]*height:110px!important;[^}]*border-radius:16px!important;[^}]*box-shadow:0 5px 16px rgba\(15,23,42,\.08\)!important/);
+  assert.match(readability,/#pageDash \.kpi-label\{[^}]*left:16px!important;top:13px!important;[^}]*font-size:13px!important/);
   assert.match(readability,/#pageDash \.kpi-label>span\{display:none!important\}/);
-  assert.match(readability,/#pageDash \.kpi-value\{[^}]*left:46%!important;top:42px!important;[^}]*text-align:center!important/);
-  assert.match(readability,/#pageDash \.kpi-yoy\{[^}]*left:46%!important;top:76px!important;[^}]*justify-content:center!important/);
+  assert.match(readability,/#pageDash \.kpi-value\{[^}]*left:16px!important;top:39px!important;[^}]*text-align:left!important;[^}]*font-size:24px!important/);
+  assert.match(readability,/#pageDash \.kpi-yoy\{[^}]*left:0!important;right:0!important;bottom:0!important;height:31px!important;[^}]*justify-content:flex-start!important;[^}]*border-top:1px solid var\(--border\)!important/);
+  assert.match(readability,/#pageDash \.kpi-badge\{[^}]*background:transparent!important;[^}]*padding:0!important/);
   assert.doesNotMatch(readability,/#pageDash \.kpi-prev/);
   assert.match(readability,/#pageSales #issRow \.iss-stat,#pageKyaku #ikyRow \.iky-stat\{font-size:13px!important/);
   assert.match(readability,/#iwcRow \.iwc-kpi-value\{font-size:16px!important/);

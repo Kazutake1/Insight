@@ -7,13 +7,13 @@
   var style=doc.createElement('style');
   style.id='insightReadabilityStyle';
   style.textContent=[
-    '#pageDash .kpi-card{height:110px!important;min-height:110px!important;max-height:110px!important;box-sizing:border-box!important;position:relative!important}',
-    '#pageDash .kpi-label{font-size:13px!important;line-height:1.35}',
+    '#pageDash .kpi-card{height:110px!important;min-height:110px!important;max-height:110px!important;box-sizing:border-box!important;position:relative!important;overflow:hidden!important;border:1px solid var(--border)!important;border-radius:16px!important;background:var(--surface)!important;box-shadow:0 5px 16px rgba(15,23,42,.08)!important;padding:0!important}',
+    '#pageDash .kpi-label{position:absolute!important;left:16px!important;top:13px!important;margin:0!important;font-size:13px!important;line-height:1.35}',
     '#pageDash .kpi-label>span{display:none!important}',
-    '#pageDash .kpi-value{position:absolute!important;left:46%!important;top:42px!important;transform:translateX(-50%)!important;width:calc(100% - 24px)!important;text-align:center!important;margin:0!important}',
-    '#pageDash .kpi-yoy{position:absolute!important;left:46%!important;top:76px!important;transform:translateX(-50%)!important;width:calc(100% - 24px)!important;display:flex!important;justify-content:center!important;align-items:center!important;margin:0!important}',
+    '#pageDash .kpi-value{position:absolute!important;left:16px!important;top:39px!important;transform:none!important;width:calc(100% - 32px)!important;text-align:left!important;margin:0!important;font-size:24px!important;font-weight:800!important;line-height:1.1!important}',
+    '#pageDash .kpi-yoy{position:absolute!important;left:0!important;right:0!important;bottom:0!important;height:31px!important;box-sizing:border-box!important;display:flex!important;justify-content:flex-start!important;align-items:center!important;margin:0!important;padding:0 16px!important;border-top:1px solid var(--border)!important;background:var(--surface2)!important}',
     '#pageDash .kpi-unit{font-size:12px!important}',
-    '#pageDash .kpi-badge{font-size:12px!important}',
+    '#pageDash .kpi-badge{font-size:12px!important;font-weight:700!important;background:transparent!important;border:0!important;border-radius:0!important;padding:0!important;box-shadow:none!important}',
     '#pageDash .qs-title{font-size:15px!important}',
     '.ops-field-title{font-size:13px!important}',
     '.ops-memo,.ops-stockout{font-size:14px!important;line-height:1.5}',
