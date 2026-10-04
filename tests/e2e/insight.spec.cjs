@@ -1648,7 +1648,7 @@ test('販売数入力の平日・日祝平均は保存済み通常日を分類�
     paddingBottom:getComputedStyle(card).paddingBottom,
     titleMarginBottom:getComputedStyle(card.querySelector('h3')).marginBottom
   }));
-  expect(spacing).toEqual({paddingBottom:'8px',titleMarginBottom:'6px'});
+  expect(spacing).toEqual({paddingBottom:'12px',titleMarginBottom:'8px'});
   await weekday.scrollIntoViewIfNeeded();
   await expect(weekday).toBeVisible();
   await page.screenshot({path:'test-results/day-type-averages-desktop.png',fullPage:true});
