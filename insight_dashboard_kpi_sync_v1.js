@@ -79,7 +79,9 @@
 
   function stripCardMeta(){
     var row=document.getElementById('kpiRow');if(!row)return;
-    row.querySelectorAll('.kpi-label>span,.kpi-prev').forEach(function(node){node.remove();});
+    row.querySelectorAll('.kpi-label>span,.kpi-prev').forEach(function(node){
+      if(node&&node.parentNode)node.parentNode.removeChild(node);
+    });
   }
 
   function cardByLabel(label){

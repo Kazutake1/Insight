@@ -50,10 +50,11 @@ test('AI表示CSSはIndexの文字列置換ではなくpresentation moduleが所
 test('ダッシュボードKPIカードは補助月表示と年比ラベルを削除し数値バッジを維持する',()=>{
   const index=read('Index.html');
   const sync=read('insight_dashboard_kpi_sync_v1.js');
-  assert.match(index,/insight_dashboard_kpi_sync_v1\.js\?v=20261005-compact-cards-2/);
+  assert.match(index,/insight_dashboard_kpi_sync_v1\.js\?v=20261005-compact-cards-3/);
   assert.match(sync,/box\.append\(badge\);card\.appendChild\(box\)/);
   assert.match(sync,/function stripCardMeta\(\)/);
   assert.match(sync,/querySelectorAll\('\.kpi-label>span,\.kpi-prev'\)/);
+  assert.match(sync,/if\(node&&node\.parentNode\)node\.parentNode\.removeChild\(node\)/);
   assert.doesNotMatch(sync,/prev\.textContent=String\(compareYear\)\+'年比'/);
   assert.match(sync,/badge\.textContent=\(display\.up\?'▲':'▼'\)\+' '\+display\.text/);
 });
