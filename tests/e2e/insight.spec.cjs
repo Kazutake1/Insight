@@ -1635,7 +1635,7 @@ test('販売数入力の平日・日祝平均は保存済み通常日を分類�
   await expect(page.locator('#scAnalysis h3',{hasText:'セール日平均'})).toHaveCount(0);
   await expect(page.locator('#scAnalysis h3',{hasText:'同曜日・通常日平均'})).toHaveCount(0);
   await expect(page.locator('#scAnalysis .sc-day-type-note')).toHaveCount(0);
-  await expect(cards).not.toContainText('選択月の保存済み実績');
+  expect(await page.locator('#scAnalysis').innerText()).not.toContain('選択月の保存済み実績');
   const weekday=cards.nth(0),holiday=cards.nth(1);
   await expect(weekday).toHaveClass(/sc-day-type-card/);
   await expect(holiday).toHaveClass(/sc-day-type-card/);
