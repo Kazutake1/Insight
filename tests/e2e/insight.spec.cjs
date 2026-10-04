@@ -1608,3 +1608,57 @@ test('分析AIは結論・重要ポイント・関連性・次に確認するこ
   await expect(page.locator('#aiAnalysisChecks .ai-check-line')).not.toHaveCount(0);
   expect(errors).toEqual([]);
 });
+
+test('販売数入力の平日・日祝平均は保存済み通常日を分類し既存カードを保持する',async({page})=>{
+  const errors=await openInsight(page);
+  await page.locator('#navSalesCount').click();
+  await page.evaluate(()=>{
+    store.years=Array.from(new Set(store.years.concat(['2026'])));
+    const categoryId=allStores.salesCountManagement.categories.find(c=>!c.hidden).id;
+    store.salesCounts={};
+    const values={'01':10,'05':20,'06':30,'20':0,'21':40,'22':500,'23':600,'27':700};
+    Object.entries(values).forEach(([day,value])=>{
+      store.salesCounts['2026-09-'+day]={[categoryId]:{trips:[0,1,2].map(()=>({delivery:value,sales:value}))}};
+    });
+    store.salesCounts['2026-09-03']={[categoryId]:{trips:[{delivery:0,sales:0},{delivery:null,sales:null},{delivery:0,sales:0}]}};
+    store.salesCounts['2026-08-31']={[categoryId]:{trips:[0,1,2].map(()=>({delivery:999,sales:999}))}};
+    allStores.eventManagement=allStores.eventManagement||{version:1,presets:[],events:[]};
+    allStores.eventManagement.events=[{id:'unrelated-sale',type:'sale',scope:'global',startDate:'2026-09-22',endDate:'2026-09-22',snapshot:{version:1,note:'',title:'別カテゴリー',sale:{categoryId:'cat_other',category:'その他',method:'amount',params:{amount:20}}}}];
+    store.events=[{id:'local-special',type:'special',scope:'store',startDate:'2026-09-23',endDate:'2026-09-23',snapshot:{version:1,note:'',title:'催事'}},{id:'local-nearby',type:'nearby',scope:'store',startDate:'2026-09-27',endDate:'2026-09-27',snapshot:{version:1,note:'',title:'近隣イベント'}}];
+    InsightSalesCount.setPeriod(2026,9);
+    InsightSalesCount.reloadFromStore();
+  });
+  const cards=page.locator('#scAnalysis .sc-comparisons > section');
+  await expect(cards).toHaveCount(4);
+  await expect(cards.locator('h3')).toHaveText(['セール日平均','同曜日・通常日平均','平日平均','日曜日・祝日平均']);
+  const weekday=cards.nth(2),holiday=cards.nth(3);
+  await expect(weekday.locator('thead th')).toHaveText(['','1便','2便','3便','1日合計']);
+  for(const row of [0,1]){
+    await expect(weekday.locator('tbody tr').nth(row).locator('td')).toHaveText(['10','15','10','45']);
+    await expect(holiday.locator('tbody tr').nth(row).locator('td')).toHaveText(['23.3','23.3','23.3','70']);
+  }
+  await expect(weekday).toHaveClass('sc-card');
+  await expect(holiday).toContainText('日曜または祝日');
+  await weekday.scrollIntoViewIfNeeded();
+  await expect(weekday).toBeVisible();
+  await page.screenshot({path:'test-results/day-type-averages-desktop.png',fullPage:true});
+  await page.getByLabel('2026-09-01 1便 販売数',{exact:true}).fill('100');
+  await expect(weekday.locator('tbody tr').nth(1).locator('td')).toHaveText(['10','15','10','45']);
+  await page.locator('#scSave').click();
+  await expect(weekday.locator('tbody tr').nth(1).locator('td')).toHaveText(['40','15','10','90']);
+  await page.evaluate(()=>{
+    const category=allStores.salesCountManagement.categories.find(c=>!c.hidden);
+    category.activeTrips=[false,true,true];
+    InsightSalesCount.reloadFromStore();
+  });
+  await expect(weekday.locator('tbody tr').nth(1).locator('td')).toHaveText(['ー','15','10','30']);
+  await page.setViewportSize({width:768,height:1024});
+  await holiday.scrollIntoViewIfNeeded();
+  expect(await page.locator('#scAnalysis .sc-comparisons').evaluate(n=>getComputedStyle(n).gridTemplateColumns.split(' ').length)).toBe(1);
+  await page.screenshot({path:'test-results/day-type-averages-tablet.png',fullPage:true});
+  await page.locator('#scCategory').selectOption('cat_sandwich');
+  await expect(weekday.locator('tbody tr').nth(1).locator('td')).toHaveText(['—','—','—','—']);
+  await page.locator('#scNext').click();
+  await expect(holiday.locator('tbody tr').nth(1).locator('td')).toHaveText(['—','—','—','—']);
+  expect(errors).toEqual([]);
+});
