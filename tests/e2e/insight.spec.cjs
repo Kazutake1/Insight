@@ -640,6 +640,15 @@ test('セール実績は内容別に表示し開催回ごとに行を分けて7�
   await expect(page.locator('#pageSaleResults')).toHaveClass(/show/);
   await expect(page.locator('.sr-group')).toHaveCount(1);
   await expect(page.locator('.sr-group-head h2')).toContainText('おにぎり 20円引き');
+  const saleTypography=await page.locator('.sr-group').first().evaluate(group=>({
+    heading:getComputedStyle(group.querySelector('.sr-group-head h2')).fontSize,
+    statLabel:getComputedStyle(group.querySelector('.sr-stat span')).fontSize,
+    statValue:getComputedStyle(group.querySelector('.sr-stat strong')).fontSize
+  }));
+  expect(saleTypography).toEqual({heading:'17px',statLabel:'12px',statValue:'16px'});
+  await expect(page.locator('.sr-group-stats .sr-stat')).toHaveCount(4);
+  await expect(page.locator('.sr-group-stats .sr-stat').nth(0)).toContainText('開催日数');
+  await expect(page.locator('.sr-group-stats .sr-stat').nth(3)).toContainText('消化率');
   await expect(page.locator('.sr-group .sr-day-grid')).toHaveCount(2);
   await expect(page.locator('.sr-group .sr-day-grid').nth(0).locator('.sc-day')).toHaveCount(8);
   await expect(page.locator('.sr-group .sr-day-grid').nth(1).locator('.sc-day')).toHaveCount(3);
@@ -1043,9 +1052,21 @@ test('イベント実績は過去開催→複数日→時間帯グラフ→カ�
   await expect(page.locator('.er-occurrence').first()).toContainText('9/13');
   await expect(page.locator('.er-occurrence').first()).toContainText('売上 226千円');
   await expect(page.locator('.er-occurrence').first()).toContainText('客数 205人');
+  const eventHistoryTypography=await page.locator('.er-occurrence').first().evaluate(card=>({
+    date:getComputedStyle(card.querySelector('.er-occurrence-date')).fontSize,
+    metrics:getComputedStyle(card.querySelector('.er-occurrence-metrics')).fontSize
+  }));
+  expect(eventHistoryTypography).toEqual({date:'14px',metrics:'13px'});
 
   await page.locator('.er-occurrence').first().click();
   await expect(page.locator('.er-overview-grid .er-summary-card')).toHaveCount(2);
+  const eventDetailTypography=await page.evaluate(()=>({
+    detailTitle:getComputedStyle(document.querySelector('.er-detail-title h2')).fontSize,
+    sectionTitle:getComputedStyle(document.querySelector('.er-sales-section > h2')).fontSize,
+    metricLabel:getComputedStyle(document.querySelector('.er-overview-grid .er-summary-card span')).fontSize,
+    metricValue:getComputedStyle(document.querySelector('.er-overview-grid .er-summary-card strong')).fontSize
+  }));
+  expect(eventDetailTypography).toEqual({detailTitle:'20px',sectionTitle:'17px',metricLabel:'12.5px',metricValue:'18px'});
   await expect(page.locator('.er-overview-grid .er-summary-card').first()).toContainText('226千円');
   await expect(page.locator('.er-overview-grid')).not.toContainText('客単価');
   await expect(page.locator('.er-overview-grid')).not.toContainText('買上点数');
@@ -1113,6 +1134,12 @@ test('イベント実績は過去開催→複数日→時間帯グラフ→カ�
   await expect(page.locator('.er-demand-card').first()).toContainText('52');
   await expect(page.locator('.er-demand-card').first()).toContainText('86.7%');
   await expect(page.locator('.er-demand-card').first()).toContainText('前回：用意 50　販売 45　消化率 90.0%');
+  const cardTypography=await page.evaluate(()=>({
+    category:getComputedStyle(document.querySelector('.er-category-card > h3')).fontSize,
+    demand:getComputedStyle(document.querySelector('.er-demand-card > h3')).fontSize,
+    previous:getComputedStyle(document.querySelector('.er-demand-previous')).fontSize
+  }));
+  expect(cardTypography).toEqual({category:'14px',demand:'14.5px',previous:'12px'});
 
   await page.locator('.er-day-tab').nth(1).click();
   await expect(page.locator('.er-day-tab').nth(1)).toHaveClass(/active/);
