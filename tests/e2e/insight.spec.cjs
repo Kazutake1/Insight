@@ -577,25 +577,38 @@ test('分析AIの上端は左サイドバーの上端と揃う',async({page})=>{
   expect(errors).toEqual([]);
 });
 
-test('セール実績は内容別に表示し販売数入力と同じカードを7枚ごとに折り返す',async({page})=>{
+test('セール実績は内容別に表示し開催回ごとに行を分けて7枚ごとに折り返す',async({page})=>{
   const errors=await openInsight(page);
 
   await page.evaluate(()=>{
     const categoryId='cat_onigiri';
     const storeId=allStores.current;
     if(!allStores.eventManagement)allStores.eventManagement={version:1,presets:[],events:[]};
-    allStores.eventManagement.events=(allStores.eventManagement.events||[]).filter(e=>e.id!=='e2e_sale_results');
-    allStores.eventManagement.events.push({
-      id:'e2e_sale_results',
-      type:'sale',
-      scope:'global',
-      startDate:'2026-09-01',
-      endDate:'2026-09-08',
-      snapshot:{
-        title:'E2Eおにぎりセール',
-        sale:{categoryId,category:'おにぎり',method:'amount',params:{amount:20}}
+    allStores.eventManagement.events=(allStores.eventManagement.events||[]).filter(e=>!String(e.id||'').startsWith('e2e_sale_results'));
+    allStores.eventManagement.events.push(
+      {
+        id:'e2e_sale_results_sep',
+        type:'sale',
+        scope:'global',
+        startDate:'2026-09-01',
+        endDate:'2026-09-08',
+        snapshot:{
+          title:'E2Eおにぎりセール',
+          sale:{categoryId,category:'おにぎり',method:'amount',params:{amount:20}}
+        }
+      },
+      {
+        id:'e2e_sale_results_aug',
+        type:'sale',
+        scope:'global',
+        startDate:'2026-08-20',
+        endDate:'2026-08-22',
+        snapshot:{
+          title:'E2Eおにぎりセール',
+          sale:{categoryId,category:'おにぎり',method:'amount',params:{amount:20}}
+        }
       }
-    });
+    );
     const store=allStores.stores[storeId];
     if(!store.salesCounts)store.salesCounts={};
     for(let day=1;day<=8;day++){
@@ -609,6 +622,17 @@ test('セール実績は内容別に表示し販売数入力と同じカード�
         ]
       };
     }
+    for(let day=20;day<=22;day++){
+      const date='2026-08-'+String(day).padStart(2,'0');
+      store.salesCounts[date]=store.salesCounts[date]||{};
+      store.salesCounts[date][categoryId]={
+        trips:[
+          {delivery:30+day,sales:26+day},
+          {delivery:35+day,sales:31+day},
+          {delivery:40+day,sales:36+day}
+        ]
+      };
+    }
     window.InsightSaleResults.render();
   });
 
@@ -616,25 +640,30 @@ test('セール実績は内容別に表示し販売数入力と同じカード�
   await expect(page.locator('#pageSaleResults')).toHaveClass(/show/);
   await expect(page.locator('.sr-group')).toHaveCount(1);
   await expect(page.locator('.sr-group-head h2')).toContainText('おにぎり 20円引き');
-  await expect(page.locator('.sr-group .sc-day')).toHaveCount(8);
+  await expect(page.locator('.sr-group .sr-day-grid')).toHaveCount(2);
+  await expect(page.locator('.sr-group .sr-day-grid').nth(0).locator('.sc-day')).toHaveCount(8);
+  await expect(page.locator('.sr-group .sr-day-grid').nth(1).locator('.sc-day')).toHaveCount(3);
+  await expect(page.locator('.sr-group .sc-day')).toHaveCount(11);
   const saleResultTotalFont=await page.locator('.sr-group .sc-totals b').first().evaluate(el=>getComputedStyle(el).fontSize);
   expect(saleResultTotalFont).toBe('14px');
 
   const layout=await page.evaluate(()=>{
-    const cards=Array.from(document.querySelectorAll('.sr-group .sc-day'));
-    const saleCard=cards[0];
+    const grids=Array.from(document.querySelectorAll('.sr-group .sr-day-grid'));
+    const firstCards=Array.from(grids[0].querySelectorAll('.sc-day'));
+    const secondCards=Array.from(grids[1].querySelectorAll('.sc-day'));
+    const saleCard=firstCards[0];
     const inputCard=document.querySelector('#scCalendar .sc-day:not(.empty)');
-    const grid=document.querySelector('.sr-day-grid');
-    const gridRect=grid.getBoundingClientRect();
-    const seventhRect=cards[6].getBoundingClientRect();
+    const gridRect=grids[0].getBoundingClientRect();
+    const seventhRect=firstCards[6].getBoundingClientRect();
     return {
-      firstTop:cards[0].getBoundingClientRect().top,
+      firstTop:firstCards[0].getBoundingClientRect().top,
       seventhTop:seventhRect.top,
-      eighthTop:cards[7].getBoundingClientRect().top,
+      eighthTop:firstCards[7].getBoundingClientRect().top,
+      secondOccurrenceTop:secondCards[0].getBoundingClientRect().top,
       seventhRight:seventhRect.right,
       gridRight:gridRect.right,
-      gridScrollWidth:grid.scrollWidth,
-      gridClientWidth:grid.clientWidth,
+      gridScrollWidth:grids[0].scrollWidth,
+      gridClientWidth:grids[0].clientWidth,
       saleChildren:Array.from(saleCard.children).map(node=>node.className),
       inputChildren:inputCard?Array.from(inputCard.children).map(node=>node.className):[],
       allReadOnly:Array.from(saleCard.querySelectorAll('input')).every(input=>input.readOnly)
@@ -643,6 +672,7 @@ test('セール実績は内容別に表示し販売数入力と同じカード�
 
   expect(Math.abs(layout.firstTop-layout.seventhTop)).toBeLessThanOrEqual(1);
   expect(layout.eighthTop).toBeGreaterThan(layout.seventhTop+20);
+  expect(layout.secondOccurrenceTop).toBeGreaterThan(layout.eighthTop+20);
   expect(layout.seventhRight).toBeLessThanOrEqual(layout.gridRight+1);
   expect(layout.gridScrollWidth).toBeLessThanOrEqual(layout.gridClientWidth+1);
   expect(layout.saleChildren).toEqual(layout.inputChildren);
