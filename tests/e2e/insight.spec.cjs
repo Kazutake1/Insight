@@ -1148,21 +1148,21 @@ test('イベント実績は過去開催→複数日→時間帯グラフ→カ�
   expect(eventHistoryTypography).toEqual({date:'14px',metrics:'13px'});
 
   await page.locator('.er-occurrence').first().click();
-  const overviewCards=page.locator('.er-overview-grid .er-summary-card');
-  await expect(overviewCards).toHaveCount(4);
-  await expect(overviewCards).toHaveText([
-    /期間売上\s*226千円/,
-    /期間客数\s*205人/,
-    /1日平均売上\s*113千円/,
-    /1日平均客数\s*103人/
-  ]);
-  const overviewColumns=await page.locator('.er-overview-grid').evaluate(el=>getComputedStyle(el).gridTemplateColumns.split(' ').filter(Boolean).length);
-  expect(overviewColumns).toBe(4);
+  const overviewCards=page.locator('.er-overview-grid .er-overview-card');
+  await expect(overviewCards).toHaveCount(2);
+  await expect(overviewCards.nth(0)).toHaveText(/売上\s*期間合計\s*226千円\s*1日平均\s*113千円/);
+  await expect(overviewCards.nth(1)).toHaveText(/客数\s*期間合計\s*205人\s*1日平均\s*103人/);
+  await expect(overviewCards.locator('.er-overview-value')).toHaveCount(4);
+  const overviewLayout=await page.locator('.er-overview-grid').evaluate(el=>({
+    columns:getComputedStyle(el).gridTemplateColumns.split(' ').filter(Boolean).length,
+    innerColumns:getComputedStyle(el.querySelector('.er-overview-values')).gridTemplateColumns.split(' ').filter(Boolean).length
+  }));
+  expect(overviewLayout).toEqual({columns:2,innerColumns:2});
   const eventDetailTypography=await page.evaluate(()=>({
     detailTitle:getComputedStyle(document.querySelector('.er-detail-title h2')).fontSize,
     sectionTitle:getComputedStyle(document.querySelector('.er-sales-section > h2')).fontSize,
-    metricLabel:getComputedStyle(document.querySelector('.er-overview-grid .er-summary-card span')).fontSize,
-    metricValue:getComputedStyle(document.querySelector('.er-overview-grid .er-summary-card strong')).fontSize
+    metricLabel:getComputedStyle(document.querySelector('.er-overview-value span')).fontSize,
+    metricValue:getComputedStyle(document.querySelector('.er-overview-value strong')).fontSize
   }));
   expect(eventDetailTypography).toEqual({detailTitle:'20px',sectionTitle:'17px',metricLabel:'12.5px',metricValue:'18px'});
   await expect(page.locator('.er-overview-grid')).not.toContainText('客単価');
