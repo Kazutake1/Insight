@@ -1631,10 +1631,11 @@ test('販売数入力の平日・日祝平均は保存済み通常日を分類�
   const cards=page.locator('#scAnalysis .sc-comparisons > section');
   await expect(cards).toHaveCount(4);
   await expect(cards.locator('h3')).toHaveText(['セール日平均','同曜日・通常日平均','平日平均','日曜日・祝日平均']);
+  await expect(cards.nth(2)).toContainText('月〜金（祝日を除く）');
   const weekday=cards.nth(2),holiday=cards.nth(3);
   await expect(weekday.locator('thead th')).toHaveText(['','1便','2便','3便','1日合計']);
   for(const row of [0,1]){
-    await expect(weekday.locator('tbody tr').nth(row).locator('td')).toHaveText(['10','15','10','45']);
+    await expect(weekday.locator('tbody tr').nth(row).locator('td')).toHaveText(['5','10','5','30']);
     await expect(holiday.locator('tbody tr').nth(row).locator('td')).toHaveText(['23.3','23.3','23.3','70']);
   }
   await expect(weekday).toHaveClass('sc-card');
@@ -1643,15 +1644,15 @@ test('販売数入力の平日・日祝平均は保存済み通常日を分類�
   await expect(weekday).toBeVisible();
   await page.screenshot({path:'test-results/day-type-averages-desktop.png',fullPage:true});
   await page.getByLabel('2026-09-01 1便 販売数',{exact:true}).fill('100');
-  await expect(weekday.locator('tbody tr').nth(1).locator('td')).toHaveText(['10','15','10','45']);
+  await expect(weekday.locator('tbody tr').nth(1).locator('td')).toHaveText(['5','10','5','30']);
   await page.locator('#scSave').click();
-  await expect(weekday.locator('tbody tr').nth(1).locator('td')).toHaveText(['40','15','10','90']);
+  await expect(weekday.locator('tbody tr').nth(1).locator('td')).toHaveText(['50','10','5','120']);
   await page.evaluate(()=>{
     const category=allStores.salesCountManagement.categories.find(c=>!c.hidden);
     category.activeTrips=[false,true,true];
     InsightSalesCount.reloadFromStore();
   });
-  await expect(weekday.locator('tbody tr').nth(1).locator('td')).toHaveText(['ー','15','10','30']);
+  await expect(weekday.locator('tbody tr').nth(1).locator('td')).toHaveText(['ー','10','5','20']);
   await page.setViewportSize({width:768,height:1024});
   await holiday.scrollIntoViewIfNeeded();
   expect(await page.locator('#scAnalysis .sc-comparisons').evaluate(n=>getComputedStyle(n).gridTemplateColumns.split(' ').length)).toBe(1);
