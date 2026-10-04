@@ -445,7 +445,7 @@ test('イベント実績は過去開催・日付カード・時間帯グラフ�
   const eventResults=read('insight_event_results_v1.js');
   const events=read('insight_events_v1.js');
   assert.match(index,/insight_events_v1\.js\?v=20261004-special-demand/);
-  assert.match(index,/insight_event_results_v1\.js\?v=20261004-readable-type/);
+  assert.match(index,/insight_event_results_v1\.js\?v=20261004-title-top/);
   assert.ok(index.indexOf('insight_analysis_context_v1.js')<index.indexOf('insight_event_results_v1.js'));
   assert.ok(index.indexOf('insight_event_results_v1.js')<index.indexOf('insight_daily_anomaly_v1.js'));
   assert.match(eventResults,/過去開催一覧/);
@@ -530,7 +530,7 @@ test('セール実績ページは販売数入力直後に読み込み同一日�
   const saleResults=read('insight_sale_results_v1.js');
   const sales=read('insight_sales_count_v1.js');
   assert.match(index,/insight_sales_count_v1\.js\?v=20261004-daytype-spacing/);
-  assert.match(index,/insight_sale_results_v1\.js\?v=20261004-readable-type/);
+  assert.match(index,/insight_sale_results_v1\.js\?v=20261004-title-top/);
   assert.ok(index.indexOf('insight_sales_count_v1.js')<index.indexOf('insight_sale_results_v1.js'));
   assert.ok(index.indexOf('insight_sale_results_v1.js')<index.indexOf('insight_page_period_sync_v1.js'));
   assert.match(saleResults,/id='navSaleResults'|nav\.id='navSaleResults'/);
@@ -546,6 +546,7 @@ test('セール実績ページは販売数入力直後に読み込み同一日�
   assert.match(saleResults,/\['消化率',group\.sellThrough/);
   assert.match(saleResults,/\.sr-stat span\{[^}]*font-size:12px/);
   assert.match(saleResults,/\.sr-stat strong\{[^}]*font-size:16px/);
+  assert.match(saleResults,/\.sr-group-head\{[^}]*align-items:flex-start/);
   assert.match(saleResults,/\.sr-group-head h2\{[^}]*font-size:17px/);
   assert.match(saleResults,/\.sr-list-table\{[^}]*font-size:12\.5px/);
   assert.match(saleResults,/\.sr-day-grid>\.sc-day\{min-width:0\}/);
@@ -690,7 +691,7 @@ test('販売数カテゴリーの対象便設定を全関連層で共有する',
   const saleResults=read('insight_sale_results_v1.js');
   const pageAI=read('insight_ai_page_comments_v1.js');
   assert.match(index,/insight_sales_count_v1\.js\?v=20261004-daytype-spacing/);
-  assert.match(index,/insight_sale_results_v1\.js\?v=20261004-readable-type/);
+  assert.match(index,/insight_sale_results_v1\.js\?v=20261004-title-top/);
   assert.match(index,/insight_analysis_context_v1\.js\?v=20261004-special-demand/);
   assert.match(index,/insight_ai_page_comments_v1\.js\?v=20261001-decision-analysis/);
   assert.match(sales,/activeTrips:\[true,true,true\]/);

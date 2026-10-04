@@ -715,12 +715,23 @@ test('セール実績は内容別に表示し開催回ごとに行を分けて7�
   await expect(page.locator('#pageSaleResults')).toHaveClass(/show/);
   await expect(page.locator('.sr-group')).toHaveCount(1);
   await expect(page.locator('.sr-group-head h2')).toContainText('おにぎり 20円引き');
-  const saleTypography=await page.locator('.sr-group').first().evaluate(group=>({
-    heading:getComputedStyle(group.querySelector('.sr-group-head h2')).fontSize,
-    statLabel:getComputedStyle(group.querySelector('.sr-stat span')).fontSize,
-    statValue:getComputedStyle(group.querySelector('.sr-stat strong')).fontSize
-  }));
-  expect(saleTypography).toEqual({heading:'17px',statLabel:'12px',statValue:'16px'});
+  const saleTypography=await page.locator('.sr-group').first().evaluate(group=>{
+    const heading=group.querySelector('.sr-group-head h2');
+    const stats=group.querySelector('.sr-group-stats');
+    return {
+      heading:getComputedStyle(heading).fontSize,
+      statLabel:getComputedStyle(group.querySelector('.sr-stat span')).fontSize,
+      statValue:getComputedStyle(group.querySelector('.sr-stat strong')).fontSize,
+      headAlignItems:getComputedStyle(group.querySelector('.sr-group-head')).alignItems,
+      headingTop:heading.getBoundingClientRect().top,
+      statsTop:stats.getBoundingClientRect().top
+    };
+  });
+  expect(saleTypography.heading).toBe('17px');
+  expect(saleTypography.statLabel).toBe('12px');
+  expect(saleTypography.statValue).toBe('16px');
+  expect(saleTypography.headAlignItems).toBe('flex-start');
+  expect(Math.abs(saleTypography.headingTop-saleTypography.statsTop)).toBeLessThanOrEqual(1);
   await expect(page.locator('.sr-group-stats .sr-stat')).toHaveCount(4);
   await expect(page.locator('.sr-group-stats .sr-stat').nth(0)).toContainText('開催日数');
   await expect(page.locator('.sr-group-stats .sr-stat').nth(3)).toContainText('消化率');
