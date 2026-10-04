@@ -987,8 +987,8 @@ test('イベント実績は過去開催→複数日→時間帯グラフ→カ�
     const store=allStores.stores[storeId];
     store.events=(store.events||[]).filter(event=>!String(event.id||'').startsWith('e2e_event_results_'));
     store.events.push(
-      {id:'e2e_event_results_old',type:'nearby',scope:'store',startDate:'2025-09-10',endDate:'2025-09-10',snapshot:{version:1,title:'E2Eコンサート',note:'前年',location:'E2E文化フォーラム'}},
-      {id:'e2e_event_results_new',type:'nearby',scope:'store',startDate:'2026-09-12',endDate:'2026-09-13',snapshot:{version:1,title:'E2Eコンサート',note:'2日開催',location:'E2E文化フォーラム'}}
+      {id:'e2e_event_results_old',type:'nearby',scope:'store',startDate:'2025-09-10',endDate:'2025-09-10',snapshot:{version:1,title:'E2Eコンサート',note:'前年',location:'E2E文化フォーラム',specialDemand:[{id:'dmd_e2e_ice',name:'低価格アイス',prepared:50,sold:45}]}},
+      {id:'e2e_event_results_new',type:'nearby',scope:'store',startDate:'2026-09-12',endDate:'2026-09-13',snapshot:{version:1,title:'E2Eコンサート',note:'2日開催',location:'E2E文化フォーラム',specialDemand:[{id:'dmd_e2e_ice',name:'低価格アイス',prepared:60,sold:52},{id:'dmd_e2e_drink',name:'冷たい飲料',prepared:40,sold:35}]}}
     );
 
     function metricsFor(date){
@@ -1106,6 +1106,13 @@ test('イベント実績は過去開催→複数日→時間帯グラフ→カ�
   expect(eventTotalFont).toBe('14px');
   const readOnly=await page.locator('.er-category-card input').evaluateAll(inputs=>inputs.every(input=>input.readOnly));
   expect(readOnly).toBe(true);
+  await expect(page.locator('.er-demand-section')).toBeVisible();
+  await expect(page.locator('.er-demand-card')).toHaveCount(2);
+  await expect(page.locator('.er-demand-card').first()).toContainText('低価格アイス');
+  await expect(page.locator('.er-demand-card').first()).toContainText('60');
+  await expect(page.locator('.er-demand-card').first()).toContainText('52');
+  await expect(page.locator('.er-demand-card').first()).toContainText('86.7%');
+  await expect(page.locator('.er-demand-card').first()).toContainText('前回：用意 50　販売 45　消化率 90.0%');
 
   await page.locator('.er-day-tab').nth(1).click();
   await expect(page.locator('.er-day-tab').nth(1)).toHaveClass(/active/);
@@ -1167,6 +1174,63 @@ test('イベント実績の催事は場所選択なしで過去開催を参照�
   expect(errors).toEqual([]);
 });
 
+test('よく使うイベントの特需商品は自由名で登録・編集でき次回開催へ自動継承する',async({page})=>{
+  const errors=await openInsight(page);
+  await page.locator('#nav0').click();
+  await page.evaluate(()=>{
+    const store=allStores.stores[allStores.current];
+    store.events=(store.events||[]).filter(event=>!(event.type==='nearby'&&event.snapshot&&event.snapshot.title==='E2E夏祭り'));
+    if(!allStores.eventManagement)allStores.eventManagement={version:1,presets:[],events:[]};
+    allStores.eventManagement.nearbyPresets=(allStores.eventManagement.nearbyPresets||[]).filter(item=>item.snapshot&&item.snapshot.title!=='E2E夏祭り');
+  });
+
+  await page.getByRole('button',{name:'＋イベントを追加'}).click();
+  let eventDialog=page.locator('.ie-dialog.ie-event-add');
+  await eventDialog.getByLabel('イベント種別').selectOption('nearby');
+  await expect(eventDialog.getByText('よく使うイベント',{exact:true})).toBeVisible();
+  await eventDialog.getByRole('button',{name:'編集'}).click();
+
+  let presetDialog=page.locator('.ie-dialog.ie-preset-editor').last();
+  await expect(presetDialog.getByRole('heading',{name:'よく使うイベントを編集'})).toBeVisible();
+  await presetDialog.getByRole('button',{name:'＋よく使うイベントを追加'}).click();
+  await presetDialog.getByLabel('イベント場所').fill('E2E文化フォーラム');
+  await presetDialog.getByLabel('イベント名').fill('E2E夏祭り');
+  await presetDialog.locator('.ie-demand-editor').getByRole('button',{name:'＋追加'}).click();
+  await presetDialog.locator('.ie-demand-row').first().getByLabel('名称').fill('低価格アイス');
+  await presetDialog.getByRole('button',{name:'保存する'}).click();
+  await expect(presetDialog.getByText('E2E夏祭り（E2E文化フォーラム）',{exact:true})).toBeVisible();
+  await presetDialog.getByRole('button',{name:'閉じる'}).click();
+
+  eventDialog=page.locator('.ie-dialog.ie-event-add');
+  await eventDialog.getByRole('button',{name:'E2E夏祭り'}).click();
+  await expect(eventDialog.getByLabel('イベント場所')).toHaveValue('E2E文化フォーラム');
+  await expect(eventDialog.getByLabel('イベント名')).toHaveValue('E2E夏祭り');
+  await expect(eventDialog.locator('.ie-demand-row')).toHaveCount(1);
+  await expect(eventDialog.locator('.ie-demand-row').first().getByLabel('名称')).toHaveValue('低価格アイス');
+  await eventDialog.locator('.ie-demand-row').first().getByLabel('用意数').fill('60');
+  await eventDialog.locator('.ie-demand-row').first().getByLabel('販売数').fill('52');
+  await eventDialog.locator('.ie-demand-editor').getByRole('button',{name:'＋追加'}).click();
+  await eventDialog.locator('.ie-demand-row').nth(1).getByLabel('名称').fill('氷');
+  await eventDialog.locator('.ie-demand-row').nth(1).getByLabel('用意数').fill('30');
+  await eventDialog.locator('.ie-demand-row').nth(1).getByLabel('販売数').fill('27');
+  await eventDialog.getByRole('button',{name:'登録する'}).click();
+  await expect(eventDialog).toHaveCount(0);
+
+  await page.getByRole('button',{name:'＋イベントを追加'}).click();
+  eventDialog=page.locator('.ie-dialog.ie-event-add');
+  await eventDialog.getByLabel('イベント種別').selectOption('nearby');
+  await eventDialog.getByRole('button',{name:'E2E夏祭り'}).click();
+  await expect(eventDialog.locator('.ie-demand-row')).toHaveCount(2);
+  await expect(eventDialog.locator('.ie-demand-row').nth(0).getByLabel('名称')).toHaveValue('低価格アイス');
+  await expect(eventDialog.locator('.ie-demand-row').nth(1).getByLabel('名称')).toHaveValue('氷');
+  await expect(eventDialog.locator('.ie-demand-row').nth(0).getByLabel('用意数')).toHaveValue('');
+  await expect(eventDialog.locator('.ie-demand-row').nth(0).getByLabel('販売数')).toHaveValue('');
+  await eventDialog.locator('.ie-demand-row').nth(1).getByRole('button',{name:'削除'}).click();
+  await expect(eventDialog.locator('.ie-demand-row')).toHaveCount(1);
+  await eventDialog.getByRole('button',{name:'キャンセル'}).click();
+  expect(errors).toEqual([]);
+});
+
 test('よく使う催事を登録して選択でき、同名同期間は重複警告する',async({page})=>{
   const errors=await openInsight(page);
   await page.locator('#nav0').click();
@@ -1188,6 +1252,8 @@ test('よく使う催事を登録して選択でき、同名同期間は重複�
   await presetDialog.getByRole('button',{name:'＋よく使う催事を追加'}).click();
   await presetDialog.getByLabel('催事名').fill('E2E催事');
   await presetDialog.getByLabel('補足（任意）').fill('毎年確認');
+  await presetDialog.locator('.ie-demand-editor').getByRole('button',{name:'＋追加'}).click();
+  await presetDialog.locator('.ie-demand-row').first().getByLabel('名称').fill('羊羹');
   await presetDialog.getByRole('button',{name:'保存する'}).click();
   await expect(presetDialog.getByText('E2E催事',{exact:true})).toBeVisible();
   await presetDialog.getByRole('button',{name:'閉じる'}).click();
@@ -1197,6 +1263,8 @@ test('よく使う催事を登録して選択でき、同名同期間は重複�
   await eventDialog.getByRole('button',{name:'E2E催事'}).click();
   await expect(eventDialog.getByLabel('催事名')).toHaveValue('E2E催事');
   await expect(eventDialog.getByLabel('補足（任意）')).toHaveValue('毎年確認');
+  await expect(eventDialog.locator('.ie-demand-row')).toHaveCount(1);
+  await expect(eventDialog.locator('.ie-demand-row').first().getByLabel('名称')).toHaveValue('羊羹');
   await eventDialog.getByRole('button',{name:'登録する'}).click();
   await expect(eventDialog).toHaveCount(0);
 
