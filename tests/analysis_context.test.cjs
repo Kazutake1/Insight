@@ -86,7 +86,7 @@ function setup(){
         scope:'store',
         startDate:'2026-10-02',
         endDate:'2026-10-02',
-        snapshot:{title:'地域イベント',note:'駅前',version:1}
+        snapshot:{title:'地域イベント',note:'駅前',version:1,specialDemand:[{id:'dmd_ice',name:'低価格アイス',prepared:60,sold:52}]}
       };
       return event.startDate<=end&&event.endDate>=start?[event]:[];
     },
@@ -144,6 +144,7 @@ test('月次contextはKPI・条件・イベント・販売納品・利益コス�
   assert.equal(ctx.conditions.daily[1].holiday,true);
   assert.deepEqual(ctx.conditions.daily[1].eventIds,['evt1']);
   assert.equal(ctx.conditions.events[0].summary,'地域イベント');
+  assert.deepEqual(ctx.conditions.events[0].specialDemand,[{id:'dmd_ice',name:'低価格アイス',prepared:60,sold:52,sellThrough:52/60*100}]);
 
   const onigiri=ctx.salesCount.categories.find(c=>c.id==='cat_onigiri');
   assert.equal(onigiri.inputDays,2);
