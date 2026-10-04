@@ -1086,7 +1086,7 @@ test('イベント実績は過去開催→複数日→時間帯グラフ→カ�
   const hourlyBarColor=await page.locator('.er-hour-bar').first().evaluate(el=>getComputedStyle(el).backgroundColor);
   expect(hourlyBarColor).toBe('rgb(59, 130, 246)');
   const timeFontSize=await page.locator('.er-hour-item>span').first().evaluate(el=>getComputedStyle(el).fontSize);
-  expect(timeFontSize).toBe('11.5px');
+  expect(timeFontSize).toBe('13px');
   const hourlyGap=await page.locator('.er-hour-chart').evaluate(el=>getComputedStyle(el).gap);
   expect(hourlyGap).toBe('4px');
   await expect(page.locator('.er-hour-plot').nth(18)).toHaveAttribute('aria-label','18時台 186人');
