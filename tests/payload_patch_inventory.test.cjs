@@ -445,7 +445,7 @@ test('イベント実績は過去開催・日付カード・時間帯グラフ�
   const eventResults=read('insight_event_results_v1.js');
   const events=read('insight_events_v1.js');
   assert.match(index,/insight_events_v1\.js\?v=20261004-special-demand/);
-  assert.match(index,/insight_event_results_v1\.js\?v=20261004-day-cards/);
+  assert.match(index,/insight_event_results_v1\.js\?v=20261004-period-averages/);
   assert.ok(index.indexOf('insight_analysis_context_v1.js')<index.indexOf('insight_event_results_v1.js'));
   assert.ok(index.indexOf('insight_event_results_v1.js')<index.indexOf('insight_daily_anomaly_v1.js'));
   assert.match(eventResults,/過去開催一覧/);
@@ -459,10 +459,15 @@ test('イベント実績は過去開催・日付カード・時間帯グラフ�
   assert.match(eventResults,/売上 /);
   assert.match(eventResults,/Math\.trunc\(Number\(value\)\/1000\)/);
   assert.match(eventResults,/\+'千円'/);
-  assert.match(eventResults,/summaryMetric\('売上',salesYen\(/);
+  assert.match(eventResults,/summaryMetric\('期間売上',salesYen\(occurrence\.metrics\.salesYen\)\)/);
+  assert.match(eventResults,/summaryMetric\('期間客数',people\(occurrence\.metrics\.customers\)\)/);
+  assert.match(eventResults,/summaryMetric\('1日平均売上',salesYen\(dailyAverage\(occurrence,'salesYen'\)\)\)/);
+  assert.match(eventResults,/summaryMetric\('1日平均客数',people\(dailyAverage\(occurrence,'customers'\)\)\)/);
+  assert.match(eventResults,/function dailyAverage\(occurrence,key\)/);
+  assert.match(eventResults,/finite\(day&&day\.metrics&&day\.metrics\[key\]\)!==null/);
   assert.doesNotMatch(eventResults,/summaryMetric\('客単価'/);
   assert.doesNotMatch(eventResults,/summaryMetric\('買上点数'/);
-  assert.match(eventResults,/grid-template-columns:repeat\(2,minmax\(115px,1fr\)\)/);
+  assert.match(eventResults,/\.er-overview-grid\{[^}]*grid-template-columns:repeat\(4,minmax\(110px,1fr\)\)/);
   assert.match(eventResults,/客数 /);
   assert.match(eventResults,/er-day-tab/);
   assert.doesNotMatch(eventResults,/er-daily-summary|er-daily-grid/);
