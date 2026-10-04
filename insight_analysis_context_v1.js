@@ -178,7 +178,12 @@
         endDate:event.endDate||null,
         title:event.snapshot&&event.snapshot.title||'',
         summary:summary,
-        note:event.snapshot&&event.snapshot.note||''
+        note:event.snapshot&&event.snapshot.note||'',
+        specialDemand:(Array.isArray(event.snapshot&&event.snapshot.specialDemand)?event.snapshot.specialDemand:[]).map(function(item){
+          var prepared=item&&item.prepared!==undefined&&item.prepared!==null?finite(item.prepared):null;
+          var sold=item&&item.sold!==undefined&&item.sold!==null?finite(item.sold):null;
+          return {id:String(item&&item.id||''),name:String(item&&item.name||''),prepared:prepared,sold:sold,sellThrough:prepared!==null&&prepared>0&&sold!==null?sold/prepared*100:null};
+        }).filter(function(item){return item.id&&item.name;})
       };
     });
   }
