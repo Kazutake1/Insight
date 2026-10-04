@@ -1634,15 +1634,21 @@ test('販売数入力の平日・日祝平均は保存済み通常日を分類�
   await expect(page.locator('#scAnalysis h3',{hasText:'セール実績'})).toHaveCount(0);
   await expect(page.locator('#scAnalysis h3',{hasText:'セール日平均'})).toHaveCount(0);
   await expect(page.locator('#scAnalysis h3',{hasText:'同曜日・通常日平均'})).toHaveCount(0);
-  await expect(cards.nth(0)).toContainText('月〜金（祝日を除く）');
+  await expect(page.locator('#scAnalysis .sc-day-type-note')).toHaveCount(0);
+  await expect(cards).not.toContainText('選択月の保存済み実績');
   const weekday=cards.nth(0),holiday=cards.nth(1);
+  await expect(weekday).toHaveClass(/sc-day-type-card/);
+  await expect(holiday).toHaveClass(/sc-day-type-card/);
   await expect(weekday.locator('thead th')).toHaveText(['','1便','2便','3便','1日合計']);
   for(const row of [0,1]){
     await expect(weekday.locator('tbody tr').nth(row).locator('td')).toHaveText(['5','10','5','30']);
     await expect(holiday.locator('tbody tr').nth(row).locator('td')).toHaveText(['23.3','23.3','23.3','70']);
   }
-  await expect(weekday).toHaveClass('sc-card');
-  await expect(holiday).toContainText('日曜または祝日');
+  const spacing=await weekday.evaluate(card=>({
+    paddingBottom:getComputedStyle(card).paddingBottom,
+    titleMarginBottom:getComputedStyle(card.querySelector('h3')).marginBottom
+  }));
+  expect(spacing).toEqual({paddingBottom:'8px',titleMarginBottom:'6px'});
   await weekday.scrollIntoViewIfNeeded();
   await expect(weekday).toBeVisible();
   await page.screenshot({path:'test-results/day-type-averages-desktop.png',fullPage:true});
