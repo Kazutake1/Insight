@@ -85,6 +85,43 @@ test('special presets are optional, global, ordered and survive backup roundtrip
   assert.throws(()=>events.validate(restored),/よく使う催事名が重複/);
 });
 
+test('特需商品は商品名・カテゴリ名を自由入力でき用意数と販売数を履歴に保持する',()=>{
+  const a=data(),snap={version:1,title:'夏祭り',note:'',location:'文化フォーラム',specialDemand:[
+    {id:'dmd_ice',name:'低価格アイス',prepared:60,sold:52},
+    {id:'dmd_protein',name:'プロテイン系',prepared:30,sold:28}
+  ]};
+  events.add(a,'a',{type:'nearby',scope:'store',startDate:'2026-08-01',endDate:'2026-08-01',snapshot:snap});
+  const restored=JSON.parse(JSON.stringify(a));events.validate(restored);
+  assert.deepEqual(events.demandItems(restored.stores.a.events[0].snapshot),snap.specialDemand);
+  const bad=events.copy(snap);bad.specialDemand[0].sold=61;
+  assert.throws(()=>events.validateSnapshot(bad),/販売数は用意数以下/);
+});
+
+test('よく使うイベントの特需商品は開催実績から次回用テンプレートへ同期し過去実績は変えない',()=>{
+  const a=data();
+  a.eventManagement={version:1,presets:[],events:[],nearbyPresets:[
+    {id:'np1',snapshot:{version:1,title:'夏祭り',note:'',location:'文化フォーラム',specialDemand:[{id:'dmd_ice',name:'低価格アイス'}]}}
+  ]};
+  const past={id:'past1',presetId:'np1',type:'nearby',scope:'store',startDate:'2025-08-01',endDate:'2025-08-01',snapshot:{version:1,title:'夏祭り',note:'',location:'文化フォーラム',specialDemand:[{id:'dmd_ice',name:'低価格アイス',prepared:50,sold:45}]}};
+  a.stores.a.events=[events.copy(past)];
+  const current={id:'now1',presetId:'np1',type:'nearby',scope:'store',startDate:'2026-08-01',endDate:'2026-08-01',snapshot:{version:1,title:'夏祭り',note:'',location:'文化フォーラム',specialDemand:[{id:'dmd_ice',name:'低価格アイス',prepared:60,sold:52},{id:'dmd_water',name:'冷たい飲料',prepared:40,sold:35}]}};
+  events.syncDemandPreset(a,current);events.validate(a);
+  assert.deepEqual(events.nearbyPresets(a)[0].snapshot.specialDemand,[{id:'dmd_ice',name:'低価格アイス'},{id:'dmd_water',name:'冷たい飲料'}]);
+  assert.deepEqual(a.stores.a.events[0],past);
+  assert.deepEqual(events.demandTemplate(current.snapshot.specialDemand),[{id:'dmd_ice',name:'低価格アイス'},{id:'dmd_water',name:'冷たい飲料'}]);
+});
+
+test('よく使うイベントはイベント名と場所の組み合わせで重複を防ぐ',()=>{
+  const a=data();
+  a.eventManagement={version:1,presets:[],events:[],nearbyPresets:[
+    {id:'np1',snapshot:{version:1,title:'大会',note:'',location:'文化フォーラム',specialDemand:[]}},
+    {id:'np2',snapshot:{version:1,title:'大会',note:'',location:'市民会館',specialDemand:[]}}
+  ]};
+  assert.doesNotThrow(()=>events.validate(a));
+  a.eventManagement.nearbyPresets.push({id:'np3',snapshot:{version:1,title:'大会',note:'',location:'文化フォーラム',specialDemand:[]}});
+  assert.throws(()=>events.validate(a),/同じイベント名・場所が重複/);
+});
+
 test('same-store special duplicate detection requires same title and exact period',()=>{
   const a=data();
   const id=events.add(a,'a',{type:'special',scope:'store',startDate:'2026-12-24',endDate:'2026-12-25',snapshot:{version:1,title:'クリスマス',note:''}});
