@@ -201,7 +201,7 @@ test('STEP17の文字階層をダッシュボード・入力・販売数・分�
     question:getComputedStyle(document.querySelector('.ai-analysis-question-input')).fontSize
   }));
   expect(aiType).toEqual({cardTitle:'13px',period:'13px',question:'14px'});
-  await page.locator('#aiAnalysisClose').click();
+  await page.locator('.ai-workspace-close').click();
 
   await page.locator('#navSettings').click();
   const settingsType=await page.evaluate(()=>({
