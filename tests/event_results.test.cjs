@@ -10,8 +10,8 @@ function data(){
       a:{
         name:'A',
         events:[
-          {id:'e1',type:'nearby',scope:'store',startDate:'2026-09-10',endDate:'2026-09-11',snapshot:{version:1,title:'秋まつり',note:'',location:'文化フォーラム'}},
-          {id:'e2',type:'nearby',scope:'store',startDate:'2025-09-12',endDate:'2025-09-12',snapshot:{version:1,title:'秋まつり',note:'前年',location:'文化フォーラム'}},
+          {id:'e1',type:'nearby',scope:'store',startDate:'2026-09-10',endDate:'2026-09-11',snapshot:{version:1,title:'秋まつり',note:'',location:'文化フォーラム',specialDemand:[{id:'dmd_ice',name:'低価格アイス',prepared:60,sold:52},{id:'dmd_drink',name:'冷たい飲料',prepared:40,sold:35}]}},
+          {id:'e2',type:'nearby',scope:'store',startDate:'2025-09-12',endDate:'2025-09-12',snapshot:{version:1,title:'秋まつり',note:'前年',location:'文化フォーラム',specialDemand:[{id:'dmd_ice',name:'低価格アイス',prepared:50,sold:45}]}},
           {id:'e3',type:'nearby',scope:'store',startDate:'2026-10-01',endDate:'2026-10-01',snapshot:{version:1,title:'展示会',note:'',location:'市民会館'}},
           {id:'e4',type:'nearby',scope:'store',startDate:'2026-08-01',endDate:'2026-08-01',snapshot:{version:1,title:'旧催事',note:''}},
           {id:'e5',type:'staff',scope:'store',startDate:'2026-09-10',endDate:'2026-09-10',snapshot:{version:1,title:'応援',note:''}},
@@ -46,6 +46,16 @@ test('each registered nearby event remains a separate past occurrence',()=>{
   assert.equal(value.occurrences[0].metrics.customers,221);
   assert.equal(value.occurrences[1].id,'e2');
   assert.deepEqual(value.occurrences[1].days.map(day=>day.date),['2025-09-12']);
+});
+
+test('特需商品は開催回ごとに保持し前回実績と比較できる',()=>{
+  const value=results.collect(data(),'a','文化フォーラム','秋まつり',analysis);
+  const current=value.occurrences[0];
+  assert.deepEqual(current.specialDemand[0],{id:'dmd_ice',name:'低価格アイス',prepared:60,sold:52,sellThrough:52/60*100});
+  const comparison=results.demandComparison(value.occurrences,current);
+  assert.equal(comparison.length,2);
+  assert.deepEqual(comparison[0].previous,{id:'dmd_ice',name:'低価格アイス',prepared:50,sold:45,sellThrough:90});
+  assert.equal(comparison[1].previous,null);
 });
 
 test('period summary recalculates customer unit price from totals',()=>{
