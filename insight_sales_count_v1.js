@@ -43,7 +43,8 @@
       if(eventsForDate(date).length)return;
       var parts=date.split('-').map(Number),wd=new Date(parts[0],parts[1]-1,parts[2]).getDay();
       var holiday=holidayForDate(parts[0],parts[1],parts[2]);
-      groups[wd===0||holiday?'sundayHoliday':'weekday'].push(normalizeRecord(records[date][categoryId]));
+      if(wd===0||holiday)groups.sundayHoliday.push(normalizeRecord(records[date][categoryId]));
+      else if(wd>=1&&wd<=5)groups.weekday.push(normalizeRecord(records[date][categoryId]));
     });
     return groups;
   }
@@ -153,7 +154,7 @@
         return root.InsightEvents.list(allStores,allStores.current,date);
       },function(year,month,day){return typeof isHoliday==='function'&&isHoliday(year,month,day);});
       [
-        {records:groups.weekday,title:'平日平均',note:'月〜土（祝日を除く）'},
+        {records:groups.weekday,title:'平日平均',note:'月〜金（祝日を除く）'},
         {records:groups.sundayHoliday,title:'日曜日・祝日平均',note:'日曜または祝日'}
       ].forEach(function(group){
         var card=comparisonTable(group.records,group.title);
