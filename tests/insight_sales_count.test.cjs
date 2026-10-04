@@ -158,16 +158,16 @@ test('複数値引き条件でも通常カテゴリー実績を一度だけ使�
 });
 
 
-test('日種別平均は選択月・カテゴリーの保存実績から全イベントを除外し土曜を平日に含む',()=>{
+test('日種別平均は選択月・カテゴリーの保存実績から全イベントを除外し土曜を平日平均から除外する',()=>{
   const rec=value=>({trips:[{delivery:value,sales:value},{delivery:value,sales:value},{delivery:value,sales:value}]});
   const records={};
   for(const [date,value] of [['2026-09-01',10],['2026-09-05',20],['2026-09-06',30],['2026-09-21',40],['2026-09-22',50],['2026-09-23',60],['2026-09-27',70],['2026-08-31',900]])records[date]={cat:rec(value)};
   records['2026-09-02']={other:rec(900)};
   const excluded=new Set(['2026-09-22','2026-09-23','2026-09-27']);
   const groups=sales.dayTypeRecords(records,'cat','2026-09',date=>excluded.has(date)?[{type:'sale'}]:[],(y,m,d)=>d===21||d===23);
-  assert.deepEqual(groups.weekday.map(r=>r.trips[0].sales),[10,20]);
+  assert.deepEqual(groups.weekday.map(r=>r.trips[0].sales),[10]);
   assert.deepEqual(groups.sundayHoliday.map(r=>r.trips[0].sales),[30,40]);
-  assert.equal(sales.average(groups.weekday,'sales').total,45);
+  assert.equal(sales.average(groups.weekday,'sales').total,30);
   assert.equal(sales.average(groups.sundayHoliday,'sales').total,105);
   assert.equal(sales.average([],'sales').total,null);
 });
