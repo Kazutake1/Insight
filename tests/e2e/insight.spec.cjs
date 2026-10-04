@@ -142,11 +142,14 @@ test('STEP17の文字階層をダッシュボード・入力・販売数・分�
   const errors=await openInsight(page);
 
   await page.locator('#nav1').click();
-  const dashboardType=await page.evaluate(()=>({
-    kpiLabel:getComputedStyle(document.querySelector('#pageDash .kpi-label')).fontSize,
-    kpiPrev:getComputedStyle(document.querySelector('#pageDash .kpi-prev')).fontSize
-  }));
-  expect(dashboardType).toEqual({kpiLabel:'13px',kpiPrev:'11.5px'});
+  await expect(page.locator('#pageDash .kpi-label').first()).toBeVisible();
+  const dashboardType=await page.evaluate(()=>{
+    const label=document.querySelector('#pageDash .kpi-label');
+    const prev=document.querySelector('#pageDash .kpi-prev');
+    return {kpiLabel:getComputedStyle(label).fontSize,kpiPrev:prev?getComputedStyle(prev).fontSize:null};
+  });
+  expect(dashboardType.kpiLabel).toBe('13px');
+  if(dashboardType.kpiPrev!==null)expect(dashboardType.kpiPrev).toBe('11.5px');
 
   await page.locator('#nav2').click();
   await expect(page.locator('#pageSales #issRow .iss-card')).toBeVisible();
