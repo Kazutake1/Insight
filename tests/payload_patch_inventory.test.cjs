@@ -34,7 +34,9 @@ test('AI表示CSSはIndexの文字列置換ではなくpresentation moduleが所
     '  .ai-analysis-panel{width:92vw;}',
     '.ai-analysis-empty{font-size:12px;line-height:1.7;color:var(--text4);}'
   ]) assert.ok(!index.includes("html=html.replace('"+marker),marker+' がIndexのreplaceに残っています');
+  assert.match(index,/insight_ai_presentation_v1\.js\?v=20261004-remove-hint/);
   assert.match(presentation,/insightAiPresentationStyle/);
+  assert.doesNotMatch(presentation,/数値と要点を優先して表示/);
   assert.match(presentation,/body\.ai-analysis-open #main\{margin-right:0!important\}/);
   assert.match(presentation,/\.ai-analysis-panel\.ai-analysis-workspace/);
   assert.match(presentation,/\.ai-workspace-grid/);

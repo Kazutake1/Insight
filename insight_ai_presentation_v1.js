@@ -176,10 +176,7 @@
     var mainTitle=document.createElement('div');
     mainTitle.className='ai-workspace-section-title';
     mainTitle.textContent='分析サマリー';
-    var mainHint=document.createElement('div');
-    mainHint.className='ai-workspace-section-hint';
-    mainHint.textContent='数値と要点を優先して表示';
-    mainHead.append(mainTitle,mainHint);
+    mainHead.append(mainTitle);
 
     var historyToolbar=document.createElement('section');
     historyToolbar.id='aiHistoryToolbar';
