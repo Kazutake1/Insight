@@ -14,8 +14,9 @@
     '#insightSettingsYearInlineHost:not(:empty){margin-top:10px}',
     '#pageDash .insight-dashboard-year-row{flex-wrap:wrap!important}',
     '#pageDash .insight-dashboard-inline-months{display:contents!important}',
-    '#pageDash .insight-dashboard-inline-months>button{background:#fff!important}',
-    '#pageDash .insight-dashboard-inline-months>button:first-child{margin-left:12px!important}'
+    '#pageDash .insight-dashboard-inline-months>button{background:#fff!important;color:#1a1a1a!important}',
+    '#pageDash .insight-dashboard-inline-months>button:first-child{margin-left:12px!important}',
+    '#pageDash .insight-dashboard-inline-months>button.insight-dashboard-selected-month{border-color:#000!important;color:#1a1a1a!important}'
   ].join('');
   doc.head.appendChild(style);
 
@@ -31,6 +32,15 @@
   function isMonthRow(node){
     var list=directMonthButtons(node);
     return list.length===12&&list.every(function(button,index){return normalized(button)===String(index+1)+'月';});
+  }
+  function selectedMonthLabel(){
+    try{return typeof selMonth!=='undefined'?String(selMonth):'';}catch(_){return '';}
+  }
+  function syncSelectedMonth(node){
+    var selected=selectedMonthLabel();
+    directMonthButtons(node).forEach(function(button){
+      button.classList.toggle('insight-dashboard-selected-month',normalized(button)===selected);
+    });
   }
   function findMonthRow(dash,row){
     if(row){
@@ -90,6 +100,7 @@
       if(monthRow){
         monthRow.classList.add('insight-dashboard-inline-months');
         if(monthRow.parentElement!==yearRow)yearRow.appendChild(monthRow);
+        syncSelectedMonth(monthRow);
       }
     }
 
@@ -118,6 +129,10 @@
     getState:function(){return {moved:state.moved,monthsInline:state.monthsInline};}
   };
   function init(){
+    doc.addEventListener('click',function(event){
+      var button=event.target&&event.target.closest?event.target.closest('.insight-dashboard-inline-months>button'):null;
+      if(button)setTimeout(schedule,0);
+    });
     schedule();
     var main=doc.getElementById('main')||doc.body;
     if(main&&typeof MutationObserver!=='undefined')new MutationObserver(schedule).observe(main,{childList:true,subtree:true});

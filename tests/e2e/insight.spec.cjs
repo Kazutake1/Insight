@@ -1043,6 +1043,10 @@ test('年度管理ボタンは設定へ移動し月ボタンは年度選択行�
       monthLabels:months.map(node=>node.textContent.trim()),
       monthRowInside:!!(row&&monthRow&&monthRow.parentElement===row),
       backgrounds:months.map(node=>getComputedStyle(node).backgroundColor),
+      colors:months.map(node=>getComputedStyle(node).color),
+      selectedLabel:typeof selMonth!=='undefined'?String(selMonth):'',
+      selectedCount:months.filter(node=>node.classList.contains('insight-dashboard-selected-month')).length,
+      selectedBorderColor:(()=>{const node=months.find(node=>node.classList.contains('insight-dashboard-selected-month'));return node?getComputedStyle(node).borderColor:null;})(),
       firstMonthMarginLeft:months[0]?getComputedStyle(months[0]).marginLeft:null
     };
   });
@@ -1051,6 +1055,11 @@ test('年度管理ボタンは設定へ移動し月ボタンは年度選択行�
   expect(layout.monthLabels).toEqual(Array.from({length:12},(_,index)=>String(index+1)+'月'));
   expect(layout.monthRowInside).toBe(true);
   expect(layout.backgrounds).toEqual(Array(12).fill('rgb(255, 255, 255)'));
+  expect(new Set(layout.colors).size).toBe(1);
+  expect(layout.colors[0]).toBe('rgb(26, 26, 26)');
+  expect(layout.selectedCount).toBe(1);
+  expect(layout.monthLabels).toContain(layout.selectedLabel);
+  expect(layout.selectedBorderColor).toBe('rgb(0, 0, 0)');
   expect(layout.firstMonthMarginLeft).toBe('12px');
 
   await page.locator('#navSettings').click();
