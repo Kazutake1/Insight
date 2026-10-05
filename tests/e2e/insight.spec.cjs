@@ -176,18 +176,36 @@ test('STEP17の文字階層をダッシュボード・入力・販売数・分�
             fontSize:getComputedStyle(value).fontSize,
             fontWeight:getComputedStyle(value).fontWeight
           }:null,
-          yoy:yoy?{
-            position:getComputedStyle(yoy).position,
-            left:getComputedStyle(yoy).left,
-            right:getComputedStyle(yoy).right,
-            bottom:getComputedStyle(yoy).bottom,
-            height:getComputedStyle(yoy).height,
-            justifyContent:getComputedStyle(yoy).justifyContent,
-            backgroundColor:getComputedStyle(yoy).backgroundColor,
-            borderTopWidth:getComputedStyle(yoy).borderTopWidth,
-            prevText:yoy.querySelector('.kpi-prev')?yoy.querySelector('.kpi-prev').textContent:'',
-            prevFontSize:yoy.querySelector('.kpi-prev')?getComputedStyle(yoy.querySelector('.kpi-prev')).fontSize:null
-          }:null
+          yoy:yoy?(()=>{
+            const badge=yoy.querySelector('.kpi-badge');
+            const prev=yoy.querySelector('.kpi-prev');
+            const yr=yoy.getBoundingClientRect();
+            const br=badge?badge.getBoundingClientRect():null;
+            const pr=prev?prev.getBoundingClientRect():null;
+            return {
+              position:getComputedStyle(yoy).position,
+              left:getComputedStyle(yoy).left,
+              right:getComputedStyle(yoy).right,
+              bottom:getComputedStyle(yoy).bottom,
+              height:getComputedStyle(yoy).height,
+              justifyContent:getComputedStyle(yoy).justifyContent,
+              flexWrap:getComputedStyle(yoy).flexWrap,
+              columnGap:getComputedStyle(yoy).columnGap,
+              paddingLeft:getComputedStyle(yoy).paddingLeft,
+              paddingRight:getComputedStyle(yoy).paddingRight,
+              overflow:getComputedStyle(yoy).overflow,
+              backgroundColor:getComputedStyle(yoy).backgroundColor,
+              borderTopWidth:getComputedStyle(yoy).borderTopWidth,
+              prevText:prev?prev.textContent:'',
+              prevFontSize:prev?getComputedStyle(prev).fontSize:null,
+              badgeFontSize:badge?getComputedStyle(badge).fontSize:null,
+              badgeWhiteSpace:badge?getComputedStyle(badge).whiteSpace:null,
+              prevWhiteSpace:prev?getComputedStyle(prev).whiteSpace:null,
+              badgeRect:br?{left:br.left,right:br.right,top:br.top,bottom:br.bottom,height:br.height}:null,
+              prevRect:pr?{left:pr.left,right:pr.right,top:pr.top,bottom:pr.bottom,height:pr.height}:null,
+              yoyRect:{left:yr.left,right:yr.right,top:yr.top,bottom:yr.bottom,height:yr.height}
+            };
+          })():null
         };
       })
     };
@@ -217,10 +235,23 @@ test('STEP17の文字階層をダッシュボード・入力・販売数・分�
       expect(card.yoy.right).toBe('0px');
       expect(card.yoy.bottom).toBe('0px');
       expect(card.yoy.height).toBe('31px');
-      expect(card.yoy.justifyContent).toBe('flex-start');
+      expect(card.yoy.justifyContent).toBe('space-between');
+      expect(card.yoy.flexWrap).toBe('nowrap');
+      expect(card.yoy.columnGap).toBe('6px');
+      expect(card.yoy.paddingLeft).toBe('10px');
+      expect(card.yoy.paddingRight).toBe('10px');
+      expect(card.yoy.overflow).toBe('hidden');
       expect(card.yoy.borderTopWidth).toBe('1px');
       expect(card.yoy.prevText).toMatch(/^\d{4}年比$/);
-      expect(card.yoy.prevFontSize).toBe('11.5px');
+      expect(card.yoy.prevFontSize).toBe('11px');
+      expect(card.yoy.badgeFontSize).toBe('11.5px');
+      expect(card.yoy.badgeWhiteSpace).toBe('nowrap');
+      expect(card.yoy.prevWhiteSpace).toBe('nowrap');
+      expect(card.yoy.badgeRect.left).toBeGreaterThanOrEqual(card.yoy.yoyRect.left+9);
+      expect(card.yoy.prevRect.right).toBeLessThanOrEqual(card.yoy.yoyRect.right-9);
+      expect(card.yoy.badgeRect.right).toBeLessThanOrEqual(card.yoy.prevRect.left-5);
+      expect(card.yoy.badgeRect.height).toBeLessThanOrEqual(14);
+      expect(card.yoy.prevRect.height).toBeLessThanOrEqual(14);
     }
     expect(card.text).not.toMatch(/\d{1,2}月1日平均/);
     expect(card.text.split('\n').map(line=>line.trim())).not.toContainEqual(expect.stringMatching(/^\d{1,2}月$/));

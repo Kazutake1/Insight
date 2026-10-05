@@ -63,7 +63,7 @@ test('ダッシュボードKPIカードは補助月表示を削除し年比ラ�
 test('STEP17の可読性CSSは独立moduleで主要ページへ横展開する',()=>{
   const index=read('Index.html');
   const readability=read('insight_readability_v1.js');
-  assert.match(index,/insight_readability_v1\.js\?v=20261005-main-spacing-0/);
+  assert.match(index,/insight_readability_v1\.js\?v=20261005-kpi-yoy-nowrap/);
   assert.ok(index.indexOf('insight_dark_theme_v1.js')<index.indexOf('insight_readability_v1.js'));
   assert.match(readability,/insightReadabilityStyle/);
   assert.match(readability,/#main\{padding-left:0!important;padding-right:0!important;min-width:0!important;box-sizing:border-box!important\}/);
@@ -73,9 +73,9 @@ test('STEP17の可読性CSSは独立moduleで主要ページへ横展開する',
   assert.match(readability,/#pageDash \.kpi-label\{[^}]*left:16px!important;top:13px!important;[^}]*font-size:13px!important/);
   assert.match(readability,/#pageDash \.kpi-label>span\{display:none!important\}/);
   assert.match(readability,/#pageDash \.kpi-value\{[^}]*left:16px!important;top:39px!important;[^}]*text-align:left!important;[^}]*font-size:24px!important/);
-  assert.match(readability,/#pageDash \.kpi-yoy\{[^}]*left:0!important;right:0!important;bottom:0!important;height:31px!important;[^}]*justify-content:flex-start!important;[^}]*border-top:1px solid var\(--border\)!important/);
-  assert.match(readability,/#pageDash \.kpi-badge\{[^}]*background:transparent!important;[^}]*padding:0!important/);
-  assert.match(readability,/#pageDash \.kpi-prev\{[^}]*margin-left:7px!important;[^}]*font-size:11\.5px!important;[^}]*color:var\(--text4\)!important/);
+  assert.match(readability,/#pageDash \.kpi-yoy\{[^}]*left:0!important;right:0!important;bottom:0!important;height:31px!important;[^}]*justify-content:space-between!important;[^}]*flex-wrap:nowrap!important;[^}]*gap:6px!important;[^}]*padding:0 10px!important;[^}]*overflow:hidden!important;[^}]*border-top:1px solid var\(--border\)!important/);
+  assert.match(readability,/#pageDash \.kpi-badge\{[^}]*font-size:11\.5px!important;[^}]*white-space:nowrap!important;[^}]*flex:0 0 auto!important/);
+  assert.match(readability,/#pageDash \.kpi-prev\{[^}]*margin-left:0!important;[^}]*font-size:11px!important;[^}]*white-space:nowrap!important;[^}]*flex:0 0 auto!important/);
   assert.match(readability,/#pageSales #issRow \.iss-stat,#pageKyaku #ikyRow \.iky-stat\{font-size:13px!important/);
   assert.match(readability,/#iwcRow \.iwc-kpi-value\{font-size:16px!important/);
   assert.match(readability,/#pageSalesCount \.sc-col-head,#pageSalesCount \.sc-average-head\{font-size:12\.5px!important/);
