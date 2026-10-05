@@ -106,6 +106,69 @@ test('選択月は主要ページを横断しても維持される',async({page}
 });
 
 
+test('入力変更で3つの曜日別グラフが即時更新され売上Y軸は万円換算する',async({page})=>{
+  const errors=await openInsight(page);
+
+  await page.locator('#nav2').click();
+  await page.waitForFunction(()=>window.InsightWeekdayChartFix&&window.Chart&&typeof Chart.getChart==='function'&&Chart.getChart(document.getElementById('salesWdChart')));
+  const salesBefore=await page.evaluate(()=>{
+    const input=document.querySelector('#salesForm input[data-k="売上"]');
+    const ri=Number(input.dataset.ri);
+    const wd=getWeekday(editYear.sales,MONTHS.indexOf(editMonth.sales),ri+1);
+    const chart=Chart.getChart(document.getElementById('salesWdChart'));
+    const before=chart.data.datasets[0].data[wd];
+    input.value='987654';
+    input.dispatchEvent(new Event('input',{bubbles:true}));
+    return {wd,before};
+  });
+  await page.waitForFunction(({wd,before})=>{
+    const chart=Chart.getChart(document.getElementById('salesWdChart'));
+    return chart&&chart.data.datasets[0].data[wd]!==before;
+  },salesBefore);
+  const salesAxis=await page.evaluate(()=>{
+    const chart=Chart.getChart(document.getElementById('salesWdChart'));
+    const callback=chart.options.scales.y.ticks.callback;
+    return {v500:callback(500),v1000:callback(1000)};
+  });
+  expect(salesAxis).toEqual({v500:'50万',v1000:'100万'});
+
+  await page.locator('#nav3').click();
+  await page.waitForFunction(()=>Chart.getChart(document.getElementById('kyakuWdChart')));
+  const kyakuBefore=await page.evaluate(()=>{
+    const input=document.querySelector('#kyakuGrid input.kyaku-input');
+    const ri=Number(input.dataset.ri);
+    const wd=getWeekday(editYear.kyaku,MONTHS.indexOf(editMonth.kyaku),ri+1);
+    const chart=Chart.getChart(document.getElementById('kyakuWdChart'));
+    const before=chart.data.datasets[0].data[wd];
+    input.value='98765';
+    input.dispatchEvent(new Event('input',{bubbles:true}));
+    return {wd,before};
+  });
+  await page.waitForFunction(({wd,before})=>{
+    const chart=Chart.getChart(document.getElementById('kyakuWdChart'));
+    return chart&&chart.data.datasets[0].data[wd]!==before;
+  },kyakuBefore);
+
+  await page.locator('#nav4').click();
+  await page.waitForFunction(()=>Chart.getChart(document.getElementById('haikiWdChart')));
+  const haikiBefore=await page.evaluate(()=>{
+    const input=document.querySelector('#haikiForm input[data-hc]');
+    const ri=Number(input.dataset.ri);
+    const wd=getWeekday(editYear.haiki,MONTHS.indexOf(editMonth.haiki),ri+1);
+    const chart=Chart.getChart(document.getElementById('haikiWdChart'));
+    const before=chart.data.datasets[0].data[wd];
+    input.value='987654';
+    input.dispatchEvent(new Event('input',{bubbles:true}));
+    return {wd,before};
+  });
+  await page.waitForFunction(({wd,before})=>{
+    const chart=Chart.getChart(document.getElementById('haikiWdChart'));
+    return chart&&chart.data.datasets[0].data[wd]!==before;
+  },haikiBefore);
+
+  expect(errors).toEqual([]);
+});
+
 test('売上・客数・廃棄の日別グラフは指定された補助文だけを表示しない',async({page})=>{
   const errors=await openInsight(page);
 
