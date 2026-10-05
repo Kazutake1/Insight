@@ -1378,6 +1378,35 @@ test('販売数入力で未登録の過年度へ移動すると年度を正式�
 });
 
 
+test('今日の入力の日付ピッカーは年月変更でも入力要素を維持する',async({page})=>{
+  const errors=await openInsight(page);
+  await page.locator('#nav0').click();
+  await expect(page.locator('#iqdDateInput')).toBeAttached();
+  const before=await page.evaluate(()=>window.InsightDateContext.getSelectedIso());
+  const target=await page.evaluate(iso=>{
+    const year=Number(iso.slice(0,4));
+    const month=Number(iso.slice(5,7));
+    const day=Math.min(Number(iso.slice(8,10)),28);
+    const targetMonth=month===12?11:month+1;
+    return year+'-'+String(targetMonth).padStart(2,'0')+'-'+String(day).padStart(2,'0');
+  },before);
+  await page.locator('#iqdDateInput').evaluate((input,value)=>{
+    input.__insightPickerIdentity='preserved';
+    input.value=value;
+    input.dispatchEvent(new Event('change',{bubbles:true}));
+  },target);
+  await expect.poll(()=>page.evaluate(()=>window.InsightDateContext.getSelectedIso())).toBe(target);
+  const state=await page.locator('#iqdDateInput').evaluate(input=>({
+    identity:input.__insightPickerIdentity,
+    value:input.value,
+    label:document.querySelector('#qNavRow .iqd-date-main').textContent
+  }));
+  expect(state.identity).toBe('preserved');
+  expect(state.value).toBe(target);
+  expect(state.label).toContain(target.slice(0,4)+'年'+Number(target.slice(5,7))+'月');
+  expect(errors).toEqual([]);
+});
+
 test('今日の入力で未登録の過年度日付を選ぶと年度を正式追加し既存データを保持する',async({page})=>{
   const errors=await openInsight(page);
   await page.evaluate(()=>{
