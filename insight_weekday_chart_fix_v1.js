@@ -39,6 +39,53 @@
     return null;
   }
 
+  function wasteChart(){
+    var canvas=doc.getElementById('haikiWdChart');
+    if(!canvas)return null;
+    try{
+      if(root.Chart&&typeof root.Chart.getChart==='function'){
+        var found=root.Chart.getChart(canvas);
+        if(found)return found;
+      }
+    }catch(_){}
+    try{
+      if(typeof haikiWdChartInst!=='undefined'&&haikiWdChartInst)return haikiWdChartInst;
+    }catch(_){}
+    return null;
+  }
+
+  function computeWasteWeekdayAverage(rows,fy,mi,now){
+    var sums=Array(7).fill(0);
+    var counts=Array(7).fill(0);
+    var current=now instanceof Date?now:new Date();
+    var cutoff=new Date(current.getFullYear(),current.getMonth(),current.getDate());
+    (Array.isArray(rows)?rows:[]).forEach(function(row){
+      var day=parseInt(row&&row.d,10);
+      if(!Number.isFinite(day)||day<1)return;
+      var date=new Date(parseInt(fy,10),mi,day);
+      if(date>=cutoff)return;
+      var total=HAIKI_CATS.reduce(function(sum,cat){
+        return sum+(Number(row&&row.haiki&&row.haiki[cat])||0);
+      },0);
+      var wd=getWeekday(fy,mi,day);
+      sums[wd]+=total;
+      counts[wd]++;
+    });
+    return sums.map(function(sum,index){
+      return counts[index]>0?Math.round(sum/counts[index]):0;
+    });
+  }
+
+  function fixWasteAverage(fy,mi){
+    var chart=wasteChart();
+    if(!chart||!chart.data||!chart.data.datasets||!chart.data.datasets[0])return false;
+    var rows=[];
+    try{rows=drafts.haiki||[];}catch(_){rows=[];}
+    chart.data.datasets[0].data=computeWasteWeekdayAverage(rows,fy,mi,new Date());
+    try{chart.update('none');}catch(_){try{chart.update();}catch(__){}}
+    return true;
+  }
+
   function fixSalesAxis(){
     var chart=salesChart();
     if(!chart||!chart.options||!chart.options.scales||!chart.options.scales.y||!chart.options.scales.y.ticks)return false;
@@ -58,6 +105,19 @@
     wrapped.__insightWeekdayChartFix=true;
     wrapped.__original=original;
     root.refreshSalesWdChart=wrapped;
+  }
+
+  function wrapWasteRefresh(){
+    if(typeof root.refreshHaikiWdChart!=='function'||root.refreshHaikiWdChart.__insightWeekdayWasteFix)return;
+    var original=root.refreshHaikiWdChart;
+    var wrapped=function(fy,mi){
+      var result=original.apply(this,arguments);
+      fixWasteAverage(fy,mi);
+      return result;
+    };
+    wrapped.__insightWeekdayWasteFix=true;
+    wrapped.__original=original;
+    root.refreshHaikiWdChart=wrapped;
   }
 
   function refresh(type){
@@ -106,6 +166,7 @@
 
   function init(){
     wrapSalesRefresh();
+    wrapWasteRefresh();
     fixSalesAxis();
     doc.addEventListener('input',onValueChange,false);
     doc.addEventListener('change',onValueChange,false);
@@ -114,7 +175,8 @@
   root.InsightWeekdayChartFix={
     refresh:refresh,
     fixSalesAxis:fixSalesAxis,
-    formatSalesYAxis:formatSalesYAxis
+    formatSalesYAxis:formatSalesYAxis,
+    computeWasteWeekdayAverage:computeWasteWeekdayAverage
   };
 
   if(doc.readyState==='loading')doc.addEventListener('DOMContentLoaded',init,{once:true});

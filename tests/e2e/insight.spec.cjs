@@ -169,6 +169,37 @@ test('入力変更で3つの曜日別グラフが即時更新され売上Y軸は
   expect(errors).toEqual([]);
 });
 
+test('廃棄曜日平均は過去日の未入力を0円として含め今日以降を除外する',async({page})=>{
+  const errors=await openInsight(page);
+  await page.waitForFunction(()=>window.InsightWeekdayChartFix&&typeof window.InsightWeekdayChartFix.computeWasteWeekdayAverage==='function');
+
+  const result=await page.evaluate(()=>{
+    const empty=()=>Object.fromEntries(HAIKI_CATS.map(cat=>[cat,0]));
+    const withValue=value=>{
+      const h=empty();
+      h[HAIKI_CATS[0]]=value;
+      return h;
+    };
+    const rows=[
+      {d:'1',haiki:withValue(1000)},
+      {d:'8',haiki:empty()},
+      {d:'9',haiki:withValue(9000)},
+      {d:'15',haiki:withValue(9000)}
+    ];
+    return InsightWeekdayChartFix.computeWasteWeekdayAverage(
+      rows,
+      '2026',
+      9,
+      new Date(2026,9,9,12,0,0)
+    );
+  });
+
+  // 2026-10-01/08 are both Thursday: (1000 + 0) / 2 = 500.
+  // 10/09 is today and 10/15 is future, so both must be excluded.
+  expect(result).toEqual([0,0,0,0,500,0,0]);
+  expect(errors).toEqual([]);
+});
+
 test('売上・客数・廃棄の日別グラフは指定された補助文だけを表示しない',async({page})=>{
   const errors=await openInsight(page);
 

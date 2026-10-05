@@ -270,7 +270,7 @@ test('入力グラフ補助文の整理は入力3ページだけを対象にす�
 test('入力曜日別グラフは入力変更で再描画し売上Y軸を千円から万円へ正しく換算する',()=>{
   const index=read('Index.html');
   const fix=read('insight_weekday_chart_fix_v1.js');
-  assert.match(index,/insight_weekday_chart_fix_v1\.js\?v=20261006-live-axis-1/);
+  assert.match(index,/insight_weekday_chart_fix_v1\.js\?v=20261006-waste-zero-past-1/);
   assert.ok(index.indexOf('insight_input_chart_cleanup_v1.js')<index.indexOf('insight_weekday_chart_fix_v1.js'));
   assert.match(fix,/#pageSales #salesForm input\[data-k="売上"\]/);
   assert.match(fix,/#pageKyaku #kyakuGrid input\.kyaku-input/);
@@ -279,6 +279,10 @@ test('入力曜日別グラフは入力変更で再描画し売上Y軸を千円�
   assert.match(fix,/root\.refreshKyakuWdChart\(p\.year,p\.mi\)/);
   assert.match(fix,/root\.refreshHaikiWdChart\(p\.year,p\.mi\)/);
   assert.match(fix,/var man=n\/10/);
+  assert.match(fix,/function computeWasteWeekdayAverage\(/);
+  assert.match(fix,/if\(date>=cutoff\)return/);
+  assert.match(fix,/counts\[wd\]\+\+/);
+  assert.match(fix,/wrapWasteRefresh\(\)/);
   assert.doesNotMatch(fix,/localStorage|InsightStorage|persist\(/);
   assert.doesNotThrow(()=>new vm.Script(fix),'weekday chart fix module must be valid JavaScript');
 });
