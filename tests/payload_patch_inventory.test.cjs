@@ -63,9 +63,11 @@ test('ダッシュボードKPIカードは補助月表示を削除し年比ラ�
 test('STEP17の可読性CSSは独立moduleで主要ページへ横展開する',()=>{
   const index=read('Index.html');
   const readability=read('insight_readability_v1.js');
-  assert.match(index,/insight_readability_v1\.js\?v=20261005-kpi-reference-card-yoy/);
+  assert.match(index,/insight_readability_v1\.js\?v=20261005-page-spacing-12/);
   assert.ok(index.indexOf('insight_dark_theme_v1.js')<index.indexOf('insight_readability_v1.js'));
   assert.match(readability,/insightReadabilityStyle/);
+  assert.match(readability,/\.page\{padding-left:12px!important;padding-right:12px!important;box-sizing:border-box!important;min-width:0!important;max-width:100%!important\}/);
+  assert.match(readability,/InsightPageTitleLayout&&typeof root\.InsightPageTitleLayout\.alignAll==='function'/);
   assert.match(readability,/#pageDash \.kpi-card\{[^}]*height:110px!important;[^}]*border-radius:16px!important;[^}]*box-shadow:0 5px 16px rgba\(15,23,42,\.08\)!important/);
   assert.match(readability,/#pageDash \.kpi-label\{[^}]*left:16px!important;top:13px!important;[^}]*font-size:13px!important/);
   assert.match(readability,/#pageDash \.kpi-label>span\{display:none!important\}/);

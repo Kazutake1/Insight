@@ -673,6 +673,11 @@ test('全ページタイトルはダッシュボード位置に揃い追加ペ�
   await page.locator('#nav1').click();
   await expect(page.locator('#pageDash > .page-header > .page-title')).toBeVisible();
   const reference=await titleRect();
+  const dashboardSpacing=await page.locator('#pageDash').evaluate(node=>({
+    left:getComputedStyle(node).paddingLeft,
+    right:getComputedStyle(node).paddingRight
+  }));
+  expect(dashboardSpacing).toEqual({left:'12px',right:'12px'});
 
   for(const selector of ['#nav2','#nav3','#nav4','#navSalesCount','#navSaleResults','#navEventResults']){
     await page.locator(selector).click();
@@ -680,6 +685,16 @@ test('全ページタイトルはダッシュボード位置に揃い追加ペ�
     const current=await titleRect();
     expect(Math.abs(current.left-reference.left),selector+' left').toBeLessThanOrEqual(1);
     expect(Math.abs(current.top-reference.top),selector+' top').toBeLessThanOrEqual(1);
+    const spacing=await page.locator('.page.show').evaluate(node=>({
+      left:getComputedStyle(node).paddingLeft,
+      right:getComputedStyle(node).paddingRight,
+      boxSizing:getComputedStyle(node).boxSizing,
+      maxWidth:getComputedStyle(node).maxWidth
+    }));
+    expect(spacing.left,selector+' padding-left').toBe('12px');
+    expect(spacing.right,selector+' padding-right').toBe('12px');
+    expect(spacing.boxSizing,selector+' box-sizing').toBe('border-box');
+    expect(spacing.maxWidth,selector+' max-width').toBe('100%');
   }
 
   await page.evaluate(()=>{
@@ -692,6 +707,11 @@ test('全ページタイトルはダッシュボード位置に揃い追加ペ�
     document.getElementById('main').appendChild(future);
   });
   await expect(page.locator('#e2eFuturePage > .page-header > .page-title')).toBeVisible();
+  const futureSpacing=await page.locator('#e2eFuturePage').evaluate(node=>({
+    left:getComputedStyle(node).paddingLeft,
+    right:getComputedStyle(node).paddingRight
+  }));
+  expect(futureSpacing).toEqual({left:'12px',right:'12px'});
   await expect.poll(async()=>{
     const current=await page.locator('#e2eFuturePage > .page-header > .page-title').evaluate(node=>{
       const rect=node.getBoundingClientRect();
