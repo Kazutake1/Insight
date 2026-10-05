@@ -16,7 +16,7 @@
     '#pageDash .insight-dashboard-inline-months{display:contents!important}',
     '#pageDash .insight-dashboard-inline-months>button{background:#fff!important;color:#1a1a1a!important}',
     '#pageDash .insight-dashboard-inline-months>button:first-child{margin-left:12px!important}',
-    '#pageDash .insight-dashboard-inline-months>button.insight-dashboard-selected-month{border-color:#000!important;color:#1a1a1a!important}'
+    '#pageDash .insight-dashboard-inline-months>button.insight-dashboard-selected-month{border:2px solid #000!important;box-sizing:border-box!important;color:#1a1a1a!important}'
   ].join('');
   doc.head.appendChild(style);
 
