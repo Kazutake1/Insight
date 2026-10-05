@@ -73,7 +73,9 @@ test('STEP17の可読性CSSは独立moduleで主要ページへ横展開する',
   assert.match(readability,/#pageDash \.kpi-label\{[^}]*left:16px!important;top:13px!important;[^}]*font-size:13px!important/);
   assert.match(readability,/#pageDash \.kpi-label>span\{display:none!important\}/);
   assert.match(readability,/#pageDash \.kpi-value\{[^}]*left:16px!important;top:39px!important;[^}]*text-align:left!important;[^}]*font-size:24px!important/);
-  assert.match(readability,/#pageDash \.kpi-yoy\{[^}]*left:0!important;right:0!important;bottom:0!important;height:31px!important;[^}]*justify-content:space-between!important;[^}]*flex-wrap:nowrap!important;[^}]*gap:6px!important;[^}]*padding:0 10px!important;[^}]*overflow:hidden!important;[^}]*border-top:1px solid var\(--border\)!important/);
+  assert.match(readability,/#pageDash \.kpi-yoy\{[^}]*left:0!important;right:0!important;bottom:0!important;height:31px!important;[^}]*justify-content:space-between!important;[^}]*flex-wrap:nowrap!important;[^}]*gap:6px!important;[^}]*padding:0 10px!important/);
+  assert.match(readability,/#pageDash \.kpi-yoy\{[^}]*border-top:1px solid var\(--border\)!important/);
+  assert.match(readability,/#pageDash \.kpi-yoy\{[^}]*overflow:hidden!important/);
   assert.match(readability,/#pageDash \.kpi-badge\{[^}]*font-size:11\.5px!important;[^}]*white-space:nowrap!important;[^}]*flex:0 0 auto!important/);
   assert.match(readability,/#pageDash \.kpi-prev\{[^}]*margin-left:0!important;[^}]*font-size:11px!important;[^}]*white-space:nowrap!important;[^}]*flex:0 0 auto!important/);
   assert.match(readability,/#pageSales #issRow \.iss-stat,#pageKyaku #ikyRow \.iky-stat\{font-size:13px!important/);
