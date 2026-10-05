@@ -1478,6 +1478,22 @@ test('イベント実績の催事は場所選択なしで過去開催を参照�
   expect(errors).toEqual([]);
 });
 
+test('セール追加ダイアログは補足文を省きプリセット一覧に余白を設ける',async({page})=>{
+  const errors=await openInsight(page);
+  await page.locator('#nav0').click();
+  await page.getByRole('button',{name:'＋イベントを追加'}).click();
+  const eventDialog=page.locator('.ie-dialog.ie-event-add');
+  await expect(eventDialog).toBeVisible();
+  await expect(eventDialog.getByLabel('イベント種別')).toHaveValue('sale');
+  await expect(eventDialog.getByText('全店舗共通・指定期間の各日に表示します。',{exact:true})).toHaveCount(0);
+  await expect(eventDialog.getByText('選ぶと上記の期間で登録します。個別の条件は下で入力できます。',{exact:true})).toHaveCount(0);
+  await expect(eventDialog.getByText(/同じカテゴリー内に複数の値引きパターンがある場合は/)).toHaveCount(0);
+  const presetMargin=await eventDialog.locator('.ie-presets').evaluate(node=>getComputedStyle(node).marginTop);
+  expect(presetMargin).toBe('10px');
+  await eventDialog.getByRole('button',{name:'閉じる'}).click();
+  expect(errors).toEqual([]);
+});
+
 test('よく使うイベントの特需商品は自由名で登録・編集でき次回開催へ自動継承する',async({page})=>{
   const errors=await openInsight(page);
   await page.locator('#nav0').click();
