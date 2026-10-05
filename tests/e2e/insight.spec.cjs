@@ -305,12 +305,14 @@ test('STEP17の文字階層をダッシュボード・入力・販売数・分�
   expect(errors).toEqual([]);
 });
 
-test('販売数入力カレンダーはiPad幅で7列を見切れなく表示する',async({page})=>{
-  await page.setViewportSize({width:1024,height:768});
+test('販売数入力カレンダーは11インチiPad横幅で親領域から見切れない',async({page})=>{
+  await page.setViewportSize({width:1194,height:834});
   const errors=await openInsight(page);
   await page.locator('#navSalesCount').click();
   await expect(page.locator('#pageSalesCount .sc-calendar')).toBeVisible();
   const layout=await page.evaluate(()=>{
+    const main=document.getElementById('main');
+    const pageRoot=document.getElementById('pageSalesCount');
     const calendar=document.querySelector('#pageSalesCount .sc-calendar');
     const averageGrid=document.querySelector('#pageSalesCount .sc-average-grid');
     function read(grid,cardSelector){
@@ -329,16 +331,24 @@ test('販売数入力カレンダーはiPad幅で7列を見切れなく表示す
         gridRight:gridRect.right
       };
     }
+    const mainRect=main.getBoundingClientRect();
+    const pageRect=pageRoot.getBoundingClientRect();
     return {
+      main:{left:mainRect.left,right:mainRect.right,clientWidth:main.clientWidth,scrollWidth:main.scrollWidth},
+      page:{left:pageRect.left,right:pageRect.right,clientWidth:pageRoot.clientWidth,scrollWidth:pageRoot.scrollWidth,boxSizing:getComputedStyle(pageRoot).boxSizing},
       calendar:read(calendar,'.sc-day'),
       average:read(averageGrid,'.sc-average-day')
     };
   });
+  expect(layout.page.boxSizing).toBe('border-box');
+  expect(layout.page.right).toBeLessThanOrEqual(layout.main.right+1);
+  expect(layout.page.scrollWidth).toBeLessThanOrEqual(layout.page.clientWidth+1);
   for(const item of [layout.calendar,layout.average]){
     expect(item.gap).toBe('6px');
     expect(item.scrollWidth).toBeLessThanOrEqual(item.clientWidth+1);
     expect(item.firstLeft).toBeGreaterThanOrEqual(item.gridLeft-1);
     expect(item.lastRight).toBeLessThanOrEqual(item.gridRight+1);
+    expect(item.gridRight).toBeLessThanOrEqual(layout.page.right+1);
   }
   expect(errors).toEqual([]);
 });
