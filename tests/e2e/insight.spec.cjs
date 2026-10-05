@@ -138,6 +138,33 @@ test('サイドバー下部は設定だけを表示し管理項目は設定ペ�
   expect(errors).toEqual([]);
 });
 
+test('年間サマリーは買上点数を表示せず残り項目の縦可読性を上げる',async({page})=>{
+  const errors=await openInsight(page);
+  await page.locator('#nav1').click();
+  await page.waitForFunction(()=>window.InsightAnnualSummaryDisplay&&window.InsightAnnualSummaryDisplay.getState().found);
+  await expect.poll(()=>page.evaluate(()=>window.InsightAnnualSummaryDisplay.getState())).toMatchObject({found:true,removed:true});
+  const annual=page.locator('.insight-annual-summary-enhanced');
+  await expect(annual).toBeVisible();
+  await expect(annual.getByText('買上点数',{exact:true})).toHaveCount(0);
+  const typography=await annual.evaluate(node=>{
+    const label=node.querySelector('.insight-annual-summary-metric-label');
+    const value=node.querySelector('.insight-annual-summary-metric-value');
+    const title=node.querySelector('.insight-annual-summary-title');
+    const metrics=node.querySelector('.insight-annual-summary-metrics');
+    return {
+      title:title?getComputedStyle(title).fontSize:null,
+      label:label?getComputedStyle(label).fontSize:null,
+      value:value?getComputedStyle(value).fontSize:null,
+      rowGap:metrics?getComputedStyle(metrics).rowGap:null
+    };
+  });
+  expect(typography.title).toBe('16px');
+  expect(typography.label).toBe('13px');
+  expect(typography.value).toBe('18px');
+  expect(typography.rowGap).toBe('12px');
+  expect(errors).toEqual([]);
+});
+
 test('STEP17の文字階層をダッシュボード・入力・販売数・分析AI・設定へ横展開する',async({page})=>{
   const errors=await openInsight(page);
 
