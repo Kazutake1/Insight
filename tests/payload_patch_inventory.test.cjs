@@ -501,12 +501,14 @@ test('年度削除は年度直結データをトランザクションで削除�
 test('今日の入力は未登録年度の日付移動前に正式年度追加を確認する',()=>{
   const index=read('Index.html');
   const quick=read('insight_quick_date_nav_v1.js');
-  assert.match(index,/insight_quick_date_nav_v1\.js\?v=20261002-quick-historical-year/);
+  assert.match(index,/insight_quick_date_nav_v1\.js\?v=20261006-keep-picker-open/);
   assert.match(quick,/function ensureRegisteredYear\(/);
   assert.match(quick,/InsightYearManager/);
   assert.match(quick,/年度を追加してこの日付を入力しますか/);
   assert.match(quick,/manager\.promoteCurrent\(year\)/);
   assert.match(quick,/if\(!ensureRegisteredYear\(date\)\)return/);
+  assert.match(quick,/function selectDate\(date,preserveDatePicker\)/);
+  assert.match(quick,/if\(date\)selectDate\(date,true\)/);
   assert.doesNotMatch(quick,/localStorage/);
   assert.doesNotThrow(()=>new vm.Script(quick),'quick date navigation must be valid JavaScript');
 });
@@ -561,7 +563,8 @@ test('イベント実績は過去開催・日付カード・時間帯グラフ�
   assert.doesNotMatch(events,/選ぶと上記の期間で登録します。個別の条件は下で入力できます。/);
   assert.doesNotMatch(events,/同じカテゴリー内に複数の値引きパターンがある場合は/);
   assert.doesNotMatch(events,/イベントは登録時に保存されます。日次の「クリア」では削除されません。/);
-  assert.match(events,/変更内容は保存後、登録済みの期間全体に反映されます。/);
+  assert.doesNotMatch(events,/変更内容は保存後、登録済みの期間全体に反映されます。/);
+  assert.doesNotMatch(events,/プリセットを選ぶと、その内容で登録済みイベントを変更します。下の項目から個別編集もできます。/);
   assert.match(eventResults,/過去開催一覧/);
   assert.match(eventResults,/<span>イベント・催事<\/span>/);
   assert.match(eventResults,/page-title">イベント・催事実績/);
