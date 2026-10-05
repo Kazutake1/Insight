@@ -106,6 +106,22 @@ test('選択月は主要ページを横断しても維持される',async({page}
 });
 
 
+test('売上・客数・廃棄の曜日別グラフ下部余白を統一して詰める',async({page})=>{
+  const errors=await openInsight(page);
+  const checks=[['#nav2','#salesWdChart'],['#nav3','#kyakuWdChart'],['#nav4','#haikiWdChart']];
+  for(const [nav,canvas] of checks){
+    await page.locator(nav).click();
+    await page.waitForFunction(sel=>document.querySelector(sel),canvas);
+    const spacing=await page.locator(canvas).evaluate(node=>({
+      canvasMarginBottom:getComputedStyle(node).marginBottom,
+      parentPaddingBottom:getComputedStyle(node.parentElement).paddingBottom,
+      parentMarginBottom:getComputedStyle(node.parentElement).marginBottom
+    }));
+    expect(spacing).toEqual({canvasMarginBottom:'0px',parentPaddingBottom:'6px',parentMarginBottom:'0px'});
+  }
+  expect(errors).toEqual([]);
+});
+
 test('入力変更で3つの曜日別グラフが即時更新され売上Y軸は万円換算する',async({page})=>{
   const errors=await openInsight(page);
 

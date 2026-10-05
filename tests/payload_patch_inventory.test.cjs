@@ -267,6 +267,19 @@ test('入力グラフ補助文の整理は入力3ページだけを対象にす�
   assert.doesNotThrow(()=>new vm.Script(cleanup),'input chart cleanup module must be valid JavaScript');
 });
 
+test('売上・客数・廃棄の曜日別グラフ下部余白だけを詰める',()=>{
+  const index=read('Index.html');
+  const spacing=read('insight_weekday_chart_spacing_v1.js');
+  assert.match(index,/insight_weekday_chart_spacing_v1\.js\?v=20261006-bottom-gap-1/);
+  assert.match(spacing,/#salesWdChart,#kyakuWdChart,#haikiWdChart/);
+  assert.match(spacing,/#pageSales \*:has\(> #salesWdChart\)/);
+  assert.match(spacing,/#pageKyaku \*:has\(> #kyakuWdChart\)/);
+  assert.match(spacing,/#pageHaiki \*:has\(> #haikiWdChart\)/);
+  assert.match(spacing,/padding-bottom:6px!important/);
+  assert.doesNotMatch(spacing,/localStorage|InsightStorage|persist\(/);
+  assert.doesNotThrow(()=>new vm.Script(spacing),'weekday chart spacing module must be valid JavaScript');
+});
+
 test('入力曜日別グラフは入力変更で再描画し売上Y軸を千円から万円へ正しく換算する',()=>{
   const index=read('Index.html');
   const fix=read('insight_weekday_chart_fix_v1.js');
