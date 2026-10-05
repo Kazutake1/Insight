@@ -239,7 +239,7 @@ test('設定ページはサイドバー下部の管理項目を集約する',()=
 test('年度管理ボタンは設定へ移動し月ボタンはダッシュボード年度行へ移動する',()=>{
   const index=read('Index.html');
   const layout=read('insight_year_controls_layout_v1.js');
-  assert.match(index,/insight_year_controls_layout_v1\.js\?v=20261006-month-selected-style-1/);
+  assert.match(index,/insight_year_controls_layout_v1\.js\?v=20261006-month-selected-border-2/);
   assert.ok(index.indexOf('insight_settings_v1.js')<index.indexOf('insight_year_controls_layout_v1.js'));
   assert.match(layout,/insightSettingsYearSection/);
   assert.match(layout,/insightSettingsYearActions/);
@@ -247,7 +247,7 @@ test('年度管理ボタンは設定へ移動し月ボタンはダッシュボ�
   assert.match(layout,/insight-dashboard-year-row/);
   assert.match(layout,/insight-dashboard-inline-months/);
   assert.match(layout,/insight-dashboard-inline-months>button\{background:#fff!important;color:#1a1a1a!important\}/);
-  assert.match(layout,/insight-dashboard-selected-month\{border-color:#000!important;color:#1a1a1a!important\}/);
+  assert.match(layout,/insight-dashboard-selected-month\{border:2px solid #000!important;box-sizing:border-box!important;color:#1a1a1a!important\}/);
   assert.match(layout,/function syncSelectedMonth\(/);
   assert.match(layout,/insight-dashboard-inline-months>button:first-child\{margin-left:12px!important\}/);
   assert.match(layout,/monthRow\.parentElement!==yearRow/);
