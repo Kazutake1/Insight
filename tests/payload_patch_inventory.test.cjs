@@ -236,6 +236,21 @@ test('設定ページはサイドバー下部の管理項目を集約する',()=
   assert.match(settings,/sidebarActions\.replaceChildren\(themeWrap,nav\)/);
 });
 
+test('年度管理ボタンは設定へ移動し月ボタンはダッシュボード年度行へ移動する',()=>{
+  const index=read('Index.html');
+  const layout=read('insight_year_controls_layout_v1.js');
+  assert.match(index,/insight_year_controls_layout_v1\.js\?v=20261005-settings-months-1/);
+  assert.ok(index.indexOf('insight_settings_v1.js')<index.indexOf('insight_year_controls_layout_v1.js'));
+  assert.match(layout,/insightSettingsYearSection/);
+  assert.match(layout,/insightSettingsYearActions/);
+  assert.match(layout,/addYearInlineWrap/);
+  assert.match(layout,/insight-dashboard-year-row/);
+  assert.match(layout,/insight-dashboard-inline-months/);
+  assert.match(layout,/monthRow\.parentElement!==yearRow/);
+  assert.doesNotMatch(layout,/localStorage|InsightStorage/);
+  assert.doesNotThrow(()=>new vm.Script(layout),'year controls layout module must be valid JavaScript');
+});
+
 test('複数年度分析はAnalysisContextの後に読み込み読み取り専用で動作する',()=>{
   const index=read('Index.html');
   const multi=read('insight_multiyear_analysis_v1.js');

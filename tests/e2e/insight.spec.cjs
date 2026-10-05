@@ -1025,6 +1025,51 @@ test('セール実績は内容別に表示し開催回ごとに行を分けて7�
 });
 
 
+test('年度管理ボタンは設定へ移動し月ボタンは年度選択行へ配置する',async({page})=>{
+  const errors=await openInsight(page);
+  await page.locator('#nav1').click();
+  await page.waitForFunction(()=>window.InsightYearControlsLayout&&window.InsightYearControlsLayout.getState().moved&&window.InsightYearControlsLayout.getState().monthsInline);
+  await expect(page.locator('#pageDash').getByRole('button',{name:/年度追加/})).toHaveCount(0);
+  await expect(page.locator('#pageDash #insightDeleteYearButton')).toHaveCount(0);
+
+  const layout=await page.evaluate(()=>{
+    const dash=document.getElementById('pageDash');
+    const row=dash.querySelector('.insight-dashboard-year-row');
+    const monthRow=row&&Array.from(row.children).find(node=>node.classList.contains('insight-dashboard-inline-months'));
+    const months=monthRow?Array.from(monthRow.children).filter(node=>node.tagName==='BUTTON'&&/^(?:[1-9]|1[0-2])月$/.test(node.textContent.trim())):[];
+    return {
+      selectCount:row?row.querySelectorAll('select').length:0,
+      monthCount:months.length,
+      monthLabels:months.map(node=>node.textContent.trim()),
+      monthRowInside:!!(row&&monthRow&&monthRow.parentElement===row)
+    };
+  });
+  expect(layout.selectCount).toBeGreaterThanOrEqual(2);
+  expect(layout.monthCount).toBe(12);
+  expect(layout.monthLabels).toEqual(Array.from({length:12},(_,index)=>String(index+1)+'月'));
+  expect(layout.monthRowInside).toBe(true);
+
+  await page.locator('#navSettings').click();
+  await expect(page.locator('#pageSettings #insightSettingsYearSection')).toBeVisible();
+  await expect(page.locator('#pageSettings').getByRole('button',{name:/年度追加/})).toBeVisible();
+  await expect(page.locator('#pageSettings #insightDeleteYearButton')).toBeVisible();
+  const settingsPlacement=await page.evaluate(()=>{
+    const section=document.getElementById('insightSettingsYearSection');
+    const actions=document.getElementById('insightSettingsYearActions');
+    const add=Array.from(actions.querySelectorAll('button')).find(button=>/年度追加/.test(button.textContent||''));
+    const del=document.getElementById('insightDeleteYearButton');
+    const wrap=document.getElementById('addYearInlineWrap');
+    return {
+      addInside:!!(add&&add.parentElement===actions),
+      deleteInside:!!(del&&del.parentElement===actions),
+      inlineWrapInside:!wrap||section.contains(wrap)
+    };
+  });
+  expect(settingsPlacement).toEqual({addInside:true,deleteInside:true,inlineWrapInside:true});
+  expect(errors).toEqual([]);
+});
+
+
 test('年度削除は年度直結データだけを削除しイベント履歴と他年度を保持する',async({page})=>{
   const errors=await openInsight(page);
   await page.evaluate(()=>{
@@ -1060,9 +1105,9 @@ test('年度削除は年度直結データだけを削除しイベント履歴�
     refreshDash();
   });
 
-  await page.locator('#nav1').click();
-  await expect(page.locator('#insightDeleteYearButton')).toBeVisible();
-  await page.locator('#insightDeleteYearButton').click();
+  await page.locator('#navSettings').click();
+  await expect(page.locator('#pageSettings #insightDeleteYearButton')).toBeVisible();
+  await page.locator('#pageSettings #insightDeleteYearButton').click();
   await expect(page.locator('#insightYearDeleteOverlay')).toBeVisible();
   await page.locator('#insightYearDeleteSelect').selectOption('2024');
   await expect(page.locator('#insightYearDeleteWarning')).toContainText('販売数/納品数');
