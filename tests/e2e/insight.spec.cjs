@@ -260,13 +260,30 @@ test('STEP17の文字階層をダッシュボード・入力・販売数・分�
   wasteType.cards.forEach(card=>expect(card.scroll).toBeLessThanOrEqual(card.client+2));
 
   await page.locator('#navSalesCount').click();
-  const salesCountType=await page.evaluate(()=>({
-    toolbar:getComputedStyle(document.querySelector('#pageSalesCount .sc-toolbar')).fontSize,
-    tripLabel:getComputedStyle(document.querySelector('#pageSalesCount .sc-col-head')).fontSize,
-    input:getComputedStyle(document.querySelector('#pageSalesCount .sc-trip input')).fontSize,
-    averageTitle:getComputedStyle(document.querySelector('#pageSalesCount .sc-average-title')).fontSize
-  }));
-  expect(salesCountType).toEqual({toolbar:'13.5px',tripLabel:'12.5px',input:'13.5px',averageTitle:'16px'});
+  const salesCountType=await page.evaluate(()=>{
+    const calendar=document.querySelector('#pageSalesCount .sc-calendar');
+    const averageGrid=document.querySelector('#pageSalesCount .sc-average-grid');
+    const day=document.querySelector('#pageSalesCount .sc-day:not(.empty)');
+    const averageDay=document.querySelector('#pageSalesCount .sc-average-day');
+    return {
+      toolbar:getComputedStyle(document.querySelector('#pageSalesCount .sc-toolbar')).fontSize,
+      tripLabel:getComputedStyle(document.querySelector('#pageSalesCount .sc-col-head')).fontSize,
+      input:getComputedStyle(document.querySelector('#pageSalesCount .sc-trip input')).fontSize,
+      averageTitle:getComputedStyle(document.querySelector('#pageSalesCount .sc-average-title')).fontSize,
+      calendarGap:getComputedStyle(calendar).columnGap,
+      averageGap:getComputedStyle(averageGrid).columnGap,
+      dayWidth:day.getBoundingClientRect().width,
+      averageDayWidth:averageDay.getBoundingClientRect().width
+    };
+  });
+  expect(salesCountType.toolbar).toBe('13.5px');
+  expect(salesCountType.tripLabel).toBe('12.5px');
+  expect(salesCountType.input).toBe('13.5px');
+  expect(salesCountType.averageTitle).toBe('16px');
+  expect(salesCountType.calendarGap).toBe('8px');
+  expect(salesCountType.averageGap).toBe('8px');
+  expect(salesCountType.dayWidth).toBeGreaterThanOrEqual(160);
+  expect(salesCountType.averageDayWidth).toBeGreaterThanOrEqual(160);
 
   await page.locator('#aiAnalysisToggle').click();
   await expect(page.locator('body')).toHaveClass(/ai-analysis-open/);
