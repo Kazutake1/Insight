@@ -66,7 +66,7 @@ test('年間サマリーは買上点数だけを表示対象から外し縦方�
 test('ダッシュボードKPIカードは補助月表示を削除し年比ラベルと数値バッジを表示する',()=>{
   const index=read('Index.html');
   const sync=read('insight_dashboard_kpi_sync_v1.js');
-  assert.match(index,/insight_dashboard_kpi_sync_v1\.js\?v=20261005-compact-cards-4/);
+  assert.match(index,/insight_dashboard_kpi_sync_v1\.js\?v=20261006-yen-suffix/);
   assert.match(sync,/box\.append\(badge,prev\);card\.appendChild\(box\)/);
   assert.match(sync,/prev\.textContent=String\(compareYear\)\+'年比'/);
   assert.match(sync,/function stripCardMeta\(\)/);

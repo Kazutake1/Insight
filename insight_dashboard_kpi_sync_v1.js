@@ -68,7 +68,8 @@
       var card=row.querySelector('.kpi-card[data-key="'+key+'"]');if(!card)return;
       var cfg=metricMap[key],def=metricDefinition(key),value=cfg.display(c.current),valueEl=card.querySelector('.kpi-value');
       if(valueEl){
-        if(def&&typeof def.short==='function')valueEl.innerHTML=def.short(value);
+        if(key==='廃棄金額')valueEl.innerHTML=value.toLocaleString()+'<span class="kpi-unit">円</span>';
+        else if(def&&typeof def.short==='function')valueEl.innerHTML=def.short(value);
         else valueEl.textContent=String(value);
       }
       var ch=c.comparison?c.comparison[cfg.field]:null;
@@ -104,7 +105,7 @@
     var unitCard=cardByLabel('客単価');
     if(unitCard){
       var unitValue=unitCard.querySelector('.kpi-value');
-      if(unitValue)unitValue.innerHTML='¥'+Math.round(num(c.current.customerUnitPrice)).toLocaleString()+'<span class="kpi-unit">円</span>';
+      if(unitValue)unitValue.innerHTML=Math.round(num(c.current.customerUnitPrice)).toLocaleString()+'<span class="kpi-unit">円</span>';
       replaceBadge(unitCard,pctText(c.comparison&&c.comparison.customerUnitPrice),true,c.compare);
     }
     var wasteCard=cardByLabel('廃棄率');
