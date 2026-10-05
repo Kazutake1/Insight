@@ -255,6 +255,18 @@ test('年度管理ボタンは設定へ移動し月ボタンはダッシュボ�
   assert.doesNotThrow(()=>new vm.Script(layout),'year controls layout module must be valid JavaScript');
 });
 
+test('入力グラフ補助文の整理は入力3ページだけを対象にする',()=>{
+  const index=read('Index.html');
+  const cleanup=read('insight_input_chart_cleanup_v1.js');
+  assert.match(index,/insight_input_chart_cleanup_v1\.js\?v=20261006-remove-chart-copy-1/);
+  assert.match(cleanup,/pageSales:\['月合計','グラフをタップで日付選択'\]/);
+  assert.match(cleanup,/pageKyaku:\['月合計'\]/);
+  assert.match(cleanup,/pageHaiki:\['月合計'\]/);
+  assert.doesNotMatch(cleanup,/棒をタップで日付選択/);
+  assert.doesNotMatch(cleanup,/localStorage|InsightStorage/);
+  assert.doesNotThrow(()=>new vm.Script(cleanup),'input chart cleanup module must be valid JavaScript');
+});
+
 test('複数年度分析はAnalysisContextの後に読み込み読み取り専用で動作する',()=>{
   const index=read('Index.html');
   const multi=read('insight_multiyear_analysis_v1.js');

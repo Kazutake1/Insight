@@ -106,6 +106,26 @@ test('選択月は主要ページを横断しても維持される',async({page}
 });
 
 
+test('売上・客数・廃棄の日別グラフは指定された補助文だけを表示しない',async({page})=>{
+  const errors=await openInsight(page);
+
+  await page.locator('#nav2').click();
+  await expect(page.locator('#pageSales')).toHaveClass(/show/);
+  await expect(page.locator('#pageSales').getByText('月合計',{exact:true})).toHaveCount(0);
+  await expect(page.locator('#pageSales').getByText('グラフをタップで日付選択',{exact:true})).toHaveCount(0);
+
+  await page.locator('#nav3').click();
+  await expect(page.locator('#pageKyaku')).toHaveClass(/show/);
+  await expect(page.locator('#pageKyaku').getByText('月合計',{exact:true})).toHaveCount(0);
+
+  await page.locator('#nav4').click();
+  await expect(page.locator('#pageHaiki')).toHaveClass(/show/);
+  await expect(page.locator('#pageHaiki').getByText('月合計',{exact:true})).toHaveCount(0);
+  await expect(page.locator('#pageHaiki').getByText('棒をタップで日付選択',{exact:true})).toBeVisible();
+
+  expect(errors).toEqual([]);
+});
+
 test('トップページはビルド番号を持ち最新版確認をno-storeで行う',async({page})=>{
   const errors=await openInsight(page);
   const source=await page.evaluate(()=>fetch('/Index.html?e2e-shell-check=1',{cache:'no-store'}).then(r=>r.text()));

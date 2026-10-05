@@ -100,7 +100,8 @@ var orderedFeatureLoads=[
   './insight_settings_v1.js?v=20261003-theme-bridge-hidden',
   './insight_year_controls_layout_v1.js?v=20261006-month-selected-style-1',
   './insight_dark_theme_v1.js?v=20261003-firefox-dark-1',
-  './insight_readability_v1.js?v=20261005-kpi-yoy-nowrap'
+  './insight_readability_v1.js?v=20261005-kpi-yoy-nowrap',
+  './insight_input_chart_cleanup_v1.js?v=20261006-remove-chart-copy-1'
 ];
 var orderedFeatureHtml=orderedFeatureLoads.map(function(entry){return '<script src="'+entry+'"></scr'+'ipt>';}).join('');
 html=html.replace('</body>',orderedFeatureHtml+'</body>');
