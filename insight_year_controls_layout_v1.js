@@ -13,7 +13,9 @@
     '#insightSettingsYearInlineHost:empty{display:none}',
     '#insightSettingsYearInlineHost:not(:empty){margin-top:10px}',
     '#pageDash .insight-dashboard-year-row{flex-wrap:wrap!important}',
-    '#pageDash .insight-dashboard-inline-months{display:contents!important}'
+    '#pageDash .insight-dashboard-inline-months{display:contents!important}',
+    '#pageDash .insight-dashboard-inline-months>button{background:#fff!important}',
+    '#pageDash .insight-dashboard-inline-months>button:first-child{margin-left:12px!important}'
   ].join('');
   doc.head.appendChild(style);
 

@@ -1041,13 +1041,17 @@ test('年度管理ボタンは設定へ移動し月ボタンは年度選択行�
       selectCount:row?row.querySelectorAll('select').length:0,
       monthCount:months.length,
       monthLabels:months.map(node=>node.textContent.trim()),
-      monthRowInside:!!(row&&monthRow&&monthRow.parentElement===row)
+      monthRowInside:!!(row&&monthRow&&monthRow.parentElement===row),
+      backgrounds:months.map(node=>getComputedStyle(node).backgroundColor),
+      firstMonthMarginLeft:months[0]?getComputedStyle(months[0]).marginLeft:null
     };
   });
   expect(layout.selectCount).toBeGreaterThanOrEqual(2);
   expect(layout.monthCount).toBe(12);
   expect(layout.monthLabels).toEqual(Array.from({length:12},(_,index)=>String(index+1)+'月'));
   expect(layout.monthRowInside).toBe(true);
+  expect(layout.backgrounds).toEqual(Array(12).fill('rgb(255, 255, 255)'));
+  expect(layout.firstMonthMarginLeft).toBe('12px');
 
   await page.locator('#navSettings').click();
   await expect(page.locator('#pageSettings #insightSettingsYearSection')).toBeVisible();

@@ -239,13 +239,15 @@ test('設定ページはサイドバー下部の管理項目を集約する',()=
 test('年度管理ボタンは設定へ移動し月ボタンはダッシュボード年度行へ移動する',()=>{
   const index=read('Index.html');
   const layout=read('insight_year_controls_layout_v1.js');
-  assert.match(index,/insight_year_controls_layout_v1\.js\?v=20261005-settings-months-1/);
+  assert.match(index,/insight_year_controls_layout_v1\.js\?v=20261006-month-style-1/);
   assert.ok(index.indexOf('insight_settings_v1.js')<index.indexOf('insight_year_controls_layout_v1.js'));
   assert.match(layout,/insightSettingsYearSection/);
   assert.match(layout,/insightSettingsYearActions/);
   assert.match(layout,/addYearInlineWrap/);
   assert.match(layout,/insight-dashboard-year-row/);
   assert.match(layout,/insight-dashboard-inline-months/);
+  assert.match(layout,/insight-dashboard-inline-months>button\{background:#fff!important\}/);
+  assert.match(layout,/insight-dashboard-inline-months>button:first-child\{margin-left:12px!important\}/);
   assert.match(layout,/monthRow\.parentElement!==yearRow/);
   assert.doesNotMatch(layout,/localStorage|InsightStorage/);
   assert.doesNotThrow(()=>new vm.Script(layout),'year controls layout module must be valid JavaScript');
