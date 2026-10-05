@@ -53,13 +53,18 @@
       return false;
     }
   }
-  function selectDate(date){
+  function selectDate(date,preserveDatePicker){
     if(!date||typeof date.getTime!=='function'||!Number.isFinite(date.getTime())||dateContext.iso(date)===dateContext.getSelectedIso())return;
     if(dirty&&!window.confirm('未保存の入力があります。\n保存せずに別の日付へ移動しますか？'))return;
     if(!ensureRegisteredYear(date))return;
     dateContext.setSelectedDate(date);
     quickEditDay=dateContext.getSelectedInfo().day;
-    window.renderQuickNav();
+    if(preserveDatePicker){
+      var current=document.getElementById('iqdDateInput');
+      var label=document.querySelector('#qNavRow .iqd-date-main');
+      if(current)current.value=dateContext.getSelectedIso();
+      if(label)label.textContent=date.getFullYear()+'年'+(date.getMonth()+1)+'月'+date.getDate()+'日（'+week[date.getDay()]+'）';
+    }else window.renderQuickNav();
     window.renderQuickPage();
     dirty=false;
   }
@@ -79,7 +84,7 @@
     document.getElementById('iqdToday').onclick=function(){selectDate(new Date());};
     document.getElementById('iqdDateInput').addEventListener('change',function(){
       var date=dateContext.parseIso(this.value);
-      if(date)selectDate(date);
+      if(date)selectDate(date,true);
       this.value=dateContext.getSelectedIso();
     });
   };
