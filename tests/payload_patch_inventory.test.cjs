@@ -484,7 +484,7 @@ test('時間帯別客数は日報客数と分離して日付別24時間データ
   const index=read('Index.html');
   const hourly=read('insight_hourly_customers_v1.js');
   assert.match(index,/insight_bootstrap_patches_v1\.js\?v=20261003-input-period-source-1/);
-  assert.match(index,/insight_hourly_customers_v1\.js\?v=20261002-hourly-position/);
+  assert.match(index,/insight_hourly_customers_v1\.js\?v=20261006-remove-help/);
   assert.ok(index.indexOf('insight_events_v1.js')<index.indexOf('insight_hourly_customers_v1.js'));
   assert.ok(index.indexOf('insight_hourly_customers_v1.js')<index.indexOf('insight_event_results_v1.js'));
   assert.match(hourly,/hourlyCustomers/);
@@ -493,6 +493,7 @@ test('時間帯別客数は日報客数と分離して日付別24時間データ
   assert.match(hourly,/入力済み 24\/24/);
   assert.match(hourly,/getElementById\('insightEvents'\)/);
   assert.match(hourly,/insertBefore\(card,events\)/);
+  assert.doesNotMatch(hourly,/0時〜23時の客数を入力してください。空欄は未入力、0は0人として保存します。/);
   assert.doesNotMatch(hourly,/日次客数|差異|暦日/);
   assert.doesNotThrow(()=>new vm.Script(hourly),'hourly customers module must be valid JavaScript');
 });

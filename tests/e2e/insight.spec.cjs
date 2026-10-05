@@ -1317,6 +1317,7 @@ test('今日の入力で時間帯別客数を途中保存し24時間入力を完
 
   await page.locator('#hourlyCustomersQuick .hourly-quick-button').click();
   await expect(page.locator('.hourly-dialog')).toBeVisible();
+  await expect(page.locator('.hourly-dialog .hourly-help')).toHaveCount(0);
   const inputs=page.locator('.hourly-dialog .hourly-input-group input');
   await expect(inputs).toHaveCount(24);
   await inputs.nth(0).fill('0');

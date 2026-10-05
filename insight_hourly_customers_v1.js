@@ -121,7 +121,6 @@
       var head=el('header'),heading=el('h2','時間帯別客数　'+date),close=el('button','閉じる');close.type='button';close.onclick=function(){dialog.close();};
       head.append(heading,close);dialog.append(head);
 
-      var lead=el('p','0時〜23時の客数を入力してください。空欄は未入力、0は0人として保存します。','hourly-help');dialog.append(lead);
       var grid=el('div',undefined,'hourly-input-grid'),inputs=[];
       for(var block=0;block<4;block++){
         var group=el('section',undefined,'hourly-input-group');
