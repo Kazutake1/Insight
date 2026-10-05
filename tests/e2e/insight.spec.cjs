@@ -334,12 +334,23 @@ test('販売数入力カレンダーは11インチiPad横幅で親領域から�
     const mainRect=main.getBoundingClientRect();
     const pageRect=pageRoot.getBoundingClientRect();
     return {
-      main:{left:mainRect.left,right:mainRect.right,clientWidth:main.clientWidth,scrollWidth:main.scrollWidth},
+      main:{
+        left:mainRect.left,
+        right:mainRect.right,
+        clientWidth:main.clientWidth,
+        scrollWidth:main.scrollWidth,
+        paddingLeft:getComputedStyle(main).paddingLeft,
+        paddingRight:getComputedStyle(main).paddingRight,
+        boxSizing:getComputedStyle(main).boxSizing
+      },
       page:{left:pageRect.left,right:pageRect.right,clientWidth:pageRoot.clientWidth,scrollWidth:pageRoot.scrollWidth,boxSizing:getComputedStyle(pageRoot).boxSizing},
       calendar:read(calendar,'.sc-day'),
       average:read(averageGrid,'.sc-average-day')
     };
   });
+  expect(layout.main.paddingLeft).toBe('0px');
+  expect(layout.main.paddingRight).toBe('0px');
+  expect(layout.main.boxSizing).toBe('border-box');
   expect(layout.page.boxSizing).toBe('border-box');
   expect(layout.page.right).toBeLessThanOrEqual(layout.main.right+1);
   expect(layout.page.scrollWidth).toBeLessThanOrEqual(layout.page.clientWidth+1);
@@ -673,6 +684,12 @@ test('全ページタイトルはダッシュボード位置に揃い追加ペ�
   await page.locator('#nav1').click();
   await expect(page.locator('#pageDash > .page-header > .page-title')).toBeVisible();
   const reference=await titleRect();
+  const mainSpacing=await page.locator('#main').evaluate(node=>({
+    left:getComputedStyle(node).paddingLeft,
+    right:getComputedStyle(node).paddingRight,
+    boxSizing:getComputedStyle(node).boxSizing
+  }));
+  expect(mainSpacing).toEqual({left:'0px',right:'0px',boxSizing:'border-box'});
   const dashboardSpacing=await page.locator('#pageDash').evaluate(node=>({
     left:getComputedStyle(node).paddingLeft,
     right:getComputedStyle(node).paddingRight

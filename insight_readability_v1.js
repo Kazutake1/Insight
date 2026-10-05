@@ -7,6 +7,7 @@
   var style=doc.createElement('style');
   style.id='insightReadabilityStyle';
   style.textContent=[
+    '#main{padding-left:0!important;padding-right:0!important;min-width:0!important;box-sizing:border-box!important}',
     '.page{padding-left:12px!important;padding-right:12px!important;box-sizing:border-box!important;min-width:0!important;max-width:100%!important}',
     '#pageDash .kpi-card{height:110px!important;min-height:110px!important;max-height:110px!important;box-sizing:border-box!important;position:relative!important;overflow:hidden!important;border:1px solid var(--border)!important;border-radius:16px!important;background:var(--surface)!important;box-shadow:0 5px 16px rgba(15,23,42,.08)!important;padding:0!important}',
     '#pageDash .kpi-label{position:absolute!important;left:16px!important;top:13px!important;margin:0!important;font-size:13px!important;line-height:1.35}',
