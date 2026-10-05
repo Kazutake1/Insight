@@ -142,7 +142,7 @@ test('年間サマリーは買上点数を表示せず残り項目の縦可読�
   const errors=await openInsight(page);
   await page.locator('#nav1').click();
   await page.waitForFunction(()=>window.InsightAnnualSummaryDisplay&&window.InsightAnnualSummaryDisplay.getState().found);
-  await expect.poll(()=>page.evaluate(()=>window.InsightAnnualSummaryDisplay.getState())).toMatchObject({found:true,removed:true});
+  await expect.poll(()=>page.evaluate(()=>window.InsightAnnualSummaryDisplay.getState())).toEqual({found:true,removed:true,metricCount:3});
   const annual=page.locator('.insight-annual-summary-enhanced');
   await expect(annual).toBeVisible();
   await expect(annual.getByText(/買上点数/)).toHaveCount(0);
@@ -150,18 +150,20 @@ test('年間サマリーは買上点数を表示せず残り項目の縦可読�
     const label=node.querySelector('.insight-annual-summary-metric-label');
     const value=node.querySelector('.insight-annual-summary-metric-value');
     const title=node.querySelector('.insight-annual-summary-title');
-    const metrics=node.querySelector('.insight-annual-summary-metrics');
+    const metric=node.querySelector('.insight-annual-summary-metric');
     return {
       title:title?getComputedStyle(title).fontSize:null,
       label:label?getComputedStyle(label).fontSize:null,
       value:value?getComputedStyle(value).fontSize:null,
-      rowGap:metrics?getComputedStyle(metrics).rowGap:null
+      paddingTop:metric?getComputedStyle(metric).paddingTop:null,
+      paddingBottom:metric?getComputedStyle(metric).paddingBottom:null
     };
   });
   expect(typography.title).toBe('16px');
   expect(typography.label).toBe('13px');
   expect(typography.value).toBe('18px');
-  expect(typography.rowGap).toBe('12px');
+  expect(typography.paddingTop).toBe('6px');
+  expect(typography.paddingBottom).toBe('6px');
   expect(errors).toEqual([]);
 });
 

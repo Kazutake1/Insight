@@ -1,11 +1,11 @@
-/* Dashboard annual summary presentation: hide 買上点数 only in 年間サマリー and improve vertical readability. */
+/* Dashboard annual summary presentation: remove 買上点数 only from 年間サマリー and improve vertical readability. */
 (function(root){
   'use strict';
   if(root.InsightAnnualSummaryDisplay)return;
   if(!root.document)return;
 
   var doc=root.document;
-  var METRIC_LABELS=['売上','客数','買上点数','廃棄金額','廃棄率','客単価','人件費','粗利率'];
+  var LABELS=['売上','客数','買上点数','廃棄金額'];
   var state={found:false,removed:false,metricCount:0};
 
   var style=doc.createElement('style');
@@ -13,8 +13,9 @@
   style.textContent=[
     '.insight-annual-summary-enhanced .insight-annual-summary-title{font-size:16px!important;line-height:1.4!important;margin-bottom:8px!important}',
     '.insight-annual-summary-metrics{row-gap:12px!important}',
-    '.insight-annual-summary-metric-label{font-size:13px!important;line-height:1.45!important;padding-top:3px!important;padding-bottom:3px!important}',
-    '.insight-annual-summary-metric-value{font-size:18px!important;line-height:1.3!important;font-weight:800!important;padding-top:3px!important;padding-bottom:3px!important}'
+    '.insight-annual-summary-metric{padding-top:6px!important;padding-bottom:6px!important}',
+    '.insight-annual-summary-metric-label{font-size:13px!important;line-height:1.45!important}',
+    '.insight-annual-summary-metric-value{font-size:18px!important;line-height:1.3!important;font-weight:800!important}'
   ].join('');
   doc.head.appendChild(style);
 
@@ -34,52 +35,39 @@
     for(var i=0;i<nodes.length;i++)if(normalized(nodes[i]).indexOf(text)>=0)return nodes[i];
     return null;
   }
-  function knownCount(node,except){
-    var text=normalized(node),count=0;
-    METRIC_LABELS.forEach(function(label){
-      if(label!==except&&text.indexOf(label)>=0)count++;
-    });
-    return count;
-  }
-  function findAnnualRoot(heading){
-    var current=heading;
-    while(current&&current!==doc.body){
-      var buy=containing(current,'買上点数');
-      if(buy&&knownCount(current,'買上点数')>=2)return {root:current,buy:buy};
-      current=current.parentElement;
+  function metricsForHeading(heading){
+    if(!heading)return null;
+    var sibling=heading.nextElementSibling;
+    if(sibling&&containing(sibling,'売上')&&containing(sibling,'客数')&&containing(sibling,'廃棄金額'))return sibling;
+    var parent=heading.parentElement;
+    if(!parent)return null;
+    var children=Array.prototype.slice.call(parent.children);
+    for(var i=0;i<children.length;i++){
+      var node=children[i];
+      if(node!==heading&&containing(node,'売上')&&containing(node,'客数')&&containing(node,'廃棄金額'))return node;
     }
     return null;
   }
-  function removableBlock(label,rootNode){
-    var current=label;
-    while(current.parentElement&&current.parentElement!==rootNode){
-      var parent=current.parentElement;
-      if(normalized(parent).indexOf('年間サマリー')>=0||knownCount(parent,'買上点数')>0)break;
-      current=parent;
-    }
-    return current;
+  function metricLabel(block){
+    for(var i=0;i<LABELS.length;i++)if(normalized(block).indexOf(LABELS[i])>=0)return LABELS[i];
+    return null;
   }
-  function decorateMetricContainer(container){
-    if(!container)return 0;
-    container.classList.add('insight-annual-summary-metrics');
+  function decorate(metrics){
     var count=0;
-    Array.prototype.forEach.call(container.children,function(block){
-      if(block.dataset&&block.dataset.insightAnnualSummaryRemoved==='1')return;
-      var blockText=normalized(block),labelName=null;
-      METRIC_LABELS.forEach(function(label){
-        if(label!=='買上点数'&&!labelName&&blockText.indexOf(label)>=0)labelName=label;
-      });
-      if(!labelName)return;
+    Array.prototype.forEach.call(metrics.children,function(block){
+      var label=metricLabel(block);
+      if(!label||label==='買上点数')return;
       block.classList.add('insight-annual-summary-metric');
-      var labelNode=containing(block,labelName);
-      if(labelNode)labelNode.classList.add('insight-annual-summary-metric-label');
-      leaves(block).forEach(function(node){
-        var text=normalized(node);
-        if(node===labelNode)return;
-        if(/[0-9０-９]/.test(text)||/[¥￥%％円人点千]/.test(text)||text==='—'||text==='-'){
-          node.classList.add('insight-annual-summary-metric-value');
-        }
-      });
+
+      var labelLeaf=containing(block,label);
+      if(labelLeaf)labelLeaf.classList.add('insight-annual-summary-metric-label');
+
+      var branches=Array.prototype.slice.call(block.children);
+      var labelBranch=branches.find(function(node){return normalized(node).indexOf(label)>=0;})||null;
+      var valueBranch=branches.slice().reverse().find(function(node){
+        return node!==labelBranch&&normalized(node)&&LABELS.every(function(name){return normalized(node).indexOf(name)<0;});
+      })||null;
+      if(valueBranch)valueBranch.classList.add('insight-annual-summary-metric-value');
       count++;
     });
     return count;
@@ -92,35 +80,26 @@
       return false;
     }
 
-    var enhanced=heading.closest('.insight-annual-summary-enhanced');
-    if(enhanced){
-      heading.classList.add('insight-annual-summary-title');
-      var metrics=enhanced.querySelector('.insight-annual-summary-metrics');
-      state={found:true,removed:!containing(enhanced,'買上点数'),metricCount:decorateMetricContainer(metrics)};
-      return true;
-    }
-
-    var match=findAnnualRoot(heading);
-    if(!match){
+    var metrics=metricsForHeading(heading);
+    if(!metrics){
       state={found:true,removed:false,metricCount:0};
       return false;
     }
 
-    var rootNode=match.root,buy=match.buy;
-    rootNode.classList.add('insight-annual-summary-enhanced');
+    var section=heading.parentElement;
+    if(section)section.classList.add('insight-annual-summary-enhanced');
     heading.classList.add('insight-annual-summary-title');
+    metrics.classList.add('insight-annual-summary-metrics');
 
-    var block=removableBlock(buy,rootNode);
-    var container=block&&block.parentElement;
-    if(block&&container){
-      block.dataset.insightAnnualSummaryRemoved='1';
-      block.remove();
-    }
+    var buyBlock=Array.prototype.find.call(metrics.children,function(block){
+      return normalized(block).indexOf('買上点数')>=0;
+    });
+    if(buyBlock)buyBlock.remove();
 
     state={
       found:true,
-      removed:!containing(rootNode,'買上点数'),
-      metricCount:decorateMetricContainer(container)
+      removed:Array.prototype.every.call(metrics.children,function(block){return normalized(block).indexOf('買上点数')<0;}),
+      metricCount:decorate(metrics)
     };
     return state.removed;
   }

@@ -50,14 +50,16 @@ test('AI表示CSSはIndexの文字列置換ではなくpresentation moduleが所
 test('年間サマリーは買上点数だけを表示対象から外し縦方向の可読性を上げる',()=>{
   const index=read('Index.html');
   const annual=read('insight_annual_summary_v1.js');
-  assert.match(index,/insight_annual_summary_v1\.js\?v=20261005-remove-items-2/);
+  assert.match(index,/insight_annual_summary_v1\.js\?v=20261005-remove-items-3/);
   assert.match(annual,/exact\(page,'年間サマリー'\)/);
-  assert.match(annual,/function containing\(rootNode,text\)/);
-  assert.match(annual,/containing\(current,'買上点数'\)/);
-  assert.match(annual,/block\.remove\(\)/);
+  assert.match(annual,/function metricsForHeading\(heading\)/);
+  assert.match(annual,/heading\.nextElementSibling/);
+  assert.match(annual,/normalized\(block\)\.indexOf\('買上点数'\)>=0/);
+  assert.match(annual,/buyBlock\.remove\(\)/);
   assert.match(annual,/insight-annual-summary-metric-label\{font-size:13px!important/);
   assert.match(annual,/insight-annual-summary-metric-value\{font-size:18px!important/);
   assert.match(annual,/insight-annual-summary-metrics\{row-gap:12px!important\}/);
+  assert.match(annual,/insight-annual-summary-metric\{padding-top:6px!important;padding-bottom:6px!important\}/);
   assert.doesNotMatch(annual,/localStorage\.(?:setItem|removeItem|clear)/);
 });
 
