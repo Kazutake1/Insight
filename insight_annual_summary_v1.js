@@ -29,6 +29,11 @@
     for(var i=0;i<nodes.length;i++)if(normalized(nodes[i])===text)return nodes[i];
     return null;
   }
+  function containing(rootNode,text){
+    var nodes=leaves(rootNode);
+    for(var i=0;i<nodes.length;i++)if(normalized(nodes[i]).indexOf(text)>=0)return nodes[i];
+    return null;
+  }
   function knownCount(node,except){
     var text=normalized(node),count=0;
     METRIC_LABELS.forEach(function(label){
@@ -39,7 +44,7 @@
   function findAnnualRoot(heading){
     var current=heading;
     while(current&&current!==doc.body){
-      var buy=exact(current,'買上点数');
+      var buy=containing(current,'買上点数');
       if(buy&&knownCount(current,'買上点数')>=2)return {root:current,buy:buy};
       current=current.parentElement;
     }
@@ -66,7 +71,7 @@
       });
       if(!labelName)return;
       block.classList.add('insight-annual-summary-metric');
-      var labelNode=exact(block,labelName);
+      var labelNode=containing(block,labelName);
       if(labelNode)labelNode.classList.add('insight-annual-summary-metric-label');
       leaves(block).forEach(function(node){
         var text=normalized(node);
@@ -91,7 +96,7 @@
     if(enhanced){
       heading.classList.add('insight-annual-summary-title');
       var metrics=enhanced.querySelector('.insight-annual-summary-metrics');
-      state={found:true,removed:!exact(enhanced,'買上点数'),metricCount:decorateMetricContainer(metrics)};
+      state={found:true,removed:!containing(enhanced,'買上点数'),metricCount:decorateMetricContainer(metrics)};
       return true;
     }
 
@@ -114,7 +119,7 @@
 
     state={
       found:true,
-      removed:!exact(rootNode,'買上点数'),
+      removed:!containing(rootNode,'買上点数'),
       metricCount:decorateMetricContainer(container)
     };
     return state.removed;

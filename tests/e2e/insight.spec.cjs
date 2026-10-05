@@ -145,7 +145,7 @@ test('年間サマリーは買上点数を表示せず残り項目の縦可読�
   await expect.poll(()=>page.evaluate(()=>window.InsightAnnualSummaryDisplay.getState())).toMatchObject({found:true,removed:true});
   const annual=page.locator('.insight-annual-summary-enhanced');
   await expect(annual).toBeVisible();
-  await expect(annual.getByText('買上点数',{exact:true})).toHaveCount(0);
+  await expect(annual.getByText(/買上点数/)).toHaveCount(0);
   const typography=await annual.evaluate(node=>{
     const label=node.querySelector('.insight-annual-summary-metric-label');
     const value=node.querySelector('.insight-annual-summary-metric-value');
