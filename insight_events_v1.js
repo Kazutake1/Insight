@@ -439,7 +439,7 @@
           var h=el('div',undefined,'ie-head');h.append(el('strong','よく使うセール'),button('編集',function(){managePresets(draw);}));content.append(h);
           var ps=el('div',undefined,'ie-presets'),items=presets(allStores);items.slice(0,showAll?items.length:6).forEach(function(p){ps.append(button(summary(p.snapshot),function(){save(copy(p.snapshot),p.id);}));});
           if(!items.length)ps.append(el('span','「編集」からよく使うセールを追加できます。','ie-muted'));
-          if(items.length>6)ps.append(button(showAll?'折りたたむ':'すべて表示（'+items.length+'件）',function(){showAll=!showAll;draw();}));content.append(ps);if(editing)content.append(el('p','プリセットを選ぶと、その内容で登録済みイベントを変更します。下の項目から個別編集もできます。','ie-muted'));
+          if(items.length>6)ps.append(button(showAll?'折りたたむ':'すべて表示（'+items.length+'件）',function(){showAll=!showAll;draw();}));content.append(ps);
           read=saleEditor(content,editing&&source.type==='sale'?source.snapshot:null);
         }else{
           if(type.value==='other')scope=select(content,'適用範囲',{store:'この店舗のみ',global:'全店舗共通'},editing&&source.type==='other'?source.scope:'store');
@@ -462,7 +462,7 @@
         }
       }
       type.onchange=function(){showAll=false;eventTemplate=null;templatePresetId=null;draw();};draw();
-      if(editing)form.append(el('p','変更内容は保存後、登録済みの期間全体に反映されます。','ie-muted'));
+      
       var actions=el('div',undefined,'ie-actions'),submit=el('button',editing?'変更を保存':'登録する','ie-primary');submit.type='submit';actions.append(button('キャンセル',function(){d.close();}),submit);form.append(actions);
       form.onsubmit=function(e){e.preventDefault();try{save(read(),templatePresetId);}catch(err){alert(err.message);}};
     }
