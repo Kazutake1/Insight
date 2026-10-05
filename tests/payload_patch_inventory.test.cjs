@@ -502,7 +502,7 @@ test('イベント実績は過去開催・日付カード・時間帯グラフ�
   const index=read('Index.html');
   const eventResults=read('insight_event_results_v1.js');
   const events=read('insight_events_v1.js');
-  assert.match(index,/insight_events_v1\.js\?v=20261005-sale-dialog-cleanup/);
+  assert.match(index,/insight_events_v1\.js\?v=20261006-remove-add-hint/);
   assert.match(index,/insight_event_results_v1\.js\?v=20261004-grouped-overview/);
   assert.ok(index.indexOf('insight_analysis_context_v1.js')<index.indexOf('insight_event_results_v1.js'));
   assert.ok(index.indexOf('insight_event_results_v1.js')<index.indexOf('insight_daily_anomaly_v1.js'));
@@ -511,6 +511,8 @@ test('イベント実績は過去開催・日付カード・時間帯グラフ�
   assert.doesNotMatch(events,/全店舗共通・指定期間の各日に表示します。/);
   assert.doesNotMatch(events,/選ぶと上記の期間で登録します。個別の条件は下で入力できます。/);
   assert.doesNotMatch(events,/同じカテゴリー内に複数の値引きパターンがある場合は/);
+  assert.doesNotMatch(events,/イベントは登録時に保存されます。日次の「クリア」では削除されません。/);
+  assert.match(events,/変更内容は保存後、登録済みの期間全体に反映されます。/);
   assert.match(eventResults,/過去開催一覧/);
   assert.match(eventResults,/<span>イベント・催事<\/span>/);
   assert.match(eventResults,/page-title">イベント・催事実績/);

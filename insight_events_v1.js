@@ -462,7 +462,7 @@
         }
       }
       type.onchange=function(){showAll=false;eventTemplate=null;templatePresetId=null;draw();};draw();
-      form.append(el('p',editing?'変更内容は保存後、登録済みの期間全体に反映されます。':'イベントは登録時に保存されます。日次の「クリア」では削除されません。','ie-muted'));
+      if(editing)form.append(el('p','変更内容は保存後、登録済みの期間全体に反映されます。','ie-muted'));
       var actions=el('div',undefined,'ie-actions'),submit=el('button',editing?'変更を保存':'登録する','ie-primary');submit.type='submit';actions.append(button('キャンセル',function(){d.close();}),submit);form.append(actions);
       form.onsubmit=function(e){e.preventDefault();try{save(read(),templatePresetId);}catch(err){alert(err.message);}};
     }

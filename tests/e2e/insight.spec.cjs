@@ -1594,6 +1594,7 @@ test('セール追加ダイアログは補足文を省きプリセット一覧�
   await expect(eventDialog.getByText('全店舗共通・指定期間の各日に表示します。',{exact:true})).toHaveCount(0);
   await expect(eventDialog.getByText('選ぶと上記の期間で登録します。個別の条件は下で入力できます。',{exact:true})).toHaveCount(0);
   await expect(eventDialog.getByText(/同じカテゴリー内に複数の値引きパターンがある場合は/)).toHaveCount(0);
+  await expect(eventDialog.getByText('イベントは登録時に保存されます。日次の「クリア」では削除されません。',{exact:true})).toHaveCount(0);
   const presetMargin=await eventDialog.locator('.ie-presets').evaluate(node=>getComputedStyle(node).marginTop);
   expect(presetMargin).toBe('10px');
   await eventDialog.getByRole('button',{name:'閉じる'}).click();
