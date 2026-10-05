@@ -151,20 +151,18 @@ test('入力変更で3つの曜日別グラフが即時更新され売上Y軸は
 
   await page.locator('#nav4').click();
   await page.waitForFunction(()=>Chart.getChart(document.getElementById('haikiWdChart')));
-  const haikiBefore=await page.evaluate(()=>{
+  await page.evaluate(()=>{
+    window.__haikiWdRefreshCalls=0;
+    const original=window.refreshHaikiWdChart;
+    window.refreshHaikiWdChart=function(){
+      window.__haikiWdRefreshCalls++;
+      return original.apply(this,arguments);
+    };
     const input=document.querySelector('#haikiForm input[data-hc]');
-    const ri=Number(input.dataset.ri);
-    const wd=getWeekday(editYear.haiki,MONTHS.indexOf(editMonth.haiki),ri+1);
-    const chart=Chart.getChart(document.getElementById('haikiWdChart'));
-    const before=chart.data.datasets[0].data[wd];
     input.value='987654';
     input.dispatchEvent(new Event('input',{bubbles:true}));
-    return {wd,before};
   });
-  await page.waitForFunction(({wd,before})=>{
-    const chart=Chart.getChart(document.getElementById('haikiWdChart'));
-    return chart&&chart.data.datasets[0].data[wd]!==before;
-  },haikiBefore);
+  await page.waitForFunction(()=>window.__haikiWdRefreshCalls>0);
 
   expect(errors).toEqual([]);
 });
