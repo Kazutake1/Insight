@@ -165,7 +165,7 @@ test('分析AIの対象年月をサイドバー切替後も固定し各ページ
   const lock=read('insight_analysis_period_lock_v1.js');
   const salesCount=read('insight_sales_count_v1.js');
   assert.match(index,/insight_analysis_period_lock_v1\.js\?v=20261001-sync-owner/);
-  assert.match(index,/insight_sales_count_v1\.js\?v=20261005-calendar-fit/);
+  assert.match(index,/insight_sales_count_v1\.js\?v=20261005-ipad-calendar-fit/);
   assert.match(presentation,/aiAnalysisTarget/);
   assert.match(presentation,/!window\.InsightPagePeriodSync&&window\.InsightAnalysisPeriodLock/);
   assert.match(pageAI,/InsightAnalysisPeriodLock\.getContext/);
@@ -560,7 +560,7 @@ test('セール実績ページは販売数入力直後に読み込み同一日�
   const index=read('Index.html');
   const saleResults=read('insight_sale_results_v1.js');
   const sales=read('insight_sales_count_v1.js');
-  assert.match(index,/insight_sales_count_v1\.js\?v=20261005-calendar-fit/);
+  assert.match(index,/insight_sales_count_v1\.js\?v=20261005-ipad-calendar-fit/);
   assert.match(index,/insight_sale_results_v1\.js\?v=20261004-kpi-3/);
   assert.ok(index.indexOf('insight_sales_count_v1.js')<index.indexOf('insight_sale_results_v1.js'));
   assert.ok(index.indexOf('insight_sale_results_v1.js')<index.indexOf('insight_page_period_sync_v1.js'));
@@ -699,6 +699,8 @@ test('曜日別平均カードと廃棄悪化色の表示契約を維持する',
   const visual=read('insight_ai_visual_v1.js');
   assert.match(sales,/\.sc-calendar\{[^}]*grid-template-columns:repeat\(7,minmax\(160px,1fr\)\);gap:8px/);
   assert.match(sales,/\.sc-average-grid\{[^}]*grid-template-columns:repeat\(7,minmax\(160px,1fr\)\);gap:8px/);
+  assert.match(sales,/@media\(max-width:1200px\)\{\.sc-calendar,\.sc-average-grid\{grid-template-columns:repeat\(7,minmax\(0,1fr\)\);gap:6px\}/);
+  assert.match(sales,/@media\(max-width:800px\)\{\.sc-calendar,\.sc-average-grid\{grid-template-columns:repeat\(7,minmax\(102px,1fr\)\);gap:7px\}/);
   assert.match(sales,/sc-day sc-average-card/);
   assert.match(sales,/sc-trip sc-delivery-row/);
   assert.match(sales,/sc-trip sc-sales-row/);
@@ -724,7 +726,7 @@ test('販売数カテゴリーの対象便設定を全関連層で共有する',
   const analysis=read('insight_analysis_context_v1.js');
   const saleResults=read('insight_sale_results_v1.js');
   const pageAI=read('insight_ai_page_comments_v1.js');
-  assert.match(index,/insight_sales_count_v1\.js\?v=20261005-calendar-fit/);
+  assert.match(index,/insight_sales_count_v1\.js\?v=20261005-ipad-calendar-fit/);
   assert.match(index,/insight_sale_results_v1\.js\?v=20261004-kpi-3/);
   assert.match(index,/insight_analysis_context_v1\.js\?v=20261004-special-demand/);
   assert.match(index,/insight_ai_page_comments_v1\.js\?v=20261001-decision-analysis/);

@@ -305,6 +305,44 @@ test('STEP17の文字階層をダッシュボード・入力・販売数・分�
   expect(errors).toEqual([]);
 });
 
+test('販売数入力カレンダーはiPad幅で7列を見切れなく表示する',async({page})=>{
+  await page.setViewportSize({width:1024,height:768});
+  const errors=await openInsight(page);
+  await page.locator('#navSalesCount').click();
+  await expect(page.locator('#pageSalesCount .sc-calendar')).toBeVisible();
+  const layout=await page.evaluate(()=>{
+    const calendar=document.querySelector('#pageSalesCount .sc-calendar');
+    const averageGrid=document.querySelector('#pageSalesCount .sc-average-grid');
+    function read(grid,cardSelector){
+      const cards=Array.from(grid.querySelectorAll(cardSelector)).filter(node=>!node.classList.contains('empty'));
+      const gridRect=grid.getBoundingClientRect();
+      const first=cards[0]&&cards[0].getBoundingClientRect();
+      const last=cards.length&&cards[cards.length-1].getBoundingClientRect();
+      return {
+        clientWidth:grid.clientWidth,
+        scrollWidth:grid.scrollWidth,
+        gap:getComputedStyle(grid).columnGap,
+        template:getComputedStyle(grid).gridTemplateColumns,
+        firstLeft:first?first.left:null,
+        lastRight:last?last.right:null,
+        gridLeft:gridRect.left,
+        gridRight:gridRect.right
+      };
+    }
+    return {
+      calendar:read(calendar,'.sc-day'),
+      average:read(averageGrid,'.sc-average-day')
+    };
+  });
+  for(const item of [layout.calendar,layout.average]){
+    expect(item.gap).toBe('6px');
+    expect(item.scrollWidth).toBeLessThanOrEqual(item.clientWidth+1);
+    expect(item.firstLeft).toBeGreaterThanOrEqual(item.gridLeft-1);
+    expect(item.lastRight).toBeLessThanOrEqual(item.gridRight+1);
+  }
+  expect(errors).toEqual([]);
+});
+
 test('設定ボタンは他のサイドバーナビと文字・アイコン配置を揃える',async({page})=>{
   const errors=await openInsight(page);
   const styles=await page.evaluate(()=>{
