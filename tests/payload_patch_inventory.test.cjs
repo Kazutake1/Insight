@@ -270,12 +270,12 @@ test('入力グラフ補助文の整理は入力3ページだけを対象にす�
 test('売上・客数・廃棄の曜日別グラフ下部余白だけを詰める',()=>{
   const index=read('Index.html');
   const spacing=read('insight_weekday_chart_spacing_v1.js');
-  assert.match(index,/insight_weekday_chart_spacing_v1\.js\?v=20261006-bottom-gap-1/);
+  assert.match(index,/insight_weekday_chart_spacing_v1\.js\?v=20261006-fill-height-2/);
   assert.match(spacing,/#salesWdChart,#kyakuWdChart,#haikiWdChart/);
   assert.match(spacing,/#pageSales \*:has\(> #salesWdChart\)/);
   assert.match(spacing,/#pageKyaku \*:has\(> #kyakuWdChart\)/);
   assert.match(spacing,/#pageHaiki \*:has\(> #haikiWdChart\)/);
-  assert.match(spacing,/padding-bottom:6px!important/);
+  assert.match(spacing,/padding-bottom:0!important/);
   assert.doesNotMatch(spacing,/localStorage|InsightStorage|persist\(/);
   assert.doesNotThrow(()=>new vm.Script(spacing),'weekday chart spacing module must be valid JavaScript');
 });
