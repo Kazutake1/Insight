@@ -1,12 +1,7 @@
 const {test,expect}=require('@playwright/test');
-const path=require('node:path');
 const fs=require('node:fs');
 
 async function openInsight(page){
-  const pakoPath=path.join(process.cwd(),'node_modules','pako','dist','pako.min.js');
-  await page.route('https://unpkg.com/pako@2.1.0/dist/pako.min.js',route=>
-    route.fulfill({path:pakoPath,contentType:'application/javascript'})
-  );
   const errors=[];
   page.on('pageerror',error=>errors.push(error.message));
   await page.goto('/Index.html',{waitUntil:'domcontentloaded'});
@@ -908,10 +903,6 @@ test('データ状態チェックは未登録年度を要確認表示し保存�
 
 
 test('保存済みデータが壊れている場合は空データで起動せず保存データを保持する',async({page})=>{
-  const pakoPath=path.join(process.cwd(),'node_modules','pako','dist','pako.min.js');
-  await page.route('https://unpkg.com/pako@2.1.0/dist/pako.min.js',route=>
-    route.fulfill({path:pakoPath,contentType:'application/javascript'})
-  );
   await page.addInitScript(()=>localStorage.setItem('insight_v11','{"current":"broken","stores":'));
   await page.goto('/Index.html',{waitUntil:'domcontentloaded'});
   await expect(page.locator('#insightStorageLoadError')).toBeVisible();
