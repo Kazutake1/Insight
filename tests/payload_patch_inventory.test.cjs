@@ -354,7 +354,7 @@ test('設定ページはサイドバー下部の管理項目を集約する',()=
 test('年度管理ボタンは設定へ移動し月ボタンはダッシュボード年度行へ移動する',()=>{
   const index=readShell();
   const layout=read('insight_year_controls_layout_v1.js');
-  assert.match(index,/insight_year_controls_layout_v1\.js\?v=20261006-month-selected-border-2/);
+  assert.match(index,/insight_year_controls_layout_v1\.js\?v=20261006-base-year-center-1/);
   assert.ok(index.indexOf('insight_settings_v1.js')<index.indexOf('insight_year_controls_layout_v1.js'));
   assert.match(layout,/insightSettingsYearSection/);
   assert.match(layout,/insightSettingsYearActions/);

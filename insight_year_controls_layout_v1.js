@@ -12,6 +12,7 @@
     '#insightSettingsYearActions>button{margin:0!important}',
     '#insightSettingsYearInlineHost:empty{display:none}',
     '#insightSettingsYearInlineHost:not(:empty){margin-top:10px}',
+    '#pageDash #baseYearSel{text-align:center;text-align-last:center}',
     '#pageDash .insight-dashboard-year-row{flex-wrap:wrap!important}',
     '#pageDash .insight-dashboard-inline-months{display:contents!important}',
     '#pageDash .insight-dashboard-inline-months>button{background:#fff!important;color:#1a1a1a!important}',
