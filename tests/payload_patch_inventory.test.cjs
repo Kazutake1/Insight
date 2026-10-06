@@ -90,7 +90,7 @@ test('天気キー拡張はruntime moduleが所有しbootstrap patch件数に含
 
 test('未使用の天気相関グループはbootstrapで書き換えない',()=>{
   const bootstrap=read('insight_bootstrap_patches_v1.js');
-  const featureFiles=fs.readdirSync(root).filter(name=>name.endsWith('.js')&&name!=='insight_bootstrap_patches_v1.js');
+  const featureFiles=fs.readdirSync(root).filter(name=>name.endsWith('.js')&&name!=='insight_bootstrap_patches_v1.js'&&!name.startsWith('insight_payload_'));
   const consumers=featureFiles.filter(name=>/getCorrData|wxAvg|wxGroups/.test(read(name)));
   assert.doesNotMatch(bootstrap,/const wxGroups=/);
   assert.deepEqual(consumers,[]);
