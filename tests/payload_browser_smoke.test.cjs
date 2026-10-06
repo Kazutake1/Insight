@@ -44,20 +44,19 @@ test('主要ナビ・入力・保存関数はbase payloadに存在する',()=>{
   }
 });
 
-test('起動時の保存データ読込は失敗時に空データへフォールバックしない',()=>{
-  const bootstrap=read('insight_bootstrap_patches_v1.js');
-  assert.match(bootstrap,/var originalLoadAll=/);
-  assert.match(bootstrap,/var safeLoadAll=/);
-  assert.match(bootstrap,/Insight stored data load failed/);
-  assert.match(bootstrap,/insightStorageLoadError/);
-  assert.match(bootstrap,/insightStorageLoadReason/);
-  assert.match(bootstrap,/insightStorageExportRaw/);
-  assert.match(bootstrap,/new Blob\(\[raw\]/);
-  assert.match(bootstrap,/if\(current!==null\)/);
-  assert.match(bootstrap,/failStoredDataLoad/);
-  assert.match(bootstrap,/activeYears/);
-  assert.match(bootstrap,/Object\.entries\(st\.data\)/);
-  assert.match(bootstrap,/activeYears&&!activeYears\.has/);
+test('起動時の保存データ読込安全化はpayload本体に組み込まれている',()=>{
+  const html=basePayload();
+  assert.match(html,/Insight stored data load failed/);
+  assert.match(html,/insightStorageLoadError/);
+  assert.match(html,/insightStorageLoadReason/);
+  assert.match(html,/insightStorageExportRaw/);
+  assert.match(html,/new Blob\(\[raw\]/);
+  assert.match(html,/if\(current!==null\)/);
+  assert.match(html,/failStoredDataLoad/);
+  assert.match(html,/activeYears/);
+  assert.match(html,/Object\.entries\(st\.data\)/);
+  assert.match(html,/activeYears&&!activeYears\.has/);
+  assert.doesNotMatch(html,/function loadAll\(\)\{\n  try\{\n    const s=localStorage\.getItem\(SK\)/);
 });
 
 test('STEP5互換処理の元anchorはpayload内に残して破壊していない',()=>{
