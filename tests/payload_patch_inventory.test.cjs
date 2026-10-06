@@ -8,15 +8,13 @@ const root=path.join(__dirname,'..');
 const read=name=>fs.readFileSync(path.join(root,name),'utf8');
 const readShell=()=>[read('Index.html'),read('insight_shell_boot_v1.js'),read('insight_shell_loader_v1.js')].join('\n');
 
-test('payload文字列互換パッチは0件でshell loaderもbootstrap patcherへ依存しない',()=>{
+test('旧bootstrap shimは削除されshell loaderも依存しない',()=>{
   const index=read('Index.html');
   const loader=read('insight_shell_loader_v1.js');
-  const bootstrap=read('insight_bootstrap_patches_v1.js');
-  assert.equal((bootstrap.match(/^patch\(/gm)||[]).length,0);
+  assert.equal(fs.existsSync(path.join(root,'insight_bootstrap_patches_v1.js')),false);
   assert.equal((index.match(/html=html\.replace/g)||[]).length,0);
   assert.equal((loader.match(/html=html\.replace/g)||[]).length,1);
   assert.doesNotMatch(index+loader,/insight_bootstrap_patches_v1\.js|InsightBootstrapPatches/);
-  assert.match(bootstrap,/return html/);
 });
 
 test('Index shellはinline script/styleを持たず外部assetへ分離する',()=>{
@@ -52,58 +50,48 @@ test('トップページはキャッシュ抑止とシェル・機能manifestの
   assert.doesNotMatch(index,/if\(params\.get\('insight_build'\)===BUILD\)return/);
 });
 
-test('天気アイコン拡張はruntime moduleが所有しbootstrap patch件数に含めない',()=>{
+test('天気アイコン拡張はruntime moduleが所有し旧bootstrap shimに依存しない',()=>{
   const index=readShell();
-  const bootstrap=read('insight_bootstrap_patches_v1.js');
   const runtime=read('insight_weather_icon_compat_v1.js');
   assert.match(index,/insight_weather_icon_compat_v1\.js\?v=20261006-weather-icons-runtime-1/);
   assert.ok(index.indexOf('insight_weather_icon_compat_v1.js')<index.indexOf('insight_weather_compact_v1.js'));
-  assert.doesNotMatch(bootstrap,/🌫️|🧊|🌩️/);
   assert.match(runtime,/typeof WX_ICONS==='undefined'/);
   assert.match(runtime,/WX_ICONS\['霧'\]='🌫️'/);
   assert.doesNotThrow(()=>new vm.Script(runtime),'weather icon runtime module must be valid JavaScript');
 });
 
-test('天気キー拡張はruntime moduleが所有しbootstrap patch件数に含めない',()=>{
+test('天気キー拡張はruntime moduleが所有し旧bootstrap shimに依存しない',()=>{
   const index=readShell();
-  const bootstrap=read('insight_bootstrap_patches_v1.js');
   const runtime=read('insight_weather_keys_compat_v1.js');
   assert.match(index,/insight_weather_keys_compat_v1\.js\?v=20261006-weather-keys-runtime-1/);
   assert.ok(index.indexOf('insight_weather_icon_compat_v1.js')<index.indexOf('insight_weather_keys_compat_v1.js'));
   assert.ok(index.indexOf('insight_weather_keys_compat_v1.js')<index.indexOf('insight_weather_compact_v1.js'));
-  assert.doesNotMatch(bootstrap,/patch\("const WX_KEYS=/);
   assert.match(runtime,/typeof WX_KEYS==='undefined'/);
   assert.match(runtime,/WX_KEYS\.indexOf\(wx\)<0/);
   assert.doesNotThrow(()=>new vm.Script(runtime),'weather key runtime module must be valid JavaScript');
 });
 
-test('未使用の天気相関グループはbootstrapで書き換えない',()=>{
-  const bootstrap=read('insight_bootstrap_patches_v1.js');
-  const featureFiles=fs.readdirSync(root).filter(name=>name.endsWith('.js')&&name!=='insight_bootstrap_patches_v1.js');
+test('未使用の天気相関グループは追加補正を持たない',()=>{
+  const featureFiles=fs.readdirSync(root).filter(name=>name.endsWith('.js'));
   const consumers=featureFiles.filter(name=>/getCorrData|wxAvg|wxGroups/.test(read(name)));
-  assert.doesNotMatch(bootstrap,/const wxGroups=/);
   assert.deepEqual(consumers,[]);
 });
 
 test('Chart.js依存はshellでSRI付き読込しpayload内の旧タグを実行前に除去する',()=>{
   const index=readShell();
-  const bootstrap=read('insight_bootstrap_patches_v1.js');
   assert.match(index,/https:\/\/cdnjs\.cloudflare\.com\/ajax\/libs\/Chart\.js\/4\.4\.1\/chart\.umd\.min\.js/);
   assert.match(index,/integrity="sha512-CQBWl4fJHWbryGE\+Pc7UAxWMUMNMWzWxF4SQo9CgkJIN1kx6djDQZjh3Y8SZ1d\+6I\+1zze6Z7kHXO7q3UyZAWw=="/);
   assert.match(index,/crossorigin="anonymous" referrerpolicy="no-referrer"/);
   assert.match(index,/function stripPayloadChartScript\(html\)/);
   assert.match(index,/html=stripPayloadChartScript\(html\)/);
   assert.match(index,/typeof Chart==='undefined'/);
-  assert.doesNotMatch(bootstrap,/Chart\.js\/4\.4\.1/);
 });
 
-test('旧コア配色補正はbootstrap文字列置換ではなくruntime style moduleが所有する',()=>{
+test('旧コア配色補正はruntime style moduleが所有する',()=>{
   const index=readShell();
-  const bootstrap=read('insight_bootstrap_patches_v1.js');
   const compat=read('insight_legacy_style_compat_v1.js');
   assert.match(index,/insight_legacy_style_compat_v1\.js\?v=20261006-core-contrast-runtime-1/);
   assert.ok(index.indexOf('insight_legacy_style_compat_v1.js')<index.indexOf('insight_yoy_policy_v1.js'));
-  assert.doesNotMatch(bootstrap,/background:#1a1a1a;color:#fff;box-shadow:0 6px 24px var\(--shadow\)/);
   assert.match(compat,/getPropertyValue\('background'\)/);
   assert.match(compat,/setProperty\('background','#1a1a1a'\)/);
   assert.match(compat,/setProperty\('color','#fff'\)/);
@@ -514,11 +502,9 @@ test('全分析バンドルは履歴の後・AI解釈の前に読み込み外部
 test('売上・客数・廃棄の旧年月UIはruntime selectorが除去し販売数入力方式だけを使う',()=>{
   const index=readShell();
   const controls=read('insight_sales_period_selector_v1.js');
-  const bootstrap=read('insight_bootstrap_patches_v1.js');
   assert.doesNotMatch(index,/insight_bootstrap_patches_v1\.js|InsightBootstrapPatches/);
   assert.match(index,/insight_sales_period_selector_v1\.js\?v=20261006-input-period-runtime-2/);
   assert.ok(index.indexOf('insight_page_period_sync_v1.js')<index.indexOf('insight_sales_period_selector_v1.js'));
-  assert.doesNotMatch(bootstrap,/legacyInputPeriodStart|入力ページ旧年月UIの開始位置が見つかりません/);
   assert.match(controls,/pageId:'pageSales'/);
   assert.match(controls,/pageId:'pageKyaku'/);
   assert.match(controls,/pageId:'pageHaiki'/);
@@ -536,7 +522,6 @@ test('売上・客数・廃棄の旧年月UIはruntime selectorが除去し販�
   assert.match(controls,/InsightPagePeriodSync\.setTarget/);
   assert.doesNotMatch(controls,/localStorage|InsightStorage\.writeSnapshot|InsightStorage\.transaction|\bfetch\s*\(|XMLHttpRequest|WebSocket/);
   assert.doesNotThrow(()=>new vm.Script(controls),'input period controls must be valid JavaScript');
-  assert.doesNotThrow(()=>new vm.Script(bootstrap),'bootstrap patches must be valid JavaScript');
 });
 
 test('保存データ健全性チェックは読み取り専用で不整合を可視化する',()=>{
@@ -840,16 +825,13 @@ test('店舗運営UIのCSSはops moduleが所有する',()=>{
   assert.match(ops,/\.monthly-ops-card/);
 });
 
-test('安全・互換処理はbootstrap文字列パッチではなく各所有層へ分離済み',()=>{
+test('安全・互換処理は各所有層へ分離済み',()=>{
   const index=readShell();
-  const bootstrap=read('insight_bootstrap_patches_v1.js');
   assert.doesNotMatch(index,/insight_bootstrap_patches_v1\.js|InsightBootstrapPatches/);
-  assert.equal((bootstrap.match(/^patch\(/gm)||[]).length,0);
   assert.match(read('insight_weather_keys_compat_v1.js'),/InsightWeatherKeysCompat/);
   assert.match(read('insight_weather_icon_compat_v1.js'),/InsightWeatherIconCompat/);
   assert.match(read('insight_persist_guard_v1.js'),/InsightPersistGuard/);
   assert.match(read('insight_persist_guard_v1.js'),/InsightStorage\.persistCurrent/);
-  assert.doesNotMatch(bootstrap,/Chart\.js\/4\.4\.1|integrity=|originalPersist|safePersist|yearToDelete/);
   assert.match(index,/Chart\.js\/4\.4\.1\/chart\.umd\.min\.js" integrity=/);
   assert.match(index,/referrerpolicy="no-referrer"/);
   assert.match(index,/stripPayloadChartScript/);
@@ -857,16 +839,13 @@ test('安全・互換処理はbootstrap文字列パッチではなく各所有�
   assert.match(index,/orderedFeatureLoads/);
 });
 
-test('STEP5完了: bootstrap文字列patch依存は0件',()=>{
+test('STEP5完了: 旧bootstrap shimは削除済み',()=>{
   const index=readShell();
-  const bootstrap=read('insight_bootstrap_patches_v1.js');
   assert.match(read('insight_persist_guard_v1.js'),/function guardedPersist\(\)/);
   assert.match(read('insight_legacy_style_compat_v1.js'),/InsightLegacyStyleCompat/);
   assert.match(index,/function stripPayloadChartScript\(html\)/);
   assert.match(read('insight_dashboard_year_fix_v1.js'),/removeLegacyYearDeleteUi/);
   assert.match(index,/STEP5 complete: payload source is self-contained/);
-  assert.equal((bootstrap.match(/^patch\(/gm)||[]).length,0);
-  assert.doesNotMatch(bootstrap,/originalLoadAll|safeLoadAll|互換パッチの適用対象が見つかりません/);
   assert.doesNotMatch(index,/insight_bootstrap_patches_v1\.js|InsightBootstrapPatches/);
   assert.equal((index.match(/html=html\.replace/g)||[]).length,1);
 });
