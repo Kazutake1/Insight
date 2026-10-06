@@ -5,59 +5,62 @@ const path=require('node:path');
 const vm=require('node:vm');
 
 const root=path.join(__dirname,'..');
+const read=name=>fs.readFileSync(path.join(root,name),'utf8');
 
-function safePersistSource(){
-  const bootstrap=fs.readFileSync(path.join(root,'insight_bootstrap_patches_v1.js'),'utf8');
-  const marker='var safePersist=',start=bootstrap.indexOf(marker);
-  const end=bootstrap.indexOf(';\nif(html.indexOf(originalPersist)',start);
-  assert.ok(start>=0&&end>start,'安全な保存処理がbootstrap moduleに定義されていること');
-  return vm.runInNewContext(bootstrap.slice(start+marker.length,end));
+function setupPersistGuard(options={}){
+  const calls=[],alerts=[];
+  let errorHandler=null;
+  const context={
+    allStores:{current:'a',stores:{a:{name:'A'}}},
+    persist(){calls.push(['legacy']);},
+    InsightStorage:{
+      persistCurrent:options.writer||((value)=>{calls.push(['storage',value]);return true;})
+    },
+    alert:message=>alerts.push(String(message)),
+    addEventListener:(type,handler)=>{if(type==='error')errorHandler=handler;},
+    Error,Array,Object,String,console
+  };
+  context.window=context;
+  context.globalThis=context;
+  vm.createContext(context);
+  vm.runInContext(read('insight_persist_guard_v1.js'),context);
+  return {context,calls,alerts,getErrorHandler:()=>errorHandler};
 }
 
-test('共通保存処理は成功時だけtrueを返す',()=>{
-  const calls=[];
-  const context={
-    SK:'insight',allStores:{current:'a'},
-    localStorage:{setItem:(key,value)=>calls.push([key,value])},
-    alert:()=>assert.fail('保存成功時に警告を出さないこと'),
-    window:{addEventListener:()=>{}},Error
-  };
-  vm.runInNewContext(safePersistSource(),context);
-  assert.equal(context.persist(),true);
-  assert.deepEqual(calls,[['insight','{"current":"a"}']]);
-});
-
-test('共通保存処理はStorage読込後に共有保存層へ委譲する',()=>{
-  const calls=[];
-  const context={
-    SK:'insight',allStores:{current:'a'},
-    localStorage:{setItem:()=>assert.fail('共有保存層がある場合はfallbackへ書かないこと')},
-    alert:()=>assert.fail('保存成功時に警告を出さないこと'),
-    window:{
-      InsightStorage:{persistCurrent:value=>{calls.push(value);return true;}},
-      addEventListener:()=>{}
-    },
-    Error
-  };
-  vm.runInNewContext(safePersistSource(),context);
+test('共通保存処理はruntime guardから共有保存層へ委譲する',()=>{
+  const {context,calls}=setupPersistGuard();
+  assert.equal(context.persist.__insightPersistGuard,true);
+  assert.equal(typeof context.persist.__insightOriginal,'function');
   assert.equal(context.persist(),true);
   assert.equal(calls.length,1);
-  assert.equal(calls[0],context.allStores);
+  assert.equal(calls[0][0],'storage');
+  assert.equal(calls[0][1],context.allStores);
 });
 
-test('共通保存処理は失敗時に成功表示へ進ませない',()=>{
-  const alerts=[];let errorHandler;
-  const context={
-    SK:'insight',allStores:{current:'a'},
-    localStorage:{setItem:()=>{throw new Error('quota');}},
-    alert:message=>alerts.push(message),
-    window:{addEventListener:(type,handler)=>{if(type==='error')errorHandler=handler;}},Error
-  };
-  vm.runInNewContext(safePersistSource(),context);
-  assert.throws(()=>context.persist(),error=>error&&error.name==='InsightPersistError');
+test('runtime persist guardは旧persistを実行せず共有writerだけを使用する',()=>{
+  const {context,calls}=setupPersistGuard();
+  context.persist();
+  assert.equal(calls.some(call=>call[0]==='legacy'),false);
+  assert.equal(calls.filter(call=>call[0]==='storage').length,1);
+});
+
+test('共通保存処理は失敗時に成功扱いせずInsightPersistErrorを通知する',()=>{
+  const quota=new Error('quota');
+  const {context,alerts,getErrorHandler}=setupPersistGuard({writer:()=>{throw quota;}});
+  assert.throws(()=>context.persist(),error=>error&&error.name==='InsightPersistError'&&error.cause===quota);
   assert.match(alerts[0],/現在の変更は保存されていません/);
-  let prevented=false;errorHandler({error:{name:'InsightPersistError'},preventDefault:()=>{prevented=true;}});
+  const handler=getErrorHandler();
+  assert.equal(typeof handler,'function');
+  let prevented=false;
+  handler({error:{name:'InsightPersistError'},preventDefault:()=>{prevented=true;}});
   assert.equal(prevented,true);
+});
+
+test('共有Storageが利用できない場合も旧persistへ戻らず失敗を明示する',()=>{
+  const {context,alerts}=setupPersistGuard();
+  context.InsightStorage=null;
+  assert.throws(()=>context.persist(),error=>error&&error.name==='InsightPersistError');
+  assert.match(alerts[0],/データを保存できませんでした/);
 });
 
 test('セール実績の内容はHTMLではなく文字列として描画する',()=>{

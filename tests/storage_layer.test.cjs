@@ -133,11 +133,15 @@ test('feature moduleはlocalStorageへ直接書き込まず共有storageを使�
   }
 });
 
-test('bootstrapの共通persistはStorage読込後に共有保存層へ委譲する',()=>{
+test('runtime persist guardはStorage直後に読み込まれ共有保存層へ委譲する',()=>{
   const index=fs.readFileSync(path.join(root,'Index.html'),'utf8');
   const bootstrap=fs.readFileSync(path.join(root,'insight_bootstrap_patches_v1.js'),'utf8');
-  assert.match(bootstrap,/var safePersist=/);
-  assert.match(bootstrap,/InsightStorage\.persistCurrent\(allStores\)/);
-  assert.match(bootstrap,/localStorage\.setItem\(SK,JSON\.stringify\(allStores\)\)/);
+  const guard=fs.readFileSync(path.join(root,'insight_persist_guard_v1.js'),'utf8');
+  assert.doesNotMatch(bootstrap,/originalPersist|safePersist|InsightPersistError/);
+  assert.match(guard,/InsightStorage\.persistCurrent\(currentSnapshot\(\)\)/);
+  assert.doesNotMatch(guard,/localStorage\.setItem/);
   assert.match(index,/insight_storage_v1\.js\?v=20261003-restore-readback/);
+  assert.match(index,/insight_persist_guard_v1\.js\?v=20261006-persist-runtime-1/);
+  assert.ok(index.indexOf('insight_storage_v1.js')<index.indexOf('insight_persist_guard_v1.js'));
+  assert.ok(index.indexOf('insight_persist_guard_v1.js')<index.indexOf('insight_year_manager_v1.js'));
 });

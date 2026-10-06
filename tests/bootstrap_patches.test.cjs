@@ -24,7 +24,8 @@ test('現在の圧縮payloadへ全互換パッチを適用できる',()=>{
   const patched=patches.apply(base);
   assert.notEqual(patched,base);
   assert.match(patched,/霧/);
-  assert.match(patched,/InsightStorage&&typeof window\.InsightStorage\.persistCurrent/);
+  assert.match(patched,/localStorage\.setItem\(SK,JSON\.stringify\(allStores\)\)/);
+  assert.doesNotMatch(patched,/InsightPersistError/);
   assert.match(patched,/Chart\.js\/4\.4\.1\/chart\.umd\.min\.js/);
   assert.doesNotMatch(patched,/Chart\.js\/4\.4\.1\/chart\.umd\.min\.js"[^>]*integrity=/);
   assert.match(patched,/let yearToDelete=null;/);
@@ -34,11 +35,16 @@ test('互換パッチ対象が欠けたpayloadはsilentに続行しない',()=>{
   assert.throws(()=>patches.apply('<!doctype html><html><body></body></html>'),/互換パッチの適用対象が見つかりません/);
 });
 
-test('bootstrap patch moduleは外部通信を行わず保存処理はpayloadへ差し込む文字列として保持する',()=>{
+test('persist安全化はbootstrap文字列パッチではなくruntime guardが所有する',()=>{
   const source=fs.readFileSync(path.join(root,'insight_bootstrap_patches_v1.js'),'utf8');
+  const guard=fs.readFileSync(path.join(root,'insight_persist_guard_v1.js'),'utf8');
   assert.doesNotMatch(source,/\bfetch\s*\(|XMLHttpRequest|WebSocket/);
-  assert.match(source,/var safePersist=/);
-  assert.match(source,/patch\(originalPersist,safePersist\)/);
+  assert.doesNotMatch(source,/originalPersist|safePersist|InsightPersistError/);
+  assert.match(guard,/function guardedPersist\(\)/);
+  assert.match(guard,/InsightStorage\.persistCurrent\(currentSnapshot\(\)\)/);
+  assert.match(guard,/InsightPersistError/);
+  assert.doesNotMatch(guard,/localStorage\.setItem|\bfetch\s*\(|XMLHttpRequest|WebSocket/);
+  assert.doesNotThrow(()=>new vm.Script(guard),'persist guard must be valid JavaScript');
 });
 
 test('年度削除の旧UI除去はbootstrap文字列置換ではなくyear-fix moduleが所有する',()=>{
