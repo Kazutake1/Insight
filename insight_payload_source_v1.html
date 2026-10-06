@@ -32,46 +32,46 @@
     <h1>Insight</h1>
     <!-- 店舗セレクター -->
     <div class="store-sel-wrap">
-      <select id="storeSel" onchange="switchStore(this.value)" class="store-sel"></select>
-      <button onclick="showStoreMenu()" class="store-menu-btn" id="storeMenuBtn">⋯</button>
+      <select id="storeSel" class="store-sel"></select>
+      <button class="store-menu-btn" id="storeMenuBtn">⋯</button>
     </div>
     <div id="storeMenu" class="store-menu" style="display:none;"></div>
     <div class="nav-list">
-      <button class="nav-btn quick active" id="nav0" onclick="gotoNav(0)">
+      <button class="nav-btn quick active" id="nav0">
         <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20h9"/><path d="M16.5 3.5a2.12 2.12 0 0 1 3 3L7 19l-4 1 1-4Z"/></svg>今日の入力
         <span class="today-badge" id="todayBadge">今日</span>
       </button>
-      <button class="nav-btn" id="nav1" onclick="gotoNav(1)">
+      <button class="nav-btn" id="nav1">
         <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/></svg>ダッシュボード</button>
-      <button class="nav-btn" id="nav2" onclick="gotoNav(2)">
+      <button class="nav-btn" id="nav2">
         <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="6" width="20" height="12" rx="2"/><circle cx="12" cy="12" r="2"/><path d="M6 12h.01M18 12h.01"/></svg>売上入力</button>
-      <button class="nav-btn" id="nav3" onclick="gotoNav(3)">
+      <button class="nav-btn" id="nav3">
         <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>客数入力</button>
-      <button class="nav-btn" id="nav4" onclick="gotoNav(4)">
+      <button class="nav-btn" id="nav4">
         <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 10V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l2-1.14"/><path d="m7.5 4.27 9 5.15"/><polyline points="3.29 7 12 12 20.71 7"/><line x1="12" y1="22" x2="12" y2="12"/><path d="m17 13 5 5m-5 0 5-5"/></svg>廃棄入力</button>
     </div>
     <div class="sidebar-btns">
-      <button onclick="backupData()" id="backupBtn" class="sidebar-btn">
+      <button id="backupBtn" class="sidebar-btn">
         <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="22" y1="12" x2="2" y2="12"/><path d="M5.45 5.11 2 12v6a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2v-6l-3.45-6.89A2 2 0 0 0 16.76 4H7.24a2 2 0 0 0-1.79 1.11z"/><line x1="6" y1="16" x2="6.01" y2="16"/><line x1="10" y1="16" x2="10.01" y2="16"/></svg>
         <div class="sidebar-btn-text">
           <span>バックアップ</span>
           <span id="backupDaysLabel" class="sidebar-btn-sub"></span>
         </div>
       </button>
-      <button onclick="document.getElementById('restoreFile').click()" class="sidebar-btn">
+      <button id="restoreBtn" class="sidebar-btn">
         <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/><path d="M3 3v5h5"/></svg>
         <span>データ復元</span>
       </button>
-      <button onclick="toggleDarkMode()" id="darkModeBtn" class="sidebar-btn">
+      <button id="darkModeBtn" class="sidebar-btn">
         <svg class="nav-icon" id="darkModeIcon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3a6 6 0 0 0 9 9 9 9 0 1 1-9-9Z"/></svg>
         <span id="darkModeLabel">ダークモード</span>
       </button>
-      <button onclick="document.getElementById('csvImportFile').click()" class="sidebar-btn">
+      <button id="csvImportBtn" class="sidebar-btn">
         <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14.5 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7.5L14.5 2z"/><polyline points="14 2 14 8 20 8"/><line x1="8" y1="13" x2="16" y2="13"/><line x1="8" y1="17" x2="16" y2="17"/><line x1="8" y1="9" x2="10" y2="9"/></svg>
         <span>CSVインポート</span>
       </button>
-      <input type="file" id="restoreFile" accept=".json" style="display:none" onchange="restoreData(event)">
-      <input type="file" id="csvImportFile" accept=".csv" style="display:none" onchange="importCSV(event)">
+      <input type="file" id="restoreFile" accept=".json" style="display:none">
+      <input type="file" id="csvImportFile" accept=".csv" style="display:none">
     </div>
   </div>
 
@@ -85,17 +85,17 @@
         </div>
         <div class="quick-weekday" id="qWeekday"></div>
         <div class="weather-sel" id="qWeatherSel">
-          <button class="wx-btn active" data-wx="快晴" onclick="setWeather('快晴')">☀️</button>
-          <button class="wx-btn" data-wx="晴" onclick="setWeather('晴')">🌤️</button>
-          <button class="wx-btn" data-wx="晴曇" onclick="setWeather('晴曇')">⛅</button>
-          <button class="wx-btn" data-wx="曇" onclick="setWeather('曇')">☁️</button>
-          <button class="wx-btn" data-wx="小雨" onclick="setWeather('小雨')">🌦️</button>
-          <button class="wx-btn" data-wx="雨" onclick="setWeather('雨')">🌧️</button>
-          <button class="wx-btn" data-wx="大雨" onclick="setWeather('大雨')">⛈️</button>
-          <button class="wx-btn" data-wx="みぞれ" onclick="setWeather('みぞれ')">🌨️</button>
-          <button class="wx-btn" data-wx="雪" onclick="setWeather('雪')">❄️</button>
+          <button class="wx-btn active" data-wx="快晴" >☀️</button>
+          <button class="wx-btn" data-wx="晴" >🌤️</button>
+          <button class="wx-btn" data-wx="晴曇" >⛅</button>
+          <button class="wx-btn" data-wx="曇" >☁️</button>
+          <button class="wx-btn" data-wx="小雨" >🌦️</button>
+          <button class="wx-btn" data-wx="雨" >🌧️</button>
+          <button class="wx-btn" data-wx="大雨" >⛈️</button>
+          <button class="wx-btn" data-wx="みぞれ" >🌨️</button>
+          <button class="wx-btn" data-wx="雪" >❄️</button>
         </div>
-        <button id="autoWxBtn" onclick="fetchWeather()" style="padding:4px 10px;border-radius:8px;
+        <button id="autoWxBtn" style="padding:4px 10px;border-radius:8px;
           border:1.5px solid #ddd;background:#fff;
           color:#333;font-size:10.5px;font-weight:700;cursor:pointer;font-family:inherit;
           display:flex;align-items:center;gap:4px;">
@@ -105,8 +105,8 @@
       </div>
       <div class="quick-grid" id="quickGrid"></div>
       <div style="display:flex;gap:8px;margin-top:10px;">
-        <button class="clear-btn quick-clear" onclick="clearTodayData()">クリア</button>
-        <button class="quick-save" onclick="saveQuick()" style="margin-top:0;flex:1;width:auto;">保存する</button>
+        <button id="quickClearBtn" class="clear-btn quick-clear">クリア</button>
+        <button id="quickSaveBtn" class="quick-save" style="margin-top:0;flex:1;width:auto;">保存する</button>
       </div>
     </div>
 
@@ -118,7 +118,7 @@
       <div class="year-bar">
         <div class="year-sel-group">
           <span class="year-sel-label">基準年</span>
-          <select id="baseYearSel" onchange="onBaseYearChange(this.value)"
+          <select id="baseYearSel"
             style="padding:5px 10px;border-radius:9px;border:2px solid #1a1a1a;
             background:#1a1a1a;color:#fff;font-size:12px;font-weight:700;
             font-family:inherit;outline:none;cursor:pointer;"></select>
@@ -126,12 +126,12 @@
         <span style="font-size:16px;color:var(--text5);">vs</span>
         <div class="year-sel-group">
           <span class="year-sel-label">比較年</span>
-          <select id="cmpYearSel" onchange="onCmpYearChange(this.value)"
+          <select id="cmpYearSel"
             style="padding:5px 10px;border-radius:9px;border:2px solid #888;
             background:var(--surface);color:var(--text2);font-size:12px;font-weight:700;
             font-family:inherit;outline:none;cursor:pointer;"></select>
         </div>
-        <button onclick="showAddYear()" id="addYearBtn"
+        <button id="addYearBtn"
           style="padding:5px 12px;border-radius:9px;border:1.5px dashed #ccc;
           background:transparent;color:#999;font-size:11px;font-weight:700;
           cursor:pointer;font-family:inherit;">＋ 年度追加</button>
@@ -154,8 +154,8 @@
                 <div class="chart-sub" id="chartSub"></div>
               </div>
               <div class="chart-controls">
-                <button class="tab-btn" id="tabDay" onclick="setView('日')">日別</button>
-                <button class="tab-btn active" id="tabMonth" onclick="setView('月')">月別</button>
+                <button class="tab-btn" id="tabDay">日別</button>
+                <button class="tab-btn active" id="tabMonth">月別</button>
               </div>
             </div>
             <div class="legend-row" id="legendRow"></div>
@@ -168,15 +168,15 @@
               <div><div class="chart-title">廃棄内訳</div><div class="chart-sub" id="donutSub">月合計</div></div>
               <div style="display:flex;align-items:center;gap:5px;">
                 <div style="display:flex;border-radius:7px;overflow:hidden;border:1px solid #e0e0e0;">
-                  <button id="donutBtnAmt" onclick="setDonutMode('amount')"
+                  <button id="donutBtnAmt"
                     style="padding:3px 9px;border:none;font-size:10px;font-weight:700;
                     cursor:pointer;font-family:inherit;background:var(--text);color:var(--surface);">金額</button>
-                  <button id="donutBtnPct" onclick="setDonutMode('percent')"
+                  <button id="donutBtnPct"
                     style="padding:3px 9px;border:none;font-size:10px;font-weight:700;
                     cursor:pointer;font-family:inherit;background:var(--surface);color:var(--text4);">割合</button>
                 </div>
                 <div id="donutDayPicker" style="display:none;">
-                  <select id="donutDaySelect" onchange="refreshDonut()"
+                  <select id="donutDaySelect"
                     style="font-size:9.5px;font-weight:700;border:1px solid #eee;border-radius:6px;
                     padding:3px 5px;color:var(--text3);background:var(--input-bg);font-family:inherit;"></select>
                 </div>
@@ -192,9 +192,9 @@
             <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px;">
               <div class="chart-title">曜日別平均売上</div>
               <div style="display:flex;border-radius:7px;overflow:hidden;border:1px solid var(--border);">
-                <button class="wd-period-btn active" data-months="1" onclick="setWdPeriod(1)">1ヶ月</button>
-                <button class="wd-period-btn" data-months="3" onclick="setWdPeriod(3)">3ヶ月</button>
-                <button class="wd-period-btn" data-months="6" onclick="setWdPeriod(6)">6ヶ月</button>
+                <button class="wd-period-btn active" data-months="1">1ヶ月</button>
+                <button class="wd-period-btn" data-months="3">3ヶ月</button>
+                <button class="wd-period-btn" data-months="6">6ヶ月</button>
               </div>
             </div>
             <div style="height:160px;position:relative;"><canvas id="wdChart"></canvas></div>
@@ -213,8 +213,8 @@
         <div class="page-title">売上入力</div>
         <div class="header-right">
           <div class="saved-msg" id="savedSales">✓ 保存しました</div>
-          <button class="clear-btn" onclick="clearDayData('sales')">クリア</button>
-          <button class="save-btn" onclick="saveInput('sales')">保存する</button>
+          <button id="salesClearBtn" class="clear-btn">クリア</button>
+          <button id="salesSaveBtn" class="save-btn">保存する</button>
         </div>
       </div>
       <div class="input-year-row" id="salesYearRow"></div>
@@ -253,8 +253,8 @@
         <div class="page-title">客数入力</div>
         <div class="header-right">
           <div class="saved-msg" id="savedKyaku">✓ 保存しました</div>
-          <button class="clear-btn" onclick="clearKyakuMonth()">クリア</button>
-          <button class="save-btn" onclick="saveInput('kyaku')">保存する</button>
+          <button id="kyakuClearBtn" class="clear-btn">クリア</button>
+          <button id="kyakuSaveBtn" class="save-btn">保存する</button>
         </div>
       </div>
       <div class="input-year-row" id="kyakuYearRow"></div>
@@ -291,8 +291,8 @@
         <div class="page-title">廃棄入力</div>
         <div class="header-right">
           <div class="saved-msg" id="savedHaiki">✓ 保存しました</div>
-          <button class="clear-btn" onclick="clearDayData('haiki')">クリア</button>
-          <button class="save-btn" onclick="saveInput('haiki')">保存する</button>
+          <button id="haikiClearBtn" class="clear-btn">クリア</button>
+          <button id="haikiSaveBtn" class="save-btn">保存する</button>
         </div>
       </div>
       <div class="input-year-row" id="haikiYearRow"></div>
@@ -333,8 +333,8 @@
     <div class="budget-modal-title">廃棄予算の設定</div>
     <div id="budgetEditRows"></div>
     <div class="budget-modal-btns">
-      <button class="budget-modal-cancel" onclick="closeBudgetModal()">キャンセル</button>
-      <button class="budget-modal-save" onclick="saveBudget()">保存する</button>
+      <button id="budgetCancelBtn" class="budget-modal-cancel">キャンセル</button>
+      <button id="budgetSaveBtn" class="budget-modal-save">保存する</button>
     </div>
   </div>
 </div>
@@ -344,8 +344,8 @@
     <h2>年度を削除しますか？</h2>
     <p id="modalMsg"></p>
     <div class="modal-btns">
-      <button class="modal-btn cancel" onclick="closeModal()">キャンセル</button>
-      <button class="modal-btn danger" onclick="confirmDeleteYear()">削除する</button>
+      <button id="yearDeleteCancelBtn" class="modal-btn cancel">キャンセル</button>
+      <button id="yearDeleteConfirmBtn" class="modal-btn danger">削除する</button>
     </div>
   </div>
 </div>
@@ -354,7 +354,7 @@
 
 
 <!-- Split View 経営分析AIパネル（既存画面から独立） -->
-<button id="aiAnalysisToggle" class="ai-analysis-toggle" type="button" aria-controls="aiAnalysisPanel" aria-expanded="false" onclick="openAIAnalysisPanel()">
+<button id="aiAnalysisToggle" class="ai-analysis-toggle" type="button" aria-controls="aiAnalysisPanel" aria-expanded="false">
   <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3a5 5 0 0 0-4.6 3H7a4 4 0 0 0-1 7.87V14a4 4 0 0 0 4 4h1v3"/><path d="M12 3a5 5 0 0 1 4.6 3h.4a4 4 0 0 1 1 7.87V14a4 4 0 0 1-4 4h-1v3"/><path d="M9 9h.01M15 9h.01M9 14c1.5 1 4.5 1 6 0"/></svg>
   経営分析AI
 </button>
@@ -364,7 +364,7 @@
       <div class="ai-analysis-title">経営分析AI</div>
       <div class="ai-analysis-subtitle">KPI・前年比較から生成した経営コメント</div>
     </div>
-    <button class="ai-analysis-close" type="button" aria-label="閉じる" onclick="closeAIAnalysisPanel()">×</button>
+    <button id="aiAnalysisClose" class="ai-analysis-close" type="button" aria-label="閉じる">×</button>
   </div>
   <div class="ai-analysis-body">
     <div id="aiAnalysisPeriod" class="ai-analysis-period"></div>
@@ -377,5 +377,6 @@
 </aside>
 
 <script src="./insight_payload_ai_legacy_v1.js?v=20261006-payload-assets-1"></script>
+<script src="./insight_payload_bindings_v1.js?v=20261006-inline-bindings-1"></script>
 </body>
 </html>
