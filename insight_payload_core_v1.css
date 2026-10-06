@@ -651,3 +651,8 @@ body.ai-analysis-open .ai-analysis-toggle{display:none;}
 .payload-input-chart-side{width:200px;flex-shrink:0;margin-bottom:0;padding:8px 10px 8px;}
 .payload-input-chart-side-wrap{height:105px;position:relative;}
 .dark #autoWxBtn{background:var(--surface)!important;color:var(--text2)!important;}
+
+/* Weekday chart spacing v1: fixed presentation rules externalized from runtime JS. */
+.haiki-chart-card:has(#salesWdChart),.haiki-chart-card:has(#kyakuWdChart),.haiki-chart-card:has(#haikiWdChart){display:flex!important;flex-direction:column!important}
+#salesWdChart,#kyakuWdChart,#haikiWdChart{display:block!important;margin-bottom:0!important}
+#pageSales *:has(> #salesWdChart),#pageKyaku *:has(> #kyakuWdChart),#pageHaiki *:has(> #haikiWdChart){height:auto!important;min-height:105px;flex:1 1 0!important;padding-bottom:0!important;margin-bottom:0!important}

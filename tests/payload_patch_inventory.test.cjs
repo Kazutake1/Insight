@@ -43,7 +43,7 @@ test('canonical payloadはinline script/styleを持たず外部assetを順序固
   const core=read('insight_payload_core_v1.js');
   const ai=read('insight_payload_ai_legacy_v1.js');
   const css=read('insight_payload_core_v1.css');
-  assert.match(payload,/insight_payload_core_v1\.css\?v=20261006-static-styles-1/);
+  assert.match(payload,/insight_payload_core_v1\.css\?v=20261006-weekday-spacing-css-1/);
   assert.match(payload,/insight_payload_core_v1\.js\?v=20261006-payload-assets-1/);
   assert.match(payload,/insight_payload_ai_legacy_v1\.js\?v=20261006-payload-assets-1/);
   assert.match(payload,/insight_payload_bindings_v1\.js\?v=20261006-inline-bindings-1/);
@@ -387,19 +387,20 @@ test('入力グラフ補助文の整理は入力3ページだけを対象にす�
   assert.doesNotThrow(()=>new vm.Script(cleanup),'input chart cleanup module must be valid JavaScript');
 });
 
-test('売上・客数・廃棄の曜日別グラフ下部余白だけを詰める',()=>{
+test('売上・客数・廃棄の曜日別グラフ下部余白は外部CSSで維持する',()=>{
   const index=readShell();
   const spacing=read('insight_weekday_chart_spacing_v1.js');
-  assert.match(index,/insight_weekday_chart_spacing_v1\.js\?v=20261006-fill-height-2/);
-  assert.match(spacing,/#salesWdChart,#kyakuWdChart,#haikiWdChart/);
-  assert.match(spacing,/#pageSales \*:has\(> #salesWdChart\)/);
-  assert.match(spacing,/#pageKyaku \*:has\(> #kyakuWdChart\)/);
-  assert.match(spacing,/#pageHaiki \*:has\(> #haikiWdChart\)/);
-  assert.match(spacing,/padding-bottom:0!important/);
+  const css=read('insight_payload_core_v1.css');
+  assert.match(index,/insight_weekday_chart_spacing_v1\.js\?v=20261006-csp-style-weekday-1/);
+  assert.match(css,/#salesWdChart,#kyakuWdChart,#haikiWdChart/);
+  assert.match(css,/#pageSales \*:has\(> #salesWdChart\)/);
+  assert.match(css,/#pageKyaku \*:has\(> #kyakuWdChart\)/);
+  assert.match(css,/#pageHaiki \*:has\(> #haikiWdChart\)/);
+  assert.match(css,/padding-bottom:0!important/);
+  assert.doesNotMatch(spacing,/createElement\(['"]style['"]\)|style\.textContent|appendChild\(style\)/);
   assert.doesNotMatch(spacing,/localStorage|InsightStorage|persist\(/);
   assert.doesNotThrow(()=>new vm.Script(spacing),'weekday chart spacing module must be valid JavaScript');
 });
-
 test('入力曜日別グラフは入力変更で再描画し売上Y軸を千円から万円へ正しく換算する',()=>{
   const index=readShell();
   const fix=read('insight_weekday_chart_fix_v1.js');
