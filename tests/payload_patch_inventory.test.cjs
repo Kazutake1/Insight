@@ -6,20 +6,39 @@ const vm=require('node:vm');
 
 const root=path.join(__dirname,'..');
 const read=name=>fs.readFileSync(path.join(root,name),'utf8');
+const readShell=()=>[read('Index.html'),read('insight_shell_boot_v1.js'),read('insight_shell_loader_v1.js')].join('\n');
 
-test('payload文字列互換パッチは0件でIndexもbootstrap patcherへ依存しない',()=>{
+test('payload文字列互換パッチは0件でshell loaderもbootstrap patcherへ依存しない',()=>{
   const index=read('Index.html');
+  const loader=read('insight_shell_loader_v1.js');
   const bootstrap=read('insight_bootstrap_patches_v1.js');
   assert.equal((bootstrap.match(/^patch\(/gm)||[]).length,0);
-  assert.equal((index.match(/html=html\.replace/g)||[]).length,1);
-  assert.doesNotMatch(index,/insight_bootstrap_patches_v1\.js|InsightBootstrapPatches/);
+  assert.equal((index.match(/html=html\.replace/g)||[]).length,0);
+  assert.equal((loader.match(/html=html\.replace/g)||[]).length,1);
+  assert.doesNotMatch(index+loader,/insight_bootstrap_patches_v1\.js|InsightBootstrapPatches/);
   assert.match(bootstrap,/return html/);
 });
 
-test('トップページはキャッシュ抑止とシェル・機能manifestの自己更新を持つ',()=>{
+test('Index shellはinline script/styleを持たず外部assetへ分離する',()=>{
   const index=read('Index.html');
-  assert.match(index,/insight-shell-version" content="20261006-step5-bootstrap-free-1/);
-  assert.match(index,/var BUILD="20261006-step5-bootstrap-free-1"/);
+  const boot=read('insight_shell_boot_v1.js');
+  const loader=read('insight_shell_loader_v1.js');
+  const css=read('insight_shell_v1.css');
+  assert.match(index,/insight_shell_boot_v1\.js\?v=20261006-shell-external-1/);
+  assert.match(index,/insight_shell_loader_v1\.js\?v=20261006-shell-external-1/);
+  assert.match(index,/insight_shell_v1\.css\?v=20261006-shell-external-1/);
+  assert.doesNotMatch(index,/<script(?![^>]*\bsrc=)[^>]*>/i);
+  assert.doesNotMatch(index,/<style\b/i);
+  assert.match(boot,/fetch\('\.\/Index\.html\?insight_probe='/);
+  assert.match(loader,/fetch\('\.\/insight_shell_loader_v1\.js\?insight_manifest_probe='/);
+  assert.match(loader,/document\.open\(\);document\.write\(html\);document\.close\(\)/);
+  assert.match(css,/#loading\{/);
+});
+
+test('トップページはキャッシュ抑止とシェル・機能manifestの自己更新を持つ',()=>{
+  const index=readShell();
+  assert.match(index,/insight-shell-version" content="20261006-shell-external-1/);
+  assert.match(index,/var BUILD="20261006-shell-external-1"/);
   assert.match(index,/Shell rule: bump BUILD whenever the loader/);
   assert.match(index,/Cache-Control" content="no-cache, no-store, must-revalidate/);
   assert.match(index,/insight_probe=/);
@@ -34,7 +53,7 @@ test('トップページはキャッシュ抑止とシェル・機能manifestの
 });
 
 test('天気アイコン拡張はruntime moduleが所有しbootstrap patch件数に含めない',()=>{
-  const index=read('Index.html');
+  const index=readShell();
   const bootstrap=read('insight_bootstrap_patches_v1.js');
   const runtime=read('insight_weather_icon_compat_v1.js');
   assert.match(index,/insight_weather_icon_compat_v1\.js\?v=20261006-weather-icons-runtime-1/);
@@ -46,7 +65,7 @@ test('天気アイコン拡張はruntime moduleが所有しbootstrap patch件数
 });
 
 test('天気キー拡張はruntime moduleが所有しbootstrap patch件数に含めない',()=>{
-  const index=read('Index.html');
+  const index=readShell();
   const bootstrap=read('insight_bootstrap_patches_v1.js');
   const runtime=read('insight_weather_keys_compat_v1.js');
   assert.match(index,/insight_weather_keys_compat_v1\.js\?v=20261006-weather-keys-runtime-1/);
@@ -67,7 +86,7 @@ test('未使用の天気相関グループはbootstrapで書き換えない',()=
 });
 
 test('Chart.js依存はshellでSRI付き読込しpayload内の旧タグを実行前に除去する',()=>{
-  const index=read('Index.html');
+  const index=readShell();
   const bootstrap=read('insight_bootstrap_patches_v1.js');
   assert.match(index,/https:\/\/cdnjs\.cloudflare\.com\/ajax\/libs\/Chart\.js\/4\.4\.1\/chart\.umd\.min\.js/);
   assert.match(index,/integrity="sha512-CQBWl4fJHWbryGE\+Pc7UAxWMUMNMWzWxF4SQo9CgkJIN1kx6djDQZjh3Y8SZ1d\+6I\+1zze6Z7kHXO7q3UyZAWw=="/);
@@ -79,7 +98,7 @@ test('Chart.js依存はshellでSRI付き読込しpayload内の旧タグを実行
 });
 
 test('旧コア配色補正はbootstrap文字列置換ではなくruntime style moduleが所有する',()=>{
-  const index=read('Index.html');
+  const index=readShell();
   const bootstrap=read('insight_bootstrap_patches_v1.js');
   const compat=read('insight_legacy_style_compat_v1.js');
   assert.match(index,/insight_legacy_style_compat_v1\.js\?v=20261006-core-contrast-runtime-1/);
@@ -93,7 +112,7 @@ test('旧コア配色補正はbootstrap文字列置換ではなくruntime style 
 });
 
 test('AI表示CSSはIndexの文字列置換ではなくpresentation moduleが所有する',()=>{
-  const index=read('Index.html');
+  const index=readShell();
   const presentation=read('insight_ai_presentation_v1.js');
   for(const marker of [
     'body.ai-analysis-open #main{margin-right:390px;}',
@@ -116,7 +135,7 @@ test('AI表示CSSはIndexの文字列置換ではなくpresentation moduleが所
 });
 
 test('年間サマリーは買上点数だけを表示対象から外し縦方向の可読性を上げる',()=>{
-  const index=read('Index.html');
+  const index=readShell();
   const annual=read('insight_annual_summary_v1.js');
   assert.match(index,/insight_annual_summary_v1\.js\?v=20261005-remove-items-3/);
   assert.match(annual,/exact\(page,'年間サマリー'\)/);
@@ -132,7 +151,7 @@ test('年間サマリーは買上点数だけを表示対象から外し縦方�
 });
 
 test('ダッシュボードKPIカードは補助月表示を削除し年比ラベルと数値バッジを表示する',()=>{
-  const index=read('Index.html');
+  const index=readShell();
   const sync=read('insight_dashboard_kpi_sync_v1.js');
   assert.match(index,/insight_dashboard_kpi_sync_v1\.js\?v=20261006-yen-suffix/);
   assert.match(sync,/box\.append\(badge,prev\);card\.appendChild\(box\)/);
@@ -145,7 +164,7 @@ test('ダッシュボードKPIカードは補助月表示を削除し年比ラ�
 });
 
 test('STEP17の可読性CSSは独立moduleで主要ページへ横展開する',()=>{
-  const index=read('Index.html');
+  const index=readShell();
   const readability=read('insight_readability_v1.js');
   assert.match(index,/insight_readability_v1\.js\?v=20261005-kpi-yoy-nowrap/);
   assert.ok(index.indexOf('insight_dark_theme_v1.js')<index.indexOf('insight_readability_v1.js'));
@@ -174,7 +193,7 @@ test('STEP17の可読性CSSは独立moduleで主要ページへ横展開する',
 });
 
 test('AIのDOM・背景・開閉同期はpresentation moduleが所有する',()=>{
-  const index=read('Index.html');
+  const index=readShell();
   const presentation=read('insight_ai_presentation_v1.js');
   for(const marker of [
     '(<button id="aiAnalysisToggle"',
@@ -211,7 +230,7 @@ test('STEP4の今週タブは週次レビューへ接続された状態を維持
 });
 
 test('STEP5で今月タブを月次レビューへ接続する',()=>{
-  const index=read('Index.html');
+  const index=readShell();
   const pageAI=read('insight_ai_page_comments_v1.js');
   const monthly=read('insight_monthly_review_v1.js');
   assert.match(index,/insight_monthly_review_v1\.js\?v=20261001-step5/);
@@ -226,7 +245,7 @@ test('STEP5で今月タブを月次レビューへ接続する',()=>{
 });
 
 test('STEP6で履歴タブ・週次月次切替・過去レビュー再表示を有効化する',()=>{
-  const index=read('Index.html');
+  const index=readShell();
   const presentation=read('insight_ai_presentation_v1.js');
   const pageAI=read('insight_ai_page_comments_v1.js');
   const history=read('insight_analysis_history_v1.js');
@@ -248,7 +267,7 @@ test('STEP6で履歴タブ・週次月次切替・過去レビュー再表示を
 });
 
 test('分析AIの対象年月をサイドバー切替後も固定し各ページへ同期する',()=>{
-  const index=read('Index.html');
+  const index=readShell();
   const presentation=read('insight_ai_presentation_v1.js');
   const pageAI=read('insight_ai_page_comments_v1.js');
   const lock=read('insight_analysis_period_lock_v1.js');
@@ -275,7 +294,7 @@ test('分析AIの対象年月をサイドバー切替後も固定し各ページ
 });
 
 test('STEP7で将来AI接続用の共通analysisContext境界を追加する',()=>{
-  const index=read('Index.html');
+  const index=readShell();
   const aiContext=read('insight_ai_context_v1.js');
   assert.match(index,/insight_ai_context_v1\.js\?v=20261003-ai-pipeline-1/);
   assert.ok(index.indexOf('insight_analysis_history_v1.js')<index.indexOf('insight_ai_interpretation_v1.js'));
@@ -292,7 +311,7 @@ test('STEP7で将来AI接続用の共通analysisContext境界を追加する',()
 });
 
 test('設定ページはサイドバー下部の管理項目を集約する',()=>{
-  const index=fs.readFileSync(path.join(root,'Index.html'),'utf8');
+  const index=readShell();
   const settings=fs.readFileSync(path.join(root,'insight_settings_v1.js'),'utf8');
   assert.match(index,/insight_settings_v1\.js\?v=20261003-theme-bridge-hidden/);
   assert.ok(index.indexOf('insight_data_health_v1.js')<index.indexOf('insight_settings_v1.js'));
@@ -307,7 +326,7 @@ test('設定ページはサイドバー下部の管理項目を集約する',()=
 });
 
 test('年度管理ボタンは設定へ移動し月ボタンはダッシュボード年度行へ移動する',()=>{
-  const index=read('Index.html');
+  const index=readShell();
   const layout=read('insight_year_controls_layout_v1.js');
   assert.match(index,/insight_year_controls_layout_v1\.js\?v=20261006-month-selected-border-2/);
   assert.ok(index.indexOf('insight_settings_v1.js')<index.indexOf('insight_year_controls_layout_v1.js'));
@@ -326,7 +345,7 @@ test('年度管理ボタンは設定へ移動し月ボタンはダッシュボ�
 });
 
 test('入力グラフ補助文の整理は入力3ページだけを対象にする',()=>{
-  const index=read('Index.html');
+  const index=readShell();
   const cleanup=read('insight_input_chart_cleanup_v1.js');
   assert.match(index,/insight_input_chart_cleanup_v1\.js\?v=20261006-remove-chart-copy-1/);
   assert.match(cleanup,/pageSales:\['月合計','グラフをタップで日付選択'\]/);
@@ -338,7 +357,7 @@ test('入力グラフ補助文の整理は入力3ページだけを対象にす�
 });
 
 test('売上・客数・廃棄の曜日別グラフ下部余白だけを詰める',()=>{
-  const index=read('Index.html');
+  const index=readShell();
   const spacing=read('insight_weekday_chart_spacing_v1.js');
   assert.match(index,/insight_weekday_chart_spacing_v1\.js\?v=20261006-fill-height-2/);
   assert.match(spacing,/#salesWdChart,#kyakuWdChart,#haikiWdChart/);
@@ -351,7 +370,7 @@ test('売上・客数・廃棄の曜日別グラフ下部余白だけを詰め�
 });
 
 test('入力曜日別グラフは入力変更で再描画し売上Y軸を千円から万円へ正しく換算する',()=>{
-  const index=read('Index.html');
+  const index=readShell();
   const fix=read('insight_weekday_chart_fix_v1.js');
   assert.match(index,/insight_weekday_chart_fix_v1\.js\?v=20261006-waste-zero-past-1/);
   assert.ok(index.indexOf('insight_input_chart_cleanup_v1.js')<index.indexOf('insight_weekday_chart_fix_v1.js'));
@@ -371,7 +390,7 @@ test('入力曜日別グラフは入力変更で再描画し売上Y軸を千円�
 });
 
 test('複数年度分析はAnalysisContextの後に読み込み読み取り専用で動作する',()=>{
-  const index=read('Index.html');
+  const index=readShell();
   const multi=read('insight_multiyear_analysis_v1.js');
   assert.match(index,/insight_multiyear_analysis_v1\.js\?v=20261003-multiyear-1/);
   assert.ok(index.indexOf('insight_analysis_context_v1.js')<index.indexOf('insight_multiyear_analysis_v1.js'));
@@ -384,7 +403,7 @@ test('複数年度分析はAnalysisContextの後に読み込み読み取り専�
 });
 
 test('曜日分析は複数年度分析の後に読み込みイベント・祝日を通常日基準から除外する',()=>{
-  const index=read('Index.html');
+  const index=readShell();
   const weekday=read('insight_weekday_analysis_v1.js');
   assert.match(index,/insight_weekday_analysis_v1\.js\?v=20261003-weekday-1/);
   assert.ok(index.indexOf('insight_multiyear_analysis_v1.js')<index.indexOf('insight_weekday_analysis_v1.js'));
@@ -397,7 +416,7 @@ test('曜日分析は複数年度分析の後に読み込みイベント・祝�
 });
 
 test('セール影響分析は曜日分析の後に読み込み前中後を読み取り専用で比較する',()=>{
-  const index=read('Index.html');
+  const index=readShell();
   const impact=read('insight_sale_impact_v1.js');
   assert.match(index,/insight_sale_impact_v1\.js\?v=20261003-sale-impact-1/);
   assert.ok(index.indexOf('insight_weekday_analysis_v1.js')<index.indexOf('insight_sale_impact_v1.js'));
@@ -411,7 +430,7 @@ test('セール影響分析は曜日分析の後に読み込み前中後を読�
 });
 
 test('イベント影響分析は通常同曜日と時間帯別客数を読み取り専用で比較する',()=>{
-  const index=read('Index.html');
+  const index=readShell();
   const impact=read('insight_event_impact_v1.js');
   assert.match(index,/insight_event_impact_v1\.js\?v=20261003-event-impact-1/);
   assert.ok(index.indexOf('insight_sale_impact_v1.js')<index.indexOf('insight_event_impact_v1.js'));
@@ -426,7 +445,7 @@ test('イベント影響分析は通常同曜日と時間帯別客数を読み�
 });
 
 test('季節性分析は過去年度の季節指数と今年固有の変化を読み取り専用で分離する',()=>{
-  const index=read('Index.html');
+  const index=readShell();
   const season=read('insight_seasonality_analysis_v1.js');
   assert.match(index,/insight_seasonality_analysis_v1\.js\?v=20261003-seasonality-1/);
   assert.ok(index.indexOf('insight_event_impact_v1.js')<index.indexOf('insight_seasonality_analysis_v1.js'));
@@ -441,7 +460,7 @@ test('季節性分析は過去年度の季節指数と今年固有の変化を�
 });
 
 test('異常説明レイヤーは曜日・セール・イベント・季節性を統合し既存警告を消さない',()=>{
-  const index=read('Index.html');
+  const index=readShell();
   const explanation=read('insight_anomaly_explanation_v1.js');
   const anomaly=read('insight_daily_anomaly_v1.js');
   assert.match(index,/insight_anomaly_explanation_v1\.js\?v=20261003-anomaly-context-1/);
@@ -459,7 +478,7 @@ test('異常説明レイヤーは曜日・セール・イベント・季節性�
 });
 
 test('Firefox系ダークテーマは設定モジュールの後に読み込みライトモードを変更しない',()=>{
-  const index=read('Index.html');
+  const index=readShell();
   const theme=read('insight_dark_theme_v1.js');
   assert.match(index,/insight_dark_theme_v1\.js\?v=20261003-firefox-dark-1/);
   assert.ok(index.indexOf('insight_settings_v1.js')<index.indexOf('insight_dark_theme_v1.js'));
@@ -472,7 +491,7 @@ test('Firefox系ダークテーマは設定モジュールの後に読み込み�
 });
 
 test('全分析バンドルは履歴の後・AI解釈の前に読み込み外部通信せず標準化する',()=>{
-  const index=read('Index.html');
+  const index=readShell();
   const bundle=read('insight_analysis_bundle_v1.js');
   assert.match(index,/insight_analysis_bundle_v1\.js\?v=20261003-bundle-1/);
   assert.ok(index.indexOf('insight_analysis_history_v1.js')<index.indexOf('insight_analysis_bundle_v1.js'));
@@ -493,7 +512,7 @@ test('全分析バンドルは履歴の後・AI解釈の前に読み込み外部
 });
 
 test('売上・客数・廃棄の旧年月UIはruntime selectorが除去し販売数入力方式だけを使う',()=>{
-  const index=read('Index.html');
+  const index=readShell();
   const controls=read('insight_sales_period_selector_v1.js');
   const bootstrap=read('insight_bootstrap_patches_v1.js');
   assert.doesNotMatch(index,/insight_bootstrap_patches_v1\.js|InsightBootstrapPatches/);
@@ -521,7 +540,7 @@ test('売上・客数・廃棄の旧年月UIはruntime selectorが除去し販�
 });
 
 test('保存データ健全性チェックは読み取り専用で不整合を可視化する',()=>{
-  const index=read('Index.html');
+  const index=readShell();
   const health=read('insight_data_health_v1.js');
   assert.match(index,/insight_data_health_v1\.js\?v=20261002-data-health/);
   assert.ok(index.indexOf('insight_backup_guard_v1.js')<index.indexOf('insight_data_health_v1.js'));
@@ -538,7 +557,7 @@ test('保存データ健全性チェックは読み取り専用で不整合を�
 });
 
 test('過年度は既存の疎データを保持して正式年度へ昇格し販売数入力から追加できる',()=>{
-  const index=read('Index.html');
+  const index=readShell();
   const manager=read('insight_year_manager_v1.js');
   const salesCount=read('insight_sales_count_v1.js');
   assert.match(index,/insight_year_manager_v1\.js\?v=20261002-year-delete-consistency/);
@@ -555,7 +574,7 @@ test('過年度は既存の疎データを保持して正式年度へ昇格し�
 });
 
 test('年度削除は年度直結データをトランザクションで削除しイベント履歴を保持する',()=>{
-  const index=read('Index.html');
+  const index=readShell();
   const manager=read('insight_year_manager_v1.js');
   const yearFix=read('insight_dashboard_year_fix_v1.js');
   assert.match(index,/insight_year_manager_v1\.js\?v=20261002-year-delete-consistency/);
@@ -573,7 +592,7 @@ test('年度削除は年度直結データをトランザクションで削除�
 });
 
 test('今日の入力は未登録年度の日付移動前に正式年度追加を確認する',()=>{
-  const index=read('Index.html');
+  const index=readShell();
   const quick=read('insight_quick_date_nav_v1.js');
   assert.match(index,/insight_quick_date_nav_v1\.js\?v=20261006-keep-picker-open/);
   assert.match(quick,/function ensureRegisteredYear\(/);
@@ -588,7 +607,7 @@ test('今日の入力は未登録年度の日付移動前に正式年度追加�
 });
 
 test('通常画面の選択年月をサイドバー切替後も全ページで維持する',()=>{
-  const index=read('Index.html');
+  const index=readShell();
   const pagePeriod=read('insight_page_period_sync_v1.js');
   assert.match(index,/insight_page_period_sync_v1\.js\?v=20261001-route-order/);
   assert.ok(index.indexOf('insight_sales_count_v1.js')<index.indexOf('insight_page_period_sync_v1.js'));
@@ -606,7 +625,7 @@ test('通常画面の選択年月をサイドバー切替後も全ページで�
 
 
 test('時間帯別客数は日報客数と分離して日付別24時間データとして保存する',()=>{
-  const index=read('Index.html');
+  const index=readShell();
   const hourly=read('insight_hourly_customers_v1.js');
   assert.doesNotMatch(index,/insight_bootstrap_patches_v1\.js|InsightBootstrapPatches/);
   assert.match(index,/insight_hourly_customers_v1\.js\?v=20261006-remove-help/);
@@ -624,7 +643,7 @@ test('時間帯別客数は日報客数と分離して日付別24時間データ
 });
 
 test('イベント実績は過去開催・日付カード・時間帯グラフ・販売数カードを読み取り専用で表示する',()=>{
-  const index=read('Index.html');
+  const index=readShell();
   const eventResults=read('insight_event_results_v1.js');
   const events=read('insight_events_v1.js');
   assert.match(index,/insight_events_v1\.js\?v=20261006-multi-location-1/);
@@ -712,7 +731,7 @@ test('イベント実績は過去開催・日付カード・時間帯グラフ�
 });
 
 test('全ページタイトルはダッシュボード基準の共通モジュールで位置を統一する',()=>{
-  const index=read('Index.html');
+  const index=readShell();
   const layout=read('insight_page_title_layout_v1.js');
   assert.match(index,/insight_page_title_layout_v1\.js\?v=20261002-title-align/);
   assert.ok(index.indexOf('insight_sale_results_v1.js')<index.indexOf('insight_page_title_layout_v1.js'));
@@ -727,7 +746,7 @@ test('全ページタイトルはダッシュボード基準の共通モジュ�
 });
 
 test('セール実績ページは販売数入力直後に読み込み同一日別カードを再利用する',()=>{
-  const index=read('Index.html');
+  const index=readShell();
   const saleResults=read('insight_sale_results_v1.js');
   const sales=read('insight_sales_count_v1.js');
   assert.match(index,/insight_sales_count_v1\.js\?v=20261005-ipad-container-fit/);
@@ -761,7 +780,7 @@ test('セール実績ページは販売数入力直後に読み込み同一日�
 });
 
 test('分析AIコメントは文章列ではなく構造化カードで表示し色は注意と改善だけに限定する',()=>{
-  const index=read('Index.html');
+  const index=readShell();
   const presentation=read('insight_ai_presentation_v1.js');
   const visual=read('insight_ai_visual_v1.js');
   const pageAI=read('insight_ai_page_comments_v1.js');
@@ -788,7 +807,7 @@ test('月次分析AIは標準Evidenceを解釈層へ渡し旧crossAnalysisも互
 
 
 test('分析AIはダッシュボード再掲ではなく4ブロックの意思決定支援へ変換する',()=>{
-  const index=read('Index.html');
+  const index=readShell();
   const interpretation=read('insight_ai_interpretation_v1.js');
   const pageAI=read('insight_ai_page_comments_v1.js');
   const presentation=read('insight_ai_presentation_v1.js');
@@ -813,7 +832,7 @@ test('分析AIはダッシュボード再掲ではなく4ブロックの意思�
 });
 
 test('店舗運営UIのCSSはops moduleが所有する',()=>{
-  const index=read('Index.html');
+  const index=readShell();
   const ops=read('insight_ops_v1.js');
   assert.ok(!index.includes("html=html.replace('</style>'"));
   assert.match(ops,/insightOpsV1Style/);
@@ -822,7 +841,7 @@ test('店舗運営UIのCSSはops moduleが所有する',()=>{
 });
 
 test('安全・互換処理はbootstrap文字列パッチではなく各所有層へ分離済み',()=>{
-  const index=read('Index.html');
+  const index=readShell();
   const bootstrap=read('insight_bootstrap_patches_v1.js');
   assert.doesNotMatch(index,/insight_bootstrap_patches_v1\.js|InsightBootstrapPatches/);
   assert.equal((bootstrap.match(/^patch\(/gm)||[]).length,0);
@@ -839,7 +858,7 @@ test('安全・互換処理はbootstrap文字列パッチではなく各所有�
 });
 
 test('STEP5完了: bootstrap文字列patch依存は0件',()=>{
-  const index=read('Index.html');
+  const index=readShell();
   const bootstrap=read('insight_bootstrap_patches_v1.js');
   assert.match(read('insight_persist_guard_v1.js'),/function guardedPersist\(\)/);
   assert.match(read('insight_legacy_style_compat_v1.js'),/InsightLegacyStyleCompat/);
@@ -853,7 +872,7 @@ test('STEP5完了: bootstrap文字列patch依存は0件',()=>{
 });
 
 test('分析AI workspace assetはcache bustされている',()=>{
-  const index=read('Index.html');
+  const index=readShell();
   assert.match(index,/insight_ai_presentation_v1\.js\?v=20261006-header-compact-1/);
   assert.match(index,/insight_ops_v1\.js\?v=20260930-step5-2/);
 });
@@ -895,7 +914,7 @@ test('販売数AI分析は販売数入力と同じ平均カード生成APIを使
 });
 
 test('販売数カテゴリーの対象便設定を全関連層で共有する',()=>{
-  const index=read('Index.html');
+  const index=readShell();
   const sales=read('insight_sales_count_v1.js');
   const analysis=read('insight_analysis_context_v1.js');
   const saleResults=read('insight_sale_results_v1.js');
@@ -961,7 +980,7 @@ test('曜日別平均も対象外便をダッシュ＋グレー表示に統一�
 
 
 test('分析AI互換コアはIndexインラインから分離し新パイプラインのフォールバックに限定する',()=>{
-  const index=read('Index.html');
+  const index=readShell();
   const compat=read('insight_ai_compat_core_v1.js');
   assert.match(index,/insight_ai_compat_core_v1\.js\?v=20261003-ai-pipeline-1/);
   assert.ok(index.indexOf('insight_yoy_policy_v1.js')<index.indexOf('insight_ai_compat_core_v1.js'));
