@@ -136,6 +136,14 @@ test('Index.htmlは必要先だけを許可するCSPを定義する',()=>{
   assert.ok(index.indexOf('Content-Security-Policy')<index.indexOf('insight_shell_boot_v1.js'),'CSPは外部スクリプトより前に定義すること');
 });
 
+test('shell loaderの読み込み失敗表示はinline styleを生成しない',()=>{
+  const loader=read('insight_shell_loader_v1.js');
+  const shellCss=read('insight_shell_v1.css');
+  assert.match(loader,/class="insight-load-failure"/);
+  assert.doesNotMatch(loader,/function fail\(e\).*style=/);
+  assert.match(shellCss,/\.insight-load-failure\{[^}]*padding:24px[^}]*color:#b42318[^}]*\}/);
+});
+
 test('販売数入力は不正値の保存と同じページの再読込を防ぐ',()=>{
   const source=fs.readFileSync(path.join(root,'insight_sales_count_v1.js'),'utf8');
   assert.match(source,/querySelector\('#pageSalesCount input:invalid'\)/);

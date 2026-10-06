@@ -79,9 +79,19 @@ test('機能スクリプトの読み込み順はshell loaderのmanifestで明示
 
 test('Indexはshell loaderを外部scriptとして読み込む',()=>{
   const index=read('Index.html');
-  assert.match(index,/insight_shell_loader_v1\.js\?v=20261006-csp-script-strict-1/);
+  assert.match(index,/insight_shell_loader_v1\.js\?v=20261006-csp-style-shell-1/);
   assert.doesNotMatch(index,/var orderedFeatureLoads=/);
   assert.match(read('insight_shell_loader_v1.js'),/var orderedFeatureLoads=/);
+});
+
+test('shell BUILDはIndex metaとboot scriptで一致する',()=>{
+  const index=read('Index.html');
+  const boot=read('insight_shell_boot_v1.js');
+  const meta=index.match(/<meta name="insight-shell-version" content="([^"]+)"/);
+  const build=boot.match(/var BUILD="([^"]+)"/);
+  assert.ok(meta&&build,'shell BUILD情報が取得できること');
+  assert.equal(build[1],meta[1]);
+  assert.ok(index.includes('insight_shell_boot_v1.js?v='+build[1]));
 });
 
 test('旧動的scriptローダーはルートJSから除去されている',()=>{
