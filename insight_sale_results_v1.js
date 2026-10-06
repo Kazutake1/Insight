@@ -128,6 +128,7 @@
       var occurrence={
         id:event.id||summary+'|'+start+'|'+end,
         summary:summary,
+        note:String(event.snapshot.note||'').trim(),
         startDate:start,
         endDate:end,
         originalStartDate:event.startDate,
@@ -217,7 +218,14 @@
           ['平均販売',fmt(group.averageSales,1)],
           ['消化率',group.sellThrough===null?'—':fmt(group.sellThrough,1)+'%']
         ].forEach(function(item){var stat=el('div',undefined,'sr-stat');stat.append(el('span',item[0]),el('strong',item[1]));statsRow.append(stat);});
-        head.append(title,statsRow);
+        var heading=el('div',undefined,'sr-group-heading');heading.append(title);
+        var notes=Array.from(new Set(group.occurrences.map(function(item){return item.note;}).filter(Boolean)));
+        notes.forEach(function(note){
+          var text=note;
+          if(notes.length>1)text=group.occurrences.filter(function(item){return item.note===note;}).map(periodLabel).join('、')+'\n'+note;
+          heading.append(el('div',text,'sr-sale-note'));
+        });
+        head.append(heading,statsRow);
         var rows=el('div',undefined,'sr-occurrence-grids'),category=selectedCategory();
         group.occurrences.forEach(function(occurrence){
           var grid=el('div',undefined,'sr-day-grid');
@@ -278,6 +286,7 @@
       '.sr-period-tabs button,.sr-category-label select{border:0;border-radius:7px;background:transparent;color:var(--text3);padding:7px 11px;font:700 13px/1 -apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif}.sr-period-tabs button.active{background:var(--text);color:var(--surface)}'+
       '.sr-category-label{display:flex;align-items:center;gap:7px;font-size:13px;font-weight:700;color:var(--text3)}.sr-category-label select{min-width:150px;border:1px solid var(--border);background:var(--surface2);color:var(--text)}'+
       '.sr-group{margin:0 0 18px;padding:14px;border:1px solid var(--border);border-radius:14px;background:var(--surface)}.sr-group-head{display:flex;align-items:flex-start;justify-content:space-between;gap:14px;margin-bottom:10px}.sr-group-head h2{margin:0;font-size:17px;color:var(--text)}'+
+      '.sr-group-heading{min-width:0}.sr-sale-note{margin-top:6px;font-size:13px;line-height:1.5;color:var(--text3);white-space:pre-wrap;overflow-wrap:anywhere}'+
       '.sr-group-stats{display:grid;grid-template-columns:repeat(3,minmax(88px,1fr));gap:8px;justify-content:end}.sr-stat{border:1px solid var(--border);border-radius:10px;background:var(--surface2);padding:7px 9px;min-width:0}.sr-stat span{display:block;color:var(--text4);font-size:12px;font-weight:700}.sr-stat strong{display:block;margin-top:3px;color:var(--text);font-size:16px;font-weight:800}.sr-occurrence-grids{display:grid;gap:9px}.sr-day-grid{display:grid;grid-template-columns:repeat(7,minmax(0,1fr));gap:9px;width:100%;box-sizing:border-box}.sr-day-grid>.sc-day{min-width:0}.sr-empty{padding:24px;border:1px solid var(--border);border-radius:12px;background:var(--surface);color:var(--text4);font-size:12px;text-align:center}'+
       '.sr-list-section{margin-top:18px;padding:14px;border:1px solid var(--border);border-radius:14px;background:var(--surface)}.sr-list-section h2{font-size:17px;margin:0 0 10px}.sr-table-scroll{overflow:auto}.sr-list-table{width:100%;border-collapse:collapse;font-size:12.5px}.sr-list-table th,.sr-list-table td{padding:8px;border-bottom:1px solid var(--border);text-align:right;white-space:nowrap}.sr-list-table th:first-child,.sr-list-table td:first-child,.sr-list-table th:nth-child(2),.sr-list-table td:nth-child(2){text-align:left}.sr-positive{color:#15803d;font-weight:800}.sr-negative{color:#b42318;font-weight:800}'+
       '@media(max-width:1200px){.sr-day-grid{grid-template-columns:repeat(7,minmax(0,1fr));gap:7px}.sr-group{padding:12px}.sr-group-head{align-items:flex-start;flex-direction:column}.sr-group-stats{width:100%;grid-template-columns:repeat(3,minmax(88px,1fr))}}'+

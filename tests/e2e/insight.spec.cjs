@@ -1041,6 +1041,7 @@ test('セール実績は内容別に表示し開催回ごとに行を分けて7�
         endDate:'2026-09-08',
         snapshot:{
           title:'E2Eおにぎりセール',
+          note:'対象商品限定\n数量限定 <補足>',
           sale:{categoryId,category:'おにぎり',method:'amount',params:{amount:20}}
         }
       },
@@ -1052,6 +1053,7 @@ test('セール実績は内容別に表示し開催回ごとに行を分けて7�
         endDate:'2026-08-22',
         snapshot:{
           title:'E2Eおにぎりセール',
+          note:'対象商品限定\n数量限定 <補足>',
           sale:{categoryId,category:'おにぎり',method:'amount',params:{amount:20}}
         }
       }
@@ -1087,6 +1089,8 @@ test('セール実績は内容別に表示し開催回ごとに行を分けて7�
   await expect(page.locator('#pageSaleResults')).toHaveClass(/show/);
   await expect(page.locator('.sr-group')).toHaveCount(1);
   await expect(page.locator('.sr-group-head h2')).toContainText('おにぎり 20円引き');
+  await expect(page.locator('.sr-group-heading .sr-sale-note')).toHaveCount(1);
+  await expect(page.locator('.sr-group-heading .sr-sale-note')).toHaveText('対象商品限定\n数量限定 <補足>');
   const saleTypography=await page.locator('.sr-group').first().evaluate(group=>{
     const heading=group.querySelector('.sr-group-head h2');
     const stats=group.querySelector('.sr-group-stats');
