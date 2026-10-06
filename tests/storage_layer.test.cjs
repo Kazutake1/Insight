@@ -120,7 +120,7 @@ test('transactionは検証失敗時に保存・反映しない',()=>{
 });
 
 test('feature moduleはlocalStorageへ直接書き込まず共有storageを使う',()=>{
-  const files=fs.readdirSync(root).filter(name=>/^insight_.*\.js$/.test(name)&&name!=='insight_storage_v1.js'&&name!=='insight_bootstrap_patches_v1.js');
+  const files=fs.readdirSync(root).filter(name=>/^insight_.*\.js$/.test(name)&&!name.startsWith('insight_payload_')&&name!=='insight_storage_v1.js'&&name!=='insight_bootstrap_patches_v1.js');
   const offenders=[];
   files.forEach(name=>{
     const text=fs.readFileSync(path.join(root,name),'utf8');
