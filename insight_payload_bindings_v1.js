@@ -1,5 +1,5 @@
 /* Canonical payload bindings v1.
- * Replaces static inline onclick/onchange attributes with CSP-compatible listeners.
+ * Replaces payload inline event attributes with CSP-compatible listeners.
  */
 (function(root){
 'use strict';
@@ -63,6 +63,41 @@ on('yearDeleteConfirmBtn','click',function(){invoke('confirmDeleteYear');});
 
 on('aiAnalysisToggle','click',function(){invoke('openAIAnalysisPanel');});
 on('aiAnalysisClose','click',function(){invoke('closeAIAnalysisPanel');});
+
+doc.addEventListener('keydown',function(event){
+  var target=event.target;
+  if(!target||target.id!=='ayInput')return;
+  if(event.key==='Enter')invoke('addYear',[target.value]);
+  else if(event.key==='Escape'){
+    var wrap=byId('addYearInlineWrap');
+    if(wrap)wrap.innerHTML='';
+  }
+});
+
+doc.addEventListener('click',function(event){
+  var target=event.target&&event.target.closest?event.target.closest('#ayAddBtn,#haikiBudgetEditBtn,[data-sales-weather][data-ri],#installBannerAddBtn,#installBannerCloseBtn,#iosHintCloseBtn'):null;
+  if(!target)return;
+  if(target.id==='ayAddBtn'){
+    var input=byId('ayInput');
+    invoke('addYear',[input?input.value:'']);
+    return;
+  }
+  if(target.id==='haikiBudgetEditBtn'){invoke('openBudgetModal');return;}
+  if(target.hasAttribute('data-sales-weather')){
+    invoke('setSalesWeather',[Number(target.getAttribute('data-ri')),target.getAttribute('data-sales-weather')]);
+    return;
+  }
+  if(target.id==='installBannerAddBtn'){invoke('doInstall');return;}
+  if(target.id==='installBannerCloseBtn'){
+    var banner=target.closest('#installBanner');
+    if(banner)banner.remove();
+    return;
+  }
+  if(target.id==='iosHintCloseBtn'){
+    var hint=target.closest('#iosHint');
+    if(hint)hint.remove();
+  }
+});
 
 root.InsightPayloadBindings={VERSION:1};
 })(typeof window!=='undefined'?window:globalThis);
