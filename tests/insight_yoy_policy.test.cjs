@@ -5,7 +5,7 @@ const path=require('node:path');
 const vm=require('node:vm');
 const root=path.join(__dirname,'..');
 const read=name=>fs.readFileSync(path.join(root,name),'utf8');
-const payload=read('insight_payload_source_v1.html');
+const payload=read('insight_payload_core_v1.js');
 const engineSource=payload.slice(payload.indexOf('function kpiNum('),payload.indexOf('function blankMonthData('));
 function element(label=''){
   return {textContent:label,style:{},children:[],append(...xs){xs.forEach(x=>{x.parent=this;this.children.push(x);});},appendChild(x){this.append(x);},remove(){this.parent.children=this.parent.children.filter(x=>x!==this);},querySelector(s){if(s==='.kpi-label')return this.label;if(s==='.kpi-value')return this.value;return this.children.find(x=>x.className===s.slice(1))||null;},querySelectorAll(){return this.children;}};
