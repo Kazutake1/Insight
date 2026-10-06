@@ -89,6 +89,12 @@ jobs:
           node-version: '22'
       - name: Install E2E dependencies
         run: npm install --no-audit --no-fund
+      - name: Upload generated dependency lockfile
+        uses: actions/upload-artifact@v4
+        with:
+          name: generated-package-lock
+          path: package-lock.json
+          retention-days: 1
       - name: Install Chromium
         run: npx playwright install --with-deps chromium
       - name: Run browser E2E
