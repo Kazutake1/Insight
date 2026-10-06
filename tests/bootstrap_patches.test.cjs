@@ -3,6 +3,7 @@ const assert=require('node:assert/strict');
 const fs=require('node:fs');
 const path=require('node:path');
 const zlib=require('node:zlib');
+const vm=require('node:vm');
 const patches=require('../insight_bootstrap_patches_v1.js');
 
 const root=path.join(__dirname,'..');
@@ -65,6 +66,22 @@ test('入力ページ旧年月UIのソースはbootstrapで切り取らずruntim
   const source=fs.readFileSync(path.join(root,'insight_bootstrap_patches_v1.js'),'utf8');
   assert.match(patched,/const yrId=\{sales:"salesYearRow",kyaku:"kyakuYearRow",haiki:"haikiYearRow"\}\[type\]/);
   assert.doesNotMatch(source,/legacyInputPeriodStart|入力ページ旧年月UIの開始位置が見つかりません/);
+});
+
+test('天気アイコン拡張はbootstrap文字列パッチではなくruntime moduleが所有する',()=>{
+  const bootstrap=fs.readFileSync(path.join(root,'insight_bootstrap_patches_v1.js'),'utf8');
+  const runtime=fs.readFileSync(path.join(root,'insight_weather_icon_compat_v1.js'),'utf8');
+  assert.doesNotMatch(bootstrap,/🌫️|🧊|🌩️/);
+  assert.match(runtime,/WX_ICONS\['霧'\]='🌫️'/);
+  assert.match(runtime,/WX_ICONS\['凍雨'\]='🧊'/);
+  assert.match(runtime,/WX_ICONS\['雷雨'\]='🌩️'/);
+  assert.doesNotMatch(runtime,/localStorage|InsightStorage|\bfetch\s*\(|XMLHttpRequest|WebSocket/);
+  const context={};context.window=context;context.globalThis=context;vm.createContext(context);
+  vm.runInContext('const WX_ICONS={"雪":"❄️","":""};',context);
+  vm.runInContext(runtime,context);
+  assert.equal(vm.runInContext('WX_ICONS["霧"]',context),'🌫️');
+  assert.equal(vm.runInContext('WX_ICONS["凍雨"]',context),'🧊');
+  assert.equal(vm.runInContext('WX_ICONS["雷雨"]',context),'🌩️');
 });
 
 test('Chart.jsの安全属性はbootstrap文字列パッチではなくshellが所有する',()=>{
