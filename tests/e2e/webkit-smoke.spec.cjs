@@ -29,6 +29,7 @@ async function openInsight(page){
 
 test('WebKitで起動し主要入力ページを移動できる',async({page})=>{
   const errors=await openInsight(page);
+  await expect.poll(()=>page.evaluate(()=>!!(window.persist&&window.persist.__insightPersistGuard))).toBe(true);
 
   await page.locator('#nav1').click();
   await expect(page.locator('#pageDash')).toHaveClass(/show/);

@@ -13,6 +13,7 @@ const ordered=[
   'insight_date_context_v1.js',
   'insight_hooks_v1.js',
   'insight_storage_v1.js',
+  'insight_persist_guard_v1.js',
   'insight_year_manager_v1.js',
   'insight_ops_v1.js',
   'insight_preserve_dailyops_v1.js',
@@ -91,7 +92,8 @@ test('日付ナビは保存保護モジュールから動的ロードされな�
   const index=read('Index.html');
   assert.ok(index.indexOf('insight_date_context_v1.js')<index.indexOf('insight_hooks_v1.js'));
   assert.ok(index.indexOf('insight_hooks_v1.js')<index.indexOf('insight_storage_v1.js'));
-  assert.ok(index.indexOf('insight_storage_v1.js')<index.indexOf('insight_ops_v1.js'));
+  assert.ok(index.indexOf('insight_storage_v1.js')<index.indexOf('insight_persist_guard_v1.js'));
+  assert.ok(index.indexOf('insight_persist_guard_v1.js')<index.indexOf('insight_ops_v1.js'));
   assert.ok(index.indexOf('insight_preserve_dailyops_v1.js')<index.indexOf('insight_quick_date_nav_v1.js'));
 });
 
