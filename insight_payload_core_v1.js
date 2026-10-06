@@ -922,9 +922,8 @@ function showAddYear(){
     <input id="ayInput" type="number" placeholder="例: 2026"
       style="width:90px;padding:5px 8px;border:1.5px solid #ddd;border-radius:8px;
       font-size:12px;font-weight:600;color:var(--text);font-family:inherit;outline:none;text-align:center;"
-      onkeydown="if(event.key==='Enter')addYear(document.getElementById('ayInput').value);
-                 if(event.key==='Escape')document.getElementById('addYearInlineWrap').innerHTML='';">
-    <button onclick="addYear(document.getElementById('ayInput').value)"
+      >
+    <button id="ayAddBtn"
       style="padding:5px 10px;border-radius:8px;font-size:12px;font-weight:700;border:none;
       cursor:pointer;font-family:inherit;background:#e8eaed;color:#444;">追加</button>
   </span>`;
@@ -1439,7 +1438,7 @@ function renderHaikiBudgetSection(actualTotal, actualCats){
   let html=`<div class="hf-budget-section">
     <div class="hf-budget-title">
       <span>予算</span>
-      <button class="hf-budget-edit-btn" onclick="openBudgetModal()">⚙️ 設定</button>
+      <button id="haikiBudgetEditBtn" class="hf-budget-edit-btn">⚙️ 設定</button>
     </div>`;
 
   if(!hasBudget){
@@ -1753,7 +1752,7 @@ function renderSalesForm(fy,mi,day){
     <div style="margin-bottom:10px;">
       <div style="font-size:9px;font-weight:700;letter-spacing:0.1em;text-transform:uppercase;color:var(--text5);margin-bottom:6px;">天気</div>
       <div style="display:flex;gap:5px;flex-wrap:wrap;">
-        ${WX_KEYS.map(w=>`<button onclick="setSalesWeather(${ri},'${w}')" style="font-size:16px;padding:5px 8px;border-radius:8px;border:2px solid ${row.weather===w?"#1a1a1a":"transparent"};background:${row.weather===w?"#f8f8f8":"#fff"};cursor:pointer;line-height:1;" id="swx_${ri}_${w}">${WX_ICONS[w]}</button>`).join("")}
+        ${WX_KEYS.map(w=>`<button data-sales-weather="${w}" data-ri="${ri}" style="font-size:16px;padding:5px 8px;border-radius:8px;border:2px solid ${row.weather===w?"#1a1a1a":"transparent"};background:${row.weather===w?"#f8f8f8":"#fff"};cursor:pointer;line-height:1;" id="swx_${ri}_${w}">${WX_ICONS[w]}</button>`).join("")}
       </div>
     </div>
 
@@ -2720,11 +2719,11 @@ function showInstallBanner(){
     box-shadow:0 8px 30px rgba(0,0,0,0.3);font-family:-apple-system,sans-serif;
     font-size:13px;font-weight:600;white-space:nowrap;`;
   banner.innerHTML=`<span>📲 ホーム画面に追加して使う</span>
-    <button onclick="doInstall()" style="background:#fff;color:#1a1a1a;border:none;
+    <button id="installBannerAddBtn" style="background:#fff;color:#1a1a1a;border:none;
       border-radius:8px;padding:6px 14px;font-weight:800;font-size:12px;cursor:pointer;">
       追加する
     </button>
-    <button onclick="this.closest('#installBanner').remove()" style="background:transparent;
+    <button id="installBannerCloseBtn" style="background:transparent;
       color:rgba(255,255,255,0.5);border:none;font-size:16px;cursor:pointer;padding:0 4px;">✕</button>`;
   document.body.appendChild(banner);
   setTimeout(()=>banner.remove&&banner.remove(),15000);
@@ -2746,7 +2745,7 @@ function showIOSInstallHint(){
   hint.innerHTML=`
     <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px;">
       <div style="font-size:15px;font-weight:800;">📲 アプリとして使う</div>
-      <button onclick="this.closest('#iosHint').remove()" style="background:rgba(255,255,255,0.15);
+      <button id="iosHintCloseBtn" style="background:rgba(255,255,255,0.15);
         color:#fff;border:none;border-radius:8px;padding:5px 10px;font-size:12px;cursor:pointer;">後で</button>
     </div>
     <div style="font-size:13px;color:rgba(255,255,255,0.75);line-height:1.7;">
