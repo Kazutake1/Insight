@@ -5,22 +5,6 @@
   if(!root.document)return;
   var doc=root.document,yearRow=null,state={moved:false,monthsInline:false};
 
-  var style=doc.createElement('style');
-  style.id='insightYearControlsLayoutStyle';
-  style.textContent=[
-    '#insightSettingsYearActions{display:flex;align-items:center;gap:8px;flex-wrap:wrap}',
-    '#insightSettingsYearActions>button{margin:0!important}',
-    '#insightSettingsYearInlineHost:empty{display:none}',
-    '#insightSettingsYearInlineHost:not(:empty){margin-top:10px}',
-    '#pageDash #baseYearSel{text-align:center;text-align-last:center}',
-    '#pageDash .insight-dashboard-year-row{flex-wrap:wrap!important}',
-    '#pageDash .insight-dashboard-inline-months{display:contents!important}',
-    '#pageDash .insight-dashboard-inline-months>button{background:#fff!important;color:#1a1a1a!important}',
-    '#pageDash .insight-dashboard-inline-months>button:first-child{margin-left:12px!important}',
-    '#pageDash .insight-dashboard-inline-months>button.insight-dashboard-selected-month{border:2px solid #000!important;box-sizing:border-box!important;color:#1a1a1a!important}'
-  ].join('');
-  doc.head.appendChild(style);
-
   function normalized(node){return String(node&&node.textContent||'').replace(/\s+/g,' ').trim();}
   function buttons(container){return container?Array.prototype.slice.call(container.querySelectorAll('button')):[];}
   function findButton(container,pattern){return buttons(container).find(function(button){return pattern.test(normalized(button));})||null;}
