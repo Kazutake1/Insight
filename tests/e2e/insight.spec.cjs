@@ -1794,6 +1794,15 @@ test('イベント実績は過去開催→複数日→時間帯グラフ→カ�
 
   await page.locator('.er-back').click();
   await page.locator('.er-occurrence').nth(1).click();
+  await expect(page.locator('.er-overview-grid')).not.toContainText('1日平均');
+  await expect(page.locator('.er-overview-grid')).not.toContainText('期間合計');
+  await expect(page.locator('.er-overview-grid .er-overview-value')).toHaveCount(2);
+  await expect(page.locator('.er-overview-grid .er-overview-title')).toHaveText(['売上','客数']);
+  const singleLayout=await page.locator('.er-overview-values').first().evaluate(el=>({
+    columns:getComputedStyle(el).gridTemplateColumns.split(' ').filter(Boolean).length,
+    align:getComputedStyle(el).textAlign
+  }));
+  expect(singleLayout).toEqual({columns:1,align:'center'});
   await expect(page.locator('.er-day-tabs')).toHaveCount(0);
   await expect(page.locator('.er-daily-summary')).toHaveCount(0);
   expect(errors).toEqual([]);
