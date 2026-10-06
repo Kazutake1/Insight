@@ -7,7 +7,12 @@ const patches=require('../insight_bootstrap_patches_v1.js');
 
 const root=path.join(__dirname,'..');
 function payload(){
-  return fs.readFileSync(path.join(root,'insight_payload_source_v1.html'),'utf8');
+  return [
+    'insight_payload_source_v1.html',
+    'insight_payload_core_v1.css',
+    'insight_payload_core_v1.js',
+    'insight_payload_ai_legacy_v1.js'
+  ].map(name=>fs.readFileSync(path.join(root,name),'utf8')).join('\n');
 }
 
 test('正規payload sourceはbootstrap文字列置換なしで安全化済み',()=>{

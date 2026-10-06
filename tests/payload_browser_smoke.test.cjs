@@ -5,7 +5,15 @@ const path=require('node:path');
 
 const root=path.join(__dirname,'..');
 function read(name){return fs.readFileSync(path.join(root,name),'utf8');}
-function basePayload(){return read('insight_payload_source_v1.html');}
+function payloadHtml(){return read('insight_payload_source_v1.html');}
+function basePayload(){
+  return [
+    payloadHtml(),
+    read('insight_payload_core_v1.css'),
+    read('insight_payload_core_v1.js'),
+    read('insight_payload_ai_legacy_v1.js')
+  ].join('\n');
+}
 
 test('正規payload sourceは旧圧縮fixtureに依存しない',()=>{
   for(const name of [
@@ -17,7 +25,7 @@ test('正規payload sourceは旧圧縮fixtureに依存しない',()=>{
 });
 
 test('非圧縮payload sourceは有効なInsight HTMLである',()=>{
-  const html=basePayload();
+  const html=payloadHtml();
   assert.match(html,/^<!doctype html>/i);
   assert.match(html,/<\/body>/i);
   assert.match(html,/<\/html>/i);
@@ -79,7 +87,7 @@ test('旧天気相関グループは現行画面で未使用のためbootstrap�
   assert.match(html,/function getCorrData\(year,months\)/);
   assert.match(html,/const \{wdAvg\}=getCorrData\(baseYear,wdPeriod\)/);
   assert.doesNotMatch(bootstrap,/patch\("const wxGroups=/);
-  const featureFiles=fs.readdirSync(root).filter(name=>name.endsWith('.js')&&name!=='insight_bootstrap_patches_v1.js');
+  const featureFiles=fs.readdirSync(root).filter(name=>name.endsWith('.js')&&!name.startsWith('insight_payload_')&&name!=='insight_bootstrap_patches_v1.js');
   assert.deepEqual(featureFiles.filter(name=>/getCorrData|wxAvg|wxGroups/.test(read(name))),[]);
 });
 
