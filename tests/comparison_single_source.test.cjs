@@ -38,7 +38,7 @@ test('未使用の平均フィールド指定はダッシュボード定義か�
 });
 
 test('比較共通化moduleはmanifestでcache bustされ一意に読み込まれる',()=>{
-  const index=read('Index.html');
+  const index=read('insight_shell_loader_v1.js');
   const start=index.indexOf('var orderedFeatureLoads=[');
   const end=index.indexOf('];',start);
   assert.ok(start>=0&&end>start);
