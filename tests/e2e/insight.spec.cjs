@@ -1681,7 +1681,7 @@ test('イベント実績は過去開催→複数日→時間帯グラフ→カ�
   const timeFontSize=await page.locator('.er-hour-item>span').first().evaluate(el=>getComputedStyle(el).fontSize);
   expect(timeFontSize).toBe('13px');
   const hourlyGap=await page.locator('.er-hour-chart').evaluate(el=>getComputedStyle(el).gap);
-  expect(hourlyGap).toBe('4px');
+  expect(hourlyGap).toBe('2px');
   await expect(page.locator('.er-hour-plot').nth(18)).toHaveAttribute('aria-label','18時台 186人');
   await page.locator('.er-hour-plot').first().click();
   await expect(page.locator('.er-hour-value:visible')).toHaveText('20人');
@@ -1704,9 +1704,26 @@ test('イベント実績は過去開催→複数日→時間帯グラフ→カ�
       rightGap:Math.round(chartRect.right-lastRect.right)
     };
   });
-  expect(horizontal.scrollWidth).toBeGreaterThan(horizontal.clientWidth);
-  expect(horizontal.minWidth).toBe('1340px');
+  expect(horizontal.scrollWidth).toBeLessThanOrEqual(horizontal.clientWidth+1);
+  expect(horizontal.minWidth).toBe('0px');
   expect(horizontal.rightGap).toBeLessThanOrEqual(7);
+  const originalViewport=page.viewportSize();
+  for(const viewport of [{width:1194,height:834},{width:834,height:1194}]){
+    await page.setViewportSize(viewport);
+    const fit=await page.locator('.er-hour-scroll').evaluate(scroll=>{
+      const items=Array.from(scroll.querySelectorAll('.er-hour-item'));
+      const widths=items.map(item=>item.getBoundingClientRect().width);
+      return {overflow:scroll.scrollWidth-scroll.clientWidth,count:items.length,variation:Math.max(...widths)-Math.min(...widths)};
+    });
+    expect(fit.count).toBe(24);
+    expect(fit.overflow).toBeLessThanOrEqual(1);
+    expect(fit.variation).toBeLessThan(1);
+    await page.locator('.er-hour-plot').last().click();
+    await expect(page.locator('.er-hour-plot').last()).toHaveAttribute('aria-pressed','true');
+    await page.locator('.er-hour-plot').last().click();
+  }
+  await page.setViewportSize(originalViewport);
+
 
   await expect(page.locator('.er-sales-section > h2')).toHaveText('カテゴリー実績');
   await expect(page.locator('.er-category-card')).toHaveCount(2);

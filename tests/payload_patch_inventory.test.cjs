@@ -617,7 +617,7 @@ test('イベント実績は過去開催・日付カード・時間帯グラフ�
   const eventResults=read('insight_event_results_v1.js');
   const events=read('insight_events_v1.js');
   assert.match(index,/insight_events_v1\.js\?v=20261006-multi-location-1/);
-  assert.match(index,/insight_event_results_v1\.js\?v=20261006-multi-location-1/);
+  assert.match(index,/insight_event_results_v1\.js\?v=20261006-hourly-fit-1/);
   assert.ok(index.indexOf('insight_analysis_context_v1.js')<index.indexOf('insight_event_results_v1.js'));
   assert.ok(index.indexOf('insight_event_results_v1.js')<index.indexOf('insight_daily_anomaly_v1.js'));
   assert.match(events,/\.ie-dialog\.ie-event-add \.ie-presets\{margin-top:10px\}/);
@@ -667,7 +667,7 @@ test('イベント実績は過去開催・日付カード・時間帯グラフ�
   assert.match(eventResults,/\.er-category-card>h3\{[^}]*font-size:14px/);
   assert.match(eventResults,/\.er-demand-card>h3\{[^}]*font-size:14\.5px/);
   assert.doesNotMatch(eventResults,/item\.append\(el\('strong',String\(value\)\)/);
-  assert.match(eventResults,/\.er-hour-chart\{[^}]*gap:4px;[^}]*min-width:1340px/);
+  assert.match(eventResults,/\.er-hour-chart\{[^}]*gap:2px;[^}]*min-width:0/);
   assert.match(eventResults,/min-width:1340px/);
   assert.match(eventResults,/createReadOnlyDayCard/);
   assert.match(eventResults,/カテゴリー実績/);
