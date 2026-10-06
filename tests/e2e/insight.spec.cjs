@@ -27,12 +27,10 @@ async function selectDashboardSeptember(page){
 test('売上・客数・廃棄は販売数入力と同じ前月・年月・翌月の操作に統一される',async({page})=>{
   const errors=await openInsight(page);
   const legacyRenderer=await page.evaluate(()=>initInputPage.toString());
-  expect(legacyRenderer).not.toContain('iytab');
-  expect(legacyRenderer).not.toContain('mtab');
-  expect(legacyRenderer).not.toContain('add-year-form');
-  expect(legacyRenderer).not.toContain('salesYearRow');
-  expect(legacyRenderer).not.toContain('salesMonthTabs');
+  expect(legacyRenderer).toContain('salesYearRow');
+  expect(legacyRenderer).toContain('salesMonthTabs');
   expect(legacyRenderer).toContain('renderTable(type)');
+  expect(await page.evaluate(()=>window.InsightInputPeriodControls.legacyCleanupMode)).toBe('runtime');
 
   const year=await page.evaluate(()=>Number(allStores.stores[allStores.current].years.map(Number).sort((a,b)=>a-b).slice(-1)[0]));
 
@@ -251,7 +249,7 @@ test('旧コア配色補正はruntime moduleで適用する',async({page})=>{
 test('トップページはシェルと機能manifestの最新版確認をno-storeで行う',async({page})=>{
   const errors=await openInsight(page);
   const source=await page.evaluate(()=>fetch('/Index.html?e2e-shell-check=1',{cache:'no-store'}).then(r=>r.text()));
-  expect(source).toContain('name="insight-shell-version" content="20261006-step5-control-style-1"');
+  expect(source).toContain('name="insight-shell-version" content="20261006-step5-input-period-runtime-1"');
   expect(source).toContain("fetch('./Index.html?insight_probe='+Date.now(),{cache:'no-store'})");
   expect(source).toContain("fetch('./Index.html?insight_manifest_probe='+Date.now(),{cache:'no-store'})");
   expect(source).toContain('function featureSignature(entries)');

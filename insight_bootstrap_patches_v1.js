@@ -32,15 +32,8 @@ patch('<script src=\"https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart
 // STEP5 migrated: legacy year-delete UI cleanup now runs in insight_dashboard_year_fix_v1.js after payload execution.
 // Keeping this out of bootstrap removes four brittle HTML/function string replacements.
 
-  // Input pages: remove the legacy year pills, inline year-add form and 12 month tabs before the payload executes.
-  // The replacement period UI is owned by insight_sales_period_selector_v1.js and matches sales-count navigation.
-  var legacyInputPeriodStart='  const yrId={sales:"salesYearRow",kyaku:"kyakuYearRow",haiki:"haikiYearRow"}[type];';
-  var legacyInputPeriodEnd='  renderTable(type);\n}';
-  var legacyInputStartAt=html.indexOf(legacyInputPeriodStart);
-  if(legacyInputStartAt<0)throw new Error('入力ページ旧年月UIの開始位置が見つかりません');
-  var legacyInputEndAt=html.indexOf(legacyInputPeriodEnd,legacyInputStartAt);
-  if(legacyInputEndAt<0)throw new Error('入力ページ旧年月UIの終了位置が見つかりません');
-  html=html.slice(0,legacyInputStartAt)+html.slice(legacyInputEndAt);
+  // STEP5 migrated: legacy input year/month controls stay in the payload source.
+  // insight_sales_period_selector_v1.js removes their DOM nodes synchronously after renderTable and owns the replacement toolbar.
 
   return html;
 }

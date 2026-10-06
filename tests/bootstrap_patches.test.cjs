@@ -58,3 +58,10 @@ test('旧コア配色はbootstrapで書き換えずruntime style互換モジュ�
   assert.match(runtime,/background','#1a1a1a'/);
   assert.match(runtime,/color','#fff'/);
 });
+
+test('入力ページ旧年月UIのソースはbootstrapで切り取らずruntime selectorへ委譲する',()=>{
+  const patched=patches.apply(payload());
+  const source=fs.readFileSync(path.join(root,'insight_bootstrap_patches_v1.js'),'utf8');
+  assert.match(patched,/const yrId=\{sales:"salesYearRow",kyaku:"kyakuYearRow",haiki:"haikiYearRow"\}\[type\]/);
+  assert.doesNotMatch(source,/legacyInputPeriodStart|入力ページ旧年月UIの開始位置が見つかりません/);
+});

@@ -12,13 +12,13 @@ test('payload互換パッチ6件はbootstrap moduleへ分離しIndexにはbody�
   const bootstrap=read('insight_bootstrap_patches_v1.js');
   assert.equal((bootstrap.match(/^patch\(/gm)||[]).length,6);
   assert.equal((index.match(/html=html\.replace/g)||[]).length,1);
-  assert.match(index,/insight_bootstrap_patches_v1\.js\?v=20261006-control-style-runtime-1/);
+  assert.match(index,/insight_bootstrap_patches_v1\.js\?v=20261006-input-period-runtime-2/);
 });
 
 test('トップページはキャッシュ抑止とシェル・機能manifestの自己更新を持つ',()=>{
   const index=read('Index.html');
-  assert.match(index,/insight-shell-version" content="20261006-step5-control-style-1/);
-  assert.match(index,/var BUILD="20261006-step5-control-style-1"/);
+  assert.match(index,/insight-shell-version" content="20261006-step5-input-period-runtime-1/);
+  assert.match(index,/var BUILD="20261006-step5-input-period-runtime-1"/);
   assert.match(index,/Shell rule: bump BUILD whenever the loader/);
   assert.match(index,/Cache-Control" content="no-cache, no-store, must-revalidate/);
   assert.match(index,/insight_probe=/);
@@ -444,15 +444,14 @@ test('全分析バンドルは履歴の後・AI解釈の前に読み込み外部
   assert.doesNotThrow(()=>new vm.Script(bundle),'analysis bundle module must be valid JavaScript');
 });
 
-test('売上・客数・廃棄の旧年月UIは本体実行前に削除し販売数入力方式だけを使う',()=>{
+test('売上・客数・廃棄の旧年月UIはruntime selectorが除去し販売数入力方式だけを使う',()=>{
   const index=read('Index.html');
   const controls=read('insight_sales_period_selector_v1.js');
   const bootstrap=read('insight_bootstrap_patches_v1.js');
-  assert.match(index,/insight_bootstrap_patches_v1\.js\?v=20261006-control-style-runtime-1/);
-  assert.match(index,/insight_sales_period_selector_v1\.js\?v=20261003-input-period-source-1/);
+  assert.match(index,/insight_bootstrap_patches_v1\.js\?v=20261006-input-period-runtime-2/);
+  assert.match(index,/insight_sales_period_selector_v1\.js\?v=20261006-input-period-runtime-1/);
   assert.ok(index.indexOf('insight_page_period_sync_v1.js')<index.indexOf('insight_sales_period_selector_v1.js'));
-  assert.match(bootstrap,/legacyInputPeriodStart/);
-  assert.match(bootstrap,/入力ページ旧年月UIの開始位置が見つかりません/);
+  assert.doesNotMatch(bootstrap,/legacyInputPeriodStart|入力ページ旧年月UIの開始位置が見つかりません/);
   assert.match(controls,/pageId:'pageSales'/);
   assert.match(controls,/pageId:'pageKyaku'/);
   assert.match(controls,/pageId:'pageHaiki'/);
@@ -460,6 +459,8 @@ test('売上・客数・廃棄の旧年月UIは本体実行前に削除し販売
   assert.match(controls,/‹ 前月/);
   assert.match(controls,/翌月 ›/);
   assert.match(controls,/removeLegacyPlaceholders/);
+  assert.match(controls,/model\.legacyCleanupMode='runtime'/);
+  assert.match(controls,/input:table:after/);
   assert.doesNotMatch(controls,/hideLegacy|legacy-hidden|setTimeout|MutationObserver|今月へ|年月を選択|insightSalesPeriodOverlay/);
   assert.match(controls,/InsightYearManager\.promoteCurrent/);
   assert.match(controls,/InsightPagePeriodSync\.setTarget/);
@@ -556,7 +557,7 @@ test('通常画面の選択年月をサイドバー切替後も全ページで�
 test('時間帯別客数は日報客数と分離して日付別24時間データとして保存する',()=>{
   const index=read('Index.html');
   const hourly=read('insight_hourly_customers_v1.js');
-  assert.match(index,/insight_bootstrap_patches_v1\.js\?v=20261006-control-style-runtime-1/);
+  assert.match(index,/insight_bootstrap_patches_v1\.js\?v=20261006-input-period-runtime-2/);
   assert.match(index,/insight_hourly_customers_v1\.js\?v=20261006-remove-help/);
   assert.ok(index.indexOf('insight_events_v1.js')<index.indexOf('insight_hourly_customers_v1.js'));
   assert.ok(index.indexOf('insight_hourly_customers_v1.js')<index.indexOf('insight_event_results_v1.js'));
@@ -772,7 +773,7 @@ test('店舗運営UIのCSSはops moduleが所有する',()=>{
 test('まだ必要な安全・互換パッチはbootstrap moduleで保持する',()=>{
   const index=read('Index.html');
   const bootstrap=read('insight_bootstrap_patches_v1.js');
-  assert.match(index,/insight_bootstrap_patches_v1\.js\?v=20261006-control-style-runtime-1/);
+  assert.match(index,/insight_bootstrap_patches_v1\.js\?v=20261006-input-period-runtime-2/);
   assert.match(bootstrap,/const WX_KEYS=/);
   assert.match(bootstrap,/originalPersist/);
   assert.match(bootstrap,/safePersist/);

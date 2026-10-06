@@ -1,4 +1,4 @@
-/* Input period controls v3: sales-count style navigation for sales, customers and waste pages. */
+/* Input period controls v4: runtime replacement of legacy year/month controls for sales, customers and waste pages. */
 (function(root){
   'use strict';
   if(root.InsightInputPeriodControls)return;
@@ -22,7 +22,7 @@
   }
 
   var model={
-    VERSION:3,
+    VERSION:4,
     monthNumber:monthNumber,
     validYear:validYear,
     shiftPeriod:shiftPeriod,
@@ -112,6 +112,8 @@
     toolbar.querySelector('[data-period-current]').textContent=String(value.year)+'年 '+String(value.month)+'月';
   }
   function syncAll(){configs.forEach(syncConfig);}
+  model.cleanupLegacy=syncAll;
+  model.legacyCleanupMode='runtime';
 
   function apply(config,year,month){
     year=validYear(year);month=monthNumber(month);

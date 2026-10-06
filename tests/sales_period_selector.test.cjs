@@ -48,3 +48,12 @@ test('期間変更は既存同期処理を利用し保存処理を再実装し�
   assert.match(source,/InsightPagePeriodSync\.syncCurrentPage/);
   assert.doesNotMatch(source,/localStorage|InsightStorage\.writeSnapshot|InsightStorage\.transaction|\bfetch\s*\(|XMLHttpRequest|WebSocket/);
 });
+
+test('旧年月UIはbootstrap依存ではなくruntime cleanupとして所有する',()=>{
+  const source=fs.readFileSync(path.join(__dirname,'..','insight_sales_period_selector_v1.js'),'utf8');
+  assert.equal(controls.VERSION,4);
+  assert.match(source,/model\.cleanupLegacy=syncAll/);
+  assert.match(source,/model\.legacyCleanupMode='runtime'/);
+  assert.match(source,/function removeLegacyPlaceholders\(config\)/);
+  assert.match(source,/input:table:after/);
+});
