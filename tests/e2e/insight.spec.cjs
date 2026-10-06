@@ -26,7 +26,7 @@ async function selectDashboardSeptember(page){
 
 test('売上・客数・廃棄は販売数入力と同じ前月・年月・翌月の操作に統一される',async({page})=>{
   const errors=await openInsight(page);
-  const legacyRenderer=await page.evaluate(()=>initInputPage.toString());
+  const legacyRenderer=await page.evaluate(()=>initInputPage.__insightOriginal.toString());
   expect(legacyRenderer).toContain('salesYearRow');
   expect(legacyRenderer).toContain('salesMonthTabs');
   expect(legacyRenderer).toContain('renderTable(type)');
