@@ -259,9 +259,9 @@ test('トップページはシェルと機能manifestの最新版確認をno-sto
   expect(source).toContain('function stripPayloadChartScript(html)');
   expect(await page.evaluate(()=>typeof Chart)).not.toBe('undefined');
   expect(await page.evaluate(()=>({
-    fog:eval('WX_ICONS["霧"]'),
-    freezing:eval('WX_ICONS["凍雨"]'),
-    thunder:eval('WX_ICONS["雷雨"]'),
+    fog:WX_ICONS['霧'],
+    freezing:WX_ICONS['凍雨'],
+    thunder:WX_ICONS['雷雨'],
     runtime:!!window.InsightWeatherIconCompat
   }))).toEqual({fog:'🌫️',freezing:'🧊',thunder:'🌩️',runtime:true});
   expect(source).toContain("location.replace('./Index.html?insight_build='+encodeURIComponent(m[1]))");
