@@ -61,8 +61,8 @@ test('canonical payloadはinline script/styleを持たず外部assetを順序固
 
 test('トップページはキャッシュ抑止とシェル・機能manifestの自己更新を持つ',()=>{
   const index=readShell();
-  assert.match(index,/insight-shell-version" content="20261006-payload-assets-1/);
-  assert.match(index,/var BUILD="20261006-payload-assets-1"/);
+  assert.match(index,/insight-shell-version" content="20261006-inline-bindings-1/);
+  assert.match(index,/var BUILD="20261006-inline-bindings-1"/);
   assert.match(index,/Shell rule: bump BUILD whenever the loader/);
   assert.match(index,/Cache-Control" content="no-cache, no-store, must-revalidate/);
   assert.match(index,/insight_probe=/);
