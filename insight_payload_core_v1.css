@@ -606,3 +606,48 @@ body.ai-analysis-open .ai-analysis-toggle{display:none;}
   .ai-analysis-panel{width:92vw;}
   .ai-analysis-toggle{right:12px;bottom:12px;}
 }
+
+/* ══ Canonical payload static presentation hooks ══ */
+#storeMenu,#restoreFile,#csvImportFile,#donutDayPicker{display:none;}
+#autoWxBtn{
+  padding:4px 10px;border-radius:8px;border:1.5px solid #ddd;background:#fff;color:#333;
+  font-size:10.5px;font-weight:700;cursor:pointer;font-family:inherit;
+  display:flex;align-items:center;gap:4px;
+}
+#qNavRow{margin-bottom:0;}
+.payload-quick-actions{display:flex;gap:8px;margin-top:10px;}
+#quickSaveBtn{margin-top:0;flex:1;width:auto;}
+#baseYearSel{
+  padding:5px 10px;border-radius:9px;border:2px solid #1a1a1a;background:#1a1a1a;color:#fff;
+  font-size:12px;font-weight:700;font-family:inherit;outline:none;cursor:pointer;
+}
+.payload-year-vs{font-size:16px;color:var(--text5);}
+#cmpYearSel{
+  padding:5px 10px;border-radius:9px;border:2px solid #888;background:var(--surface);color:var(--text2);
+  font-size:12px;font-weight:700;font-family:inherit;outline:none;cursor:pointer;
+}
+#addYearBtn{
+  padding:5px 12px;border-radius:9px;border:1.5px dashed #ccc;background:transparent;color:#999;
+  font-size:11px;font-weight:700;cursor:pointer;font-family:inherit;
+}
+.payload-donut-head{display:flex;align-items:center;justify-content:space-between;margin-bottom:6px;}
+.payload-donut-tools{display:flex;align-items:center;gap:5px;}
+.payload-donut-toggle{display:flex;border-radius:7px;overflow:hidden;border:1px solid #e0e0e0;}
+#donutBtnAmt,#donutBtnPct{
+  padding:3px 9px;border:none;font-size:10px;font-weight:700;cursor:pointer;font-family:inherit;
+}
+#donutBtnAmt{background:var(--text);color:var(--surface);}
+#donutBtnPct{background:var(--surface);color:var(--text4);}
+#donutDaySelect{
+  font-size:9.5px;font-weight:700;border:1px solid #eee;border-radius:6px;padding:3px 5px;
+  color:var(--text3);background:var(--input-bg);font-family:inherit;
+}
+.payload-corr-head{display:flex;align-items:center;justify-content:space-between;margin-bottom:8px;}
+.payload-wd-toggle{display:flex;border-radius:7px;overflow:hidden;border:1px solid var(--border);}
+.payload-wd-chart-wrap{height:160px;position:relative;}
+.payload-input-chart-row{display:flex;gap:10px;margin-bottom:10px;flex-shrink:0;}
+.payload-input-chart-main{flex:1;margin-bottom:0;}
+.payload-input-chart-main-wrap{height:90px;position:relative;}
+.payload-input-chart-side{width:200px;flex-shrink:0;margin-bottom:0;padding:8px 10px 8px;}
+.payload-input-chart-side-wrap{height:105px;position:relative;}
+.dark #autoWxBtn{background:var(--surface)!important;color:var(--text2)!important;}
