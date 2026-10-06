@@ -24,15 +24,15 @@ test('Index shellはinline script/styleを持たず外部assetへ分離する',(
   const boot=read('insight_shell_boot_v1.js');
   const loader=read('insight_shell_loader_v1.js');
   const css=read('insight_shell_v1.css');
-  assert.match(index,/insight_shell_boot_v1\.js\?v=20261006-payload-assets-1/);
-  assert.match(index,/insight_shell_loader_v1\.js\?v=20261006-payload-assets-1/);
-  assert.match(index,/insight_shell_v1\.css\?v=20261006-payload-assets-1/);
+  assert.match(index,/insight_shell_boot_v1\.js\?v=20261006-inline-bindings-1/);
+  assert.match(index,/insight_shell_loader_v1\.js\?v=20261006-inline-bindings-1/);
+  assert.match(index,/insight_shell_v1\.css\?v=20261006-inline-bindings-1/);
   assert.doesNotMatch(index,/<script(?![^>]*\bsrc=)[^>]*>/i);
   assert.doesNotMatch(index,/<style\b/i);
   assert.match(boot,/fetch\('\.\/Index\.html\?insight_probe='/);
   assert.match(loader,/fetch\('\.\/insight_shell_loader_v1\.js\?insight_manifest_probe='/);
   assert.match(loader,/document\.open\(\);document\.write\(html\);document\.close\(\)/);
-  assert.match(loader,/fetch\('\.\/insight_payload_source_v1\.html\?v=20261006-payload-assets-1'/);
+  assert.match(loader,/fetch\('\.\/insight_payload_source_v1\.html\?v=20261006-inline-bindings-1'/);
   assert.doesNotMatch(index+loader,/pako|insight_payload_v1_part0/);
   assert.match(css,/#loading\{/);
 });
@@ -45,6 +45,9 @@ test('canonical payloadはinline script/styleを持たず外部assetを順序固
   assert.match(payload,/insight_payload_core_v1\.css\?v=20261006-payload-assets-1/);
   assert.match(payload,/insight_payload_core_v1\.js\?v=20261006-payload-assets-1/);
   assert.match(payload,/insight_payload_ai_legacy_v1\.js\?v=20261006-payload-assets-1/);
+  assert.match(payload,/insight_payload_bindings_v1\.js\?v=20261006-inline-bindings-1/);
+  assert.doesNotMatch(payload,/\son(?:click|change)\s*=/i);
+  assert.match(read('insight_payload_bindings_v1.js'),/InsightPayloadBindings/);
   assert.ok(payload.indexOf('insight_payload_core_v1.js')<payload.indexOf('insight_payload_ai_legacy_v1.js'));
   assert.doesNotMatch(payload,/<script(?![^>]*\bsrc=)[^>]*>/i);
   assert.doesNotMatch(payload,/<style\b/i);
@@ -58,8 +61,8 @@ test('canonical payloadはinline script/styleを持たず外部assetを順序固
 
 test('トップページはキャッシュ抑止とシェル・機能manifestの自己更新を持つ',()=>{
   const index=readShell();
-  assert.match(index,/insight-shell-version" content="20261006-payload-assets-1/);
-  assert.match(index,/var BUILD="20261006-payload-assets-1"/);
+  assert.match(index,/insight-shell-version" content="20261006-inline-bindings-1/);
+  assert.match(index,/var BUILD="20261006-inline-bindings-1"/);
   assert.match(index,/Shell rule: bump BUILD whenever the loader/);
   assert.match(index,/Cache-Control" content="no-cache, no-store, must-revalidate/);
   assert.match(index,/insight_probe=/);
