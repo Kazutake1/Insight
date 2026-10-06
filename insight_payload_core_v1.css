@@ -619,7 +619,7 @@ body.ai-analysis-open .ai-analysis-toggle{display:none;}
 #quickSaveBtn{margin-top:0;flex:1;width:auto;}
 #baseYearSel{
   padding:5px 10px;border-radius:9px;border:2px solid #1a1a1a;background:#1a1a1a;color:#fff;
-  font-size:12px;font-weight:700;font-family:inherit;outline:none;cursor:pointer;
+  font-size:12px;font-weight:700;font-family:inherit;outline:none;cursor:pointer;color-scheme:dark;
 }
 .payload-year-vs{font-size:16px;color:var(--text5);}
 #cmpYearSel{
