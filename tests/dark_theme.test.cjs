@@ -3,15 +3,17 @@ const assert=require('node:assert/strict');
 const fs=require('node:fs');
 const path=require('node:path');
 const source=fs.readFileSync(path.join(__dirname,'..','insight_dark_theme_v1.js'),'utf8');
+const css=fs.readFileSync(path.join(__dirname,'..','insight_payload_core_v1.css'),'utf8');
 
-test('Firefox系ダークテーマは指定パレットをdarkモードだけに適用する',()=>{
+test('Firefox系ダークテーマは指定パレットをdarkモードだけに適用し固定スタイルは外部CSSで維持する',()=>{
   assert.match(source,/background:'#251b26'/);
   assert.match(source,/surface:'#2f2942'/);
   assert.match(source,/wine:'#432325'/);
   assert.match(source,/wineActive:'#5a3038'/);
-  assert.match(source,/\.dark\{/);
-  assert.match(source,/\.dark \.sidebar/);
-  assert.match(source,/\.dark \.nav-btn\.active/);
+  assert.match(css,/\.dark\{--bg:#251b26;--surface:#2f2942;--surface2:#342c45/);
+  assert.match(css,/\.dark \.sidebar\{background:linear-gradient\(180deg,#2f2942 0%,#251b26 100%\)\}/);
+  assert.match(css,/\.dark \.nav-btn\.active\{background:#5a3038;color:#e2e2ea\}/);
+  assert.doesNotMatch(source,/createElement\(['"]style['"]\)|style\.textContent|appendChild\(style\)/);
 });
 
 test('ダークテーマは保存データや外部通信に触れない',()=>{

@@ -722,3 +722,13 @@ body.ai-analysis-open .ai-analysis-toggle{display:none;}
 .insight-health-error strong{color:#b42318}.insight-health-warning strong{color:#a16207}
 #insightDataHealthActions{display:flex;justify-content:flex-end;margin-top:16px}
 #insightDataHealthClose{border:1px solid var(--border,#ccc);border-radius:8px;padding:9px 14px;background:var(--surface,#fff);color:var(--text,#222);font:700 12px/1 inherit;cursor:pointer}
+
+/* Firefox-inspired dark theme v1: fixed presentation rules externalized from runtime JS. */
+.dark{--bg:#251b26;--surface:#2f2942;--surface2:#342c45;--surface3:#3b324c;--border:#554a5e;--text:#e2e2ea;--text2:#d2cdda;--text3:#b9b3c4;--text4:#9793a1;--text5:#756f7e;color-scheme:dark}
+html.dark body,body.dark{background:#251b26}
+.dark #main{background:#251b26}
+.dark .sidebar{background:linear-gradient(180deg,#2f2942 0%,#251b26 100%)}
+.dark .nav-btn.active{background:#5a3038;color:#e2e2ea}
+.dark .sidebar-btn.insight-settings-nav.active{background:#5a3038;color:#e2e2ea}
+.dark .sidebar-btn.insight-settings-nav.active .nav-icon{opacity:1}
+.dark ::selection{background:#6b435f;color:#e2e2ea}
