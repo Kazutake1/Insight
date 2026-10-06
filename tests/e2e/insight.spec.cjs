@@ -287,7 +287,7 @@ test('トップページは外部shellと機能manifestの最新版確認をno-s
   expect(source).toContain('https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js');
   expect(source).toContain('integrity="sha512-CQBWl4fJHWbryGE+Pc7UAxWMUMNMWzWxF4SQo9CgkJIN1kx6djDQZjh3Y8SZ1d+6I+1zze6Z7kHXO7q3UyZAWw=="');
   expect(loader).not.toContain('stripPayloadChartScript');
-  expect(payload).toContain('insight_payload_core_v1.css?v=20261007-dark-theme-css-1');
+  expect(payload).toContain('insight_payload_core_v1.css?v=20261007-base-year-arrow-light-1');
   expect(payload).toContain('insight_payload_core_v1.js?v=20261006-payload-assets-1');
   expect(payload).toContain('insight_payload_ai_legacy_v1.js?v=20261006-payload-assets-1');
   expect(payload).toContain('insight_payload_bindings_v1.js?v=20261006-inline-bindings-1');
@@ -651,6 +651,29 @@ test('設定ボタンは他のサイドバーナビと文字・アイコン配�
   expect(styles.settings).not.toBeNull();
   expect(styles.reference).not.toBeNull();
   expect(styles.settings).toEqual(styles.reference);
+  expect(errors).toEqual([]);
+});
+
+test('ライトモードの基準年selectは黒背景でも標準矢印を見える配色で描画する',async({page})=>{
+  const errors=await openInsight(page);
+  const toggle=page.locator('.insight-theme-switch-track');
+  const wasDark=await page.evaluate(()=>document.documentElement.classList.contains('dark')||document.body.classList.contains('dark'));
+  if(wasDark){
+    await toggle.click();
+    await page.waitForFunction(()=>!(document.documentElement.classList.contains('dark')||document.body.classList.contains('dark')));
+  }
+  const style=await page.evaluate(()=>{
+    const select=document.getElementById('baseYearSel');
+    const cs=getComputedStyle(select);
+    return {
+      background:cs.backgroundColor,
+      color:cs.color,
+      colorScheme:cs.colorScheme
+    };
+  });
+  expect(style.background).toBe('rgb(26, 26, 26)');
+  expect(style.color).toBe('rgb(255, 255, 255)');
+  expect(style.colorScheme).toContain('dark');
   expect(errors).toEqual([]);
 });
 

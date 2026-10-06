@@ -43,7 +43,7 @@ test('canonical payloadはinline script/styleを持たず外部assetを順序固
   const core=read('insight_payload_core_v1.js');
   const ai=read('insight_payload_ai_legacy_v1.js');
   const css=read('insight_payload_core_v1.css');
-  assert.match(payload,/insight_payload_core_v1\.css\?v=20261007-dark-theme-css-1/);
+  assert.match(payload,/insight_payload_core_v1\.css\?v=20261007-base-year-arrow-light-1/);
   assert.match(payload,/insight_payload_core_v1\.js\?v=20261006-payload-assets-1/);
   assert.match(payload,/insight_payload_ai_legacy_v1\.js\?v=20261006-payload-assets-1/);
   assert.match(payload,/insight_payload_bindings_v1\.js\?v=20261006-inline-bindings-1/);
@@ -55,6 +55,7 @@ test('canonical payloadはinline script/styleを持たず外部assetを順序固
   assert.doesNotMatch(payload,/\sstyle\s*=/i);
   assert.match(css,/Canonical payload static presentation hooks/);
   assert.match(css,/#autoWxBtn\{/);
+  assert.match(css,/#baseYearSel\{[^}]*background:#1a1a1a;[^}]*color:#fff;[^}]*color-scheme:dark;/);
   assert.match(css,/\.payload-input-chart-row\{/);
   assert.match(css,/\* ══ ライト\/ダークモード CSS変数 ══ \*/);
   assert.match(core,/const SK="insight_v11"/);
