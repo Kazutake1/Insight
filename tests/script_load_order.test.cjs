@@ -84,6 +84,16 @@ test('Indexはshell loaderを外部scriptとして読み込む',()=>{
   assert.match(read('insight_shell_loader_v1.js'),/var orderedFeatureLoads=/);
 });
 
+test('shell BUILDはIndex metaとboot scriptで一致する',()=>{
+  const index=read('Index.html');
+  const boot=read('insight_shell_boot_v1.js');
+  const meta=index.match(/<meta name="insight-shell-version" content="([^"]+)"/);
+  const build=boot.match(/var BUILD="([^"]+)"/);
+  assert.ok(meta&&build,'shell BUILD情報が取得できること');
+  assert.equal(build[1],meta[1]);
+  assert.ok(index.includes('insight_shell_boot_v1.js?v='+build[1]));
+});
+
 test('旧動的scriptローダーはルートJSから除去されている',()=>{
   const files=fs.readdirSync(root).filter(name=>name.endsWith('.js'));
   const offenders=[];
