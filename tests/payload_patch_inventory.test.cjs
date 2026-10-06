@@ -43,7 +43,7 @@ test('canonical payloadはinline script/styleを持たず外部assetを順序固
   const core=read('insight_payload_core_v1.js');
   const ai=read('insight_payload_ai_legacy_v1.js');
   const css=read('insight_payload_core_v1.css');
-  assert.match(payload,/insight_payload_core_v1\.css\?v=20261006-annual-summary-css-1/);
+  assert.match(payload,/insight_payload_core_v1\.css\?v=20261006-year-controls-css-1/);
   assert.match(payload,/insight_payload_core_v1\.js\?v=20261006-payload-assets-1/);
   assert.match(payload,/insight_payload_ai_legacy_v1\.js\?v=20261006-payload-assets-1/);
   assert.match(payload,/insight_payload_bindings_v1\.js\?v=20261006-inline-bindings-1/);
@@ -360,22 +360,23 @@ test('設定ページはサイドバー下部の管理項目を集約する',()=
 test('年度管理ボタンは設定へ移動し月ボタンはダッシュボード年度行へ移動する',()=>{
   const index=readShell();
   const layout=read('insight_year_controls_layout_v1.js');
-  assert.match(index,/insight_year_controls_layout_v1\.js\?v=20261006-base-year-center-1/);
+  const css=read('insight_payload_core_v1.css');
+  assert.match(index,/insight_year_controls_layout_v1\.js\?v=20261006-csp-style-year-controls-1/);
   assert.ok(index.indexOf('insight_settings_v1.js')<index.indexOf('insight_year_controls_layout_v1.js'));
   assert.match(layout,/insightSettingsYearSection/);
   assert.match(layout,/insightSettingsYearActions/);
   assert.match(layout,/addYearInlineWrap/);
   assert.match(layout,/insight-dashboard-year-row/);
   assert.match(layout,/insight-dashboard-inline-months/);
-  assert.match(layout,/insight-dashboard-inline-months>button\{background:#fff!important;color:#1a1a1a!important\}/);
-  assert.match(layout,/insight-dashboard-selected-month\{border:2px solid #000!important;box-sizing:border-box!important;color:#1a1a1a!important\}/);
+  assert.match(css,/insight-dashboard-inline-months>button\{background:#fff!important;color:#1a1a1a!important\}/);
+  assert.match(css,/insight-dashboard-selected-month\{border:2px solid #000!important;box-sizing:border-box!important;color:#1a1a1a!important\}/);
   assert.match(layout,/function syncSelectedMonth\(/);
-  assert.match(layout,/insight-dashboard-inline-months>button:first-child\{margin-left:12px!important\}/);
+  assert.match(css,/insight-dashboard-inline-months>button:first-child\{margin-left:12px!important\}/);
   assert.match(layout,/monthRow\.parentElement!==yearRow/);
+  assert.doesNotMatch(layout,/createElement\(['"]style['"]\)|style\.textContent|appendChild\(style\)/);
   assert.doesNotMatch(layout,/localStorage|InsightStorage/);
   assert.doesNotThrow(()=>new vm.Script(layout),'year controls layout module must be valid JavaScript');
 });
-
 test('入力グラフ補助文の整理は入力3ページだけを対象にする',()=>{
   const index=readShell();
   const cleanup=read('insight_input_chart_cleanup_v1.js');
