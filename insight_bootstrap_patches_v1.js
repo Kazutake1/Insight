@@ -27,8 +27,7 @@ var safePersist='function persist(){\n  try{\n    if(window.InsightStorage&&type
 if(html.indexOf(originalPersist)<0)throw new Error('保存処理の安全化に失敗しました');
 patch(originalPersist,safePersist);
 // STEP5 migrated: legacy core control contrast is now applied at runtime by insight_legacy_style_compat_v1.js.
-// STEP5 retained: Chart.js SRI/referrer policy must be injected before the browser evaluates the dependency tag.
-patch('<script src=\"https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js\"\n  crossorigin=\"anonymous\"','<script src=\"https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js\"\n  integrity=\"sha512-CQBWl4fJHWbryGE+Pc7UAxWMUMNMWzWxF4SQo9CgkJIN1kx6djDQZjh3Y8SZ1d+6I+1zze6Z7kHXO7q3UyZAWw==\"\n  crossorigin=\"anonymous\"\n  referrerpolicy=\"no-referrer\"');
+// STEP5 migrated: Chart.js is loaded securely by Index.html; the legacy payload tag is stripped by src before document.write().
 // STEP5 migrated: legacy year-delete UI cleanup now runs in insight_dashboard_year_fix_v1.js after payload execution.
 // Keeping this out of bootstrap removes four brittle HTML/function string replacements.
 

@@ -250,10 +250,14 @@ test('旧コア配色補正はruntime moduleで適用する',async({page})=>{
 test('トップページはシェルと機能manifestの最新版確認をno-storeで行う',async({page})=>{
   const errors=await openInsight(page);
   const source=await page.evaluate(()=>fetch('/Index.html?e2e-shell-check=1',{cache:'no-store'}).then(r=>r.text()));
-  expect(source).toContain('name="insight-shell-version" content="20261006-step5-input-period-runtime-1"');
+  expect(source).toContain('name="insight-shell-version" content="20261006-step5-chart-shell-1"');
   expect(source).toContain("fetch('./Index.html?insight_probe='+Date.now(),{cache:'no-store'})");
   expect(source).toContain("fetch('./Index.html?insight_manifest_probe='+Date.now(),{cache:'no-store'})");
   expect(source).toContain('function featureSignature(entries)');
+  expect(source).toContain('https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js');
+  expect(source).toContain('integrity="sha512-CQBWl4fJHWbryGE+Pc7UAxWMUMNMWzWxF4SQo9CgkJIN1kx6djDQZjh3Y8SZ1d+6I+1zze6Z7kHXO7q3UyZAWw=="');
+  expect(source).toContain('function stripPayloadChartScript(html)');
+  expect(await page.evaluate(()=>typeof Chart)).not.toBe('undefined');
   expect(source).toContain("location.replace('./Index.html?insight_build='+encodeURIComponent(m[1]))");
   expect(source).toContain("'&insight_manifest='+encodeURIComponent(remoteFeatureSignature)");
   expect(errors).toEqual([]);
