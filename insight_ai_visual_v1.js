@@ -103,8 +103,8 @@
       id==='aiAnalysisGood'?'関連性':'分析結果'
     );
     head.appendChild(textNode(document,'div',title,'ai-insight-title'));
-    if(parts.state)head.appendChild(textNode(document,'span',parts.state,'ai-insight-state'));
-    item.appendChild(head);
+    if(parts.state&&!(id==='aiAnalysisSummary'&&parts.state==='結論'))head.appendChild(textNode(document,'span',parts.state,'ai-insight-state'));
+    if(!(id==='aiAnalysisSummary'&&parts.state==='結論'&&!parts.title))item.appendChild(head);
 
     if(parts.metric)item.appendChild(textNode(document,'div',parts.metric,'ai-insight-value'));
     if(parts.detail)item.appendChild(textNode(document,'div',parts.detail,'ai-insight-detail'));

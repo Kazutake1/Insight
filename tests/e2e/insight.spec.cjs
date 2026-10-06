@@ -2168,6 +2168,21 @@ test('分析AIは結論・重要ポイント・関連性・次に確認するこ
   },interpreted);
 
   await expect(page.locator('#aiAnalysisSummary .ai-insight-item').first()).toHaveClass(/is-neutral/);
+  await expect(page.locator('#aiAnalysisSummary .ai-insight-title')).toHaveCount(0);
+  await expect(page.locator('#aiAnalysisSummary .ai-insight-state')).toHaveCount(0);
+  await expect(page.locator('#aiAnalysisSummary .ai-insight-detail')).toHaveText(interpreted.conclusion[0].replace(/^【結論】/,''));
+  const originalViewport=page.viewportSize();
+  for(const viewport of [{width:1194,height:834},{width:834,height:1194}]){
+    await page.setViewportSize(viewport);
+    const balance=await page.locator('.ai-workspace-grid').evaluate(grid=>{
+      const columns=getComputedStyle(grid).gridTemplateColumns.split(' ').map(parseFloat);
+      return {ratio:columns[0]/columns[1],overflow:grid.scrollWidth-grid.clientWidth};
+    });
+    expect(balance.ratio).toBeCloseTo(1.5,1);
+    expect(balance.overflow).toBeLessThanOrEqual(1);
+  }
+  await page.setViewportSize(originalViewport);
+
   await expect(page.locator('#aiAnalysisCaution .ai-insight-item').first()).toHaveClass(/is-danger/);
   await expect(page.locator('#aiAnalysisGood .ai-insight-item').first()).toHaveClass(/is-neutral/);
   await expect(page.locator('#aiAnalysisChecks .ai-check-line')).not.toHaveCount(0);
