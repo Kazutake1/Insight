@@ -36,7 +36,7 @@ test('天気アイコン拡張はruntime moduleが所有しbootstrap patch件数
   const index=read('Index.html');
   const bootstrap=read('insight_bootstrap_patches_v1.js');
   const runtime=read('insight_weather_icon_compat_v1.js');
-  assert.match(index,/insight_weather_icon_compat_v1\.js\?v=20261006-weather-keys-runtime-1/);
+  assert.match(index,/insight_weather_icon_compat_v1\.js\?v=20261006-weather-icons-runtime-1/);
   assert.ok(index.indexOf('insight_weather_icon_compat_v1.js')<index.indexOf('insight_weather_compact_v1.js'));
   assert.doesNotMatch(bootstrap,/🌫️|🧊|🌩️/);
   assert.match(runtime,/typeof WX_ICONS==='undefined'/);
