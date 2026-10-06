@@ -245,7 +245,7 @@ test('売上・客数・廃棄の日別グラフは指定された補助文だ�
 test('トップページはシェルと機能manifestの最新版確認をno-storeで行う',async({page})=>{
   const errors=await openInsight(page);
   const source=await page.evaluate(()=>fetch('/Index.html?e2e-shell-check=1',{cache:'no-store'}).then(r=>r.text()));
-  expect(source).toContain('name="insight-shell-version" content="20261006-shell-manifest-1"');
+  expect(source).toContain('name="insight-shell-version" content="20261006-step5-year-runtime-1"');
   expect(source).toContain("fetch('./Index.html?insight_probe='+Date.now(),{cache:'no-store'})");
   expect(source).toContain("fetch('./Index.html?insight_manifest_probe='+Date.now(),{cache:'no-store'})");
   expect(source).toContain('function featureSignature(entries)');
@@ -1174,6 +1174,8 @@ test('年度管理ボタンは設定へ移動し月ボタンは年度選択行�
   await page.waitForFunction(()=>window.InsightYearControlsLayout&&window.InsightYearControlsLayout.getState().moved&&window.InsightYearControlsLayout.getState().monthsInline);
   await expect(page.locator('#pageDash').getByRole('button',{name:/年度追加/})).toHaveCount(0);
   await expect(page.locator('#pageDash #insightDeleteYearButton')).toHaveCount(0);
+  await expect(page.locator('#modalBg')).toHaveCount(0);
+  await expect(page.locator('.btn-del-year')).toHaveCount(0);
 
   const layout=await page.evaluate(()=>{
     const dash=document.getElementById('pageDash');

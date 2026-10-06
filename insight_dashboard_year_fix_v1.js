@@ -10,6 +10,7 @@
     '#kpiRow{padding-left:5px!important;scroll-padding-left:5px}',
     '#insightDeleteYearButton{color:#b42318!important;border-color:#b42318!important}',
     '#insightDeleteYearButton:disabled{cursor:not-allowed}',
+    '#modalBg,.btn-del-year{display:none!important}',
     '#insightYearDeleteOverlay{position:fixed;inset:0;z-index:25000;background:rgba(0,0,0,.46);display:flex;align-items:center;justify-content:center;padding:20px;box-sizing:border-box}',
     '#insightYearDeleteOverlay[hidden]{display:none!important}',
     '#insightYearDeleteDialog{box-sizing:border-box;width:min(100%,410px);padding:22px;border-radius:16px;background:var(--surface,#fff);color:var(--text,#222);box-shadow:0 18px 60px rgba(0,0,0,.25);font-family:inherit}',
@@ -25,6 +26,13 @@
   ].join('');
   document.head.appendChild(css);
 
+  function removeLegacyYearDeleteUi(){
+    var modal=document.getElementById('modalBg');
+    if(modal&&modal.parentNode)modal.parentNode.removeChild(modal);
+    Array.prototype.forEach.call(document.querySelectorAll('.btn-del-year'),function(button){
+      if(button&&button.parentNode)button.parentNode.removeChild(button);
+    });
+  }
   var deleteButton=null,overlay=null,select=null,question=null,confirmButton=null;
   function years(){return typeof store!=='undefined'&&store&&Array.isArray(store.years)?store.years:[];}
   function closeDialog(){
@@ -102,6 +110,7 @@
     overlay.hidden=false;select.focus();
   }
   function ensureButton(){
+    removeLegacyYearDeleteUi();
     var addButton=Array.prototype.find.call(document.querySelectorAll('button'),function(button){
       return /年度追加/.test(button.textContent||'')&&!button.closest('#insightYearDeleteOverlay');
     });

@@ -7,18 +7,18 @@ const vm=require('node:vm');
 const root=path.join(__dirname,'..');
 const read=name=>fs.readFileSync(path.join(root,name),'utf8');
 
-test('payload互換パッチ11件はbootstrap moduleへ分離しIndexにはbody挿入だけ残す',()=>{
+test('payload互換パッチ7件はbootstrap moduleへ分離しIndexにはbody挿入だけ残す',()=>{
   const index=read('Index.html');
   const bootstrap=read('insight_bootstrap_patches_v1.js');
-  assert.equal((bootstrap.match(/^patch\(/gm)||[]).length,11);
+  assert.equal((bootstrap.match(/^patch\(/gm)||[]).length,7);
   assert.equal((index.match(/html=html\.replace/g)||[]).length,1);
-  assert.match(index,/insight_bootstrap_patches_v1\.js\?v=20261003-input-period-source-1/);
+  assert.match(index,/insight_bootstrap_patches_v1\.js\?v=20261006-year-delete-runtime-1/);
 });
 
 test('トップページはキャッシュ抑止とシェル・機能manifestの自己更新を持つ',()=>{
   const index=read('Index.html');
-  assert.match(index,/insight-shell-version" content="20261006-shell-manifest-1/);
-  assert.match(index,/var BUILD="20261006-shell-manifest-1"/);
+  assert.match(index,/insight-shell-version" content="20261006-step5-year-runtime-1/);
+  assert.match(index,/var BUILD="20261006-step5-year-runtime-1"/);
   assert.match(index,/Shell rule: bump BUILD whenever the loader/);
   assert.match(index,/Cache-Control" content="no-cache, no-store, must-revalidate/);
   assert.match(index,/insight_probe=/);
@@ -493,7 +493,7 @@ test('年度削除は年度直結データをトランザクションで削除�
   const manager=read('insight_year_manager_v1.js');
   const yearFix=read('insight_dashboard_year_fix_v1.js');
   assert.match(index,/insight_year_manager_v1\.js\?v=20261002-year-delete-consistency/);
-  assert.match(index,/insight_dashboard_year_fix_v1\.js\?v=20261002-year-delete-consistency/);
+  assert.match(index,/insight_dashboard_year_fix_v1\\.js\\?v=20261006-legacy-year-cleanup-1/);
   assert.match(manager,/function removeYear\(/);
   assert.match(manager,/removeDateYear\(target\.salesCounts,y\)/);
   assert.match(manager,/removeDateYear\(target\.hourlyCustomers,y\)/);
@@ -764,11 +764,12 @@ test('まだ必要な安全・互換パッチはbootstrap moduleで保持する'
   assert.match(bootstrap,/safePersist/);
   assert.match(bootstrap,/Chart\.js\/4\.4\.1/);
   assert.match(bootstrap,/integrity=/);
-  assert.match(bootstrap,/yearToDelete/);
+  assert.doesNotMatch(bootstrap,/yearToDelete/);
+  assert.match(read('insight_dashboard_year_fix_v1.js'),/removeLegacyYearDeleteUi/);
   assert.match(index,/orderedFeatureLoads/);
 });
 
-test('互換パッチ11件はfail-fast bootstrapに集約しfeature挿入境界だけIndexに残す',()=>{
+test('互換パッチ7件はfail-fast bootstrapに集約し年度削除UIはruntime cleanupへ移す',()=>{
   const index=read('Index.html');
   const bootstrap=read('insight_bootstrap_patches_v1.js');
   assert.match(bootstrap,/STEP5 retained: base weather constants/);
@@ -776,10 +777,11 @@ test('互換パッチ11件はfail-fast bootstrapに集約しfeature挿入境界�
   assert.match(bootstrap,/STEP5 retained: persist\(\) must be hardened/);
   assert.match(bootstrap,/STEP5 retained: legacy core control contrast patch/);
   assert.match(bootstrap,/STEP5 retained: Chart\.js SRI\/referrer policy/);
-  assert.match(bootstrap,/STEP5 retained: suppress the legacy year-delete UI/);
+  assert.doesNotMatch(bootstrap,/STEP5 retained: suppress the legacy year-delete UI/);
+  assert.match(read('insight_dashboard_year_fix_v1.js'),/removeLegacyYearDeleteUi/);
   assert.match(index,/STEP5 retained bootstrap boundary/);
   assert.match(bootstrap,/互換パッチの適用対象が見つかりません/);
-  assert.equal((bootstrap.match(/^patch\(/gm)||[]).length,11);
+  assert.equal((bootstrap.match(/^patch\(/gm)||[]).length,7);
   assert.equal((index.match(/html=html\.replace/g)||[]).length,1);
 });
 

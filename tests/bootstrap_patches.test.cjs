@@ -25,7 +25,7 @@ test('現在の圧縮payloadへ全互換パッチを適用できる',()=>{
   assert.match(patched,/霧/);
   assert.match(patched,/InsightStorage&&typeof window\.InsightStorage\.persistCurrent/);
   assert.match(patched,/integrity="sha512-CQBWl4fJHWbryGE\+Pc7UAxWMUMNMWzWxF4SQo9CgkJIN1kx6djDQZjh3Y8SZ1d\+6I\+1zze6Z7kHXO7q3UyZAWw=="/);
-  assert.doesNotMatch(patched,/let yearToDelete=null;/);
+  assert.match(patched,/let yearToDelete=null;/);
 });
 
 test('互換パッチ対象が欠けたpayloadはsilentに続行しない',()=>{
@@ -37,4 +37,13 @@ test('bootstrap patch moduleは外部通信を行わず保存処理はpayloadへ
   assert.doesNotMatch(source,/\bfetch\s*\(|XMLHttpRequest|WebSocket/);
   assert.match(source,/var safePersist=/);
   assert.match(source,/patch\(originalPersist,safePersist\)/);
+});
+
+test('年度削除の旧UI除去はbootstrap文字列置換ではなくyear-fix moduleが所有する',()=>{
+  const bootstrap=fs.readFileSync(path.join(root,'insight_bootstrap_patches_v1.js'),'utf8');
+  const yearFix=fs.readFileSync(path.join(root,'insight_dashboard_year_fix_v1.js'),'utf8');
+  assert.doesNotMatch(bootstrap,/suppress the legacy year-delete UI/);
+  assert.doesNotMatch(bootstrap,/patch\("let yearToDelete=null;/);
+  assert.match(yearFix,/function removeLegacyYearDeleteUi\(\)/);
+  assert.match(yearFix,/#modalBg,\.btn-del-year\{display:none!important\}/);
 });
