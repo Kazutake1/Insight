@@ -7,6 +7,7 @@ const root=path.join(__dirname,'..');
 const read=name=>fs.readFileSync(path.join(root,name),'utf8');
 
 const ordered=[
+  'insight_weather_icon_compat_v1.js',
   'insight_yoy_policy_v1.js',
   'insight_date_context_v1.js',
   'insight_hooks_v1.js',
