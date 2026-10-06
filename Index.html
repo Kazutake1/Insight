@@ -6,7 +6,7 @@
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
-<meta name="insight-shell-version" content="20261006-step5-wxgroups-cleanup-1">
+<meta name="insight-shell-version" content="20261006-step5-bootstrap-free-1">
 <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline' https://unpkg.com https://cdnjs.cloudflare.com; style-src 'self' 'unsafe-inline'; connect-src 'self' https://geocoding-api.open-meteo.com https://api.open-meteo.com https://historical-forecast-api.open-meteo.com https://www.jma.go.jp; img-src 'self' data: blob:; font-src 'self' data:; object-src 'none'; base-uri 'self'; form-action 'self'; frame-src 'none'; worker-src 'self'; media-src 'none'; manifest-src 'self'; upgrade-insecure-requests">
 <meta name="theme-color" content="#1a1a1a">
 <title>Insight</title>
@@ -14,7 +14,7 @@
 (function(){
   // Shell rule: bump BUILD whenever the loader, payload list, bootstrap loader, or shell HTML changes.
   // Feature-module ?v changes are detected independently by the manifest signature below.
-  var BUILD="20261006-step5-wxgroups-cleanup-1";
+  var BUILD="20261006-step5-bootstrap-free-1";
   window.__INSIGHT_SHELL_VERSION__=BUILD;
   try{
     fetch('./Index.html?insight_probe='+Date.now(),{cache:'no-store'}).then(function(r){
@@ -31,7 +31,6 @@
 </script>
 <script src="https://unpkg.com/pako@2.1.0/dist/pako.min.js" integrity="sha512-g2TeAWw5GPnX7z0Kn8nFbYfeHcvAu/tx6d6mrLe/90mkCxO+RcptyYpksUz35EO337F83bZwcmUyHiHamspkfg==" crossorigin="anonymous" referrerpolicy="no-referrer"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js" integrity="sha512-CQBWl4fJHWbryGE+Pc7UAxWMUMNMWzWxF4SQo9CgkJIN1kx6djDQZjh3Y8SZ1d+6I+1zze6Z7kHXO7q3UyZAWw==" crossorigin="anonymous" referrerpolicy="no-referrer"></script>
-<script src="./insight_bootstrap_patches_v1.js?v=20261006-wxgroups-cleanup-1"></script>
 <style>html,body{margin:0;width:100%;height:100%;background:#eef0f5;font-family:-apple-system,'Hiragino Kaku Gothic ProN','Noto Sans JP',sans-serif}#loading{height:100%;display:flex;align-items:center;justify-content:center;color:#666;font-size:14px}</style>
 </head>
 <body>
@@ -50,9 +49,7 @@ if(typeof Chart==='undefined'){fail(new Error('グラフライブラリを読み
 Promise.all(files.map(function(file){return fetch('./'+file+'?v=20260905-2',{cache:'no-store'}).then(function(r){if(!r.ok)throw new Error(file+' の取得に失敗しました ('+r.status+')');return r.text();});})).then(function(parts){
 var b64=parts.join('').replace(/\s/g,''),bin=atob(b64),bytes=new Uint8Array(bin.length);for(var i=0;i<bin.length;i++)bytes[i]=bin.charCodeAt(i);var html=pako.ungzip(bytes,{to:'string'});if(html.indexOf('<!DOCTYPE html>')!==0&&html.indexOf('<!doctype html>')!==0)throw new Error('HTMLデータの検証に失敗しました');
 html=stripPayloadChartScript(html);
-if(!window.InsightBootstrapPatches||typeof window.InsightBootstrapPatches.apply!=="function")throw new Error('互換パッチを読み込めませんでした');
-html=window.InsightBootstrapPatches.apply(html);
-// STEP5 retained bootstrap boundary: feature modules still have to be inserted into the decompressed payload before document.write().
+// STEP5 complete: payload source is self-contained; feature modules are inserted before document.write().
 var orderedFeatureLoads=[
   './insight_legacy_style_compat_v1.js?v=20261006-core-contrast-runtime-1',
   './insight_weather_icon_compat_v1.js?v=20261006-weather-icons-runtime-1',

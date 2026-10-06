@@ -92,7 +92,6 @@ test('全JS・Index内スクリプト・展開後スクリプトに構文エラ�
   const context={pako:{ungzip:()=>payload},Chart:function Chart(){},Uint8Array,atob:s=>Buffer.from(s,'base64').toString('binary'),
     fetch:async url=>({ok:true,text:async()=>read(url.split('?')[0].replace('./',''))}),document:{body:{},open(){},write:s=>expanded=s,close(){}}};
   context.window=context;context.globalThis=context;
-  vm.runInNewContext(read('insight_bootstrap_patches_v1.js'),context);
   for(const s of scripts(read('Index.html')))vm.runInNewContext(s,context);
   await new Promise(resolve=>setImmediate(resolve));assert.ok(expanded);
   for(const s of scripts(expanded))new vm.Script(s);
