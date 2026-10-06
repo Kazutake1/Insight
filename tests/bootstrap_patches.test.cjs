@@ -19,16 +19,18 @@ function payload(){
   return zlib.gunzipSync(Buffer.from(b64,'base64')).toString('utf8');
 }
 
-test('現在の圧縮payloadへ全互換パッチを適用できる',()=>{
+test('圧縮payloadはbootstrap文字列置換なしで安全化済み',()=>{
   const base=payload();
   const patched=patches.apply(base);
-  assert.notEqual(patched,base);
-  assert.match(patched,/Insight stored data load failed/);
-  assert.match(patched,/localStorage\.setItem\(SK,JSON\.stringify\(allStores\)\)/);
-  assert.doesNotMatch(patched,/InsightPersistError/);
-  assert.match(patched,/Chart\.js\/4\.4\.1\/chart\.umd\.min\.js/);
-  assert.doesNotMatch(patched,/Chart\.js\/4\.4\.1\/chart\.umd\.min\.js"[^>]*integrity=/);
-  assert.match(patched,/let yearToDelete=null;/);
+  assert.equal(patched,base);
+  assert.match(base,/Insight stored data load failed/);
+  assert.match(base,/insightStorageLoadError/);
+  assert.match(base,/const current=localStorage\.getItem\(SK\)/);
+  assert.match(base,/activeYears&&!activeYears\.has/);
+  assert.match(base,/localStorage\.setItem\(SK,JSON\.stringify\(allStores\)\)/);
+  assert.doesNotMatch(base,/InsightPersistError/);
+  assert.match(base,/Chart\.js\/4\.4\.1\/chart\.umd\.min\.js/);
+  assert.doesNotMatch(base,/Chart\.js\/4\.4\.1\/chart\.umd\.min\.js"[^>]*integrity=/);
 });
 
 test('未使用の天気相関グループはbootstrap文字列パッチから除外する',()=>{
@@ -36,8 +38,10 @@ test('未使用の天気相関グループはbootstrap文字列パッチから�
   assert.doesNotMatch(source,/patch\("const wxGroups=/);
 });
 
-test('互換パッチ対象が欠けたpayloadはsilentに続行しない',()=>{
-  assert.throws(()=>patches.apply('<!doctype html><html><body></body></html>'),/保存済みデータ読込の安全化に失敗しました/);
+test('bootstrap互換shimはpayloadを変更せず非文字列だけ拒否する',()=>{
+  const html='<!doctype html><html><body></body></html>';
+  assert.equal(patches.apply(html),html);
+  assert.throws(()=>patches.apply(null),/Insight payload HTML is invalid/);
 });
 
 test('persist安全化はbootstrap文字列パッチではなくruntime guardが所有する',()=>{
