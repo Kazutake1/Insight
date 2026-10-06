@@ -2,30 +2,18 @@ const test=require('node:test');
 const assert=require('node:assert/strict');
 const fs=require('node:fs');
 const path=require('node:path');
-const zlib=require('node:zlib');
 
 const root=path.join(__dirname,'..');
-const PARTS=[
-  'insight_payload_v1_part01a.txt',
-  'insight_payload_v1_part01b.txt',
-  'insight_payload_v1_part02.txt',
-  'insight_payload_v1_part03.txt',
-  'insight_payload_v1_part04a.txt',
-  'insight_payload_v1_part04b.txt',
-  'insight_payload_v1_part05.txt',
-  'insight_payload_v1_part06.txt',
-  'insight_payload_v1_part07.txt'
-];
-
 function read(name){return fs.readFileSync(path.join(root,name),'utf8');}
-function legacyCompressedPayload(){
-  const b64=PARTS.map(read).join('').replace(/\s/g,'');
-  return zlib.gunzipSync(Buffer.from(b64,'base64')).toString('utf8');
-}
 function basePayload(){return read('insight_payload_source_v1.html');}
 
-test('非圧縮payload sourceは旧圧縮payloadと完全一致する',()=>{
-  assert.equal(basePayload(),legacyCompressedPayload());
+test('正規payload sourceは旧圧縮fixtureに依存しない',()=>{
+  for(const name of [
+    'insight_payload_v1_part01a.txt','insight_payload_v1_part01b.txt',
+    'insight_payload_v1_part02.txt','insight_payload_v1_part03.txt',
+    'insight_payload_v1_part04a.txt','insight_payload_v1_part04b.txt',
+    'insight_payload_v1_part05.txt','insight_payload_v1_part06.txt','insight_payload_v1_part07.txt'
+  ]) assert.equal(fs.existsSync(path.join(root,name)),false,name+' は退役済みであること');
 });
 
 test('非圧縮payload sourceは有効なInsight HTMLである',()=>{

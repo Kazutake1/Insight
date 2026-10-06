@@ -2,24 +2,15 @@ const test=require('node:test');
 const assert=require('node:assert/strict');
 const fs=require('node:fs');
 const path=require('node:path');
-const zlib=require('node:zlib');
 const vm=require('node:vm');
 const patches=require('../insight_bootstrap_patches_v1.js');
 
 const root=path.join(__dirname,'..');
-const PARTS=[
-  'insight_payload_v1_part01a.txt','insight_payload_v1_part01b.txt',
-  'insight_payload_v1_part02.txt','insight_payload_v1_part03.txt',
-  'insight_payload_v1_part04a.txt','insight_payload_v1_part04b.txt',
-  'insight_payload_v1_part05.txt','insight_payload_v1_part06.txt',
-  'insight_payload_v1_part07.txt'
-];
 function payload(){
-  const b64=PARTS.map(name=>fs.readFileSync(path.join(root,name),'utf8')).join('').replace(/\s/g,'');
-  return zlib.gunzipSync(Buffer.from(b64,'base64')).toString('utf8');
+  return fs.readFileSync(path.join(root,'insight_payload_source_v1.html'),'utf8');
 }
 
-test('圧縮payloadはbootstrap文字列置換なしで安全化済み',()=>{
+test('正規payload sourceはbootstrap文字列置換なしで安全化済み',()=>{
   const base=payload();
   const patched=patches.apply(base);
   assert.equal(patched,base);
