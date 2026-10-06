@@ -995,6 +995,8 @@ test('分析AIを開いてサイドバーを切り替えても分析対象月を
   await expect.poll(()=>page.evaluate(()=>editMonth.sales)).toBe('9月');
   await expect.poll(()=>page.evaluate(()=>window.InsightAnalysisPeriodLock.getTarget().month)).toBe(9);
   await expect(page.locator('#aiAnalysisTarget')).toContainText('9月');
+  await expect(page.locator('.ai-workspace-title')).toHaveText('分析AI');
+  await expect(page.locator('#aiAnalysisPeriod')).toBeHidden();
   expect(errors).toEqual([]);
 });
 
