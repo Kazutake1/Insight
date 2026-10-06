@@ -449,7 +449,7 @@ test('売上・客数・廃棄の旧年月UIはruntime selectorが除去し販�
   const controls=read('insight_sales_period_selector_v1.js');
   const bootstrap=read('insight_bootstrap_patches_v1.js');
   assert.match(index,/insight_bootstrap_patches_v1\.js\?v=20261006-input-period-runtime-2/);
-  assert.match(index,/insight_sales_period_selector_v1\.js\?v=20261006-input-period-runtime-1/);
+  assert.match(index,/insight_sales_period_selector_v1\.js\?v=20261006-input-period-runtime-2/);
   assert.ok(index.indexOf('insight_page_period_sync_v1.js')<index.indexOf('insight_sales_period_selector_v1.js'));
   assert.doesNotMatch(bootstrap,/legacyInputPeriodStart|入力ページ旧年月UIの開始位置が見つかりません/);
   assert.match(controls,/pageId:'pageSales'/);
@@ -460,6 +460,9 @@ test('売上・客数・廃棄の旧年月UIはruntime selectorが除去し販�
   assert.match(controls,/翌月 ›/);
   assert.match(controls,/removeLegacyPlaceholders/);
   assert.match(controls,/model\.legacyCleanupMode='runtime'/);
+  assert.match(controls,/function ensureLegacyPlaceholders\(config\)/);
+  assert.match(controls,/function installLegacyBridge\(\)/);
+  assert.match(controls,/__insightInputPeriodControls=true/);
   assert.match(controls,/input:table:after/);
   assert.doesNotMatch(controls,/hideLegacy|legacy-hidden|setTimeout|MutationObserver|今月へ|年月を選択|insightSalesPeriodOverlay/);
   assert.match(controls,/InsightYearManager\.promoteCurrent/);

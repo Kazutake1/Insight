@@ -57,3 +57,13 @@ test('旧年月UIはbootstrap依存ではなくruntime cleanupとして所有す
   assert.match(source,/function removeLegacyPlaceholders\(config\)/);
   assert.match(source,/input:table:after/);
 });
+
+test('旧initInputPage実行前に不可視プレースホルダを用意し実行後に除去する',()=>{
+  const source=fs.readFileSync(path.join(__dirname,'..','insight_sales_period_selector_v1.js'),'utf8');
+  assert.match(source,/function ensureLegacyPlaceholders\(config\)/);
+  assert.match(source,/node\.hidden=true/);
+  assert.match(source,/function installLegacyBridge\(\)/);
+  assert.match(source,/ensureLegacyPlaceholders\(config\)/);
+  assert.match(source,/finally\{if\(config\)syncConfig\(config\);\}/);
+  assert.match(source,/__insightInputPeriodControls=true/);
+});

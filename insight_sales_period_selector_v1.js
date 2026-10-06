@@ -83,6 +83,20 @@
     try{if(typeof MONTHS!=='undefined'&&Array.isArray(MONTHS)&&MONTHS[month-1])return MONTHS[month-1];}catch(_){}
     return String(month)+'月';
   }
+  function ensureLegacyPlaceholders(config){
+    var page=doc.getElementById(config.pageId);if(!page)return;
+    var header=page.querySelector(':scope > .page-header')||page.querySelector('.page-header')||page.firstElementChild;
+    [config.yearId,config.monthId].forEach(function(id){
+      var node=doc.getElementById(id);
+      if(node)return;
+      node=doc.createElement('div');
+      node.id=id;
+      node.className='insight-legacy-period-placeholder';
+      node.hidden=true;
+      if(header&&header.parentNode)header.insertAdjacentElement('afterend',node);
+      else page.prepend(node);
+    });
+  }
   function removeLegacyPlaceholders(config){
     [config.yearId,config.monthId].forEach(function(id){
       var node=doc.getElementById(id);
@@ -112,6 +126,19 @@
     toolbar.querySelector('[data-period-current]').textContent=String(value.year)+'年 '+String(value.month)+'月';
   }
   function syncAll(){configs.forEach(syncConfig);}
+  function installLegacyBridge(){
+    if(typeof root.initInputPage!=='function'||root.initInputPage.__insightInputPeriodControls)return;
+    var original=root.initInputPage;
+    var wrapped=function(type){
+      var config=configs.find(function(item){return item.type===type;});
+      if(config)ensureLegacyPlaceholders(config);
+      try{return original.apply(this,arguments);}
+      finally{if(config)syncConfig(config);}
+    };
+    wrapped.__insightInputPeriodControls=true;
+    wrapped.__insightOriginal=original;
+    root.initInputPage=wrapped;
+  }
   model.cleanupLegacy=syncAll;
   model.legacyCleanupMode='runtime';
 
@@ -150,5 +177,6 @@
   model.sync=syncAll;
   model.configs=configs.map(function(config){return {type:config.type,pageId:config.pageId,label:config.label};});
 
+  installLegacyBridge();
   syncAll();
 })(typeof window!=='undefined'?window:globalThis);

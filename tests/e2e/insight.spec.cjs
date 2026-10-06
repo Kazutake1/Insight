@@ -31,6 +31,7 @@ test('売上・客数・廃棄は販売数入力と同じ前月・年月・翌�
   expect(legacyRenderer).toContain('salesMonthTabs');
   expect(legacyRenderer).toContain('renderTable(type)');
   expect(await page.evaluate(()=>window.InsightInputPeriodControls.legacyCleanupMode)).toBe('runtime');
+  expect(await page.evaluate(()=>window.initInputPage.__insightInputPeriodControls===true)).toBe(true);
 
   const year=await page.evaluate(()=>Number(allStores.stores[allStores.current].years.map(Number).sort((a,b)=>a-b).slice(-1)[0]));
 
