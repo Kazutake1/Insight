@@ -113,15 +113,19 @@ test('売上・客数・廃棄の曜日別グラフ下部余白を統一して�
   for(const [nav,canvas] of checks){
     await page.locator(nav).click();
     await page.waitForFunction(sel=>{const node=document.querySelector(sel);return node&&Chart.getChart(node)&&Math.abs(node.getBoundingClientRect().height-node.parentElement.getBoundingClientRect().height)<2;},canvas);
+    await expect.poll(()=>page.locator(canvas).evaluate(node=>{
+      const gap=Math.round(node.parentElement.parentElement.getBoundingClientRect().bottom-node.getBoundingClientRect().bottom);
+      return gap>=0&&gap<=12;
+    })).toBe(true);
     const spacing=await page.locator(canvas).evaluate(node=>({
       canvasMarginBottom:getComputedStyle(node).marginBottom,
       parentPaddingBottom:getComputedStyle(node.parentElement).paddingBottom,
       parentMarginBottom:getComputedStyle(node.parentElement).marginBottom,
       bottomGap:Math.round(node.parentElement.parentElement.getBoundingClientRect().bottom-node.getBoundingClientRect().bottom)
     }));
+    expect(spacing).toMatchObject({canvasMarginBottom:'0px',parentPaddingBottom:'0px',parentMarginBottom:'0px'});
     expect(spacing.bottomGap).toBeGreaterThanOrEqual(0);
     expect(spacing.bottomGap).toBeLessThanOrEqual(12);
-    expect(spacing).toMatchObject({canvasMarginBottom:'0px',parentPaddingBottom:'0px',parentMarginBottom:'0px'});
   }
   expect(errors).toEqual([]);
 });

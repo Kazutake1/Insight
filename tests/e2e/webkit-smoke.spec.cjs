@@ -6,6 +6,13 @@ async function openInsight(page){
   await page.route('https://unpkg.com/pako@2.1.0/dist/pako.min.js',route=>
     route.fulfill({path:pakoPath,contentType:'application/javascript'})
   );
+  // Production is HTTPS. The local test server is HTTP, so remove only the
+  // upgrade-insecure-requests directive to stop WebKit upgrading localhost to HTTPS.
+  await page.route('**/Index.html*',async route=>{
+    const response=await route.fetch();
+    const body=(await response.text()).replace(/;?\s*upgrade-insecure-requests/g,'');
+    await route.fulfill({response,body});
+  });
   const errors=[];
   page.on('pageerror',error=>errors.push(error.message));
   await page.goto('/Index.html',{waitUntil:'domcontentloaded'});
@@ -54,12 +61,12 @@ test('WebKitでダッシュボード選択月の黒枠とページ間の月維�
   const selected=page.locator('#pageDash .insight-dashboard-selected-month');
   await expect(selected).toHaveCount(1);
   await expect(selected).toHaveText('9月');
+  await expect.poll(()=>selected.evaluate(node=>getComputedStyle(node).borderColor)).toBe('rgb(0, 0, 0)');
   const border=await selected.evaluate(node=>({
-    color:getComputedStyle(node).borderColor,
     width:getComputedStyle(node).borderWidth,
     style:getComputedStyle(node).borderStyle
   }));
-  expect(border).toEqual({color:'rgb(0, 0, 0)',width:'2px',style:'solid'});
+  expect(border).toEqual({width:'2px',style:'solid'});
 
   await page.locator('#nav2').click();
   await expect.poll(()=>page.evaluate(()=>editMonth.sales)).toBe('9月');

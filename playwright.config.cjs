@@ -1,6 +1,7 @@
 const path=require('node:path');
 module.exports={
   testDir:path.join(__dirname,'tests','e2e'),
+  testIgnore:'webkit-smoke.spec.cjs',
   timeout:30000,
   expect:{timeout:7000},
   fullyParallel:false,
