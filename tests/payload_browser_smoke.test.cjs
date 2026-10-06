@@ -62,7 +62,6 @@ test('STEP5互換処理の元anchorはpayload内に残して破壊していな�
     'const wxGroups={"晴れ":["快晴","晴","晴曇"],"曇り":["曇"],"雨":["小雨","雨","大雨"],"雪":["みぞれ","雪"]};',
     originalPersist,
     'background:var(--surface);color:var(--text);box-shadow:0 6px 24px var(--shadow);',
-    '<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"\n  crossorigin="anonymous"',
     '<div class="modal-bg" id="modalBg">',
     'let yearToDelete=null;',
     'function showDeleteYear(y){yearToDelete=y;',
@@ -70,6 +69,8 @@ test('STEP5互換処理の元anchorはpayload内に残して破壊していな�
     '</body>'
   ];
   anchors.forEach(anchor=>assert.ok(html.includes(anchor),'payload patch anchor missing: '+anchor.slice(0,80)));
+  assert.doesNotMatch(html,/Chart\.js\/4\.4\.1\/chart\.umd\.min\.js/);
+  assert.doesNotMatch(html,/onerror="window\.Chart=/);
 });
 
 test('旧天気相関グループは現行画面で未使用のためbootstrap補正を不要とする',()=>{
