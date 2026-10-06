@@ -247,10 +247,32 @@ test('旧コア配色補正はruntime moduleで適用する',async({page})=>{
   expect(errors).toEqual([]);
 });
 
+test('共通persistはruntime guardから共有Storageへ委譲する',async({page})=>{
+  const errors=await openInsight(page);
+  const result=await page.evaluate(()=>{
+    const writer=window.InsightStorage.persistCurrent;
+    let calls=0,same=false;
+    window.InsightStorage.persistCurrent=function(value){calls++;same=value===allStores;return true;};
+    try{
+      return {
+        installed:!!(window.persist&&window.persist.__insightPersistGuard),
+        hasOriginal:typeof window.persist.__insightOriginal==='function',
+        value:window.persist(),
+        calls:calls,
+        same:same
+      };
+    }finally{
+      window.InsightStorage.persistCurrent=writer;
+    }
+  });
+  expect(result).toEqual({installed:true,hasOriginal:true,value:true,calls:1,same:true});
+  expect(errors).toEqual([]);
+});
+
 test('トップページはシェルと機能manifestの最新版確認をno-storeで行う',async({page})=>{
   const errors=await openInsight(page);
   const source=await page.evaluate(()=>fetch('/Index.html?e2e-shell-check=1',{cache:'no-store'}).then(r=>r.text()));
-  expect(source).toContain('name="insight-shell-version" content="20261006-step5-weather-keys-runtime-1"');
+  expect(source).toContain('name="insight-shell-version" content="20261006-step5-persist-runtime-1"');
   expect(source).toContain("fetch('./Index.html?insight_probe='+Date.now(),{cache:'no-store'})");
   expect(source).toContain("fetch('./Index.html?insight_manifest_probe='+Date.now(),{cache:'no-store'})");
   expect(source).toContain('function featureSignature(entries)');

@@ -63,10 +63,7 @@ test('起動時の保存データ読込は失敗時に空データへフォー�
 test('STEP5で残した文字列patchの元anchorはpayload内に全て残っている',()=>{
   const html=basePayload();
   const bootstrap=read('insight_bootstrap_patches_v1.js');
-  const persistMatch=bootstrap.match(/var originalPersist='([\s\S]*?)';\nvar safePersist=/);
-  assert.ok(persistMatch,'bootstrapのoriginalPersist定義を取得できません');
-  const originalPersist=Function('return '+JSON.stringify(persistMatch[1]))()
-    .replace(/\\n/g,'\n');
+  const originalPersist='function persist(){\n  try{localStorage.setItem(SK,JSON.stringify(allStores));}catch(e){}\n}';
   const anchors=[
     'const WX_KEYS=["快晴","晴","晴曇","曇","小雨","雨","大雨","みぞれ","雪"];',
     '"雪":"❄️","":""',
@@ -90,6 +87,7 @@ test('feature manifestの主要構造モジュールは一意かつ依存順に�
     'insight_date_context_v1.js',
     'insight_hooks_v1.js',
     'insight_storage_v1.js',
+    'insight_persist_guard_v1.js',
     'insight_ops_v1.js',
     'insight_backup_guard_v1.js',
     'insight_ai_presentation_v1.js',
@@ -122,6 +120,7 @@ test('画面フローの主要module contractを維持する',()=>{
   const date=read('insight_date_context_v1.js');
   const hooks=read('insight_hooks_v1.js');
   const storage=read('insight_storage_v1.js');
+  const persistGuard=read('insight_persist_guard_v1.js');
   const ai=read('insight_ai_presentation_v1.js');
   const aiVisual=read('insight_ai_visual_v1.js');
   const events=read('insight_events_v1.js');
@@ -143,6 +142,8 @@ test('画面フローの主要module contractを維持する',()=>{
   assert.match(hooks,/quick:save:before/);
   assert.match(storage,/persistCurrent/);
   assert.match(storage,/CURRENT_SCHEMA_VERSION/);
+  assert.match(persistGuard,/InsightPersistGuard/);
+  assert.match(persistGuard,/InsightStorage\.persistCurrent/);
   assert.match(ai,/ensureAnalysisDom/);
   assert.match(ai,/ensureBackdrop/);
   assert.match(aiVisual,/InsightAIVisual/);
