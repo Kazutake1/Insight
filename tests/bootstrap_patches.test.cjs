@@ -20,8 +20,8 @@ test('正規payload sourceはbootstrap文字列置換なしで安全化済み',(
   assert.match(base,/activeYears&&!activeYears\.has/);
   assert.match(base,/localStorage\.setItem\(SK,JSON\.stringify\(allStores\)\)/);
   assert.doesNotMatch(base,/InsightPersistError/);
-  assert.match(base,/Chart\.js\/4\.4\.1\/chart\.umd\.min\.js/);
-  assert.doesNotMatch(base,/Chart\.js\/4\.4\.1\/chart\.umd\.min\.js"[^>]*integrity=/);
+  assert.doesNotMatch(base,/Chart\.js\/4\.4\.1\/chart\.umd\.min\.js/);
+  assert.doesNotMatch(base,/onerror="window\.Chart=/);
 });
 
 test('未使用の天気相関グループはbootstrap文字列パッチから除外する',()=>{
