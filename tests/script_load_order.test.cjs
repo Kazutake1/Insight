@@ -5,6 +5,7 @@ const path=require('node:path');
 
 const root=path.join(__dirname,'..');
 const read=name=>fs.readFileSync(path.join(root,name),'utf8');
+const shellSource=()=>read('Index.html')+'\n'+read('insight_shell_loader_v1.js');
 
 const ordered=[
   'insight_weather_icon_compat_v1.js',
@@ -61,8 +62,8 @@ const ordered=[
   'insight_ai_page_comments_v1.js'
 ];
 
-test('機能スクリプトの読み込み順はIndex.htmlのmanifestで明示される',()=>{
-  const index=read('Index.html');
+test('機能スクリプトの読み込み順はshell loaderのmanifestで明示される',()=>{
+  const index=shellSource();
   const start=index.indexOf('var orderedFeatureLoads=[');
   const end=index.indexOf('];',start);
   assert.ok(start>=0&&end>start,'orderedFeatureLoads manifestがありません');
@@ -74,6 +75,13 @@ test('機能スクリプトの読み込み順はIndex.htmlのmanifestで明示�
     assert.equal(manifest.indexOf(name,first+1),-1,name+' がmanifest内で重複定義されています');
     last=first;
   });
+});
+
+test('Indexはshell loaderを外部scriptとして読み込む',()=>{
+  const index=read('Index.html');
+  assert.match(index,/insight_shell_loader_v1\.js\?v=20261006-shell-external-1/);
+  assert.doesNotMatch(index,/var orderedFeatureLoads=/);
+  assert.match(read('insight_shell_loader_v1.js'),/var orderedFeatureLoads=/);
 });
 
 test('旧動的scriptローダーはルートJSから除去されている',()=>{
@@ -89,7 +97,7 @@ test('旧動的scriptローダーはルートJSから除去されている',()=>
 test('日付ナビは保存保護モジュールから動的ロードされない',()=>{
   const source=read('insight_preserve_dailyops_v1.js');
   assert.doesNotMatch(source,/insight_quick_date_nav_v1\.js/);
-  const index=read('Index.html');
+  const index=shellSource();
   assert.ok(index.indexOf('insight_date_context_v1.js')<index.indexOf('insight_hooks_v1.js'));
   assert.ok(index.indexOf('insight_hooks_v1.js')<index.indexOf('insight_storage_v1.js'));
   assert.ok(index.indexOf('insight_storage_v1.js')<index.indexOf('insight_persist_guard_v1.js'));
@@ -98,7 +106,7 @@ test('日付ナビは保存保護モジュールから動的ロードされな�
 });
 
 test('AIと分析補助モジュールはページ別AIより先に確定順で読み込む',()=>{
-  const index=read('Index.html');
+  const index=shellSource();
   for(const dependency of [
     'insight_ai_ops_v1.js',
     'insight_ai_visual_v1.js',
@@ -137,7 +145,7 @@ test('廃棄分析の既存コンパクト表示スタイルは維持する',()=
 });
 
 test('payload展開はbootstrap文字列パッチに依存しない',()=>{
-  const index=read('Index.html');
+  const index=shellSource();
   assert.doesNotMatch(index,/insight_bootstrap_patches_v1\.js|InsightBootstrapPatches/);
   assert.match(index,/Promise\.all\(files\.map/);
   assert.match(index,/orderedFeatureLoads/);

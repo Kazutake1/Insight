@@ -90,7 +90,7 @@ test('旧天気相関グループは現行画面で未使用のためbootstrap�
 });
 
 test('feature manifestの主要構造モジュールは一意かつ依存順に並ぶ',()=>{
-  const index=read('Index.html');
+  const index=read('insight_shell_loader_v1.js');
   const ordered=[
     'insight_yoy_policy_v1.js',
     'insight_date_context_v1.js',

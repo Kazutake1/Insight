@@ -117,9 +117,10 @@ test('天気キー拡張はbootstrap文字列パッチではなくruntime module
 test('Chart.jsの安全属性はbootstrap文字列パッチではなくshellが所有する',()=>{
   const source=fs.readFileSync(path.join(root,'insight_bootstrap_patches_v1.js'),'utf8');
   const index=fs.readFileSync(path.join(root,'Index.html'),'utf8');
+  const loader=fs.readFileSync(path.join(root,'insight_shell_loader_v1.js'),'utf8');
   assert.doesNotMatch(source,/Chart\.js\/4\.4\.1|SRI\/referrer policy/);
   assert.match(index,/Chart\.js\/4\.4\.1\/chart\.umd\.min\.js" integrity="sha512-CQBWl4fJHWbryGE\+Pc7UAxWMUMNMWzWxF4SQo9CgkJIN1kx6djDQZjh3Y8SZ1d\+6I\+1zze6Z7kHXO7q3UyZAWw=="/);
   assert.match(index,/crossorigin="anonymous" referrerpolicy="no-referrer"/);
-  assert.match(index,/function stripPayloadChartScript\(html\)/);
-  assert.match(index,/typeof Chart==='undefined'/);
+  assert.match(loader,/function stripPayloadChartScript\(html\)/);
+  assert.match(loader,/typeof Chart==='undefined'/);
 });
