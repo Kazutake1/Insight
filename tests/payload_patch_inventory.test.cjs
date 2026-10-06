@@ -434,7 +434,7 @@ test('売上・客数・廃棄の旧年月UIは本体実行前に削除し販売
   const index=read('Index.html');
   const controls=read('insight_sales_period_selector_v1.js');
   const bootstrap=read('insight_bootstrap_patches_v1.js');
-  assert.match(index,/insight_bootstrap_patches_v1\.js\?v=20261003-input-period-source-1/);
+  assert.match(index,/insight_bootstrap_patches_v1\.js\?v=20261006-year-delete-runtime-1/);
   assert.match(index,/insight_sales_period_selector_v1\.js\?v=20261003-input-period-source-1/);
   assert.ok(index.indexOf('insight_page_period_sync_v1.js')<index.indexOf('insight_sales_period_selector_v1.js'));
   assert.match(bootstrap,/legacyInputPeriodStart/);
@@ -493,7 +493,7 @@ test('年度削除は年度直結データをトランザクションで削除�
   const manager=read('insight_year_manager_v1.js');
   const yearFix=read('insight_dashboard_year_fix_v1.js');
   assert.match(index,/insight_year_manager_v1\.js\?v=20261002-year-delete-consistency/);
-  assert.match(index,/insight_dashboard_year_fix_v1\\.js\\?v=20261006-legacy-year-cleanup-1/);
+  assert.match(index,/insight_dashboard_year_fix_v1\.js\?v=20261006-legacy-year-cleanup-1/);
   assert.match(manager,/function removeYear\(/);
   assert.match(manager,/removeDateYear\(target\.salesCounts,y\)/);
   assert.match(manager,/removeDateYear\(target\.hourlyCustomers,y\)/);
@@ -542,7 +542,7 @@ test('通常画面の選択年月をサイドバー切替後も全ページで�
 test('時間帯別客数は日報客数と分離して日付別24時間データとして保存する',()=>{
   const index=read('Index.html');
   const hourly=read('insight_hourly_customers_v1.js');
-  assert.match(index,/insight_bootstrap_patches_v1\.js\?v=20261003-input-period-source-1/);
+  assert.match(index,/insight_bootstrap_patches_v1\.js\?v=20261006-year-delete-runtime-1/);
   assert.match(index,/insight_hourly_customers_v1\.js\?v=20261006-remove-help/);
   assert.ok(index.indexOf('insight_events_v1.js')<index.indexOf('insight_hourly_customers_v1.js'));
   assert.ok(index.indexOf('insight_hourly_customers_v1.js')<index.indexOf('insight_event_results_v1.js'));
@@ -758,7 +758,7 @@ test('店舗運営UIのCSSはops moduleが所有する',()=>{
 test('まだ必要な安全・互換パッチはbootstrap moduleで保持する',()=>{
   const index=read('Index.html');
   const bootstrap=read('insight_bootstrap_patches_v1.js');
-  assert.match(index,/insight_bootstrap_patches_v1\.js\?v=20261003-input-period-source-1/);
+  assert.match(index,/insight_bootstrap_patches_v1\.js\?v=20261006-year-delete-runtime-1/);
   assert.match(bootstrap,/const WX_KEYS=/);
   assert.match(bootstrap,/originalPersist/);
   assert.match(bootstrap,/safePersist/);
