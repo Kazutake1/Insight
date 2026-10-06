@@ -60,7 +60,7 @@ test('起動時の保存データ読込は失敗時に空データへフォー�
   assert.match(bootstrap,/activeYears&&!activeYears\.has/);
 });
 
-test('STEP5で残した文字列patchの元anchorはpayload内に全て残っている',()=>{
+test('STEP5互換処理の元anchorはpayload内に残して破壊していない',()=>{
   const html=basePayload();
   const bootstrap=read('insight_bootstrap_patches_v1.js');
   const originalPersist='function persist(){\n  try{localStorage.setItem(SK,JSON.stringify(allStores));}catch(e){}\n}';
@@ -78,6 +78,16 @@ test('STEP5で残した文字列patchの元anchorはpayload内に全て残って
     '</body>'
   ];
   anchors.forEach(anchor=>assert.ok(html.includes(anchor),'payload patch anchor missing: '+anchor.slice(0,80)));
+});
+
+test('旧天気相関グループは現行画面で未使用のためbootstrap補正を不要とする',()=>{
+  const html=basePayload();
+  const bootstrap=read('insight_bootstrap_patches_v1.js');
+  assert.match(html,/function getCorrData\(year,months\)/);
+  assert.match(html,/const \{wdAvg\}=getCorrData\(baseYear,wdPeriod\)/);
+  assert.doesNotMatch(bootstrap,/patch\("const wxGroups=/);
+  const featureFiles=fs.readdirSync(root).filter(name=>name.endsWith('.js')&&name!=='insight_bootstrap_patches_v1.js');
+  assert.deepEqual(featureFiles.filter(name=>/getCorrData|wxAvg|wxGroups/.test(read(name))),[]);
 });
 
 test('feature manifestの主要構造モジュールは一意かつ依存順に並ぶ',()=>{

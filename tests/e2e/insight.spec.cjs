@@ -272,7 +272,7 @@ test('共通persistはruntime guardから共有Storageへ委譲する',async({pa
 test('トップページはシェルと機能manifestの最新版確認をno-storeで行う',async({page})=>{
   const errors=await openInsight(page);
   const source=await page.evaluate(()=>fetch('/Index.html?e2e-shell-check=1',{cache:'no-store'}).then(r=>r.text()));
-  expect(source).toContain('name="insight-shell-version" content="20261006-step5-persist-runtime-1"');
+  expect(source).toContain('name="insight-shell-version" content="20261006-step5-wxgroups-cleanup-1"');
   expect(source).toContain("fetch('./Index.html?insight_probe='+Date.now(),{cache:'no-store'})");
   expect(source).toContain("fetch('./Index.html?insight_manifest_probe='+Date.now(),{cache:'no-store'})");
   expect(source).toContain('function featureSignature(entries)');
