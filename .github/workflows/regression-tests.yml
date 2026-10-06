@@ -103,3 +103,32 @@ jobs:
             test-results/
           if-no-files-found: ignore
           retention-days: 3
+
+  e2e-webkit:
+    name: browser e2e / webkit smoke
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+      - name: Use Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Install E2E dependencies
+        run: npm ci --no-audit --no-fund
+      - name: Install WebKit
+        run: npx playwright install --with-deps webkit
+      - name: Run WebKit smoke E2E
+        run: npx playwright test --config=playwright.webkit.config.cjs
+      - name: Upload WebKit E2E artifacts
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: playwright-webkit-report
+          path: |
+            playwright-report/
+            test-results/
+          if-no-files-found: ignore
+          retention-days: 3
+
