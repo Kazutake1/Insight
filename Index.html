@@ -6,17 +6,17 @@
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
-<meta name="insight-shell-version" content="20261003-ai-pipeline-1">
+<meta name="insight-shell-version" content="20261006-shell-manifest-1">
 <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline' https://unpkg.com https://cdnjs.cloudflare.com; style-src 'self' 'unsafe-inline'; connect-src 'self' https://geocoding-api.open-meteo.com https://api.open-meteo.com https://historical-forecast-api.open-meteo.com https://www.jma.go.jp; img-src 'self' data: blob:; font-src 'self' data:; object-src 'none'; base-uri 'self'; form-action 'self'; frame-src 'none'; worker-src 'self'; media-src 'none'; manifest-src 'self'; upgrade-insecure-requests">
 <meta name="theme-color" content="#1a1a1a">
 <title>Insight</title>
 <script>
 (function(){
-  var BUILD="20261003-ai-pipeline-1";
+  // Shell rule: bump BUILD whenever the loader, payload list, bootstrap loader, or shell HTML changes.
+  // Feature-module ?v changes are detected independently by the manifest signature below.
+  var BUILD="20261006-shell-manifest-1";
   window.__INSIGHT_SHELL_VERSION__=BUILD;
   try{
-    var params=new URLSearchParams(location.search);
-    if(params.get('insight_build')===BUILD)return;
     fetch('./Index.html?insight_probe='+Date.now(),{cache:'no-store'}).then(function(r){
       if(!r.ok)throw new Error('shell probe '+r.status);
       return r.text();
@@ -105,6 +105,31 @@ var orderedFeatureLoads=[
   './insight_weekday_chart_fix_v1.js?v=20261006-waste-zero-past-1',
   './insight_weekday_chart_spacing_v1.js?v=20261006-fill-height-2'
 ];
+function featureSignature(entries){
+  var text=entries.join('\n'),hash=2166136261;
+  for(var i=0;i<text.length;i++){hash^=text.charCodeAt(i);hash=Math.imul(hash,16777619);}
+  return ('00000000'+(hash>>>0).toString(16)).slice(-8);
+}
+var currentFeatureSignature=featureSignature(orderedFeatureLoads);
+window.__INSIGHT_FEATURE_SIGNATURE__=currentFeatureSignature;
+try{
+  fetch('./Index.html?insight_manifest_probe='+Date.now(),{cache:'no-store'}).then(function(r){
+    if(!r.ok)throw new Error('manifest probe '+r.status);
+    return r.text();
+  }).then(function(text){
+    var start=text.indexOf('var orderedFeatureLoads=['),end=text.indexOf('];',start);
+    if(start<0||end<=start)return;
+    var remoteEntries=[];
+    text.slice(start,end+2).replace(/'([^']+)'/g,function(match,entry){remoteEntries.push(entry);return match;});
+    if(!remoteEntries.length)return;
+    var remoteFeatureSignature=featureSignature(remoteEntries);
+    var shellMatch=text.match(/<meta name="insight-shell-version" content="([^"]+)"/);
+    var remoteBuild=shellMatch&&shellMatch[1]?shellMatch[1]:window.__INSIGHT_SHELL_VERSION__;
+    if(remoteBuild!==window.__INSIGHT_SHELL_VERSION__||remoteFeatureSignature!==currentFeatureSignature){
+      location.replace('./Index.html?insight_build='+encodeURIComponent(remoteBuild)+'&insight_manifest='+encodeURIComponent(remoteFeatureSignature));
+    }
+  }).catch(function(){});
+}catch(_){}
 var orderedFeatureHtml=orderedFeatureLoads.map(function(entry){return '<script src="'+entry+'"></scr'+'ipt>';}).join('');
 html=html.replace('</body>',orderedFeatureHtml+'</body>');
 document.open();document.write(html);document.close();

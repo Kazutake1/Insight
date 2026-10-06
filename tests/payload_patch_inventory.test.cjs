@@ -15,13 +15,21 @@ test('payload互換パッチ11件はbootstrap moduleへ分離しIndexにはbody�
   assert.match(index,/insight_bootstrap_patches_v1\.js\?v=20261003-input-period-source-1/);
 });
 
-test('トップページはキャッシュ抑止とビルド自己更新を持つ',()=>{
+test('トップページはキャッシュ抑止とシェル・機能manifestの自己更新を持つ',()=>{
   const index=read('Index.html');
-  assert.match(index,/insight-shell-version" content="20261003-ai-pipeline-1/);
+  assert.match(index,/insight-shell-version" content="20261006-shell-manifest-1/);
+  assert.match(index,/var BUILD="20261006-shell-manifest-1"/);
+  assert.match(index,/Shell rule: bump BUILD whenever the loader/);
   assert.match(index,/Cache-Control" content="no-cache, no-store, must-revalidate/);
   assert.match(index,/insight_probe=/);
+  assert.match(index,/insight_manifest_probe=/);
+  assert.match(index,/function featureSignature\(entries\)/);
+  assert.match(index,/window\.__INSIGHT_FEATURE_SIGNATURE__=currentFeatureSignature/);
+  assert.match(index,/remoteFeatureSignature!==currentFeatureSignature/);
+  assert.match(index,/insight_manifest=/);
   assert.match(index,/cache:'no-store'/);
   assert.match(index,/location\.replace\('\.\/Index\.html\?insight_build='/);
+  assert.doesNotMatch(index,/if\(params\.get\('insight_build'\)===BUILD\)return/);
 });
 
 test('AI表示CSSはIndexの文字列置換ではなくpresentation moduleが所有する',()=>{
