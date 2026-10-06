@@ -256,6 +256,8 @@ test('分析AIの対象年月をサイドバー切替後も固定し各ページ
   assert.match(index,/insight_analysis_period_lock_v1\.js\?v=20261001-sync-owner/);
   assert.match(index,/insight_sales_count_v1\.js\?v=20261005-ipad-container-fit/);
   assert.match(presentation,/aiAnalysisTarget/);
+  assert.match(presentation,/\.ai-workspace-period-label\{display:none!important\}/);
+  assert.match(presentation,/\.ai-workspace-brand\{min-width:0;display:grid;align-content:center;gap:2px\}/);
   assert.match(presentation,/!window\.InsightPagePeriodSync&&window\.InsightAnalysisPeriodLock/);
   assert.match(pageAI,/InsightAnalysisPeriodLock\.getContext/);
   assert.match(pageAI,/InsightAnalysisPeriodLock\.referenceDate/);
