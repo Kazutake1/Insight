@@ -1817,16 +1817,24 @@ test('よく使うイベントの特需商品は自由名で登録・編集で�
   await expect(presetDialog.getByRole('heading',{name:'よく使うイベントを編集'})).toBeVisible();
   await presetDialog.getByRole('button',{name:'＋よく使うイベントを追加'}).click();
   await presetDialog.getByLabel('イベント場所').fill('E2E文化フォーラム');
+  await presetDialog.getByRole('button',{name:'＋場所を追加',exact:true}).click();
+  await presetDialog.getByLabel('イベント場所').nth(1).fill('E2E駅前広場');
   await presetDialog.getByLabel('イベント名').fill('E2E夏祭り');
   await presetDialog.locator('.ie-demand-editor').getByRole('button',{name:'＋追加'}).click();
   await presetDialog.locator('.ie-demand-row').first().getByLabel('名称').fill('低価格アイス');
   await presetDialog.getByRole('button',{name:'保存する'}).click();
-  await expect(presetDialog.getByText('E2E夏祭り（E2E文化フォーラム）',{exact:true})).toBeVisible();
+  await expect(presetDialog.getByText('E2E夏祭り（E2E文化フォーラム・E2E駅前広場）',{exact:true})).toBeVisible();
   await presetDialog.getByRole('button',{name:'閉じる'}).click();
 
   eventDialog=page.locator('.ie-dialog.ie-event-add');
   await eventDialog.getByRole('button',{name:'E2E夏祭り'}).click();
-  await expect(eventDialog.getByLabel('イベント場所')).toHaveValue('E2E文化フォーラム');
+  await expect(eventDialog.getByLabel('イベント場所')).toHaveCount(2);
+  await expect(eventDialog.getByLabel('イベント場所').nth(0)).toHaveValue('E2E文化フォーラム');
+  await expect(eventDialog.getByLabel('イベント場所').nth(1)).toHaveValue('E2E駅前広場');
+  await eventDialog.getByRole('button',{name:'＋場所を追加',exact:true}).click();
+  await eventDialog.getByLabel('イベント場所').nth(2).fill('削除対象');
+  await eventDialog.locator('.ie-location-row').nth(2).getByRole('button',{name:'この場所を削除'}).click();
+  await expect(eventDialog.getByLabel('イベント場所')).toHaveCount(2);
   await expect(eventDialog.getByLabel('イベント名')).toHaveValue('E2E夏祭り');
   await expect(eventDialog.locator('.ie-demand-row')).toHaveCount(1);
   await expect(eventDialog.locator('.ie-demand-row').first().getByLabel('名称')).toHaveValue('低価格アイス');
@@ -1843,6 +1851,11 @@ test('よく使うイベントの特需商品は自由名で登録・編集で�
   eventDialog=page.locator('.ie-dialog.ie-event-add');
   await eventDialog.getByLabel('イベント種別').selectOption('nearby');
   await eventDialog.getByRole('button',{name:'E2E夏祭り'}).click();
+  await expect(eventDialog.getByLabel('イベント場所')).toHaveCount(2);
+  await expect(eventDialog.getByLabel('イベント場所').nth(1)).toHaveValue('E2E駅前広場');
+  const nearbySaved=await page.evaluate(()=>allStores.stores[allStores.current].events.filter(event=>event.type==='nearby'&&event.snapshot.title==='E2E夏祭り'));
+  expect(nearbySaved).toHaveLength(1);
+  expect(nearbySaved[0].snapshot.location).toBe('E2E文化フォーラム\nE2E駅前広場');
   await expect(eventDialog.locator('.ie-demand-row')).toHaveCount(2);
   await expect(eventDialog.locator('.ie-demand-row').nth(0).getByLabel('名称')).toHaveValue('低価格アイス');
   await expect(eventDialog.locator('.ie-demand-row').nth(1).getByLabel('名称')).toHaveValue('氷');

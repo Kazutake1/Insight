@@ -208,3 +208,12 @@ test('複数値引き条件の見出しは簡潔なカテゴリー＋条件一�
   }};
   assert.equal(events.summary(snap),'おにぎり：179円以下→100円均一 / 180〜239円→150円均一 / 240〜349円→250円均一');
 });
+
+test('複数場所は既存の文字列形式で保存しバックアップ往復でも維持する',()=>{
+  const a=data();
+  events.add(a,'a',{type:'nearby',scope:'store',startDate:'2026-10-02',endDate:'2026-10-02',snapshot:{version:1,title:'複数会場イベント',note:'',location:'中央公園\n駅前広場'}});
+  const restored=JSON.parse(JSON.stringify(a));
+  assert.doesNotThrow(()=>events.validate(restored));
+  assert.equal(restored.stores.a.events.length,1);
+  assert.equal(restored.stores.a.events[0].snapshot.location,'中央公園\n駅前広場');
+});

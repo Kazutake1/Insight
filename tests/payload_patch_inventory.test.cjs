@@ -579,8 +579,8 @@ test('イベント実績は過去開催・日付カード・時間帯グラフ�
   const index=read('Index.html');
   const eventResults=read('insight_event_results_v1.js');
   const events=read('insight_events_v1.js');
-  assert.match(index,/insight_events_v1\.js\?v=20261006-remove-add-hint/);
-  assert.match(index,/insight_event_results_v1\.js\?v=20261004-grouped-overview/);
+  assert.match(index,/insight_events_v1\.js\?v=20261006-multi-location-1/);
+  assert.match(index,/insight_event_results_v1\.js\?v=20261006-multi-location-1/);
   assert.ok(index.indexOf('insight_analysis_context_v1.js')<index.indexOf('insight_event_results_v1.js'));
   assert.ok(index.indexOf('insight_event_results_v1.js')<index.indexOf('insight_daily_anomaly_v1.js'));
   assert.match(events,/\.ie-dialog\.ie-event-add \.ie-presets\{margin-top:10px\}/);
@@ -659,7 +659,7 @@ test('イベント実績は過去開催・日付カード・時間帯グラフ�
   assert.match(events,/specialPresets/);
   assert.match(events,/findDuplicateSpecial/);
   assert.match(events,/同じ店舗に同じ催事名・同じ期間の登録があります/);
-  assert.match(events,/snapshot\.location=location\.value\.trim\(\)/);
+  assert.match(events,/snapshot\.location=readLocation\(\)/);
   assert.doesNotThrow(()=>new vm.Script(eventResults),'event results module must be valid JavaScript');
 });
 

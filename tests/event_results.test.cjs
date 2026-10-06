@@ -83,3 +83,15 @@ test('empty selection does not read unrelated events',()=>{
   const value=results.collect(data(),'a','','',analysis);
   assert.deepEqual(value.occurrences,[]);
 });
+
+test('複数場所のイベントは各場所から同じ開催記録を1件だけ参照できる',()=>{
+  const all=data();
+  all.stores.a.events[0].snapshot.location='文化フォーラム\n駅前広場\n文化フォーラム';
+  assert.deepEqual(results.eventNames(all,'a','駅前広場'),['秋まつり']);
+  assert.equal(results.locations(all,'a').filter(value=>value==='文化フォーラム').length,1);
+  const value=results.collect(all,'a','駅前広場','秋まつり',analysis);
+  assert.equal(value.occurrences.length,1);
+  assert.equal(value.occurrences[0].id,'e1');
+  assert.equal(value.occurrences[0].metrics.salesYen,200021);
+  assert.equal(results.collect(all,'a','文化フォーラム','秋まつり',analysis).occurrences.length,2);
+});

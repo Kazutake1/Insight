@@ -28,6 +28,10 @@
     var value=event&&event.snapshot?text(event.snapshot.location):'';
     return value||LEGACY_LOCATION;
   }
+  function eventLocations(event){
+    var values=eventLocation(event).split(/\r?\n/).map(text).filter(Boolean);
+    return Array.from(new Set(values.length?values:[LEGACY_LOCATION]));
+  }
   function eventTitle(event){return event&&event.snapshot?text(event.snapshot.title):'';}
   function storeEventsByType(all,storeId,type){
     var store=all&&all.stores&&all.stores[storeId],items=store&&Array.isArray(store.events)?store.events:[];
@@ -40,8 +44,8 @@
   function locations(all,storeId){
     var latest={};
     nearbyEvents(all,storeId).forEach(function(event){
-      var location=eventLocation(event),date=String(event.endDate||event.startDate||'');
-      if(!latest[location]||date>latest[location])latest[location]=date;
+      var date=String(event.endDate||event.startDate||'');
+      eventLocations(event).forEach(function(location){if(!latest[location]||date>latest[location])latest[location]=date;});
     });
     return Object.keys(latest).sort(function(a,b){
       if(a===LEGACY_LOCATION&&b!==LEGACY_LOCATION)return 1;
@@ -52,7 +56,7 @@
   function eventNames(all,storeId,location){
     var latest={};
     nearbyEvents(all,storeId).forEach(function(event){
-      if(eventLocation(event)!==location)return;
+      if(eventLocations(event).indexOf(location)<0)return;
       var title=eventTitle(event),date=String(event.endDate||event.startDate||'');
       if(!title)return;
       if(!latest[title]||date>latest[title])latest[title]=date;
@@ -143,7 +147,7 @@
     location=text(location);title=text(title);
     if(!location||!title)return {kind:'nearby',location:location,title:title,occurrences:[]};
     var matched=nearbyEvents(all,storeId).filter(function(event){
-      return eventLocation(event)===location&&eventTitle(event)===title;
+      return eventLocations(event).indexOf(location)>=0&&eventTitle(event)===title;
     });
     return {
       kind:'nearby',
@@ -164,7 +168,7 @@
     };
   }
 
-  var model={VERSION:3,LEGACY_LOCATION:LEGACY_LOCATION,eachDate:eachDate,eventLocation:eventLocation,storeEventsByType:storeEventsByType,nearbyEvents:nearbyEvents,specialEvents:specialEvents,locations:locations,eventNames:eventNames,specialNames:specialNames,normalizeDemand:normalizeDemand,demandComparison:demandComparison,aggregateDays:aggregateDays,occurrenceResult:occurrenceResult,collect:collect,collectSpecial:collectSpecial};
+  var model={VERSION:3,LEGACY_LOCATION:LEGACY_LOCATION,eachDate:eachDate,eventLocation:eventLocation,eventLocations:eventLocations,storeEventsByType:storeEventsByType,nearbyEvents:nearbyEvents,specialEvents:specialEvents,locations:locations,eventNames:eventNames,specialNames:specialNames,normalizeDemand:normalizeDemand,demandComparison:demandComparison,aggregateDays:aggregateDays,occurrenceResult:occurrenceResult,collect:collect,collectSpecial:collectSpecial};
   if(typeof module!=='undefined'&&module.exports)module.exports=model;
   root.InsightEventResults=model;
   if(!root.document)return;

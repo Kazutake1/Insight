@@ -228,6 +228,7 @@
       #insightEvents button,.ie-dialog button{border:1px solid var(--border);border-radius:9px;background:var(--surface2);color:var(--text);padding:7px 10px;font:inherit;cursor:pointer}
       #insightEvents .ie-list{display:flex;flex-wrap:wrap;gap:6px}.ie-chip{display:flex;align-items:center;gap:6px;max-width:100%;background:var(--surface2);border:1px solid var(--border);border-radius:9px;padding:4px 7px}.ie-chip span{overflow-wrap:anywhere}.ie-chip small{color:var(--text4);white-space:nowrap}#insightEvents .ie-chip button{padding:0 5px;border:0;font-size:17px}#insightEvents .ie-chip .ie-summary{font-size:12px;text-align:left;overflow-wrap:anywhere;min-width:0;padding:0}#insightEvents .ie-chip .ie-edit{font-size:11px;padding:2px 6px;border:1px solid var(--border);border-radius:7px}#insightEvents .ie-chip .ie-note-row{flex-basis:100%;display:flex;align-items:flex-start;gap:6px;min-width:0}#insightEvents .ie-chip .ie-note{flex:1 1 auto;min-width:0;font-size:11px;line-height:1.45;color:var(--text3);white-space:pre-wrap;overflow-wrap:anywhere;padding:2px 0 1px}
       .ie-dialog{position:fixed;inset:0;margin:auto;box-sizing:border-box;width:min(520px,calc(100vw - 24px));max-height:88vh;overflow:auto;border:1px solid var(--border);border-radius:18px;padding:20px;background:var(--surface);color:var(--text);font:12px/1.55 -apple-system,BlinkMacSystemFont,'Noto Sans JP',sans-serif;box-shadow:0 12px 40px #0003}.ie-dialog::backdrop{background:#0005}.ie-dialog h2{font-size:16px;margin:0}.ie-dialog header{display:flex;align-items:center;justify-content:space-between;margin-bottom:12px}.ie-dialog label{display:flex;flex-direction:column;gap:4px;margin:10px 0}.ie-dialog input,.ie-dialog select,.ie-dialog textarea{width:100%;box-sizing:border-box;border:1px solid var(--border);border-radius:9px;padding:9px;background:var(--input-bg,var(--surface2));color:var(--text);font:inherit}.ie-dialog textarea{min-height:64px;resize:vertical}.ie-category-options{border:1px solid var(--border);border-radius:11px;padding:8px 10px;margin:10px 0}.ie-category-options legend{font-weight:700;padding:0 4px}.ie-category-list{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:3px 10px}.ie-sale-target-list{display:grid;gap:10px}.ie-sale-target{border:1px solid var(--border);border-radius:10px;padding:9px;background:var(--surface2)}.ie-sale-target-head{display:flex!important;flex-direction:row!important;align-items:center;gap:7px!important;margin:0 0 7px!important}.ie-sale-target-head input{width:auto!important}.ie-sale-target-method{margin:5px 0!important}.ie-sale-target-params{padding-left:12px;border-left:2px solid var(--border)}.ie-sale-target-body{padding-top:4px}.ie-sale-pattern-list{display:grid;gap:8px;margin-bottom:8px}.ie-sale-pattern{border:1px solid var(--border);border-radius:9px;padding:8px;background:var(--surface)}.ie-sale-pattern-top{display:flex;align-items:center;justify-content:space-between;gap:8px}.ie-sale-pattern-top button{padding:4px 7px!important;font-size:11px}.ie-sale-pattern>label{margin:7px 0!important}.ie-dialog .ie-category-option{display:flex;flex-direction:row;align-items:center;gap:7px;margin:0;padding:5px 2px}.ie-dialog .ie-category-option input{width:auto;margin:0;accent-color:#15803d}.ie-dates{display:grid;grid-template-columns:1fr 1fr;gap:10px}.ie-actions{display:flex;justify-content:flex-end;gap:8px;margin-top:16px}.ie-dialog .ie-primary{background:var(--text);color:var(--surface)}.ie-muted{font-size:11px;color:var(--text4);margin:5px 0}.ie-dialog.ie-event-add .ie-presets{margin-top:10px}.ie-presets{display:flex;flex-wrap:wrap;gap:6px}.ie-preset-row{border-bottom:1px solid var(--border);padding:10px 0}.ie-preset-row div{display:flex;gap:6px;flex-wrap:wrap;margin-top:6px}.ie-demand-editor{margin-top:12px;padding-top:10px;border-top:1px solid var(--border)}.ie-demand-head{display:flex;align-items:center;justify-content:space-between;gap:8px}.ie-demand-list{display:grid;gap:8px}.ie-demand-row{display:grid;grid-template-columns:minmax(150px,1fr) 90px 90px auto;gap:8px;align-items:end;padding:8px;border:1px solid var(--border);border-radius:10px;background:var(--surface2)}.ie-demand-row label{margin:0}.ie-demand-row .ie-demand-remove{align-self:end}.ie-preset-editor .ie-demand-row{grid-template-columns:minmax(180px,1fr) auto}.ie-dialog button:disabled{opacity:.4;cursor:default}@media(max-width:520px){.ie-category-list{grid-template-columns:1fr}}
+      .ie-location-row{display:flex;align-items:flex-end;gap:8px;margin:10px 0}.ie-location-row label{flex:1;min-width:0;margin:0}.ie-location-row button{flex:none}
       .ie-dialog.ie-event-add{position:fixed;inset:0;margin:auto}
       .ie-dialog.ie-preset-editor{position:fixed;inset:0;margin:auto}
     `;doc.head.appendChild(style);
@@ -237,6 +238,29 @@
       d.addEventListener('close',function(){d.remove();if(activeDialog===d)activeDialog=null;});doc.body.append(d);d.showModal();return d;
     }
     function field(parent,label,type,value){var l=el('label',label),input=el(type==='textarea'?'textarea':'input');if(type!=='textarea')input.type=type;input.value=value==null?'':String(value);input.setAttribute('aria-label',label);l.append(input);parent.append(l);return input;}
+    function locationEditor(parent,snapshot){
+      var box=el('div',undefined,'ie-location-editor'),list=el('div'),rows=[];
+      parent.append(box);box.append(list);
+      function addLocation(value,focus){
+        var row=el('div',undefined,'ie-location-row'),input=field(row,'イベント場所','text',value);
+        input.required=true;
+        var entry={row:row,input:input,remove:null};
+        entry.remove=button('削除',function(){
+          rows.splice(rows.indexOf(entry),1);row.remove();refresh();
+        });
+        entry.remove.setAttribute('aria-label','この場所を削除');
+        row.append(entry.remove);rows.push(entry);list.append(row);refresh();
+        if(focus)input.focus();
+      }
+      function refresh(){rows.forEach(function(entry){entry.remove.disabled=rows.length===1;});}
+      var values=String(snapshot&&snapshot.location||'').split(/\r?\n/).map(function(value){return value.trim();}).filter(Boolean);
+      (values.length?values:['']).forEach(function(value){addLocation(value,false);});
+      box.append(button('＋場所を追加',function(){addLocation('',true);}));
+      return function(){
+        var values=rows.map(function(entry){var value=entry.input.value.trim();requireValue(value!=='','イベント場所を入力してください。');return value;});
+        return Array.from(new Set(values)).join('\n');
+      };
+    }
     function select(parent,label,options,value){var l=el('label',label),s=el('select');Object.keys(options).forEach(function(k){var o=el('option',options[k]);o.value=k;s.append(o);});s.value=value;s.setAttribute('aria-label',label);l.append(s);parent.append(l);return s;}
     function specialDemandEditor(parent,snapshot,templateOnly){
       var section=el('section',undefined,'ie-demand-editor'),head=el('div',undefined,'ie-demand-head'),listBox=el('div',undefined,'ie-demand-list'),rows=[];
@@ -269,10 +293,10 @@
       };
     }
     function nearbyPresetEditor(parent,snapshot){
-      var location=field(parent,'イベント場所','text',snapshot&&snapshot.location?snapshot.location:''),title=field(parent,'イベント名','text',snapshot?snapshot.title:''),note=field(parent,'補足（任意）','textarea',snapshot?snapshot.note:'');location.required=title.required=true;
+      var readLocation=locationEditor(parent,snapshot),title=field(parent,'イベント名','text',snapshot?snapshot.title:''),note=field(parent,'補足（任意）','textarea',snapshot?snapshot.note:'');title.required=true;
       var readDemand=specialDemandEditor(parent,snapshot,true);
       return function(){
-        var result={version:1,title:title.value.trim(),note:note.value.trim(),location:location.value.trim(),specialDemand:readDemand()};
+        var result={version:1,title:title.value.trim(),note:note.value.trim(),location:readLocation(),specialDemand:readDemand()};
         requireValue(result.location!=='','イベント場所を入力してください。');validateSnapshot(result);return result;
       };
     }
@@ -376,7 +400,7 @@
       try{validate(allStores);list(allStores,allStores.current,selectedDate()).forEach(function(e){
         var chip=el('div',undefined,'ie-chip');chip.title=e.startDate+' 〜 '+e.endDate+(e.snapshot.note?'\n'+e.snapshot.note:'');
         var desc=summary(e.snapshot);
-        var details=button(desc,function(){var d=dialog(TYPES[e.type]||e.type);d.append(el('p',desc),el('p',e.startDate+' 〜 '+e.endDate),el('p',e.scope==='global'?'全店舗共通':'この店舗のみ'));if(e.type==='nearby'&&e.snapshot.location)d.append(el('p','場所：'+e.snapshot.location));if(e.snapshot.note){var note=el('p',e.snapshot.note);note.style.whiteSpace='pre-wrap';d.append(note);}});details.className='ie-summary';
+        var details=button(desc,function(){var d=dialog(TYPES[e.type]||e.type);d.append(el('p',desc),el('p',e.startDate+' 〜 '+e.endDate),el('p',e.scope==='global'?'全店舗共通':'この店舗のみ'));if(e.type==='nearby'&&e.snapshot.location)d.append(el('p','場所：'+e.snapshot.location.split(/\r?\n/).join('・')));if(e.snapshot.note){var note=el('p',e.snapshot.note);note.style.whiteSpace='pre-wrap';d.append(note);}});details.className='ie-summary';
         var edit=button('編集',function(){openEvent(e);});edit.className='ie-edit';edit.setAttribute('aria-label',desc+'を編集');
         chip.append(el('small',TYPES[e.type]||e.type),details,el('small',e.scope==='global'?'全店舗':'この店舗'));
         var remove=button('×',function(){
@@ -455,10 +479,10 @@
             content.append(presetBox,el('p','選ぶと名称・補足'+(isNearby?'・場所':'')+'と特需商品を入力欄へ反映します。特需商品の用意数・販売数は開催ごとに入力します。','ie-muted'));
           }
           var initialSnapshot=eventTemplate||(editing&&source.snapshot?source.snapshot:null);
-          var location=type.value==='nearby'?field(content,'イベント場所','text',initialSnapshot&&initialSnapshot.location?initialSnapshot.location:''):null;if(location)location.required=true;
+          var readLocation=type.value==='nearby'?locationEditor(content,initialSnapshot):null;
           var title=field(content,type.value==='special'?'催事名':'イベント名','text',initialSnapshot?initialSnapshot.title:''),note=field(content,'補足（任意）','textarea',initialSnapshot?initialSnapshot.note:'');title.required=true;
           var readDemand=(type.value==='nearby'||type.value==='special')?specialDemandEditor(content,initialSnapshot,false):function(){return [];};
-          read=function(){var snapshot={version:1,title:title.value.trim(),note:note.value.trim()};if(location){requireValue(location.value.trim()!=='','イベント場所を入力してください。');snapshot.location=location.value.trim();}if(type.value==='nearby'||type.value==='special')snapshot.specialDemand=readDemand();validateSnapshot(snapshot);return snapshot;};
+          read=function(){var snapshot={version:1,title:title.value.trim(),note:note.value.trim()};if(readLocation)snapshot.location=readLocation();if(type.value==='nearby'||type.value==='special')snapshot.specialDemand=readDemand();validateSnapshot(snapshot);return snapshot;};
         }
       }
       type.onchange=function(){showAll=false;eventTemplate=null;templatePresetId=null;draw();};draw();
@@ -485,7 +509,7 @@
       function draw(){
         body.replaceChildren();body.append(el('p','全店舗共通です。変更・削除しても登録済みのイベントは変更されません。','ie-muted'),button('＋よく使うイベントを追加',function(){editor(null);}));
         var items=nearbyPresets(allStores);items.forEach(function(p,index){
-          var row=el('div',undefined,'ie-preset-row'),actions=el('div');row.append(el('span',p.snapshot.title+'（'+p.snapshot.location+'）'));
+          var row=el('div',undefined,'ie-preset-row'),actions=el('div');row.append(el('span',p.snapshot.title+'（'+p.snapshot.location.split(/\r?\n/).join('・')+'）'));
           function move(delta){if(transaction(function(next){var a=mutableNearbyPresets(next);var item=a.splice(index,1)[0];a.splice(index+delta,0,item);}))draw();}
           var up=button('↑',function(){move(-1);}),down=button('↓',function(){move(1);});up.disabled=index===0;down.disabled=index===items.length-1;up.setAttribute('aria-label','上へ移動');down.setAttribute('aria-label','下へ移動');
           actions.append(button('編集',function(){editor(p);}),button('削除',function(){if(!confirm(p.snapshot.title+'\nよく使うイベントから削除します。登録済みのイベントは残ります。よろしいですか？'))return;if(transaction(function(next){var a=mutableNearbyPresets(next);var at=a.findIndex(function(v){return v.id===p.id;});if(at>=0)a.splice(at,1);})){draw();}}),up,down);row.append(actions);body.append(row);
