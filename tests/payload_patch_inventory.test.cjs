@@ -668,7 +668,7 @@ test('イベント実績は過去開催・日付カード・時間帯グラフ�
   assert.match(eventResults,/\.er-demand-card>h3\{[^}]*font-size:14\.5px/);
   assert.doesNotMatch(eventResults,/item\.append\(el\('strong',String\(value\)\)/);
   assert.match(eventResults,/\.er-hour-chart\{[^}]*gap:2px;[^}]*min-width:0/);
-  assert.match(eventResults,/min-width:1340px/);
+  assert.match(eventResults,/grid-template-columns:repeat\(24,minmax\(0,1fr\)\)/);
   assert.match(eventResults,/createReadOnlyDayCard/);
   assert.match(eventResults,/カテゴリー実績/);
   assert.match(eventResults,/特需商品/);
