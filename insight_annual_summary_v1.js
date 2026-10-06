@@ -8,17 +8,6 @@
   var LABELS=['売上','客数','買上点数','廃棄金額'];
   var state={found:false,removed:false,metricCount:0};
 
-  var style=doc.createElement('style');
-  style.id='insightAnnualSummaryStyle';
-  style.textContent=[
-    '.insight-annual-summary-enhanced .insight-annual-summary-title{font-size:16px!important;line-height:1.4!important;margin-bottom:8px!important}',
-    '.insight-annual-summary-metrics{row-gap:12px!important}',
-    '.insight-annual-summary-metric{padding-top:6px!important;padding-bottom:6px!important}',
-    '.insight-annual-summary-metric-label{font-size:13px!important;line-height:1.45!important}',
-    '.insight-annual-summary-metric-value{font-size:18px!important;line-height:1.3!important;font-weight:800!important}'
-  ].join('');
-  doc.head.appendChild(style);
-
   function normalized(node){return String(node&&node.textContent||'').replace(/\s+/g,' ').trim();}
   function leaves(rootNode){
     return Array.prototype.filter.call(rootNode.querySelectorAll('*'),function(node){
