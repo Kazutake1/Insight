@@ -43,7 +43,7 @@ test('canonical payloadはinline script/styleを持たず外部assetを順序固
   const core=read('insight_payload_core_v1.js');
   const ai=read('insight_payload_ai_legacy_v1.js');
   const css=read('insight_payload_core_v1.css');
-  assert.match(payload,/insight_payload_core_v1\.css\?v=20261006-quick-date-nav-css-1/);
+  assert.match(payload,/insight_payload_core_v1\.css\?v=20261007-data-health-css-1/);
   assert.match(payload,/insight_payload_core_v1\.js\?v=20261006-payload-assets-1/);
   assert.match(payload,/insight_payload_ai_legacy_v1\.js\?v=20261006-payload-assets-1/);
   assert.match(payload,/insight_payload_bindings_v1\.js\?v=20261006-inline-bindings-1/);
@@ -589,10 +589,11 @@ test('売上・客数・廃棄の旧年月UIはruntime selectorが除去し販�
   assert.doesNotThrow(()=>new vm.Script(bootstrap),'bootstrap patches must be valid JavaScript');
 });
 
-test('保存データ健全性チェックは読み取り専用で不整合を可視化する',()=>{
+test('保存データ健全性チェックは読み取り専用で不整合を可視化し固定スタイルは外部CSSで維持する',()=>{
   const index=readShell();
   const health=read('insight_data_health_v1.js');
-  assert.match(index,/insight_data_health_v1\.js\?v=20261002-data-health/);
+  const css=read('insight_payload_core_v1.css');
+  assert.match(index,/insight_data_health_v1\.js\?v=20261007-csp-style-data-health-1/);
   assert.ok(index.indexOf('insight_backup_guard_v1.js')<index.indexOf('insight_data_health_v1.js'));
   assert.match(health,/function check\(snapshot\)/);
   assert.match(health,/orphan_data_year/);
@@ -602,10 +603,13 @@ test('保存データ健全性チェックは読み取り専用で不整合を�
   assert.match(health,/データ状態：正常/);
   assert.match(health,/データ状態：要確認/);
   assert.match(health,/この確認は読み取り専用です/);
+  assert.match(css,/#insightDataHealthOverlay\{position:fixed;inset:0;z-index:26000/);
+  assert.match(css,/#insightDataHealthDialog\{width:min\(620px,100%\);max-height:82vh/);
+  assert.match(css,/\.insight-health-error strong\{color:#b42318\}\.insight-health-warning strong\{color:#a16207\}/);
+  assert.doesNotMatch(health,/createElement\(['"]style['"]\)|style\.textContent|appendChild\(style\)|function ensureStyle\(/);
   assert.doesNotMatch(health,/localStorage\.setItem|InsightStorage\.writeSnapshot|InsightStorage\.persistCurrent/);
   assert.doesNotThrow(()=>new vm.Script(health),'data health module must be valid JavaScript');
 });
-
 test('過年度は既存の疎データを保持して正式年度へ昇格し販売数入力から追加できる',()=>{
   const index=readShell();
   const manager=read('insight_year_manager_v1.js');

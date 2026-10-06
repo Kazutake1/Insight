@@ -134,27 +134,6 @@
     var nodes=Array.prototype.slice.call(document.querySelectorAll('button,label,a'));
     return nodes.find(function(node){return /データ復元/.test(String(node.textContent||''));})||null;
   }
-  function ensureStyle(){
-    if(document.getElementById('insightDataHealthStyle'))return;
-    var style=document.createElement('style');style.id='insightDataHealthStyle';
-    style.textContent=[
-      '#insightDataHealthButton{display:block;width:100%;box-sizing:border-box;margin:2px 0 0;padding:8px 10px;border:0;border-radius:8px;background:transparent;text-align:left;font:700 12px/1.35 -apple-system,BlinkMacSystemFont,"Noto Sans JP",sans-serif;cursor:pointer}',
-      '#insightDataHealthButton:hover{background:rgba(0,0,0,.04)}',
-      '#insightDataHealthOverlay{position:fixed;inset:0;z-index:26000;background:rgba(0,0,0,.46);display:flex;align-items:center;justify-content:center;padding:18px;box-sizing:border-box}',
-      '#insightDataHealthOverlay[hidden]{display:none!important}',
-      '#insightDataHealthDialog{width:min(620px,100%);max-height:82vh;overflow:auto;box-sizing:border-box;padding:20px;border-radius:16px;background:var(--surface,#fff);color:var(--text,#222);box-shadow:0 18px 60px rgba(0,0,0,.25);font:12px/1.6 -apple-system,BlinkMacSystemFont,"Noto Sans JP",sans-serif}',
-      '#insightDataHealthDialog h2{margin:0 0 8px;font-size:18px}',
-      '#insightDataHealthSummary{font-weight:800;margin:0 0 6px}',
-      '#insightDataHealthNote{color:var(--text4,#777);margin:0 0 14px}',
-      '#insightDataHealthIssues{display:grid;gap:8px}',
-      '.insight-health-issue{border:1px solid var(--border,#ddd);border-radius:10px;padding:10px 12px;background:var(--surface2,#f7f7f7)}',
-      '.insight-health-issue strong{display:block;margin-bottom:2px}',
-      '.insight-health-error strong{color:#b42318}.insight-health-warning strong{color:#a16207}',
-      '#insightDataHealthActions{display:flex;justify-content:flex-end;margin-top:16px}',
-      '#insightDataHealthClose{border:1px solid var(--border,#ccc);border-radius:8px;padding:9px 14px;background:var(--surface,#fff);color:var(--text,#222);font:700 12px/1 inherit;cursor:pointer}'
-    ].join('');
-    document.head.appendChild(style);
-  }
   function ensureOverlay(){
     if(overlay)return;
     overlay=document.createElement('div');overlay.id='insightDataHealthOverlay';overlay.hidden=true;
@@ -199,7 +178,6 @@
   function ensureButton(){
     if(button&&button.isConnected)return true;
     var anchor=findRestoreAnchor();if(!anchor)return false;
-    ensureStyle();
     button=document.createElement('button');button.type='button';button.id='insightDataHealthButton';
     button.onclick=open;
     anchor.insertAdjacentElement('afterend',button);
