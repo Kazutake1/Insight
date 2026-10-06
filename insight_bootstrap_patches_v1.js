@@ -26,8 +26,7 @@ var originalPersist='function persist(){\n  try{localStorage.setItem(SK,JSON.str
 var safePersist='function persist(){\n  try{\n    if(window.InsightStorage&&typeof window.InsightStorage.persistCurrent==="function")return window.InsightStorage.persistCurrent(allStores);\n    localStorage.setItem(SK,JSON.stringify(allStores));return true;\n  }catch(e){\n    alert("データを保存できませんでした。\\nブラウザの保存領域を確認して、もう一度お試しください。\\n現在の変更は保存されていません。");\n    const saveError=new Error("Insight data save failed");saveError.name="InsightPersistError";saveError.cause=e;throw saveError;\n  }\n}\nwindow.addEventListener("error",e=>{if(e.error&&e.error.name==="InsightPersistError")e.preventDefault();});';
 if(html.indexOf(originalPersist)<0)throw new Error('保存処理の安全化に失敗しました');
 patch(originalPersist,safePersist);
-// STEP5 retained: legacy core control contrast patch; keep until the corresponding base style is moved out of the payload.
-patch('background:var(--surface);color:var(--text);box-shadow:0 6px 24px var(--shadow);','background:#1a1a1a;color:#fff;box-shadow:0 6px 24px var(--shadow);');
+// STEP5 migrated: legacy core control contrast is now applied at runtime by insight_legacy_style_compat_v1.js.
 // STEP5 retained: Chart.js SRI/referrer policy must be injected before the browser evaluates the dependency tag.
 patch('<script src=\"https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js\"\n  crossorigin=\"anonymous\"','<script src=\"https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js\"\n  integrity=\"sha512-CQBWl4fJHWbryGE+Pc7UAxWMUMNMWzWxF4SQo9CgkJIN1kx6djDQZjh3Y8SZ1d+6I+1zze6Z7kHXO7q3UyZAWw==\"\n  crossorigin=\"anonymous\"\n  referrerpolicy=\"no-referrer\"');
 // STEP5 migrated: legacy year-delete UI cleanup now runs in insight_dashboard_year_fix_v1.js after payload execution.

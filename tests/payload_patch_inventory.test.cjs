@@ -7,18 +7,18 @@ const vm=require('node:vm');
 const root=path.join(__dirname,'..');
 const read=name=>fs.readFileSync(path.join(root,name),'utf8');
 
-test('payload互換パッチ7件はbootstrap moduleへ分離しIndexにはbody挿入だけ残す',()=>{
+test('payload互換パッチ6件はbootstrap moduleへ分離しIndexにはbody挿入だけ残す',()=>{
   const index=read('Index.html');
   const bootstrap=read('insight_bootstrap_patches_v1.js');
-  assert.equal((bootstrap.match(/^patch\(/gm)||[]).length,7);
+  assert.equal((bootstrap.match(/^patch\(/gm)||[]).length,6);
   assert.equal((index.match(/html=html\.replace/g)||[]).length,1);
-  assert.match(index,/insight_bootstrap_patches_v1\.js\?v=20261006-year-delete-runtime-1/);
+  assert.match(index,/insight_bootstrap_patches_v1\.js\?v=20261006-control-style-runtime-1/);
 });
 
 test('トップページはキャッシュ抑止とシェル・機能manifestの自己更新を持つ',()=>{
   const index=read('Index.html');
-  assert.match(index,/insight-shell-version" content="20261006-step5-year-runtime-1/);
-  assert.match(index,/var BUILD="20261006-step5-year-runtime-1"/);
+  assert.match(index,/insight-shell-version" content="20261006-step5-control-style-1/);
+  assert.match(index,/var BUILD="20261006-step5-control-style-1"/);
   assert.match(index,/Shell rule: bump BUILD whenever the loader/);
   assert.match(index,/Cache-Control" content="no-cache, no-store, must-revalidate/);
   assert.match(index,/insight_probe=/);
@@ -30,6 +30,20 @@ test('トップページはキャッシュ抑止とシェル・機能manifestの
   assert.match(index,/cache:'no-store'/);
   assert.match(index,/location\.replace\('\.\/Index\.html\?insight_build='/);
   assert.doesNotMatch(index,/if\(params\.get\('insight_build'\)===BUILD\)return/);
+});
+
+test('旧コア配色補正はbootstrap文字列置換ではなくruntime style moduleが所有する',()=>{
+  const index=read('Index.html');
+  const bootstrap=read('insight_bootstrap_patches_v1.js');
+  const compat=read('insight_legacy_style_compat_v1.js');
+  assert.match(index,/insight_legacy_style_compat_v1\.js\?v=20261006-core-contrast-runtime-1/);
+  assert.ok(index.indexOf('insight_legacy_style_compat_v1.js')<index.indexOf('insight_yoy_policy_v1.js'));
+  assert.doesNotMatch(bootstrap,/background:#1a1a1a;color:#fff;box-shadow:0 6px 24px var\(--shadow\)/);
+  assert.match(compat,/getPropertyValue\('background'\)/);
+  assert.match(compat,/setProperty\('background','#1a1a1a'\)/);
+  assert.match(compat,/setProperty\('color','#fff'\)/);
+  assert.doesNotMatch(compat,/localStorage|InsightStorage|\bfetch\s*\(|XMLHttpRequest|WebSocket/);
+  assert.doesNotThrow(()=>new vm.Script(compat),'legacy style compat module must be valid JavaScript');
 });
 
 test('AI表示CSSはIndexの文字列置換ではなくpresentation moduleが所有する',()=>{
@@ -434,7 +448,7 @@ test('売上・客数・廃棄の旧年月UIは本体実行前に削除し販売
   const index=read('Index.html');
   const controls=read('insight_sales_period_selector_v1.js');
   const bootstrap=read('insight_bootstrap_patches_v1.js');
-  assert.match(index,/insight_bootstrap_patches_v1\.js\?v=20261006-year-delete-runtime-1/);
+  assert.match(index,/insight_bootstrap_patches_v1\.js\?v=20261006-control-style-runtime-1/);
   assert.match(index,/insight_sales_period_selector_v1\.js\?v=20261003-input-period-source-1/);
   assert.ok(index.indexOf('insight_page_period_sync_v1.js')<index.indexOf('insight_sales_period_selector_v1.js'));
   assert.match(bootstrap,/legacyInputPeriodStart/);
@@ -542,7 +556,7 @@ test('通常画面の選択年月をサイドバー切替後も全ページで�
 test('時間帯別客数は日報客数と分離して日付別24時間データとして保存する',()=>{
   const index=read('Index.html');
   const hourly=read('insight_hourly_customers_v1.js');
-  assert.match(index,/insight_bootstrap_patches_v1\.js\?v=20261006-year-delete-runtime-1/);
+  assert.match(index,/insight_bootstrap_patches_v1\.js\?v=20261006-control-style-runtime-1/);
   assert.match(index,/insight_hourly_customers_v1\.js\?v=20261006-remove-help/);
   assert.ok(index.indexOf('insight_events_v1.js')<index.indexOf('insight_hourly_customers_v1.js'));
   assert.ok(index.indexOf('insight_hourly_customers_v1.js')<index.indexOf('insight_event_results_v1.js'));
@@ -758,7 +772,7 @@ test('店舗運営UIのCSSはops moduleが所有する',()=>{
 test('まだ必要な安全・互換パッチはbootstrap moduleで保持する',()=>{
   const index=read('Index.html');
   const bootstrap=read('insight_bootstrap_patches_v1.js');
-  assert.match(index,/insight_bootstrap_patches_v1\.js\?v=20261006-year-delete-runtime-1/);
+  assert.match(index,/insight_bootstrap_patches_v1\.js\?v=20261006-control-style-runtime-1/);
   assert.match(bootstrap,/const WX_KEYS=/);
   assert.match(bootstrap,/originalPersist/);
   assert.match(bootstrap,/safePersist/);
@@ -769,19 +783,20 @@ test('まだ必要な安全・互換パッチはbootstrap moduleで保持する'
   assert.match(index,/orderedFeatureLoads/);
 });
 
-test('互換パッチ7件はfail-fast bootstrapに集約し年度削除UIはruntime cleanupへ移す',()=>{
+test('互換パッチ6件はfail-fast bootstrapに集約し視覚補正もruntimeへ移す',()=>{
   const index=read('Index.html');
   const bootstrap=read('insight_bootstrap_patches_v1.js');
   assert.match(bootstrap,/STEP5 retained: base weather constants/);
   assert.match(bootstrap,/STEP5 retained: saved data must never silently fall back/);
   assert.match(bootstrap,/STEP5 retained: persist\(\) must be hardened/);
-  assert.match(bootstrap,/STEP5 retained: legacy core control contrast patch/);
+  assert.doesNotMatch(bootstrap,/STEP5 retained: legacy core control contrast patch/);
+  assert.match(read('insight_legacy_style_compat_v1.js'),/InsightLegacyStyleCompat/);
   assert.match(bootstrap,/STEP5 retained: Chart\.js SRI\/referrer policy/);
   assert.doesNotMatch(bootstrap,/STEP5 retained: suppress the legacy year-delete UI/);
   assert.match(read('insight_dashboard_year_fix_v1.js'),/removeLegacyYearDeleteUi/);
   assert.match(index,/STEP5 retained bootstrap boundary/);
   assert.match(bootstrap,/互換パッチの適用対象が見つかりません/);
-  assert.equal((bootstrap.match(/^patch\(/gm)||[]).length,7);
+  assert.equal((bootstrap.match(/^patch\(/gm)||[]).length,6);
   assert.equal((index.match(/html=html\.replace/g)||[]).length,1);
 });
 

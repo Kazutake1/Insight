@@ -47,3 +47,14 @@ test('年度削除の旧UI除去はbootstrap文字列置換ではなくyear-fix 
   assert.match(yearFix,/function removeLegacyYearDeleteUi\(\)/);
   assert.match(yearFix,/#modalBg,\.btn-del-year\{display:none!important\}/);
 });
+
+test('旧コア配色はbootstrapで書き換えずruntime style互換モジュールへ移す',()=>{
+  const patched=patches.apply(payload());
+  const source=fs.readFileSync(path.join(root,'insight_bootstrap_patches_v1.js'),'utf8');
+  const runtime=fs.readFileSync(path.join(root,'insight_legacy_style_compat_v1.js'),'utf8');
+  assert.match(patched,/background:var\(--surface\);color:var\(--text\);box-shadow:0 6px 24px var\(--shadow\);/);
+  assert.doesNotMatch(source,/legacy core control contrast patch/);
+  assert.match(runtime,/function applyRules\(rules\)/);
+  assert.match(runtime,/background','#1a1a1a'/);
+  assert.match(runtime,/color','#fff'/);
+});
