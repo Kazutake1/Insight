@@ -132,7 +132,7 @@ test('Index.htmlは必要先だけを許可するCSPを定義する',()=>{
     "upgrade-insecure-requests"
   ].forEach(directive=>assert.ok(policy.includes(directive),'CSPに '+directive+' が含まれること'));
   assert.doesNotMatch(policy,/'unsafe-eval'/);
-  assert.ok(index.indexOf('Content-Security-Policy')<index.indexOf('https://unpkg.com/pako'),'CSPは外部スクリプトより前に定義すること');
+  assert.ok(index.indexOf('Content-Security-Policy')<index.indexOf('insight_shell_boot_v1.js'),'CSPは外部スクリプトより前に定義すること');
 });
 
 test('販売数入力は不正値の保存と同じページの再読込を防ぐ',()=>{
