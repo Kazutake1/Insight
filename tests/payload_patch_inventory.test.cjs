@@ -43,7 +43,7 @@ test('canonical payloadはinline script/styleを持たず外部assetを順序固
   const core=read('insight_payload_core_v1.js');
   const ai=read('insight_payload_ai_legacy_v1.js');
   const css=read('insight_payload_core_v1.css');
-  assert.match(payload,/insight_payload_core_v1\.css\?v=20261006-weekday-spacing-css-1/);
+  assert.match(payload,/insight_payload_core_v1\.css\?v=20261006-annual-summary-css-1/);
   assert.match(payload,/insight_payload_core_v1\.js\?v=20261006-payload-assets-1/);
   assert.match(payload,/insight_payload_ai_legacy_v1\.js\?v=20261006-payload-assets-1/);
   assert.match(payload,/insight_payload_bindings_v1\.js\?v=20261006-inline-bindings-1/);
@@ -165,22 +165,23 @@ test('AI表示CSSはIndexの文字列置換ではなくpresentation moduleが所
   assert.doesNotMatch(presentation,/var selected=!open&&currentNav===i;/);
 });
 
-test('年間サマリーは買上点数だけを表示対象から外し縦方向の可読性を上げる',()=>{
+test('年間サマリーは買上点数だけを表示対象から外し固定スタイルは外部CSSで維持する',()=>{
   const index=readShell();
   const annual=read('insight_annual_summary_v1.js');
-  assert.match(index,/insight_annual_summary_v1\.js\?v=20261005-remove-items-3/);
+  const css=read('insight_payload_core_v1.css');
+  assert.match(index,/insight_annual_summary_v1\.js\?v=20261006-csp-style-annual-1/);
   assert.match(annual,/exact\(page,'年間サマリー'\)/);
   assert.match(annual,/function metricsForHeading\(heading\)/);
   assert.match(annual,/heading\.nextElementSibling/);
   assert.match(annual,/normalized\(block\)\.indexOf\('買上点数'\)>=0/);
   assert.match(annual,/buyBlock\.remove\(\)/);
-  assert.match(annual,/insight-annual-summary-metric-label\{font-size:13px!important/);
-  assert.match(annual,/insight-annual-summary-metric-value\{font-size:18px!important/);
-  assert.match(annual,/insight-annual-summary-metrics\{row-gap:12px!important\}/);
-  assert.match(annual,/insight-annual-summary-metric\{padding-top:6px!important;padding-bottom:6px!important\}/);
+  assert.match(css,/insight-annual-summary-metric-label\{font-size:13px!important/);
+  assert.match(css,/insight-annual-summary-metric-value\{font-size:18px!important/);
+  assert.match(css,/insight-annual-summary-metrics\{row-gap:12px!important\}/);
+  assert.match(css,/insight-annual-summary-metric\{padding-top:6px!important;padding-bottom:6px!important\}/);
+  assert.doesNotMatch(annual,/createElement\(['"]style['"]\)|style\.textContent|appendChild\(style\)/);
   assert.doesNotMatch(annual,/localStorage\.(?:setItem|removeItem|clear)/);
 });
-
 test('ダッシュボードKPIカードは補助月表示を削除し年比ラベルと数値バッジを表示する',()=>{
   const index=readShell();
   const sync=read('insight_dashboard_kpi_sync_v1.js');
