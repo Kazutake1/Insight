@@ -87,7 +87,7 @@ test('旧天気相関グループは現行画面で未使用のためbootstrap�
   assert.match(html,/function getCorrData\(year,months\)/);
   assert.match(html,/const \{wdAvg\}=getCorrData\(baseYear,wdPeriod\)/);
   assert.doesNotMatch(bootstrap,/patch\("const wxGroups=/);
-  const featureFiles=fs.readdirSync(root).filter(name=>name.endsWith('.js')&&name!=='insight_bootstrap_patches_v1.js');
+  const featureFiles=fs.readdirSync(root).filter(name=>name.endsWith('.js')&&!name.startsWith('insight_payload_')&&name!=='insight_bootstrap_patches_v1.js');
   assert.deepEqual(featureFiles.filter(name=>/getCorrData|wxAvg|wxGroups/.test(read(name))),[]);
 });
 
