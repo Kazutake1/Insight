@@ -93,7 +93,7 @@ test('AI表示CSSはIndexの文字列置換ではなくpresentation moduleが所
     '  .ai-analysis-panel{width:92vw;}',
     '.ai-analysis-empty{font-size:12px;line-height:1.7;color:var(--text4);}'
   ]) assert.ok(!index.includes("html=html.replace('"+marker),marker+' がIndexのreplaceに残っています');
-  assert.match(index,/insight_ai_presentation_v1\.js\?v=20261004-remove-hint/);
+  assert.match(index,/insight_ai_presentation_v1\.js\?v=20261006-balanced-layout-1/);
   assert.match(presentation,/insightAiPresentationStyle/);
   assert.doesNotMatch(presentation,/数値と要点を優先して表示/);
   assert.match(presentation,/body\.ai-analysis-open #main\{margin-right:0!important\}/);
@@ -188,7 +188,7 @@ test('分析AI内の重複サイドバーを廃止し本体ナビへ統合する
   assert.doesNotMatch(presentation,/\.ai-workspace-left\{/);
   assert.doesNotMatch(presentation,/createNavButton/);
   assert.doesNotMatch(presentation,/ai-workspace-nav-btn/);
-  assert.match(presentation,/grid-template-columns:minmax\(0,1fr\) 250px/);
+  assert.match(presentation,/grid-template-columns:minmax\(0,3fr\) minmax\(0,2fr\)/);
   assert.match(presentation,/#nav0,#nav1,#nav2,#nav3,#nav4,#navSalesCount/);
   assert.match(presentation,/renderAIAnalysisPanel/);
 });
@@ -754,7 +754,7 @@ test('分析AIコメントは文章列ではなく構造化カードで表示し
   const presentation=read('insight_ai_presentation_v1.js');
   const visual=read('insight_ai_visual_v1.js');
   const pageAI=read('insight_ai_page_comments_v1.js');
-  assert.match(index,/insight_ai_visual_v1\.js\?v=20261001-decision-analysis/);
+  assert.match(index,/insight_ai_visual_v1\.js\?v=20261006-balanced-layout-1/);
   assert.ok(index.indexOf('insight_ai_presentation_v1.js')<index.indexOf('insight_ai_visual_v1.js'));
   assert.ok(index.indexOf('insight_ai_visual_v1.js')<index.indexOf('insight_ai_page_comments_v1.js'));
   assert.match(pageAI,/InsightAIVisual\.renderLines/);
@@ -783,8 +783,8 @@ test('分析AIはダッシュボード再掲ではなく4ブロックの意思�
   const presentation=read('insight_ai_presentation_v1.js');
   assert.match(index,/insight_ai_interpretation_v1\.js\?v=20261001-decision-analysis/);
   assert.match(index,/insight_ai_page_comments_v1\.js\?v=20261001-decision-analysis/);
-  assert.match(index,/insight_ai_presentation_v1\.js\?v=20261004-remove-hint/);
-  assert.match(index,/insight_ai_visual_v1\.js\?v=20261001-decision-analysis/);
+  assert.match(index,/insight_ai_presentation_v1\.js\?v=20261006-balanced-layout-1/);
+  assert.match(index,/insight_ai_visual_v1\.js\?v=20261006-balanced-layout-1/);
   assert.ok(index.indexOf('insight_analysis_history_v1.js')<index.indexOf('insight_ai_interpretation_v1.js'));
   assert.ok(index.indexOf('insight_ai_interpretation_v1.js')<index.indexOf('insight_ai_page_comments_v1.js'));
   assert.match(interpretation,/売上 × 客数 × 客単価/);
@@ -849,7 +849,7 @@ test('互換パッチ3件はfail-fast bootstrapに集約し視覚補正もruntim
 
 test('分析AI workspace assetはcache bustされている',()=>{
   const index=read('Index.html');
-  assert.match(index,/insight_ai_presentation_v1\.js\?v=20261004-remove-hint/);
+  assert.match(index,/insight_ai_presentation_v1\.js\?v=20261006-balanced-layout-1/);
   assert.match(index,/insight_ops_v1\.js\?v=20260930-step5-2/);
 });
 

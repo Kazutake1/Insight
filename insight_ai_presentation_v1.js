@@ -331,7 +331,7 @@
       '.ai-workspace-period-btn.active{background:var(--navy);color:#fff}',
       '.ai-workspace-period-btn:disabled{opacity:.38}',
       '.ai-workspace-close{justify-self:end;width:34px;height:34px;border:1px solid var(--border);border-radius:9px;background:#fff;color:var(--text2);font-size:23px;line-height:1;cursor:pointer}',
-      '.ai-workspace-grid{height:calc(100% - 68px);display:grid;grid-template-columns:minmax(0,1fr) 250px;gap:0;min-height:0}',
+      '.ai-workspace-grid{height:calc(100% - 68px);display:grid;grid-template-columns:minmax(0,3fr) minmax(0,2fr);gap:0;min-height:0}',
       '.ai-workspace-right{min-width:0;overflow:auto;background:#fff;padding:18px 14px;border-left:1px solid var(--border)}',
       '.ai-workspace-side-title{margin:0 8px 10px;font-size:10px;line-height:1.2;font-weight:800;letter-spacing:.08em;color:var(--text4)}',
       '.ai-workspace-main{position:relative;min-width:0;overflow:auto;padding:20px 22px 88px;background:#f4f6f8}',
@@ -345,7 +345,7 @@
       '.ai-insight-item{min-width:0;border:1px solid var(--border);border-left:3px solid var(--navy);border-radius:10px;background:#fff;padding:10px 11px}.ai-insight-item.is-primary{grid-column:1/-1;padding:12px 13px}.ai-insight-item.is-danger{border-left-color:var(--danger)}.ai-insight-item.is-success{border-left-color:var(--success)}',
       '.ai-insight-head{display:flex;align-items:center;justify-content:space-between;gap:8px}.ai-insight-title{min-width:0;font-size:11px;line-height:1.35;font-weight:800;color:var(--text2)}.ai-insight-state{flex:0 0 auto;border:1px solid var(--border);border-radius:999px;padding:2px 6px;font-size:9px;line-height:1.2;font-weight:800;color:var(--text3);background:#fff}',
       '.ai-insight-value{margin-top:6px;font-size:21px;line-height:1;font-weight:850;letter-spacing:-.02em;color:var(--navy)}.ai-insight-item.is-danger .ai-insight-value{color:var(--danger)}.ai-insight-item.is-success .ai-insight-value{color:var(--success)}',
-      '.ai-insight-detail{margin-top:6px;font-size:11px;line-height:1.5;color:var(--text3);overflow-wrap:anywhere}.ai-insight-item.is-primary .ai-insight-title{font-size:12px}.ai-insight-item.is-primary .ai-insight-detail{font-size:12px;color:var(--text2)}',
+      '.ai-insight-detail:first-child{margin-top:0}.ai-insight-detail{margin-top:6px;font-size:11px;line-height:1.5;color:var(--text3);overflow-wrap:anywhere}.ai-insight-item.is-primary .ai-insight-title{font-size:12px}.ai-insight-item.is-primary .ai-insight-detail{font-size:12px;color:var(--text2)}',
       '.ai-check-list{display:grid;gap:7px}.ai-check-line{display:grid;grid-template-columns:10px minmax(0,1fr);gap:5px;align-items:start}.ai-check-dot{color:var(--navy);font-weight:900;line-height:1.45}.ai-check-text{font-size:10.5px;line-height:1.5;color:var(--text3)}',
       '.ai-sales-count-visual{display:grid;gap:14px}.ai-sales-count-block{min-width:0}.ai-sales-count-block-title{margin:0 0 7px;font-size:11px;line-height:1.3;font-weight:800;color:var(--text3)}',
       '.ai-sales-count-overall{display:grid;grid-template-columns:minmax(165px,220px);gap:9px;overflow:auto;padding-bottom:2px}.ai-sales-count-weekdays{margin:0!important;padding-bottom:2px}.ai-sales-count-extra{margin-top:2px}',
@@ -372,8 +372,8 @@
       '.ai-analysis-question-send{height:38px;flex:0 0 auto;border:0;border-radius:9px;background:var(--navy);color:#fff;padding:0 15px;font:800 11px/1 -apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;cursor:pointer}',
       '.ai-analysis-question-answer{margin-top:9px;padding:9px 10px;border-radius:9px;background:#f8f9fb;border:1px solid var(--border);font-size:11px;line-height:1.55;color:var(--text2);white-space:pre-wrap;max-height:126px;overflow:auto}',
       '.ai-analysis-question-help{display:none}',
-      '@media(max-width:1180px){.ai-workspace-grid{grid-template-columns:minmax(0,1fr) 218px}.ai-workspace-main{padding-left:16px;padding-right:16px}.ai-workspace-question-dock{left:16px;right:16px}.ai-workspace-period-btn{padding-left:10px;padding-right:10px}}',
-      '@media(max-width:920px){.ai-analysis-panel.ai-analysis-workspace{left:8px!important;right:8px!important;top:var(--ai-workspace-top,8px)!important;bottom:0!important}.ai-workspace-grid{grid-template-columns:minmax(0,1fr) 190px}.ai-workspace-header{padding:0 14px;gap:10px}.ai-workspace-period-btn{padding:7px 8px}.ai-workspace-section-hint{display:none}.ai-history-toolbar{gap:7px;padding:8px}.ai-history-mode-btn,.ai-history-period-btn{padding:6px 8px}}',
+      '@media(max-width:1180px){.ai-workspace-grid{grid-template-columns:minmax(0,3fr) minmax(0,2fr)}.ai-workspace-main{padding-left:16px;padding-right:16px}.ai-workspace-question-dock{left:16px;right:16px}.ai-workspace-period-btn{padding-left:10px;padding-right:10px}}',
+      '@media(max-width:920px){.ai-analysis-panel.ai-analysis-workspace{left:8px!important;right:8px!important;top:var(--ai-workspace-top,8px)!important;bottom:0!important}.ai-workspace-grid{grid-template-columns:minmax(0,3fr) minmax(0,2fr)}.ai-workspace-header{padding:0 14px;gap:10px}.ai-workspace-period-btn{padding:7px 8px}.ai-workspace-section-hint{display:none}.ai-history-toolbar{gap:7px;padding:8px}.ai-history-mode-btn,.ai-history-period-btn{padding:6px 8px}}',
       '@media(max-width:920px){.ai-insight-list.is-summary{grid-template-columns:1fr}.ai-insight-item.is-primary{grid-column:auto}.ai-insight-value{font-size:19px}}'
     ].join('');
     document.head.appendChild(style);
