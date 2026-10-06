@@ -40,7 +40,7 @@
 (function(){
 var files=['insight_payload_v1_part01a.txt','insight_payload_v1_part01b.txt','insight_payload_v1_part02.txt','insight_payload_v1_part03.txt','insight_payload_v1_part04a.txt','insight_payload_v1_part04b.txt','insight_payload_v1_part05.txt','insight_payload_v1_part06.txt','insight_payload_v1_part07.txt'];
 function stripPayloadChartScript(html){
-  var re=/<script\b(?=[^>]*\bsrc=["']https:\/\/cdnjs\.cloudflare\.com\/ajax\/libs\/Chart\.js\/4\.4\.1\/chart\.umd\.min\.js["'])[^>]*>\s*<\/script>/i;
+  var re=/<script\b(?=[^>]*\bsrc=["']https:\/\/cdnjs\.cloudflare\.com\/ajax\/libs\/Chart\.js\/4\.4\.1\/chart\.umd\.min\.js["'])[^>]*>[\s\S]*?<\/script>/i;
   if(!re.test(html))throw new Error('Chart.jsの旧payload依存タグが見つかりません');
   return html.replace(re,'');
 }
