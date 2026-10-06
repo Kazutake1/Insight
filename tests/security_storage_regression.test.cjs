@@ -120,7 +120,7 @@ test('Index.htmlは必要先だけを許可するCSPを定義する',()=>{
   const policy=match[1];
   [
     "default-src 'self'",
-    "script-src 'self' https://unpkg.com https://cdnjs.cloudflare.com",
+    "script-src 'self' https://cdnjs.cloudflare.com",
     "style-src 'self' 'unsafe-inline'",
     "connect-src 'self' https://geocoding-api.open-meteo.com https://api.open-meteo.com https://historical-forecast-api.open-meteo.com https://www.jma.go.jp",
     "img-src 'self' data: blob:",
@@ -133,6 +133,7 @@ test('Index.htmlは必要先だけを許可するCSPを定義する',()=>{
   ].forEach(directive=>assert.ok(policy.includes(directive),'CSPに '+directive+' が含まれること'));
   assert.doesNotMatch(policy,/'unsafe-eval'/);
   assert.doesNotMatch(policy,/script-src[^;]*'unsafe-inline'/);
+  assert.doesNotMatch(policy,/https:\/\/unpkg\.com/);
   assert.ok(index.indexOf('Content-Security-Policy')<index.indexOf('insight_shell_boot_v1.js'),'CSPは外部スクリプトより前に定義すること');
 });
 
