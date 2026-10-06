@@ -21,11 +21,7 @@ var safeLoadAll="function loadAll(){\n  function failStoredDataLoad(error){\n   
 if(html.indexOf(originalLoadAll)<0)throw new Error('保存済みデータ読込の安全化に失敗しました');
 patch(originalLoadAll,safeLoadAll);
 
-// STEP5 retained: persist() must be hardened before the core app executes.
-var originalPersist='function persist(){\n  try{localStorage.setItem(SK,JSON.stringify(allStores));}catch(e){}\n}';
-var safePersist='function persist(){\n  try{\n    if(window.InsightStorage&&typeof window.InsightStorage.persistCurrent==="function")return window.InsightStorage.persistCurrent(allStores);\n    localStorage.setItem(SK,JSON.stringify(allStores));return true;\n  }catch(e){\n    alert("データを保存できませんでした。\\nブラウザの保存領域を確認して、もう一度お試しください。\\n現在の変更は保存されていません。");\n    const saveError=new Error("Insight data save failed");saveError.name="InsightPersistError";saveError.cause=e;throw saveError;\n  }\n}\nwindow.addEventListener("error",e=>{if(e.error&&e.error.name==="InsightPersistError")e.preventDefault();});';
-if(html.indexOf(originalPersist)<0)throw new Error('保存処理の安全化に失敗しました');
-patch(originalPersist,safePersist);
+// STEP5 migrated: persist() safety is installed at runtime by insight_persist_guard_v1.js immediately after InsightStorage loads.
 // STEP5 migrated: legacy core control contrast is now applied at runtime by insight_legacy_style_compat_v1.js.
 // STEP5 migrated: Chart.js is loaded securely by Index.html; the legacy payload tag is stripped by src before document.write().
 // STEP5 migrated: legacy year-delete UI cleanup now runs in insight_dashboard_year_fix_v1.js after payload execution.
