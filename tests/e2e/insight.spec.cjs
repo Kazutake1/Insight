@@ -1,12 +1,7 @@
 const {test,expect}=require('@playwright/test');
-const path=require('node:path');
 const fs=require('node:fs');
 
 async function openInsight(page){
-  const pakoPath=path.join(process.cwd(),'node_modules','pako','dist','pako.min.js');
-  await page.route('https://unpkg.com/pako@2.1.0/dist/pako.min.js',route=>
-    route.fulfill({path:pakoPath,contentType:'application/javascript'})
-  );
   const errors=[];
   page.on('pageerror',error=>errors.push(error.message));
   await page.goto('/Index.html',{waitUntil:'domcontentloaded'});
@@ -277,14 +272,15 @@ test('トップページは外部shellと機能manifestの最新版確認をno-s
     fetch('/insight_shell_loader_v1.js?e2e-shell-check=1',{cache:'no-store'}).then(r=>r.text())
   ]));
   const [source,boot,loader]=sources;
-  expect(source).toContain('name="insight-shell-version" content="20261006-shell-external-1"');
-  expect(source).toContain('insight_shell_boot_v1.js?v=20261006-shell-external-1');
-  expect(source).toContain('insight_shell_loader_v1.js?v=20261006-shell-external-1');
-  expect(source).toContain('insight_shell_v1.css?v=20261006-shell-external-1');
+  expect(source).toContain('name="insight-shell-version" content="20261006-uncompressed-payload-1"');
+  expect(source).toContain('insight_shell_boot_v1.js?v=20261006-uncompressed-payload-1');
+  expect(source).toContain('insight_shell_loader_v1.js?v=20261006-uncompressed-payload-1');
+  expect(source).toContain('insight_shell_v1.css?v=20261006-uncompressed-payload-1');
   expect(source).not.toMatch(/<script(?![^>]*\bsrc=)[^>]*>/i);
   expect(source).not.toMatch(/<style\b/i);
   expect(boot).toContain("fetch('./Index.html?insight_probe='+Date.now(),{cache:'no-store'})");
   expect(loader).toContain("fetch('./insight_shell_loader_v1.js?insight_manifest_probe='+Date.now(),{cache:'no-store'})");
+  expect(loader).toContain("fetch('./insight_payload_source_v1.html?v=20261006-uncompressed-source-1',{cache:'no-store'})");
   expect(loader).toContain('function featureSignature(entries)');
   expect(source).toContain('https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js');
   expect(source).toContain('integrity="sha512-CQBWl4fJHWbryGE+Pc7UAxWMUMNMWzWxF4SQo9CgkJIN1kx6djDQZjh3Y8SZ1d+6I+1zze6Z7kHXO7q3UyZAWw=="');
@@ -908,10 +904,6 @@ test('データ状態チェックは未登録年度を要確認表示し保存�
 
 
 test('保存済みデータが壊れている場合は空データで起動せず保存データを保持する',async({page})=>{
-  const pakoPath=path.join(process.cwd(),'node_modules','pako','dist','pako.min.js');
-  await page.route('https://unpkg.com/pako@2.1.0/dist/pako.min.js',route=>
-    route.fulfill({path:pakoPath,contentType:'application/javascript'})
-  );
   await page.addInitScript(()=>localStorage.setItem('insight_v11','{"current":"broken","stores":'));
   await page.goto('/Index.html',{waitUntil:'domcontentloaded'});
   await expect(page.locator('#insightStorageLoadError')).toBeVisible();

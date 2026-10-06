@@ -18,12 +18,17 @@ const PARTS=[
 ];
 
 function read(name){return fs.readFileSync(path.join(root,name),'utf8');}
-function basePayload(){
+function legacyCompressedPayload(){
   const b64=PARTS.map(read).join('').replace(/\s/g,'');
   return zlib.gunzipSync(Buffer.from(b64,'base64')).toString('utf8');
 }
+function basePayload(){return read('insight_payload_source_v1.html');}
 
-test('圧縮payloadは有効なInsight HTMLへ復元できる',()=>{
+test('非圧縮payload sourceは旧圧縮payloadと完全一致する',()=>{
+  assert.equal(basePayload(),legacyCompressedPayload());
+});
+
+test('非圧縮payload sourceは有効なInsight HTMLである',()=>{
   const html=basePayload();
   assert.match(html,/^<!doctype html>/i);
   assert.match(html,/<\/body>/i);

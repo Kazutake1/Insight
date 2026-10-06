@@ -3,10 +3,9 @@ const assert=require('node:assert/strict');
 const fs=require('node:fs');
 const path=require('node:path');
 const vm=require('node:vm');
-const zlib=require('node:zlib');
 const root=path.join(__dirname,'..');
 const read=name=>fs.readFileSync(path.join(root,name),'utf8');
-const payload=zlib.gunzipSync(Buffer.from(fs.readdirSync(root).filter(x=>/^insight_payload/.test(x)).sort().map(read).join(''),'base64')).toString();
+const payload=read('insight_payload_source_v1.html');
 const engineSource=payload.slice(payload.indexOf('function kpiNum('),payload.indexOf('function blankMonthData('));
 function element(label=''){
   return {textContent:label,style:{},children:[],append(...xs){xs.forEach(x=>{x.parent=this;this.children.push(x);});},appendChild(x){this.append(x);},remove(){this.parent.children=this.parent.children.filter(x=>x!==this);},querySelector(s){if(s==='.kpi-label')return this.label;if(s==='.kpi-value')return this.value;return this.children.find(x=>x.className===s.slice(1))||null;},querySelectorAll(){return this.children;}};
@@ -89,7 +88,7 @@ test('全JS・Index内スクリプト・展開後スクリプトに構文エラ�
   const scripts=html=>Array.from(html.matchAll(/<script\b(?:[^>"']|"[^"]*"|'[^']*')*>([\s\S]*?)<\/script>/gi),m=>m[1]);
   for(const s of scripts(payload))new vm.Script(s);
   let expanded;
-  const context={pako:{ungzip:()=>payload},Chart:function Chart(){},Uint8Array,atob:s=>Buffer.from(s,'base64').toString('binary'),
+  const context={Chart:function Chart(){},
     fetch:async url=>({ok:true,text:async()=>read(url.split('?')[0].replace('./',''))}),document:{body:{},open(){},write:s=>expanded=s,close(){}}};
   context.window=context;context.globalThis=context;
   vm.runInNewContext(read('insight_shell_boot_v1.js'),context);

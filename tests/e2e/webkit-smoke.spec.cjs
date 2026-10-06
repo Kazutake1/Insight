@@ -1,11 +1,5 @@
 const {test,expect}=require('@playwright/test');
-const path=require('node:path');
-
 async function openInsight(page){
-  const pakoPath=path.join(process.cwd(),'node_modules','pako','dist','pako.min.js');
-  await page.route('https://unpkg.com/pako@2.1.0/dist/pako.min.js',route=>
-    route.fulfill({path:pakoPath,contentType:'application/javascript'})
-  );
   // Production is HTTPS. The local test server is HTTP, so remove only the
   // upgrade-insecure-requests directive to stop WebKit upgrading localhost to HTTPS.
   await page.route('**/Index.html*',async route=>{

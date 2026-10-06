@@ -1,16 +1,14 @@
-/* Insight shell loader v1: compressed payload loader and feature manifest owner. */
+/* Insight shell loader v1: canonical HTML payload loader and feature manifest owner. */
 (function(){
-var files=['insight_payload_v1_part01a.txt','insight_payload_v1_part01b.txt','insight_payload_v1_part02.txt','insight_payload_v1_part03.txt','insight_payload_v1_part04a.txt','insight_payload_v1_part04b.txt','insight_payload_v1_part05.txt','insight_payload_v1_part06.txt','insight_payload_v1_part07.txt'];
 function stripPayloadChartScript(html){
   var re=/<script\b(?=[^>]*\bsrc=["']https:\/\/cdnjs\.cloudflare\.com\/ajax\/libs\/Chart\.js\/4\.4\.1\/chart\.umd\.min\.js["'])[^>]*>[\s\S]*?<\/script>/i;
   if(!re.test(html))throw new Error('Chart.jsの旧payload依存タグが見つかりません');
   return html.replace(re,'');
 }
 function fail(e){document.body.innerHTML='<div style="padding:24px;font-family:-apple-system,sans-serif;color:#b42318">Insightの読み込みに失敗しました。<br><small>'+String(e&&e.message?e.message:e)+'</small></div>';}
-if(typeof pako==='undefined'){fail(new Error('展開ライブラリを読み込めませんでした'));return;}
 if(typeof Chart==='undefined'){fail(new Error('グラフライブラリを読み込めませんでした'));return;}
-Promise.all(files.map(function(file){return fetch('./'+file+'?v=20260905-2',{cache:'no-store'}).then(function(r){if(!r.ok)throw new Error(file+' の取得に失敗しました ('+r.status+')');return r.text();});})).then(function(parts){
-var b64=parts.join('').replace(/\s/g,''),bin=atob(b64),bytes=new Uint8Array(bin.length);for(var i=0;i<bin.length;i++)bytes[i]=bin.charCodeAt(i);var html=pako.ungzip(bytes,{to:'string'});if(html.indexOf('<!DOCTYPE html>')!==0&&html.indexOf('<!doctype html>')!==0)throw new Error('HTMLデータの検証に失敗しました');
+fetch('./insight_payload_source_v1.html?v=20261006-uncompressed-source-1',{cache:'no-store'}).then(function(r){if(!r.ok)throw new Error('Insight payload の取得に失敗しました ('+r.status+')');return r.text();}).then(function(html){
+if(html.indexOf('<!DOCTYPE html>')!==0&&html.indexOf('<!doctype html>')!==0)throw new Error('HTMLデータの検証に失敗しました');
 html=stripPayloadChartScript(html);
 // STEP5 complete: payload source is self-contained; feature modules are inserted before document.write().
 var orderedFeatureLoads=[
