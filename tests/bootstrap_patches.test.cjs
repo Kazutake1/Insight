@@ -75,7 +75,7 @@ test('天気アイコン拡張はbootstrap文字列パッチではなくruntime 
   assert.match(runtime,/WX_ICONS\['霧'\]='🌫️'/);
   assert.match(runtime,/WX_ICONS\['凍雨'\]='🧊'/);
   assert.match(runtime,/WX_ICONS\['雷雨'\]='🌩️'/);
-  assert.doesNotMatch(runtime,/localStorage|InsightStorage|\\bfetch\\s*\\(|XMLHttpRequest|WebSocket/);
+  assert.doesNotMatch(runtime,/localStorage|InsightStorage|\bfetch\s*\(|XMLHttpRequest|WebSocket/);
   const context={};context.window=context;context.globalThis=context;vm.createContext(context);
   vm.runInContext('const WX_ICONS={"雪":"❄️","":""};',context);
   vm.runInContext(runtime,context);
