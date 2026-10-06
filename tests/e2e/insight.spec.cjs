@@ -238,12 +238,15 @@ test('売上・客数・廃棄の日別グラフは指定された補助文だ�
   expect(errors).toEqual([]);
 });
 
-test('トップページはビルド番号を持ち最新版確認をno-storeで行う',async({page})=>{
+test('トップページはシェルと機能manifestの最新版確認をno-storeで行う',async({page})=>{
   const errors=await openInsight(page);
   const source=await page.evaluate(()=>fetch('/Index.html?e2e-shell-check=1',{cache:'no-store'}).then(r=>r.text()));
-  expect(source).toContain('name="insight-shell-version" content="20261003-ai-pipeline-1"');
+  expect(source).toContain('name="insight-shell-version" content="20261006-shell-manifest-1"');
   expect(source).toContain("fetch('./Index.html?insight_probe='+Date.now(),{cache:'no-store'})");
+  expect(source).toContain("fetch('./Index.html?insight_manifest_probe='+Date.now(),{cache:'no-store'})");
+  expect(source).toContain('function featureSignature(entries)');
   expect(source).toContain("location.replace('./Index.html?insight_build='+encodeURIComponent(m[1]))");
+  expect(source).toContain("'&insight_manifest='+encodeURIComponent(remoteFeatureSignature)");
   expect(errors).toEqual([]);
 });
 
