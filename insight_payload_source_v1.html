@@ -35,7 +35,7 @@
       <select id="storeSel" class="store-sel"></select>
       <button class="store-menu-btn" id="storeMenuBtn">⋯</button>
     </div>
-    <div id="storeMenu" class="store-menu" style="display:none;"></div>
+    <div id="storeMenu" class="store-menu"></div>
     <div class="nav-list">
       <button class="nav-btn quick active" id="nav0">
         <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20h9"/><path d="M16.5 3.5a2.12 2.12 0 0 1 3 3L7 19l-4 1 1-4Z"/></svg>今日の入力
@@ -70,8 +70,8 @@
         <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14.5 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7.5L14.5 2z"/><polyline points="14 2 14 8 20 8"/><line x1="8" y1="13" x2="16" y2="13"/><line x1="8" y1="17" x2="16" y2="17"/><line x1="8" y1="9" x2="10" y2="9"/></svg>
         <span>CSVインポート</span>
       </button>
-      <input type="file" id="restoreFile" accept=".json" style="display:none">
-      <input type="file" id="csvImportFile" accept=".csv" style="display:none">
+      <input type="file" id="restoreFile" accept=".json">
+      <input type="file" id="csvImportFile" accept=".csv">
     </div>
   </div>
 
@@ -95,18 +95,15 @@
           <button class="wx-btn" data-wx="みぞれ" >🌨️</button>
           <button class="wx-btn" data-wx="雪" >❄️</button>
         </div>
-        <button id="autoWxBtn" style="padding:4px 10px;border-radius:8px;
-          border:1.5px solid #ddd;background:#fff;
-          color:#333;font-size:10.5px;font-weight:700;cursor:pointer;font-family:inherit;
-          display:flex;align-items:center;gap:4px;">
+        <button id="autoWxBtn">
           <span>📡</span><span id="autoWxLabel">自動取得</span>
         </button>
-        <div id="qNavRow" class="quick-nav-row" style="margin-bottom:0;"></div>
+        <div id="qNavRow" class="quick-nav-row"></div>
       </div>
       <div class="quick-grid" id="quickGrid"></div>
-      <div style="display:flex;gap:8px;margin-top:10px;">
+      <div class="payload-quick-actions">
         <button id="quickClearBtn" class="clear-btn quick-clear">クリア</button>
-        <button id="quickSaveBtn" class="quick-save" style="margin-top:0;flex:1;width:auto;">保存する</button>
+        <button id="quickSaveBtn" class="quick-save">保存する</button>
       </div>
     </div>
 
@@ -118,23 +115,14 @@
       <div class="year-bar">
         <div class="year-sel-group">
           <span class="year-sel-label">基準年</span>
-          <select id="baseYearSel"
-            style="padding:5px 10px;border-radius:9px;border:2px solid #1a1a1a;
-            background:#1a1a1a;color:#fff;font-size:12px;font-weight:700;
-            font-family:inherit;outline:none;cursor:pointer;"></select>
+          <select id="baseYearSel"></select>
         </div>
-        <span style="font-size:16px;color:var(--text5);">vs</span>
+        <span class="payload-year-vs">vs</span>
         <div class="year-sel-group">
           <span class="year-sel-label">比較年</span>
-          <select id="cmpYearSel"
-            style="padding:5px 10px;border-radius:9px;border:2px solid #888;
-            background:var(--surface);color:var(--text2);font-size:12px;font-weight:700;
-            font-family:inherit;outline:none;cursor:pointer;"></select>
+          <select id="cmpYearSel"></select>
         </div>
-        <button id="addYearBtn"
-          style="padding:5px 12px;border-radius:9px;border:1.5px dashed #ccc;
-          background:transparent;color:#999;font-size:11px;font-weight:700;
-          cursor:pointer;font-family:inherit;">＋ 年度追加</button>
+        <button id="addYearBtn">＋ 年度追加</button>
         <div id="addYearInlineWrap"></div>
       </div>
       <div class="dash-month-bar">
@@ -164,21 +152,15 @@
         </div><!-- /chart-left-col -->
         <div class="right-col">
           <div class="card donut-card">
-            <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:6px;">
+            <div class="payload-donut-head">
               <div><div class="chart-title">廃棄内訳</div><div class="chart-sub" id="donutSub">月合計</div></div>
-              <div style="display:flex;align-items:center;gap:5px;">
-                <div style="display:flex;border-radius:7px;overflow:hidden;border:1px solid #e0e0e0;">
-                  <button id="donutBtnAmt"
-                    style="padding:3px 9px;border:none;font-size:10px;font-weight:700;
-                    cursor:pointer;font-family:inherit;background:var(--text);color:var(--surface);">金額</button>
-                  <button id="donutBtnPct"
-                    style="padding:3px 9px;border:none;font-size:10px;font-weight:700;
-                    cursor:pointer;font-family:inherit;background:var(--surface);color:var(--text4);">割合</button>
+              <div class="payload-donut-tools">
+                <div class="payload-donut-toggle">
+                  <button id="donutBtnAmt">金額</button>
+                  <button id="donutBtnPct">割合</button>
                 </div>
-                <div id="donutDayPicker" style="display:none;">
-                  <select id="donutDaySelect"
-                    style="font-size:9.5px;font-weight:700;border:1px solid #eee;border-radius:6px;
-                    padding:3px 5px;color:var(--text3);background:var(--input-bg);font-family:inherit;"></select>
+                <div id="donutDayPicker">
+                  <select id="donutDaySelect"></select>
                 </div>
               </div>
             </div>
@@ -189,15 +171,15 @@
           </div>
           <!-- 曜日別分析 -->
           <div class="card corr-card" id="corrRow">
-            <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px;">
+            <div class="payload-corr-head">
               <div class="chart-title">曜日別平均売上</div>
-              <div style="display:flex;border-radius:7px;overflow:hidden;border:1px solid var(--border);">
+              <div class="payload-wd-toggle">
                 <button class="wd-period-btn active" data-months="1">1ヶ月</button>
                 <button class="wd-period-btn" data-months="3">3ヶ月</button>
                 <button class="wd-period-btn" data-months="6">6ヶ月</button>
               </div>
             </div>
-            <div style="height:160px;position:relative;"><canvas id="wdChart"></canvas></div>
+            <div class="payload-wd-chart-wrap"><canvas id="wdChart"></canvas></div>
           </div>
           <div class="card summary-card">
             <div class="summary-title">年間サマリー</div>
@@ -219,8 +201,8 @@
       </div>
       <div class="input-year-row" id="salesYearRow"></div>
       <div class="month-tab-row" id="salesMonthTabs"></div>
-      <div style="display:flex;gap:10px;margin-bottom:10px;flex-shrink:0;">
-        <div class="haiki-chart-card" id="salesChartCard" style="flex:1;margin-bottom:0;">
+      <div class="payload-input-chart-row">
+        <div class="haiki-chart-card payload-input-chart-main" id="salesChartCard">
           <div class="haiki-chart-header">
             <div>
               <div class="haiki-chart-title" id="salesChartTitle">売上 日別推移</div>
@@ -228,13 +210,13 @@
             </div>
             <div class="haiki-chart-total" id="salesChartTotal"></div>
           </div>
-          <div style="height:90px;position:relative;">
+          <div class="payload-input-chart-main-wrap">
             <canvas id="salesLineChart"></canvas>
           </div>
         </div>
-        <div class="haiki-chart-card" style="width:200px;flex-shrink:0;margin-bottom:0;padding:8px 10px 8px;">
+        <div class="haiki-chart-card payload-input-chart-side">
           <div class="haiki-chart-title">曜日別平均売上</div>
-          <div style="height:105px;position:relative;">
+          <div class="payload-input-chart-side-wrap">
             <canvas id="salesWdChart"></canvas>
           </div>
         </div>
@@ -259,8 +241,8 @@
       </div>
       <div class="input-year-row" id="kyakuYearRow"></div>
       <div class="month-tab-row" id="kyakuMonthTabs"></div>
-      <div style="display:flex;gap:10px;margin-bottom:10px;flex-shrink:0;">
-        <div class="haiki-chart-card" id="kyakuChartCard" style="flex:1;margin-bottom:0;">
+      <div class="payload-input-chart-row">
+        <div class="haiki-chart-card payload-input-chart-main" id="kyakuChartCard">
           <div class="haiki-chart-header">
             <div>
               <div class="haiki-chart-title" id="kyakuChartTitle">客数 日別推移</div>
@@ -268,13 +250,13 @@
             </div>
             <div class="haiki-chart-total" id="kyakuChartTotal"></div>
           </div>
-          <div style="height:90px;position:relative;">
+          <div class="payload-input-chart-main-wrap">
             <canvas id="kyakuLineChart"></canvas>
           </div>
         </div>
-        <div class="haiki-chart-card" style="width:200px;flex-shrink:0;margin-bottom:0;padding:8px 10px 8px;">
+        <div class="haiki-chart-card payload-input-chart-side">
           <div class="haiki-chart-title">曜日別平均客数</div>
-          <div style="height:105px;position:relative;">
+          <div class="payload-input-chart-side-wrap">
             <canvas id="kyakuWdChart"></canvas>
           </div>
         </div>
@@ -297,8 +279,8 @@
       </div>
       <div class="input-year-row" id="haikiYearRow"></div>
       <div class="month-tab-row" id="haikiMonthTabs"></div>
-      <div style="display:flex;gap:10px;margin-bottom:10px;flex-shrink:0;">
-        <div class="haiki-chart-card" id="haikiChartCard" style="flex:1;margin-bottom:0;">
+      <div class="payload-input-chart-row">
+        <div class="haiki-chart-card payload-input-chart-main" id="haikiChartCard">
           <div class="haiki-chart-header">
             <div>
               <div class="haiki-chart-title" id="haikiChartTitle">廃棄金額 日別推移</div>
@@ -306,13 +288,13 @@
             </div>
             <div class="haiki-chart-total" id="haikiChartTotal"></div>
           </div>
-          <div style="height:90px;position:relative;">
+          <div class="payload-input-chart-main-wrap">
             <canvas id="haikiBarChart"></canvas>
           </div>
         </div>
-        <div class="haiki-chart-card" style="width:200px;flex-shrink:0;margin-bottom:0;padding:8px 10px 8px;">
+        <div class="haiki-chart-card payload-input-chart-side">
           <div class="haiki-chart-title">曜日別平均廃棄</div>
-          <div style="height:105px;position:relative;">
+          <div class="payload-input-chart-side-wrap">
             <canvas id="haikiWdChart"></canvas>
           </div>
         </div>
