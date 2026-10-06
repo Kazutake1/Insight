@@ -43,7 +43,7 @@ test('canonical payloadはinline script/styleを持たず外部assetを順序固
   const core=read('insight_payload_core_v1.js');
   const ai=read('insight_payload_ai_legacy_v1.js');
   const css=read('insight_payload_core_v1.css');
-  assert.match(payload,/insight_payload_core_v1\.css\?v=20261006-year-controls-css-1/);
+  assert.match(payload,/insight_payload_core_v1\.css\?v=20261006-input-weather-css-1/);
   assert.match(payload,/insight_payload_core_v1\.js\?v=20261006-payload-assets-1/);
   assert.match(payload,/insight_payload_ai_legacy_v1\.js\?v=20261006-payload-assets-1/);
   assert.match(payload,/insight_payload_bindings_v1\.js\?v=20261006-inline-bindings-1/);
@@ -355,6 +355,22 @@ test('設定ページはサイドバー下部の管理項目を集約する',()=
   assert.match(settings,/themeBridge\.append\(dark\)/);
   assert.match(settings,/themeBridge\.style\.setProperty\('display','none','important'\)/);
   assert.match(settings,/sidebarActions\.replaceChildren\(themeWrap,nav\)/);
+});
+
+test('入力ページの天気・気温表示スタイルは外部CSSで維持する',()=>{
+  const index=readShell();
+  const inputWeather=read('insight_input_weather_temp_v1.js');
+  const css=read('insight_payload_core_v1.css');
+  assert.match(index,/insight_input_weather_temp_v1\.js\?v=20261006-csp-style-input-weather-1/);
+  assert.match(css,/\.iwt-date-weather\{display:inline-flex;align-items:center;gap:5px/);
+  assert.match(css,/\.iwt-kyaku-corner\{position:absolute;top:9px;right:8px/);
+  assert.match(css,/@media\(max-width:700px\)\{\.iwt-sales-list\{font-size:9px\}/);
+  assert.doesNotMatch(inputWeather,/createElement\(['"]style['"]\)|style\.textContent|appendChild\(style\)|function ensureStyle\(/);
+  assert.match(inputWeather,/function decorateSalesList\(/);
+  assert.match(inputWeather,/function decorateSalesForm\(/);
+  assert.match(inputWeather,/function decorateKyakuGrid\(/);
+  assert.doesNotMatch(inputWeather,/localStorage\.(?:setItem|removeItem|clear)/);
+  assert.doesNotThrow(()=>new vm.Script(inputWeather),'input weather module must be valid JavaScript');
 });
 
 test('年度管理ボタンは設定へ移動し月ボタンはダッシュボード年度行へ移動する',()=>{
