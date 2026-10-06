@@ -23,9 +23,24 @@ function legacyCompressedPayload(){
   return zlib.gunzipSync(Buffer.from(b64,'base64')).toString('utf8');
 }
 function basePayload(){return read('insight_payload_source_v1.html');}
+const PAYLOAD_SCRIPT_FILES=[
+  'insight_payload_chart_fallback_v1.js',
+  'insight_payload_core_v1.js',
+  'insight_payload_ai_panel_v1.js'
+];
+function payloadRuntimeSource(){return [basePayload(),...PAYLOAD_SCRIPT_FILES.map(read)].join('\n');}
+function stripScripts(html){return html.replace(/<script\b(?:[^>"']|"[^"]*"|'[^']*')*>[\s\S]*?<\/script>/gi,'');}
 
-test('非圧縮payload sourceは旧圧縮payloadと完全一致する',()=>{
-  assert.equal(basePayload(),legacyCompressedPayload());
+test('payload script外部化は旧圧縮payloadのJS内容とHTML構造を完全維持する',()=>{
+  const legacy=legacyCompressedPayload();
+  const current=basePayload();
+  const legacyInline=[...legacy.matchAll(/<script\b(?![^>]*\bsrc=)[^>]*>([\s\S]*?)<\/script>/gi)].map(m=>m[1]);
+  assert.equal(legacyInline.length,3);
+  assert.deepEqual(PAYLOAD_SCRIPT_FILES.map(read),legacyInline);
+  assert.equal(stripScripts(current),stripScripts(legacy));
+  assert.equal((current.match(/<script\b(?![^>]*\bsrc=)[^>]*>/gi)||[]).length,0);
+  for(const name of PAYLOAD_SCRIPT_FILES)assert.ok(current.includes('./'+name+'?v=20261006-payload-scripts-external-1'),name+' の外部script参照がありません');
+  assert.doesNotMatch(current,/cdnjs\.cloudflare\.com\/ajax\/libs\/Chart\.js\/4\.4\.1\/chart\.umd\.min\.js/);
 });
 
 test('非圧縮payload sourceは有効なInsight HTMLである',()=>{
@@ -42,15 +57,15 @@ test('主要画面が依存するDOM anchorはbase payloadに存在する',()=>{
   }
 });
 
-test('主要ナビ・入力・保存関数はbase payloadに存在する',()=>{
-  const html=basePayload();
+test('主要ナビ・入力・保存関数はpayload runtime sourceに存在する',()=>{
+  const source=payloadRuntimeSource();
   for(const name of ['renderQuickPage','saveQuick','persist','gotoNav','switchStore']){
-    assert.ok(new RegExp('function\\s+'+name+'\\s*\\(').test(html),name+' がbase payloadにありません');
+    assert.ok(new RegExp('function\\s+'+name+'\\s*\\(').test(source),name+' がpayload runtime sourceにありません');
   }
 });
 
-test('起動時の保存データ読込安全化はpayload本体に組み込まれている',()=>{
-  const html=basePayload();
+test('起動時の保存データ読込安全化はpayload runtime sourceに組み込まれている',()=>{
+  const html=payloadRuntimeSource();
   assert.match(html,/Insight stored data load failed/);
   assert.match(html,/insightStorageLoadError/);
   assert.match(html,/insightStorageLoadReason/);
@@ -64,8 +79,8 @@ test('起動時の保存データ読込安全化はpayload本体に組み込ま�
   assert.doesNotMatch(html,/function loadAll\(\)\{\n  try\{\n    const s=localStorage\.getItem\(SK\)/);
 });
 
-test('STEP5互換処理の元anchorはpayload内に残して破壊していない',()=>{
-  const html=basePayload();
+test('STEP5互換処理の元anchorはpayload runtime sourceに残して破壊していない',()=>{
+  const html=payloadRuntimeSource();
   const bootstrap=read('insight_bootstrap_patches_v1.js');
   const originalPersist='function persist(){\n  try{localStorage.setItem(SK,JSON.stringify(allStores));}catch(e){}\n}';
   const anchors=[
@@ -74,7 +89,6 @@ test('STEP5互換処理の元anchorはpayload内に残して破壊していな�
     'const wxGroups={"晴れ":["快晴","晴","晴曇"],"曇り":["曇"],"雨":["小雨","雨","大雨"],"雪":["みぞれ","雪"]};',
     originalPersist,
     'background:var(--surface);color:var(--text);box-shadow:0 6px 24px var(--shadow);',
-    '<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"\n  crossorigin="anonymous"',
     '<div class="modal-bg" id="modalBg">',
     'let yearToDelete=null;',
     'function showDeleteYear(y){yearToDelete=y;',
@@ -85,12 +99,12 @@ test('STEP5互換処理の元anchorはpayload内に残して破壊していな�
 });
 
 test('旧天気相関グループは現行画面で未使用のためbootstrap補正を不要とする',()=>{
-  const html=basePayload();
+  const html=payloadRuntimeSource();
   const bootstrap=read('insight_bootstrap_patches_v1.js');
   assert.match(html,/function getCorrData\(year,months\)/);
   assert.match(html,/const \{wdAvg\}=getCorrData\(baseYear,wdPeriod\)/);
   assert.doesNotMatch(bootstrap,/patch\("const wxGroups=/);
-  const featureFiles=fs.readdirSync(root).filter(name=>name.endsWith('.js')&&name!=='insight_bootstrap_patches_v1.js');
+  const featureFiles=fs.readdirSync(root).filter(name=>name.endsWith('.js')&&name!=='insight_bootstrap_patches_v1.js'&&!name.startsWith('insight_payload_'));
   assert.deepEqual(featureFiles.filter(name=>/getCorrData|wxAvg|wxGroups/.test(read(name))),[]);
 });
 

@@ -121,6 +121,7 @@ test('Chart.jsの安全属性はbootstrap文字列パッチではなくshellが�
   assert.doesNotMatch(source,/Chart\.js\/4\.4\.1|SRI\/referrer policy/);
   assert.match(index,/Chart\.js\/4\.4\.1\/chart\.umd\.min\.js" integrity="sha512-CQBWl4fJHWbryGE\+Pc7UAxWMUMNMWzWxF4SQo9CgkJIN1kx6djDQZjh3Y8SZ1d\+6I\+1zze6Z7kHXO7q3UyZAWw=="/);
   assert.match(index,/crossorigin="anonymous" referrerpolicy="no-referrer"/);
-  assert.match(loader,/function stripPayloadChartScript\(html\)/);
+  assert.doesNotMatch(loader,/stripPayloadChartScript/);
+  assert.doesNotMatch(fs.readFileSync(path.join(root,'insight_payload_source_v1.html'),'utf8'),/cdnjs\.cloudflare\.com\/ajax\/libs\/Chart\.js\/4\.4\.1\/chart\.umd\.min\.js/);
   assert.match(loader,/typeof Chart==='undefined'/);
 });

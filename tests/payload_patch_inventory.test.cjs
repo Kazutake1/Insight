@@ -24,23 +24,32 @@ test('Index shellはinline script/styleを持たず外部assetへ分離する',(
   const boot=read('insight_shell_boot_v1.js');
   const loader=read('insight_shell_loader_v1.js');
   const css=read('insight_shell_v1.css');
-  assert.match(index,/insight_shell_boot_v1\.js\?v=20261006-uncompressed-payload-1/);
-  assert.match(index,/insight_shell_loader_v1\.js\?v=20261006-uncompressed-payload-1/);
-  assert.match(index,/insight_shell_v1\.css\?v=20261006-uncompressed-payload-1/);
+  assert.match(index,/insight_shell_boot_v1\.js\?v=20261006-payload-scripts-external-1/);
+  assert.match(index,/insight_shell_loader_v1\.js\?v=20261006-payload-scripts-external-1/);
+  assert.match(index,/insight_shell_v1\.css\?v=20261006-payload-scripts-external-1/);
   assert.doesNotMatch(index,/<script(?![^>]*\bsrc=)[^>]*>/i);
   assert.doesNotMatch(index,/<style\b/i);
   assert.match(boot,/fetch\('\.\/Index\.html\?insight_probe='/);
   assert.match(loader,/fetch\('\.\/insight_shell_loader_v1\.js\?insight_manifest_probe='/);
   assert.match(loader,/document\.open\(\);document\.write\(html\);document\.close\(\)/);
-  assert.match(loader,/fetch\('\.\/insight_payload_source_v1\.html\?v=20261006-uncompressed-source-1'/);
+  assert.match(loader,/fetch\('\.\/insight_payload_source_v1\.html\?v=20261006-payload-scripts-external-1'/);
   assert.doesNotMatch(index+loader,/pako|insight_payload_v1_part0/);
   assert.match(css,/#loading\{/);
 });
 
+test('canonical payloadはinline scriptを持たず3つの外部payload scriptへ分離する',()=>{
+  const payload=read('insight_payload_source_v1.html');
+  assert.equal((payload.match(/<script\b(?![^>]*\bsrc=)[^>]*>/gi)||[]).length,0);
+  for(const name of ['insight_payload_chart_fallback_v1.js','insight_payload_core_v1.js','insight_payload_ai_panel_v1.js']){
+    assert.match(payload,new RegExp(name.replace(/\./g,'\\.')+'\\?v=20261006-payload-scripts-external-1'));
+    assert.doesNotThrow(()=>new vm.Script(read(name)),name+' must be valid JavaScript');
+  }
+});
+
 test('トップページはキャッシュ抑止とシェル・機能manifestの自己更新を持つ',()=>{
   const index=readShell();
-  assert.match(index,/insight-shell-version" content="20261006-uncompressed-payload-1/);
-  assert.match(index,/var BUILD="20261006-uncompressed-payload-1"/);
+  assert.match(index,/insight-shell-version" content="20261006-payload-scripts-external-1/);
+  assert.match(index,/var BUILD="20261006-payload-scripts-external-1"/);
   assert.match(index,/Shell rule: bump BUILD whenever the loader/);
   assert.match(index,/Cache-Control" content="no-cache, no-store, must-revalidate/);
   assert.match(index,/insight_probe=/);
@@ -81,20 +90,21 @@ test('天気キー拡張はruntime moduleが所有しbootstrap patch件数に含
 
 test('未使用の天気相関グループはbootstrapで書き換えない',()=>{
   const bootstrap=read('insight_bootstrap_patches_v1.js');
-  const featureFiles=fs.readdirSync(root).filter(name=>name.endsWith('.js')&&name!=='insight_bootstrap_patches_v1.js');
+  const featureFiles=fs.readdirSync(root).filter(name=>name.endsWith('.js')&&name!=='insight_bootstrap_patches_v1.js'&&!name.startsWith('insight_payload_'));
   const consumers=featureFiles.filter(name=>/getCorrData|wxAvg|wxGroups/.test(read(name)));
   assert.doesNotMatch(bootstrap,/const wxGroups=/);
   assert.deepEqual(consumers,[]);
 });
 
-test('Chart.js依存はshellでSRI付き読込しpayload内の旧タグを実行前に除去する',()=>{
+test('Chart.js依存はshellでSRI付き読込しcanonical payloadは旧タグを持たない',()=>{
   const index=readShell();
+  const payload=read('insight_payload_source_v1.html');
   const bootstrap=read('insight_bootstrap_patches_v1.js');
   assert.match(index,/https:\/\/cdnjs\.cloudflare\.com\/ajax\/libs\/Chart\.js\/4\.4\.1\/chart\.umd\.min\.js/);
   assert.match(index,/integrity="sha512-CQBWl4fJHWbryGE\+Pc7UAxWMUMNMWzWxF4SQo9CgkJIN1kx6djDQZjh3Y8SZ1d\+6I\+1zze6Z7kHXO7q3UyZAWw=="/);
   assert.match(index,/crossorigin="anonymous" referrerpolicy="no-referrer"/);
-  assert.match(index,/function stripPayloadChartScript\(html\)/);
-  assert.match(index,/html=stripPayloadChartScript\(html\)/);
+  assert.doesNotMatch(index,/stripPayloadChartScript/);
+  assert.doesNotMatch(payload,/cdnjs\.cloudflare\.com\/ajax\/libs\/Chart\.js\/4\.4\.1\/chart\.umd\.min\.js/);
   assert.match(index,/typeof Chart==='undefined'/);
   assert.doesNotMatch(bootstrap,/Chart\.js\/4\.4\.1/);
 });
@@ -854,7 +864,7 @@ test('安全・互換処理はbootstrap文字列パッチではなく各所有�
   assert.doesNotMatch(bootstrap,/Chart\.js\/4\.4\.1|integrity=|originalPersist|safePersist|yearToDelete/);
   assert.match(index,/Chart\.js\/4\.4\.1\/chart\.umd\.min\.js" integrity=/);
   assert.match(index,/referrerpolicy="no-referrer"/);
-  assert.match(index,/stripPayloadChartScript/);
+  assert.doesNotMatch(index,/stripPayloadChartScript/);
   assert.match(read('insight_dashboard_year_fix_v1.js'),/removeLegacyYearDeleteUi/);
   assert.match(index,/orderedFeatureLoads/);
 });
@@ -864,7 +874,7 @@ test('STEP5完了: bootstrap文字列patch依存は0件',()=>{
   const bootstrap=read('insight_bootstrap_patches_v1.js');
   assert.match(read('insight_persist_guard_v1.js'),/function guardedPersist\(\)/);
   assert.match(read('insight_legacy_style_compat_v1.js'),/InsightLegacyStyleCompat/);
-  assert.match(index,/function stripPayloadChartScript\(html\)/);
+  assert.doesNotMatch(index,/stripPayloadChartScript/);
   assert.match(read('insight_dashboard_year_fix_v1.js'),/removeLegacyYearDeleteUi/);
   assert.match(index,/STEP5 complete: payload source is self-contained/);
   assert.equal((bootstrap.match(/^patch\(/gm)||[]).length,0);
