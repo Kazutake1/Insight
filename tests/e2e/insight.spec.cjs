@@ -1855,6 +1855,23 @@ test('セール追加ダイアログは補足文を省きプリセット一覧�
   const eventDialog=page.locator('.ie-dialog.ie-event-add');
   await expect(eventDialog).toBeVisible();
   await expect(eventDialog.getByLabel('イベント種別')).toHaveValue('sale');
+  await eventDialog.getByLabel('開始日',{exact:true}).fill('2025-10-06');
+  await eventDialog.getByLabel('開始日',{exact:true}).blur();
+  await expect(eventDialog.getByLabel('終了日',{exact:true})).toHaveValue('2025-10-06');
+  await eventDialog.getByLabel('終了日',{exact:true}).fill('2025-10-10');
+  await eventDialog.getByLabel('開始日',{exact:true}).fill('2025-09-01');
+  await eventDialog.getByLabel('開始日',{exact:true}).blur();
+  await expect(eventDialog.getByLabel('終了日',{exact:true})).toHaveValue('2025-09-01');
+  const dateLayout=await eventDialog.locator('.ie-dates').evaluate(grid=>{
+    const inputs=Array.from(grid.querySelectorAll('input'));
+    const rects=inputs.map(input=>input.getBoundingClientRect());
+    const gridRect=grid.getBoundingClientRect();
+    return {gap:rects[1].left-rects[0].right,widthDifference:Math.abs(rects[0].width-rects[1].width),rightOverflow:rects[1].right-gridRect.right};
+  });
+  expect(dateLayout.gap).toBeGreaterThanOrEqual(9);
+  expect(dateLayout.widthDifference).toBeLessThan(1);
+  expect(dateLayout.rightOverflow).toBeLessThanOrEqual(1);
+
   await expect(eventDialog.getByText('全店舗共通・指定期間の各日に表示します。',{exact:true})).toHaveCount(0);
   await expect(eventDialog.getByText('選ぶと上記の期間で登録します。個別の条件は下で入力できます。',{exact:true})).toHaveCount(0);
   await expect(eventDialog.getByText(/同じカテゴリー内に複数の値引きパターンがある場合は/)).toHaveCount(0);
