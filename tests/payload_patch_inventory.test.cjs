@@ -43,7 +43,7 @@ test('canonical payloadはinline script/styleを持たず外部assetを順序固
   const core=read('insight_payload_core_v1.js');
   const ai=read('insight_payload_ai_legacy_v1.js');
   const css=read('insight_payload_core_v1.css');
-  assert.match(payload,/insight_payload_core_v1\.css\?v=20261006-input-weather-css-1/);
+  assert.match(payload,/insight_payload_core_v1\.css\?v=20261006-quick-date-nav-css-1/);
   assert.match(payload,/insight_payload_core_v1\.js\?v=20261006-payload-assets-1/);
   assert.match(payload,/insight_payload_ai_legacy_v1\.js\?v=20261006-payload-assets-1/);
   assert.match(payload,/insight_payload_bindings_v1\.js\?v=20261006-inline-bindings-1/);
@@ -641,10 +641,11 @@ test('年度削除は年度直結データをトランザクションで削除�
   assert.doesNotThrow(()=>new vm.Script(yearFix),'year delete UI must be valid JavaScript');
 });
 
-test('今日の入力は未登録年度の日付移動前に正式年度追加を確認する',()=>{
+test('今日の入力は未登録年度の日付移動前に正式年度追加を確認し固定スタイルは外部CSSで維持する',()=>{
   const index=readShell();
   const quick=read('insight_quick_date_nav_v1.js');
-  assert.match(index,/insight_quick_date_nav_v1\.js\?v=20261006-keep-picker-open/);
+  const css=read('insight_payload_core_v1.css');
+  assert.match(index,/insight_quick_date_nav_v1\.js\?v=20261006-csp-style-quick-date-1/);
   assert.match(quick,/function ensureRegisteredYear\(/);
   assert.match(quick,/InsightYearManager/);
   assert.match(quick,/年度を追加してこの日付を入力しますか/);
@@ -652,10 +653,13 @@ test('今日の入力は未登録年度の日付移動前に正式年度追加�
   assert.match(quick,/if\(!ensureRegisteredYear\(date\)\)return/);
   assert.match(quick,/function selectDate\(date,preserveDatePicker\)/);
   assert.match(quick,/if\(date\)selectDate\(date,true\)/);
+  assert.match(css,/#pageQuick #qNavRow\{display:flex;align-items:center;gap:7px/);
+  assert.match(css,/#pageQuick #qNavRow \.iqd-date\{position:relative;display:flex/);
+  assert.match(css,/@media\(max-width:450px\)\{#pageQuick #qNavRow\{gap:4px\}/);
+  assert.doesNotMatch(quick,/createElement\(['"]style['"]\)|style\.textContent|appendChild\(style\)/);
   assert.doesNotMatch(quick,/localStorage/);
   assert.doesNotThrow(()=>new vm.Script(quick),'quick date navigation must be valid JavaScript');
 });
-
 test('通常画面の選択年月をサイドバー切替後も全ページで維持する',()=>{
   const index=readShell();
   const pagePeriod=read('insight_page_period_sync_v1.js');
