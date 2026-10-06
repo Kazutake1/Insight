@@ -272,13 +272,15 @@ test('共通persistはruntime guardから共有Storageへ委譲する',async({pa
 test('トップページはシェルと機能manifestの最新版確認をno-storeで行う',async({page})=>{
   const errors=await openInsight(page);
   const source=await page.evaluate(()=>fetch('/Index.html?e2e-shell-check=1',{cache:'no-store'}).then(r=>r.text()));
-  expect(source).toContain('name="insight-shell-version" content="20261006-step5-wxgroups-cleanup-1"');
+  expect(source).toContain('name="insight-shell-version" content="20261006-step5-bootstrap-free-1"');
   expect(source).toContain("fetch('./Index.html?insight_probe='+Date.now(),{cache:'no-store'})");
   expect(source).toContain("fetch('./Index.html?insight_manifest_probe='+Date.now(),{cache:'no-store'})");
   expect(source).toContain('function featureSignature(entries)');
   expect(source).toContain('https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js');
   expect(source).toContain('integrity="sha512-CQBWl4fJHWbryGE+Pc7UAxWMUMNMWzWxF4SQo9CgkJIN1kx6djDQZjh3Y8SZ1d+6I+1zze6Z7kHXO7q3UyZAWw=="');
   expect(source).toContain('function stripPayloadChartScript(html)');
+  expect(source).not.toContain('insight_bootstrap_patches_v1.js');
+  expect(source).not.toContain('InsightBootstrapPatches');
   expect(await page.evaluate(()=>typeof Chart)).not.toBe('undefined');
   expect(await page.evaluate(()=>({
     fog:WX_ICONS['霧'],
