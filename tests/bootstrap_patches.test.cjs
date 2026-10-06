@@ -37,7 +37,7 @@ test('未使用の天気相関グループはbootstrap文字列パッチから�
 });
 
 test('互換パッチ対象が欠けたpayloadはsilentに続行しない',()=>{
-  assert.throws(()=>patches.apply('<!doctype html><html><body></body></html>'),/互換パッチの適用対象が見つかりません/);
+  assert.throws(()=>patches.apply('<!doctype html><html><body></body></html>'),/保存済みデータ読込の安全化に失敗しました/);
 });
 
 test('persist安全化はbootstrap文字列パッチではなくruntime guardが所有する',()=>{
