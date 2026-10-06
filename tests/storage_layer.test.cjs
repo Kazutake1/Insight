@@ -134,7 +134,7 @@ test('feature moduleはlocalStorageへ直接書き込まず共有storageを使�
 });
 
 test('runtime persist guardはStorage直後に読み込まれ共有保存層へ委譲する',()=>{
-  const index=fs.readFileSync(path.join(root,'Index.html'),'utf8');
+  const index=fs.readFileSync(path.join(root,'insight_shell_loader_v1.js'),'utf8');
   const bootstrap=fs.readFileSync(path.join(root,'insight_bootstrap_patches_v1.js'),'utf8');
   const guard=fs.readFileSync(path.join(root,'insight_persist_guard_v1.js'),'utf8');
   assert.doesNotMatch(bootstrap,/originalPersist|safePersist|InsightPersistError/);
