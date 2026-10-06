@@ -43,7 +43,7 @@ test('canonical payloadはinline script/styleを持たず外部assetを順序固
   const core=read('insight_payload_core_v1.js');
   const ai=read('insight_payload_ai_legacy_v1.js');
   const css=read('insight_payload_core_v1.css');
-  assert.match(payload,/insight_payload_core_v1\.css\?v=20261007-data-health-css-1/);
+  assert.match(payload,/insight_payload_core_v1\.css\?v=20261007-dark-theme-css-1/);
   assert.match(payload,/insight_payload_core_v1\.js\?v=20261006-payload-assets-1/);
   assert.match(payload,/insight_payload_ai_legacy_v1\.js\?v=20261006-payload-assets-1/);
   assert.match(payload,/insight_payload_bindings_v1\.js\?v=20261006-inline-bindings-1/);
@@ -527,19 +527,21 @@ test('異常説明レイヤーは曜日・セール・イベント・季節性�
   assert.doesNotThrow(()=>new vm.Script(explanation),'anomaly explanation module must be valid JavaScript');
 });
 
-test('Firefox系ダークテーマは設定モジュールの後に読み込みライトモードを変更しない',()=>{
+test('Firefox系ダークテーマは設定モジュールの後に読み込みライトモードを変更せず固定スタイルは外部CSSで維持する',()=>{
   const index=readShell();
   const theme=read('insight_dark_theme_v1.js');
-  assert.match(index,/insight_dark_theme_v1\.js\?v=20261003-firefox-dark-1/);
+  const css=read('insight_payload_core_v1.css');
+  assert.match(index,/insight_dark_theme_v1\.js\?v=20261007-csp-style-dark-theme-1/);
   assert.ok(index.indexOf('insight_settings_v1.js')<index.indexOf('insight_dark_theme_v1.js'));
   assert.match(theme,/background:'#251b26'/);
   assert.match(theme,/surface:'#2f2942'/);
   assert.match(theme,/wine:'#432325'/);
-  assert.match(theme,/\.dark\{/);
+  assert.match(css,/\.dark\{--bg:#251b26;--surface:#2f2942/);
+  assert.match(css,/\.dark \.sidebar\{background:linear-gradient\(180deg,#2f2942 0%,#251b26 100%\)\}/);
+  assert.doesNotMatch(theme,/createElement\(['"]style['"]\)|style\.textContent|appendChild\(style\)/);
   assert.doesNotMatch(theme,/localStorage|InsightStorage|\bfetch\s*\(|XMLHttpRequest|WebSocket/);
   assert.doesNotThrow(()=>new vm.Script(theme),'dark theme module must be valid JavaScript');
 });
-
 test('全分析バンドルは履歴の後・AI解釈の前に読み込み外部通信せず標準化する',()=>{
   const index=readShell();
   const bundle=read('insight_analysis_bundle_v1.js');
