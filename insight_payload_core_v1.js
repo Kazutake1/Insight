@@ -743,14 +743,14 @@ function renderQuickPage(){
   const secSales=document.createElement("div");secSales.className="quick-section";
   secSales.innerHTML=`<div class="qs-title">売上・点数</div>
     <div class="qs-field"><span class="qs-label">売上</span>
-      <div style="display:flex;align-items:center;gap:4px;">
+      <div class="qs-input-unit-row">
         <input class="qs-input" id="qi_売上" type="text" inputmode="numeric"
           value="${existingRow.売上>0?existingRow.売上.toLocaleString():""}"
           placeholder="0">
         <span class="qs-unit">千円</span>
       </div></div>
     <div class="qs-field"><span class="qs-label">買上点数</span>
-      <div style="display:flex;align-items:center;gap:4px;">
+      <div class="qs-input-unit-row">
         <input class="qs-input" id="qi_買上点数" type="number" inputmode="numeric"
           value="${existingRow.買上点数>0?existingRow.買上点数:""}"
           placeholder="0">
@@ -768,26 +768,26 @@ function renderQuickPage(){
   const secKyaku=document.createElement("div");secKyaku.className="quick-section";
   secKyaku.innerHTML=`<div class="qs-title">客数</div>
     <div class="qs-field"><span class="qs-label">客数</span>
-      <div style="display:flex;align-items:center;gap:4px;">
+      <div class="qs-input-unit-row">
         <input class="qs-input" id="qi_客数" type="number" inputmode="numeric"
           value="${existingRow.客数>0?existingRow.客数:""}"
           placeholder="0">
         <span class="qs-unit">人</span>
       </div></div>
-    <div style="font-size:10px;color:var(--text5);margin-top:4px;">
+    <div class="qs-unit-price">
       客単価: ¥${existingRow.客数>0?Math.round((existingRow.売上*1000)/existingRow.客数).toLocaleString():"-"}</div>`;
   grid.appendChild(secKyaku);
 
   // 廃棄
   const secHaiki=document.createElement("div");secHaiki.className="quick-section wide";
   let haikiFields=`<div class="qs-title">廃棄内訳（円）</div>
-    <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;">`;
+    <div class="qs-waste-grid">`;
   HAIKI_CATS.forEach(c=>{
     const hv=existingRow.haiki?.[c]||0;
-    haikiFields+=`<div class="qs-field"><span class="qs-label" style="font-size:11.5px;">${c}</span>
+    haikiFields+=`<div class="qs-field"><span class="qs-label qs-waste-label">${c}</span>
       <input class="qs-input" id="qi_h_${c}" type="text" inputmode="numeric"
         value="${hv>0?hv.toLocaleString():""}"
-        placeholder="0" style="width:90px;">
+        placeholder="0" class="qs-input qs-waste-input">
     </div>`;
   });
   haikiFields+=`</div>`;
@@ -918,15 +918,13 @@ function selectYear(y){
 function showAddYear(){
   const wrap=document.getElementById("addYearInlineWrap");if(!wrap)return;
   if(wrap.innerHTML)return;
-  wrap.innerHTML=`<span style="display:inline-flex;align-items:center;gap:5px;">
+  wrap.innerHTML=`<span class="add-year-inline">
     <input id="ayInput" type="number" placeholder="例: 2026"
-      style="width:90px;padding:5px 8px;border:1.5px solid #ddd;border-radius:8px;
-      font-size:12px;font-weight:600;color:var(--text);font-family:inherit;outline:none;text-align:center;"
+      class="add-year-input"
       onkeydown="if(event.key==='Enter')addYear(document.getElementById('ayInput').value);
                  if(event.key==='Escape')document.getElementById('addYearInlineWrap').innerHTML='';">
     <button onclick="addYear(document.getElementById('ayInput').value)"
-      style="padding:5px 10px;border-radius:8px;font-size:12px;font-weight:700;border:none;
-      cursor:pointer;font-family:inherit;background:#e8eaed;color:#444;">追加</button>
+      class="add-year-button">追加</button>
   </span>`;
   document.getElementById("ayInput")?.focus();
 }
