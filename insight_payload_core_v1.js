@@ -1221,8 +1221,8 @@ function renderLegend(){
       const div=document.createElement("div");div.className="legend-item";
       const indicator=l.type==="bar"
         ?`<div style="width:12px;height:12px;border-radius:3px;background:${l.color};"></div>`
-        :`<div style="width:18px;height:0;border-top:2px dashed #aaa;"></div>`;
-      div.innerHTML=`${indicator}<span style="color:var(--text5)">${l.label}</span>`;
+        :`<div class="legend-dashed-line"></div>`;
+      div.innerHTML=`${indicator}<span class="legend-label">${l.label}</span>`;
       row.appendChild(div);
     });
   }
@@ -1440,7 +1440,7 @@ function renderHaikiBudgetSection(actualTotal, actualCats){
     </div>`;
 
   if(!hasBudget){
-    html+=`<div style="font-size:11px;color:var(--text5);padding:8px 0;">予算未設定 — ⚙️設定から入力できます</div>`;
+    html+=`<div class="hf-budget-empty">予算未設定 — ⚙️設定から入力できます</div>`;
   }else{
     // 項目ごと
     HAIKI_CATS.forEach(c=>{
@@ -1461,9 +1461,9 @@ function renderHaikiBudgetSection(actualTotal, actualCats){
       const over=actualTotal>budget.total;
       const pct=Math.min(100,Math.round(actualTotal/budget.total*100));
       html+=`<div class="hf-budget-total-row">
-        <span class="hf-budget-label" style="font-weight:700;">合計</span>
+        <span class="hf-budget-label hf-budget-label-total">合計</span>
         <div class="hf-budget-bar-wrap"><div class="hf-budget-bar${over?" over":""}" style="width:${pct}%;"></div></div>
-        <span class="hf-budget-actual${over?" over":""}" style="font-size:14px;">¥${actualTotal.toLocaleString()}</span>
+        <span class="hf-budget-actual${over?" over":""} hf-budget-actual-total">¥${actualTotal.toLocaleString()}</span>
         <span class="hf-budget-limit">/ ¥${budget.total.toLocaleString()}</span>
       </div>`;
     }
@@ -1483,8 +1483,8 @@ function openBudgetModal(){
           value="${budget.cats[c]>0?budget.cats[c].toLocaleString():""}" placeholder="0">
         <span class="budget-edit-unit">円</span>
       </div>`).join("")+
-    `<div class="budget-edit-row" style="margin-top:4px;border-top:2px solid var(--border);padding-top:10px;border-bottom:none;">
-      <span class="budget-edit-label" style="font-weight:700;">合計上限</span>
+    `<div class="budget-edit-row budget-edit-row-total">
+      <span class="budget-edit-label budget-edit-label-total">合計上限</span>
       <input type="text" inputmode="numeric" class="budget-edit-input" id="be_total"
         value="${budget.total>0?budget.total.toLocaleString():""}" placeholder="0">
       <span class="budget-edit-unit">円</span>
