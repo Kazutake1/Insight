@@ -43,8 +43,8 @@ test('canonical payloadはinline script/styleを持たず外部assetを順序固
   const core=read('insight_payload_core_v1.js');
   const ai=read('insight_payload_ai_legacy_v1.js');
   const css=read('insight_payload_core_v1.css');
-  assert.match(payload,/insight_payload_core_v1\.css\?v=20261007-step3-backup-status-css-1/);
-  assert.match(payload,/insight_payload_core_v1\.js\?v=20261007-step3-backup-status-1/);
+  assert.match(payload,/insight_payload_core_v1\.css\?v=20261007-step3-kpi-value-state-css-2/);
+  assert.match(payload,/insight_payload_core_v1\.js\?v=20261007-step3-kpi-value-state-2/);
   assert.doesNotMatch(core,/label\.style\.color/);
   assert.match(core,/label\.classList\.remove\("backup-status-missing","backup-status-today","backup-status-recent","backup-status-stale"\)/);
   assert.match(core,/label\.classList\.add\("backup-status-missing"\)/);
@@ -239,7 +239,17 @@ test('年間サマリーは買上点数だけを表示対象から外し固定�
 test('ダッシュボードKPIカードは補助月表示を削除し年比ラベルと数値バッジを表示する',()=>{
   const index=readShell();
   const sync=read('insight_dashboard_kpi_sync_v1.js');
-  assert.match(index,/insight_dashboard_kpi_sync_v1\.js\?v=20261006-yen-suffix/);
+  const core=read('insight_payload_core_v1.js');
+  const css=read('insight_payload_core_v1.css');
+  assert.match(index,/insight_dashboard_kpi_sync_v1\.js\?v=20261007-step3-kpi-value-state-2/);
+  assert.doesNotMatch(sync,/\.style\.color/);
+  assert.match(sync,/classList\.toggle\('insight-kpi-value-normal',normalColor\)/);
+  assert.match(sync,/classList\.toggle\('insight-kpi-value-alert',!normalColor\)/);
+  assert.doesNotMatch(core,/class="kpi-value" style="color:/);
+  assert.match(core,/const valueState=yoyVal&&!yoyVal\.up&&m\.up\?" insight-kpi-value-alert":" insight-kpi-value-normal";/);
+  assert.match(core,/<div class="kpi-value\$\{valueState\}">\$\{m\.short\(avgNow\)\}<\/div>/);
+  assert.match(css,/#pageDash \.kpi-value\.insight-kpi-value-normal\{color:#1a1a1a\}/);
+  assert.match(css,/#pageDash \.kpi-value\.insight-kpi-value-alert\{color:#dc2626\}/);
   assert.match(sync,/box\.append\(badge,prev\);card\.appendChild\(box\)/);
   assert.match(sync,/prev\.textContent=String\(compareYear\)\+'年比'/);
   assert.match(sync,/function stripCardMeta\(\)/);
