@@ -81,8 +81,9 @@ test('実績一覧は同曜日通常日比較を持つ',()=>{
 test('セール実績ページは販売数入力と同じ日別カードAPIを利用し7列で折り返す',()=>{
   const source=fs.readFileSync(path.join(__dirname,'..','insight_sale_results_v1.js'),'utf8');
   const salesSource=fs.readFileSync(path.join(__dirname,'..','insight_sales_count_v1.js'),'utf8');
+  const css=fs.readFileSync(path.join(__dirname,'..','insight_payload_core_v1.css'),'utf8');
   assert.match(source,/InsightSalesCount\.createReadOnlyDayCard/);
-  assert.match(source,/grid-template-columns:repeat\(7,minmax\(0,1fr\)\)/);
+  assert.match(css,/\.sr-day-grid\{[^}]*grid-template-columns:repeat\(7,minmax\(0,1fr\)\)/);
   assert.match(source,/\.sr-day-grid>\.sc-day\{min-width:0\}/);
   assert.match(salesSource,/model\.createReadOnlyDayCard=createReadOnlyDayCard/);
   assert.match(salesSource,/class="sc-total-delivery"/);
