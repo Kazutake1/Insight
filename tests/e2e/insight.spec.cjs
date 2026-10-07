@@ -287,7 +287,7 @@ test('トップページは外部shellと機能manifestの最新版確認をno-s
   expect(source).toContain('https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js');
   expect(source).toContain('integrity="sha512-CQBWl4fJHWbryGE+Pc7UAxWMUMNMWzWxF4SQo9CgkJIN1kx6djDQZjh3Y8SZ1d+6I+1zze6Z7kHXO7q3UyZAWw=="');
   expect(loader).not.toContain('stripPayloadChartScript');
-  expect(payload).toContain('insight_payload_core_v1.css?v=20261007-readability-global-containers-css-1');
+  expect(payload).toContain('insight_payload_core_v1.css?v=20261007-step3-data-health-status-css-1');
   expect(payload).toContain('insight_payload_core_v1.js?v=20261006-payload-assets-1');
   expect(payload).toContain('insight_payload_ai_legacy_v1.js?v=20261006-payload-assets-1');
   expect(payload).toContain('insight_payload_bindings_v1.js?v=20261006-inline-bindings-1');
@@ -966,9 +966,13 @@ test('データ状態チェックは未登録年度を要確認表示し保存�
 
   const rawBefore=await page.evaluate(()=>localStorage.getItem('insight_v11'));
   await expect(page.locator('#insightDataHealthButton')).toContainText('データ状態：要確認');
+  await expect(page.locator('#insightDataHealthButton')).toHaveClass(/insight-health-status-error/);
+  expect(await page.locator('#insightDataHealthButton').evaluate(node=>getComputedStyle(node).color)).toBe('rgb(180, 35, 24)');
   await page.locator('#insightDataHealthButton').click();
   await expect(page.locator('#insightDataHealthOverlay')).toBeVisible();
   await expect(page.locator('#insightDataHealthSummary')).toContainText('要確認');
+  await expect(page.locator('#insightDataHealthSummary')).toHaveClass(/insight-health-status-error/);
+  expect(await page.locator('#insightDataHealthSummary').evaluate(node=>getComputedStyle(node).color)).toBe('rgb(180, 35, 24)');
   await expect(page.locator('#insightDataHealthIssues')).toContainText('1999年度');
   await expect(page.locator('#insightDataHealthIssues')).toContainText('正式年度一覧にない');
   const report=await page.evaluate(()=>window.InsightDataHealth.getLastReport());

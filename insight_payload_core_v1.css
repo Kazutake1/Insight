@@ -715,6 +715,8 @@ body.ai-analysis-open .ai-analysis-toggle{display:none;}
 #insightDataHealthDialog{width:min(620px,100%);max-height:82vh;overflow:auto;box-sizing:border-box;padding:20px;border-radius:16px;background:var(--surface,#fff);color:var(--text,#222);box-shadow:0 18px 60px rgba(0,0,0,.25);font:12px/1.6 -apple-system,BlinkMacSystemFont,"Noto Sans JP",sans-serif}
 #insightDataHealthDialog h2{margin:0 0 8px;font-size:18px}
 #insightDataHealthSummary{font-weight:800;margin:0 0 6px}
+#insightDataHealthButton.insight-health-status-ok,#insightDataHealthSummary.insight-health-status-ok{color:#15803d!important}
+#insightDataHealthButton.insight-health-status-error,#insightDataHealthSummary.insight-health-status-error{color:#b42318!important}
 #insightDataHealthNote{color:var(--text4,#777);margin:0 0 14px}
 #insightDataHealthIssues{display:grid;gap:8px}
 .insight-health-issue{border:1px solid var(--border,#ddd);border-radius:10px;padding:10px 12px;background:var(--surface2,#f7f7f7)}
