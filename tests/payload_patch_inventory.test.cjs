@@ -44,7 +44,7 @@ test('canonical payloadはinline script/styleを持たず外部assetを順序固
   const ai=read('insight_payload_ai_legacy_v1.js');
   const css=read('insight_payload_core_v1.css');
   assert.match(payload,/insight_payload_core_v1\.css\?v=20261007-step3-donut-mode-css-1/);
-  assert.match(payload,/insight_payload_core_v1\.js\?v=20261007-step3-install-inner-styles-1/);
+  assert.match(payload,/insight_payload_core_v1\.js\?v=20261007-step3-quick-year-inline-styles-1/);
   assert.doesNotMatch(core,/label\.style\.color/);
   assert.doesNotMatch(core,/msg\.style\.display/);
   assert.doesNotMatch(core,/badge\.style\.display/);
@@ -90,6 +90,12 @@ test('canonical payloadはinline script/styleを持たず外部assetを順序固
   assert.match(core,/class="ios-install-step-icon"/);
   assert.match(css,/\.install-banner-action\{/);
   assert.match(css,/\.ios-install-head\{/);
+  assert.match(core,/class="qs-input-unit-row"/);
+  assert.match(core,/class="qs-waste-grid"/);
+  assert.match(core,/class="add-year-inline"/);
+  assert.match(core,/class="add-year-input"/);
+  assert.match(css,/\.qs-input-unit-row\{/);
+  assert.match(css,/\.add-year-input\{/);
   assert.match(css,/#donutBtnAmt\.active,#donutBtnPct\.active\{background:#1a1a1a;color:#fff;\}/);
   assert.match(core,/msg\.classList\.add\("is-visible"\)/);
   assert.match(core,/msg\.classList\.remove\("is-visible"\)/);
