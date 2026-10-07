@@ -1031,11 +1031,12 @@ function renderKPI(aNow,aPrev){
     const avgPrev=aPrev?.avg?.[m.key]??aPrev?.[m.key];
     const yoyVal=aPrev?yoy(avgNow,avgPrev):null;
     const card=document.createElement("div");card.className=`kpi-card${iS1?" sel1":iS2?" sel2":""}`;
+    const valueState=yoyVal&&!yoyVal.up&&m.up?" insight-kpi-value-alert":" insight-kpi-value-normal";
     card.dataset.key=m.key;
     card.onclick=()=>toggleMetric(m.key);
     card.innerHTML=`<div class="kpi-dot"></div>
       <div class="kpi-label">${m.label} <span style="font-weight:500;font-size:8.5px;color:var(--text5);">${selMonth} 1日平均</span></div>
-      <div class="kpi-value" style="color:${yoyVal&&!yoyVal.up&&m.up?'#dc2626':'#1a1a1a'}">${m.short(avgNow)}</div>
+      <div class="kpi-value${valueState}">${m.short(avgNow)}</div>
       ${yoyVal?`<div class="kpi-yoy"><span class="kpi-badge ${m.key==='廃棄金額'?(yoyVal.up?'dn':'up'):(yoyVal.up?'up':'dn')}">${yoyVal.up?"▲":"▼"} ${yoyVal.str}</span>
         <span class="kpi-prev">${cmpYear}年比</span></div>`:""}`;
     row.appendChild(card);
