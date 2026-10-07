@@ -860,3 +860,8 @@ html.dark body,body.dark{background:#251b26}
 
 /* STEP3-2: finite event target visibility state. */
 .ie-sale-target-body.ie-sale-target-body-hidden{display:none}
+
+/* STEP3-4: backup age status uses finite state classes instead of inline colors. */
+#backupDaysLabel.backup-status-missing,#backupDaysLabel.backup-status-stale{color:#dc2626}
+#backupDaysLabel.backup-status-today{color:#15803d}
+#backupDaysLabel.backup-status-recent{color:#888}
