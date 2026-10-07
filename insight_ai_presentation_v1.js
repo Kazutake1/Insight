@@ -312,73 +312,6 @@
     backdrop.setAttribute('aria-hidden','true');
   }
 
-  function ensurePresentationStyle(){
-    if(document.getElementById('insightAiPresentationStyle'))return;
-    var style=document.createElement('style');
-    style.id='insightAiPresentationStyle';
-    style.textContent=[
-      'body.ai-analysis-open #main{margin-right:0!important}',
-      '.ai-analysis-backdrop{display:none!important}',
-      '.ai-analysis-panel.ai-analysis-workspace{position:fixed!important;left:var(--ai-workspace-left,12px)!important;right:12px!important;top:var(--ai-workspace-top,12px)!important;bottom:0!important;width:auto!important;max-width:none!important;height:auto!important;padding:0!important;overflow:hidden!important;background:#f4f6f8!important;color:#172235!important;--surface:#f4f6f8;--surface2:#fff;--border:#dfe4ea;--text:#172235;--text2:#344054;--text3:#667085;--text4:#8b95a5;--navy:#16283f;--danger:#b42318;--success:#397a56;border:1px solid #d9dee5!important;border-radius:18px!important;box-shadow:0 18px 54px rgba(18,31,49,.18)!important;z-index:10001!important}',
-      '.ai-workspace-header{height:68px;box-sizing:border-box;display:grid;grid-template-columns:minmax(180px,1fr) auto minmax(44px,1fr);align-items:center;gap:18px;padding:0 20px;border-bottom:1px solid var(--border);background:#fff}',
-      '.ai-workspace-brand{min-width:0;display:grid;align-content:center;gap:2px}',
-      '.ai-workspace-title{font-size:20px;line-height:1.1;font-weight:800;color:var(--navy);letter-spacing:.01em}',
-      '.ai-workspace-period-label{display:none!important}',
-      '.ai-workspace-target-label{margin:0;font-size:10px;line-height:1.25;font-weight:800;color:var(--navy);white-space:nowrap}',
-      '.ai-workspace-target-label[hidden]{display:none!important}',
-      '.ai-workspace-period-tabs{display:flex;align-items:center;gap:4px;padding:4px;border:1px solid var(--border);border-radius:10px;background:#f7f8fa}',
-      '.ai-workspace-period-btn{border:0;border-radius:7px;background:transparent;color:var(--text3);padding:7px 14px;font:700 11px/1 -apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;cursor:default}',
-      '.ai-workspace-period-btn.active{background:var(--navy);color:#fff}',
-      '.ai-workspace-period-btn:disabled{opacity:.38}',
-      '.ai-workspace-close{justify-self:end;width:34px;height:34px;border:1px solid var(--border);border-radius:9px;background:#fff;color:var(--text2);font-size:23px;line-height:1;cursor:pointer}',
-      '.ai-workspace-grid{height:calc(100% - 68px);display:grid;grid-template-columns:minmax(0,3fr) minmax(0,2fr);gap:0;min-height:0}',
-      '.ai-workspace-right{min-width:0;overflow:auto;background:#fff;padding:18px 14px;border-left:1px solid var(--border)}',
-      '.ai-workspace-side-title{margin:0 8px 10px;font-size:10px;line-height:1.2;font-weight:800;letter-spacing:.08em;color:var(--text4)}',
-      '.ai-workspace-main{position:relative;min-width:0;overflow:auto;padding:20px 22px 88px;background:#f4f6f8}',
-      '.ai-workspace-section-head{display:flex;justify-content:space-between;align-items:flex-end;gap:12px;margin:0 0 12px}',
-      '.ai-workspace-section-title{font-size:16px;font-weight:800;color:var(--navy)}',
-      '.ai-workspace-section-hint{font-size:9px;color:var(--text4)}',
-      '.ai-analysis-workspace .ai-analysis-card{box-sizing:border-box;margin:0 0 12px;padding:14px 15px;border:1px solid var(--border)!important;border-radius:12px!important;background:#fff!important;box-shadow:none!important;color:var(--text)!important}',
-      '.ai-analysis-workspace .ai-analysis-card-title{margin:0 0 9px;font-size:11px!important;line-height:1.2;font-weight:800!important;color:var(--text3)!important}',
-      '.ai-analysis-workspace .ai-analysis-comment,.ai-analysis-workspace .ai-analysis-empty{margin:5px 0!important;font-size:12px!important;line-height:1.55!important;color:var(--text2)!important}',
-      '.ai-insight-list{display:grid;gap:8px}.ai-insight-list.is-summary{grid-template-columns:repeat(2,minmax(0,1fr))}.ai-insight-list.is-side{grid-template-columns:1fr}',
-      '.ai-insight-item{min-width:0;border:1px solid var(--border);border-left:3px solid var(--navy);border-radius:10px;background:#fff;padding:10px 11px}.ai-insight-item.is-primary{grid-column:1/-1;padding:12px 13px}.ai-insight-item.is-danger{border-left-color:var(--danger)}.ai-insight-item.is-success{border-left-color:var(--success)}',
-      '.ai-insight-head{display:flex;align-items:center;justify-content:space-between;gap:8px}.ai-insight-title{min-width:0;font-size:11px;line-height:1.35;font-weight:800;color:var(--text2)}.ai-insight-state{flex:0 0 auto;border:1px solid var(--border);border-radius:999px;padding:2px 6px;font-size:9px;line-height:1.2;font-weight:800;color:var(--text3);background:#fff}',
-      '.ai-insight-value{margin-top:6px;font-size:21px;line-height:1;font-weight:850;letter-spacing:-.02em;color:var(--navy)}.ai-insight-item.is-danger .ai-insight-value{color:var(--danger)}.ai-insight-item.is-success .ai-insight-value{color:var(--success)}',
-      '.ai-insight-detail:first-child{margin-top:0}.ai-insight-detail{margin-top:6px;font-size:11px;line-height:1.5;color:var(--text3);overflow-wrap:anywhere}.ai-insight-item.is-primary .ai-insight-title{font-size:12px}.ai-insight-item.is-primary .ai-insight-detail{font-size:12px;color:var(--text2)}',
-      '.ai-check-list{display:grid;gap:7px}.ai-check-line{display:grid;grid-template-columns:10px minmax(0,1fr);gap:5px;align-items:start}.ai-check-dot{color:var(--navy);font-weight:900;line-height:1.45}.ai-check-text{font-size:10.5px;line-height:1.5;color:var(--text3)}',
-      '.ai-sales-count-visual{display:grid;gap:14px}.ai-sales-count-block{min-width:0}.ai-sales-count-block-title{margin:0 0 7px;font-size:11px;line-height:1.3;font-weight:800;color:var(--text3)}',
-      '.ai-sales-count-overall{display:grid;grid-template-columns:minmax(165px,220px);gap:9px;overflow:auto;padding-bottom:2px}.ai-sales-count-weekdays{margin:0!important;padding-bottom:2px}.ai-sales-count-extra{margin-top:2px}',
-      '.ai-workspace-status-card{padding-left:14px!important}.ai-workspace-status-card:before{display:none!important}',
-      '.ai-history-toolbar[hidden]{display:none!important}',
-      '.ai-history-toolbar{display:flex;align-items:flex-start;gap:10px;margin:0 0 12px;padding:10px 12px;border:1px solid var(--border);border-radius:12px;background:#fff}',
-      '.ai-history-modes{display:flex;flex:0 0 auto;gap:3px;padding:3px;border:1px solid var(--border);border-radius:9px;background:#f7f8fa}',
-      '.ai-history-mode-btn{border:0;border-radius:6px;background:transparent;color:var(--text3);padding:7px 10px;font:800 10px/1 -apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;cursor:pointer}',
-      '.ai-history-mode-btn.active{background:var(--navy);color:#fff}',
-      '.ai-history-period-list{display:flex;flex:1;gap:6px;overflow:auto;padding-bottom:2px;scrollbar-width:thin}',
-      '.ai-history-period-btn{flex:0 0 auto;border:1px solid var(--border);border-radius:8px;background:#fff;color:var(--text2);padding:7px 10px;font:700 10px/1.2 -apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;cursor:pointer;white-space:nowrap}',
-      '.ai-history-period-btn.active{border-color:var(--navy);background:#edf1f5;color:var(--navy)}',
-      '.ai-workspace-summary-card{min-height:126px}',
-      '.ai-workspace-status-card{position:relative;padding-left:16px!important}',
-      '.ai-workspace-status-card:before{content:"";position:absolute;left:0;top:10px;bottom:10px;width:3px;border-radius:0 3px 3px 0;background:#9aa4b2}',
-      '.ai-workspace-status-card.is-caution:before{background:var(--danger)}',
-      '.ai-workspace-status-card.is-good:before{background:var(--success)}',
-      '.ai-workspace-status-card.is-check:before{background:var(--navy)}',
-      '.ai-workspace-question-dock{position:absolute;left:22px;right:22px;bottom:14px;margin:0!important;z-index:3;padding:10px 12px!important;box-shadow:0 8px 24px rgba(18,31,49,.08)!important}',
-      '.ai-workspace-question-dock>.ai-analysis-card-title{display:none}',
-      '.ai-analysis-question-row{display:flex;gap:8px;align-items:flex-end}',
-      '.ai-analysis-question-input{flex:1;min-width:0;height:38px;min-height:38px;max-height:76px;resize:none;border:1px solid var(--border);border-radius:9px;background:#f8f9fb;color:var(--text);padding:9px 10px;font:500 12px/1.45 -apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;box-sizing:border-box;outline:none}',
-      '.ai-analysis-question-input:focus{border-color:#9aa4b2;background:#fff}',
-      '.ai-analysis-question-send{height:38px;flex:0 0 auto;border:0;border-radius:9px;background:var(--navy);color:#fff;padding:0 15px;font:800 11px/1 -apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;cursor:pointer}',
-      '.ai-analysis-question-answer{margin-top:9px;padding:9px 10px;border-radius:9px;background:#f8f9fb;border:1px solid var(--border);font-size:11px;line-height:1.55;color:var(--text2);white-space:pre-wrap;max-height:126px;overflow:auto}',
-      '.ai-analysis-question-help{display:none}',
-      '@media(max-width:1180px){.ai-workspace-grid{grid-template-columns:minmax(0,3fr) minmax(0,2fr)}.ai-workspace-main{padding-left:16px;padding-right:16px}.ai-workspace-question-dock{left:16px;right:16px}.ai-workspace-period-btn{padding-left:10px;padding-right:10px}}',
-      '@media(max-width:920px){.ai-analysis-panel.ai-analysis-workspace{left:8px!important;right:8px!important;top:var(--ai-workspace-top,8px)!important;bottom:0!important}.ai-workspace-grid{grid-template-columns:minmax(0,3fr) minmax(0,2fr)}.ai-workspace-header{padding:0 14px;gap:10px}.ai-workspace-period-btn{padding:7px 8px}.ai-workspace-section-hint{display:none}.ai-history-toolbar{gap:7px;padding:8px}.ai-history-mode-btn,.ai-history-period-btn{padding:6px 8px}}',
-      '@media(max-width:920px){.ai-insight-list.is-summary{grid-template-columns:1fr}.ai-insight-item.is-primary{grid-column:auto}.ai-insight-value{font-size:19px}}'
-    ].join('');
-    document.head.appendChild(style);
-  }
-
   function conciseEnding(text){
     return String(text||'')
       .replace(/で低下しています。$/,'（低下）')
@@ -422,7 +355,6 @@
 
   ensureAnalysisDom();
   ensureBackdrop();
-  ensurePresentationStyle();
   ensureWorkspace();
 
   var backdropObserver=new MutationObserver(function(){
