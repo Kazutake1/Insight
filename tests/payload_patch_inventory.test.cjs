@@ -44,7 +44,7 @@ test('canonical payloadはinline script/styleを持たず外部assetを順序固
   const ai=read('insight_payload_ai_legacy_v1.js');
   const css=read('insight_payload_core_v1.css');
   assert.match(payload,/insight_payload_core_v1\.css\?v=20261007-step3-donut-mode-css-1/);
-  assert.match(payload,/insight_payload_core_v1\.js\?v=20261007-step4-theme-toast-1/);
+  assert.match(payload,/insight_payload_core_v1\.js\?v=20261007-step4-budget-static-colors-1/);
   assert.doesNotMatch(core,/label\.style\.color/);
   assert.doesNotMatch(core,/msg\.style\.display/);
   assert.doesNotMatch(core,/badge\.style\.display/);
@@ -113,8 +113,8 @@ test('canonical payloadはinline script/styleを持たず外部assetを順序固
   assert.match(core,/sales-reference-total/);
   assert.match(css,/\.sales-weather-btn\.active\{/);
   assert.match(css,/\.sales-yen-note\{/);
-  assert.match(core,/function applyDynamicColors\(root\)/);
-  assert.match(core,/data-color="\$\{HAIKI_COLORS\[i\]\}"/);
+  assert.doesNotMatch(core,/function applyDynamicColors\(root\)/);
+  assert.doesNotMatch(core,/data-color=/);
   assert.match(core,/sum-yoy \$\{\(m\.up\?yoyVal\.up:!yoyVal\.up\)\?"positive":"negative"\}/);
   assert.match(css,/\.sum-yoy\.positive\{/);
   assert.match(css,/\.sum-yoy\.negative\{/);
@@ -126,6 +126,13 @@ test('canonical payloadはinline script/styleを持たず外部assetを順序固
   assert.match(css,/\.app-toast-danger\{/);
   assert.match(css,/\.app-toast-success\{/);
   assert.match(css,/\.app-toast-info\{/);
+  assert.doesNotMatch(core,/\.style\b/);
+  assert.doesNotMatch(core,/style="/);
+  assert.ok(core.includes('<progress class="hf-budget-bar${over?" over":""}" value="${pct}" max="100"></progress>'));
+  assert.match(core,/donut-dot donut-color-\$\{i\}/);
+  assert.match(css,/\.donut-color-0\{/);
+  assert.match(css,/\.legend-sales-bar\{/);
+  assert.match(css,/\.hf-budget-bar::\-webkit-progress-value\{/);
   assert.match(css,/#donutBtnAmt\.active,#donutBtnPct\.active\{background:#1a1a1a;color:#fff;\}/);
   assert.match(core,/msg\.classList\.add\("is-visible"\)/);
   assert.match(core,/msg\.classList\.remove\("is-visible"\)/);
