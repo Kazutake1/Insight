@@ -230,6 +230,7 @@ test('年間サマリーは買上点数だけを表示対象から外し固定�
 test('ダッシュボードKPIカードは補助月表示を削除し年比ラベルと数値バッジを表示する',()=>{
   const index=readShell();
   const sync=read('insight_dashboard_kpi_sync_v1.js');
+  const css=read('insight_payload_core_v1.css');
   assert.match(index,/insight_dashboard_kpi_sync_v1\.js\?v=20261007-step3-kpi-value-state-1/);
   assert.doesNotMatch(sync,/\.style\.color/);
   assert.match(sync,/classList\.toggle\('insight-kpi-value-normal',normalColor\)/);
