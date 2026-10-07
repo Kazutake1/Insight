@@ -129,7 +129,7 @@ test('canonical payloadはinline script/styleを持たず外部assetを順序固
   assert.doesNotMatch(core,/\.style\b/);
   assert.doesNotMatch(core,/style="/);
   assert.doesNotMatch(core,/data-color=/);
-  assert.match(core,/<progress class="hf-budget-bar\$\{over\?" over":""\}" value="\$\{pct\}" max="100"><\\/progress>/);
+  assert.ok(core.includes('<progress class="hf-budget-bar${over?" over":""}" value="${pct}" max="100"></progress>'));
   assert.match(core,/donut-dot donut-color-\$\{i\}/);
   assert.match(css,/\.donut-color-0\{/);
   assert.match(css,/\.legend-sales-bar\{/);
