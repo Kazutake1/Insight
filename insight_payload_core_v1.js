@@ -1821,7 +1821,7 @@ function setSalesWeather(ri,wx){
   // ボタンのハイライト更新
   WX_KEYS.forEach(w=>{
     const btn=document.getElementById(`swx_${ri}_${w}`);
-    if(btn){btn.style.borderColor=w===wx?"#1a1a1a":"transparent";btn.style.background=w===wx?"#f8f8f8":"#fff";}
+    if(btn)btn.classList.toggle("active",w===wx);
   });
   // 日付リストのアイコン更新
   const btnEl=document.querySelector(`#salesDayList .haiki-day-btn:nth-child(${ri+1})`);
