@@ -55,10 +55,12 @@ test('persist安全化はbootstrap文字列パッチではなくruntime guardが
 test('年度削除の旧UI除去はbootstrap文字列置換ではなくyear-fix moduleが所有する',()=>{
   const bootstrap=fs.readFileSync(path.join(root,'insight_bootstrap_patches_v1.js'),'utf8');
   const yearFix=fs.readFileSync(path.join(root,'insight_dashboard_year_fix_v1.js'),'utf8');
+  const css=fs.readFileSync(path.join(root,'insight_payload_core_v1.css'),'utf8');
   assert.doesNotMatch(bootstrap,/suppress the legacy year-delete UI/);
   assert.doesNotMatch(bootstrap,/patch\("let yearToDelete=null;/);
   assert.match(yearFix,/function removeLegacyYearDeleteUi\(\)/);
-  assert.match(yearFix,/#modalBg,\.btn-del-year\{display:none!important\}/);
+  assert.match(css,/#modalBg,\.btn-del-year\{display:none!important\}/);
+  assert.doesNotMatch(yearFix,/createElement\(['"]style['"]\)|\.style\.|cssText/);
 });
 
 test('旧コア配色補正は外部CSSが所有しruntime CSSOM mutationを使わない',()=>{
