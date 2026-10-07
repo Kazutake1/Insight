@@ -610,7 +610,7 @@ body.ai-analysis-open .ai-analysis-toggle{display:none;}
 }
 
 /* ══ Canonical payload static presentation hooks ══ */
-#storeMenu,#restoreFile,#csvImportFile,#donutDayPicker{display:none;}
+#storeMenu,#restoreFile,#csvImportFile,#donutDayPicker{display:none;}\n#donutDayPicker.is-visible{display:block;}
 #storeMenu.is-open{display:block;}
 #autoWxBtn{
   padding:4px 10px;border-radius:8px;border:1.5px solid #ddd;background:#fff;color:#333;
