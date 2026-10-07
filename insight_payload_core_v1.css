@@ -931,3 +931,9 @@ html.dark body,body.dark{background:#251b26}
 .sales-yen-note{font-size:10px;color:#bbb;padding:3px 0 8px;text-align:right;}
 .sales-reference-total{background:#f0fdf4;}
 .sales-reference-total-value{color:#166534;}
+
+.donut-dot,.legend-color-box,.legend-line{background:var(--dynamic-color);}
+.legend-color-box{width:12px;height:12px;border-radius:3px;}
+.legend-line{width:18px;height:2.5px;border-radius:2px;}
+.sum-yoy.positive{color:#16a34a;}
+.sum-yoy.negative{color:#dc2626;}
