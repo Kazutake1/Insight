@@ -489,43 +489,38 @@ test('STEP17の文字階層をダッシュボード・入力・販売数・分�
   await expect(page.locator('#pageSales #issRow .iss-card')).toBeVisible();
   const salesType=await page.evaluate(()=>{
     const table=document.querySelector('#pageSales .table-card');
+    const control=table&&table.querySelector('input,select,button');
     return {
       title:getComputedStyle(document.querySelector('#pageSales #issRow .iss-title')).fontSize,
       label:getComputedStyle(document.querySelector('#pageSales #issRow .iss-stat')).fontSize,
       value:getComputedStyle(document.querySelector('#pageSales #issRow .iss-stat strong')).fontSize,
       note:getComputedStyle(document.querySelector('#pageSales #issRow .iss-note')).fontSize,
       dailyAverage:getComputedStyle(document.querySelector('#pageSales #issDailyAverage')).fontSize,
-      dailyAverage:getComputedStyle(document.querySelector('#pageKyaku #ikyDailyAverage')).fontSize
+      table:table?getComputedStyle(table).fontSize:null,
+      control:control?getComputedStyle(control).fontSize:null
     };
   });
   expect(salesType).toEqual({title:'15px',label:'13px',value:'20px',note:'12px',dailyAverage:'12.5px',table:'13px',control:'13px'});
 
   await page.locator('#nav3').click();
   await expect(page.locator('#pageKyaku #ikyRow .iky-card')).toBeVisible();
-  const customerType=await page.evaluate(()=>{
-    return {
-      title:getComputedStyle(document.querySelector('#pageKyaku #ikyRow .iky-title')).fontSize,
-      label:getComputedStyle(document.querySelector('#pageKyaku #ikyRow .iky-stat')).fontSize,
-      value:getComputedStyle(document.querySelector('#pageKyaku #ikyRow .iky-stat strong')).fontSize,
-      note:getComputedStyle(document.querySelector('#pageKyaku #ikyRow .iky-note')).fontSize,
-      dailyAverage:getComputedStyle(document.querySelector('#pageKyaku #ikyDailyAverage')).fontSize,
-      control:control?getComputedStyle(control).fontSize:null
-    };
-  });
+  const customerType=await page.evaluate(()=>({
+    title:getComputedStyle(document.querySelector('#pageKyaku #ikyRow .iky-title')).fontSize,
+    label:getComputedStyle(document.querySelector('#pageKyaku #ikyRow .iky-stat')).fontSize,
+    value:getComputedStyle(document.querySelector('#pageKyaku #ikyRow .iky-stat strong')).fontSize,
+    note:getComputedStyle(document.querySelector('#pageKyaku #ikyRow .iky-note')).fontSize,
+    dailyAverage:getComputedStyle(document.querySelector('#pageKyaku #ikyDailyAverage')).fontSize
+  }));
   expect(customerType).toEqual({title:'15px',label:'13px',value:'20px',note:'12px',dailyAverage:'12.5px'});
 
   await page.locator('#nav4').click();
   await expect(page.locator('#iwcRow .iwc-card')).toHaveCount(2);
-  const wasteType=await page.evaluate(()=>{
-    const control=table&&table.querySelector('input,select,button');
-    return {
-      title:getComputedStyle(document.querySelector('#iwcRow .iwc-title')).fontSize,
-      kpiLabel:getComputedStyle(document.querySelector('#iwcRow .iwc-kpi-label')).fontSize,
-      kpiValue:getComputedStyle(document.querySelector('#iwcRow .iwc-kpi-value')).fontSize,
-      table:getComputedStyle(table).fontSize,
-      cards:Array.from(document.querySelectorAll('#iwcRow .iwc-card')).map(card=>({client:card.clientHeight,scroll:card.scrollHeight}))
-    };
-  });
+  const wasteType=await page.evaluate(()=>({
+    title:getComputedStyle(document.querySelector('#iwcRow .iwc-title')).fontSize,
+    kpiLabel:getComputedStyle(document.querySelector('#iwcRow .iwc-kpi-label')).fontSize,
+    kpiValue:getComputedStyle(document.querySelector('#iwcRow .iwc-kpi-value')).fontSize,
+    cards:Array.from(document.querySelectorAll('#iwcRow .iwc-card')).map(card=>({client:card.clientHeight,scroll:card.scrollHeight}))
+  }));
   expect(wasteType.title).toBe('14px');
   expect(wasteType.kpiLabel).toBe('11.5px');
   expect(wasteType.kpiValue).toBe('16px');
