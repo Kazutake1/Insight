@@ -901,3 +901,12 @@ html.dark body,body.dark{background:#251b26}
 .ios-install-step-icon{text-align:center;background:rgba(255,255,255,0.1);border-radius:10px;padding:8px 12px;font-size:20px;}
 .ios-install-step-label{font-size:11px;color:rgba(255,255,255,0.5);}
 .ios-install-arrow{font-size:20px;}
+
+.qs-input-unit-row{display:flex;align-items:center;gap:4px;}
+.qs-unit-price{font-size:10px;color:var(--text5);margin-top:4px;}
+.qs-waste-grid{display:grid;grid-template-columns:1fr 1fr;gap:8px;}
+.qs-waste-label{font-size:11.5px;}
+.qs-waste-input{width:90px;}
+.add-year-inline{display:inline-flex;align-items:center;gap:5px;}
+.add-year-input{width:90px;padding:5px 8px;border:1.5px solid #ddd;border-radius:8px;font-size:12px;font-weight:600;color:var(--text);font-family:inherit;outline:none;text-align:center;}
+.add-year-button{padding:5px 10px;border-radius:8px;font-size:12px;font-weight:700;border:none;cursor:pointer;font-family:inherit;background:#e8eaed;color:#444;}
