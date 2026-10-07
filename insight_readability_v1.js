@@ -73,7 +73,10 @@
     '.hourly-input-group h3{font-size:13px!important}',
     '.hourly-input-group label span{font-size:13px!important}',
     '.hourly-input-group input{font-size:14px!important}',
-    '.hourly-dialog-summary{font-size:14px!important}'
+    '.hourly-dialog-summary{font-size:14px!important}',
+
+    '.ai-analysis-workspace .ai-analysis-card-title{font-size:13px!important}',
+    '.ai-analysis-workspace .ai-analysis-comment,.ai-analysis-workspace .ai-analysis-empty{font-size:14px!important;line-height:1.6!important}'
   ].join('');
   doc.head.appendChild(style);
   if(root.InsightPageTitleLayout&&typeof root.InsightPageTitleLayout.alignAll==='function')root.InsightPageTitleLayout.alignAll();
