@@ -2278,7 +2278,7 @@ function saveInput(type){
   persist();updateMissingBadge();
   const msgId={sales:"savedSales",kyaku:"savedKyaku",haiki:"savedHaiki"}[type];
   const msg=document.getElementById(msgId);
-  if(msg){msg.style.display="flex";setTimeout(()=>msg.style.display="none",3000);}
+  if(msg){msg.classList.add("is-visible");setTimeout(()=>msg.classList.remove("is-visible"),3000);}
 }
 
 function clearDayData(type){
