@@ -75,7 +75,11 @@
       var ch=c.comparison?c.comparison[cfg.field]:null;
       var display=pctText(ch);
       replaceBadge(card,display,cfg.goodUp,c.compare);
-      if(valueEl&&display)valueEl.style.color=(display.up||!cfg.goodUp)?'#1a1a1a':'#dc2626';
+      if(valueEl&&display){
+        var normalColor=display.up||!cfg.goodUp;
+        valueEl.classList.toggle('insight-kpi-value-normal',normalColor);
+        valueEl.classList.toggle('insight-kpi-value-alert',!normalColor);
+      }
     });
   }
 

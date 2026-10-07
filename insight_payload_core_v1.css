@@ -865,3 +865,7 @@ html.dark body,body.dark{background:#251b26}
 #backupDaysLabel.backup-status-missing,#backupDaysLabel.backup-status-stale{color:#dc2626}
 #backupDaysLabel.backup-status-today{color:#15803d}
 #backupDaysLabel.backup-status-recent{color:#888}
+
+/* STEP3-5: finite dashboard KPI value color state. */
+#pageDash .kpi-value.insight-kpi-value-normal{color:#1a1a1a}
+#pageDash .kpi-value.insight-kpi-value-alert{color:#dc2626}
