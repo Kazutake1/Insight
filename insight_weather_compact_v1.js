@@ -7,27 +7,6 @@
   var ORDER=['快晴','晴','晴曇','曇','小雨','雨','大雨','みぞれ','雪','霧','凍雨','雷雨'];
   var ICONS={快晴:'☀️',晴:'🌤️',晴曇:'⛅',曇:'☁️',小雨:'🌦️',雨:'🌧️',大雨:'⛈️',みぞれ:'🌨️',雪:'❄️',霧:'🌫️',凍雨:'🧊',雷雨:'🌩️'};
 
-  function ensureStyle(){
-    if(document.getElementById('insightWeatherCompactV1Style'))return;
-    var style=document.createElement('style');
-    style.id='insightWeatherCompactV1Style';
-    style.textContent=[
-      '#qWeatherSel{display:none!important}',
-      '.quick-weather-compact{position:relative;flex:0 0 auto}',
-      '.qwc-trigger{height:36px;display:inline-flex;align-items:center;gap:5px;padding:0 10px;border:1.5px solid var(--border,#ddd);border-radius:9px;background:var(--surface,#fff);color:var(--text,#1a1a1a);font:700 11px/1 -apple-system,BlinkMacSystemFont,"Noto Sans JP",sans-serif;cursor:pointer;white-space:nowrap}',
-      '.qwc-trigger .qwc-icon{font-size:18px;line-height:1}',
-      '.qwc-trigger .qwc-arrow{font-size:9px;color:var(--text4,#999);margin-left:1px}',
-      '.qwc-menu{position:absolute;z-index:1200;top:calc(100% + 6px);left:0;width:228px;box-sizing:border-box;padding:8px;display:grid;grid-template-columns:repeat(3,1fr);gap:6px;border:1px solid var(--border,#ddd);border-radius:12px;background:var(--surface,#fff);box-shadow:0 10px 30px rgba(0,0,0,.16)}',
-      '.qwc-menu[hidden]{display:none!important}',
-      '.qwc-option{min-height:48px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:3px;border:1px solid var(--border,#e5e7eb);border-radius:9px;background:var(--input-bg,#fff);color:var(--text2,#444);font:700 10px/1.2 -apple-system,BlinkMacSystemFont,"Noto Sans JP",sans-serif;cursor:pointer}',
-      '.qwc-option .qwc-option-icon{font-size:20px;line-height:1}',
-      '.qwc-option.active{border-color:var(--text,#1a1a1a);background:rgba(128,128,128,.08);color:var(--text,#1a1a1a)}',
-      '@media(min-width:760px){.quick-date-bar{flex-wrap:nowrap}.quick-weather-compact{order:0}#qTemperatureInputs{order:0}#autoWxBtn{flex:0 0 auto}.quick-nav-row{flex:0 0 auto}}',
-      '@media(max-width:759px){.qwc-menu{left:auto;right:0}.qwc-trigger{height:34px;padding:0 9px}}'
-    ].join('');
-    document.head.appendChild(style);
-  }
-
   function selectedWeather(){
     var active=document.querySelector('#qWeatherSel .wx-btn.active');
     if(active&&active.dataset&&active.dataset.wx)return active.dataset.wx;
@@ -67,7 +46,6 @@
   }
 
   function ensureControl(){
-    ensureStyle();
     var weather=document.getElementById('qWeatherSel');
     if(!weather)return;
     var wrap=document.getElementById('qWeatherCompact');
