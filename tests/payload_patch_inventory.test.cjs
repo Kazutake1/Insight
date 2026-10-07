@@ -408,8 +408,8 @@ test('STEP17の可読性CSSは独立moduleで主要ページへ横展開する',
   assert.match(css,/\.hourly-quick-status\{font-size:12\.5px!important;line-height:1\.4\}/);
   assert.match(css,/\.hourly-input-group input\{font-size:14px!important\}/);
   assert.match(css,/#pageSettings \.insight-settings-section h2\{font-size:17px!important/);
-  assert.match(readability,/\.ai-analysis-workspace \.ai-analysis-card-title\{font-size:13px!important/);
-  assert.match(readability,/\.ai-analysis-workspace \.ai-analysis-comment,\.ai-analysis-workspace \.ai-analysis-empty\{font-size:14px!important;line-height:1\.6!important/);
+  assert.match(css,/\.ai-analysis-workspace \.ai-analysis-card-title\{font-size:13px!important/);
+  assert.match(css,/\.ai-analysis-workspace \.ai-analysis-comment,\.ai-analysis-workspace \.ai-analysis-empty\{font-size:14px!important;line-height:1\.6!important/);
   assert.doesNotMatch(readability,/#pageSettings \.insight-settings-section|\.ai-workspace-|\.ai-insight-|\.ai-check-text|\.ai-sales-count-block-title|\.ai-history-mode-btn|\.ai-analysis-question-/);
   assert.match(css,/#pageSettings \.insight-settings-actions \.sidebar-btn,#pageSettings #insightDataHealthButton\{font-size:14px!important;line-height:1\.4!important\}/);
   assert.match(css,/\.ai-analysis-question-answer\{font-size:13px!important;line-height:1\.6!important\}/);
@@ -443,7 +443,7 @@ test('分析AI内の重複サイドバーを廃止し本体ナビへ統合する
   assert.doesNotMatch(presentation,/\.ai-workspace-left\{/);
   assert.doesNotMatch(presentation,/createNavButton/);
   assert.doesNotMatch(presentation,/ai-workspace-nav-btn/);
-  assert.match(presentation,/grid-template-columns:minmax\(0,3fr\) minmax\(0,2fr\)/);
+  assert.match(css,/grid-template-columns:minmax\(0,3fr\) minmax\(0,2fr\)/);
   assert.match(presentation,/#nav0,#nav1,#nav2,#nav3,#nav4,#navSalesCount/);
   assert.match(presentation,/renderAIAnalysisPanel/);
 });
@@ -502,8 +502,8 @@ test('分析AIの対象年月をサイドバー切替後も固定し各ページ
   assert.match(index,/insight_analysis_period_lock_v1\.js\?v=20261001-sync-owner/);
   assert.match(index,/insight_sales_count_v1\.js\?v=20261005-ipad-container-fit/);
   assert.match(presentation,/aiAnalysisTarget/);
-  assert.match(presentation,/\.ai-workspace-period-label\{display:none!important\}/);
-  assert.match(presentation,/\.ai-workspace-brand\{min-width:0;display:grid;align-content:center;gap:2px\}/);
+  assert.match(css,/\.ai-workspace-period-label\{display:none!important\}/);
+  assert.match(css,/\.ai-workspace-brand\{min-width:0;display:grid;align-content:center;gap:2px\}/);
   assert.match(presentation,/!window\.InsightPagePeriodSync&&window\.InsightAnalysisPeriodLock/);
   assert.match(pageAI,/InsightAnalysisPeriodLock\.getContext/);
   assert.match(pageAI,/InsightAnalysisPeriodLock\.referenceDate/);
@@ -1059,9 +1059,9 @@ test('分析AIコメントは文章列ではなく構造化カードで表示し
   assert.match(pageAI,/InsightAIVisual\.renderLines/);
   assert.match(visual,/ai-insight-item/);
   assert.match(visual,/ai-check-list/);
-  assert.match(presentation,/\.ai-insight-value/);
-  assert.match(presentation,/\.ai-insight-item\.is-danger/);
-  assert.match(presentation,/\.ai-insight-item\.is-success/);
+  assert.match(css,/\.ai-insight-value/);
+  assert.match(css,/\.ai-insight-item\.is-danger/);
+  assert.match(css,/\.ai-insight-item\.is-success/);
   assert.doesNotMatch(presentation,/--warning|--info|--accent2|--purple|--orange/);
   assert.doesNotThrow(()=>new vm.Script(visual),'AI visual module must be valid JavaScript');
 });
@@ -1151,8 +1151,8 @@ test('分析AIの上端は実際のサイドバー上端へ追従する',()=>{
   assert.match(presentation,/function sidebarRect\(button\)/);
   assert.match(presentation,/button\.closest&&button\.closest\('\.sidebar'\)/);
   assert.match(presentation,/--ai-workspace-top/);
-  assert.match(presentation,/top:var\(--ai-workspace-top,12px\)!important/);
-  assert.match(presentation,/top:var\(--ai-workspace-top,8px\)!important/);
+  assert.match(css,/top:var\(--ai-workspace-top,12px\)!important/);
+  assert.match(css,/top:var\(--ai-workspace-top,8px\)!important/);
 });
 
 test('曜日別平均カードと廃棄悪化色の表示契約を維持する',()=>{
@@ -1178,8 +1178,8 @@ test('販売数AI分析は販売数入力と同じ平均カード生成APIを使
   assert.match(pageAI,/model\.createAverageCard\(/);
   assert.match(pageAI,/sc-average-grid ai-sales-count-weekdays/);
   assert.match(sales,/model\.createAverageCard=createAverageCard/);
-  assert.match(presentation,/\.ai-sales-count-overall/);
-  assert.match(presentation,/\.ai-sales-count-weekdays/);
+  assert.match(css,/\.ai-sales-count-overall/);
+  assert.match(css,/\.ai-sales-count-weekdays/);
 });
 
 test('販売数カテゴリーの対象便設定を全関連層で共有する',()=>{
