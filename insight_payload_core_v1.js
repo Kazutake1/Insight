@@ -21,27 +21,27 @@ function loadAll(){
       document.body.innerHTML="";
       const box=document.createElement("div");
       box.id="insightStorageLoadError";
-      box.style.cssText="max-width:720px;margin:48px auto;padding:24px;font-family:-apple-system,Hiragino Kaku Gothic ProN,Noto Sans JP,sans-serif;color:#1a1a1a;background:#fff;border:1px solid #e5e7eb;border-radius:16px";
+      box.className="storage-load-error-box";
       const heading=document.createElement("h2");
-      heading.style.cssText="margin:0 0 12px;font-size:18px";
+      heading.className="storage-load-error-heading";
       heading.textContent="保存済みデータを読み込めませんでした";
       const first=document.createElement("p");
-      first.style.cssText="margin:0 0 10px;line-height:1.7";
+      first.className="storage-load-error-first";
       first.textContent="安全のため、空のデータでは起動していません。現在の保存データは上書きしていません。";
       const second=document.createElement("p");
-      second.style.cssText="margin:0 0 12px;line-height:1.7;color:#666";
+      second.className="storage-load-error-second";
       second.textContent="この画面のまま新しいデータを保存せず、保存データの確認を行ってください。";
       const reason=document.createElement("p");
       reason.id="insightStorageLoadReason";
-      reason.style.cssText="margin:0 0 16px;padding:10px 12px;border-radius:10px;background:#f7f7f8;color:#555;font-size:12px;line-height:1.6;word-break:break-word";
+      reason.className="storage-load-error-reason";
       reason.textContent="読込エラー: "+String(error&&error.message?error.message:error);
       const actions=document.createElement("div");
-      actions.style.cssText="display:flex;gap:8px;flex-wrap:wrap";
+      actions.className="storage-load-error-actions";
       const exportButton=document.createElement("button");
       exportButton.id="insightStorageExportRaw";
       exportButton.type="button";
       exportButton.textContent="保存データを書き出す";
-      exportButton.style.cssText="border:0;border-radius:10px;background:#1a1a1a;color:#fff;padding:10px 14px;font-weight:700;font-family:inherit";
+      exportButton.className="storage-load-error-export";
       exportButton.onclick=function(){
         try{
           const raw=localStorage.getItem(SK);
@@ -2735,10 +2735,7 @@ function showIOSInstallHint(){
   if(document.getElementById("iosHint"))return;
   const hint=document.createElement("div");
   hint.id="iosHint";
-  hint.style.cssText=`position:fixed;bottom:0;left:0;right:0;
-    background:#1a1a1a;color:#fff;border-radius:18px 18px 0 0;
-    padding:20px 24px 32px;z-index:9999;
-    box-shadow:0 -8px 30px rgba(0,0,0,0.3);font-family:-apple-system,sans-serif;`;
+  hint.className="ios-install-hint";
   hint.innerHTML=`
     <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px;">
       <div style="font-size:15px;font-weight:800;">📲 アプリとして使う</div>
