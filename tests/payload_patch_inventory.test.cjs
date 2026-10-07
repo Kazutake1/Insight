@@ -1156,6 +1156,16 @@ test('分析AIの位置は外部CSSだけで決まりruntime inline styleを使�
   assert.match(css,/left:8px!important;right:8px!important;top:8px!important/);
 });
 
+test('STEP5 settings/title styles are external and CSP-safe',()=>{
+  const settings=read('insight_settings_v1.js');
+  const title=read('insight_page_title_layout_v1.js');
+  const css=read('insight_payload_core_v1.css');
+  assert.doesNotMatch(settings,/createElement\(['"]style['"]\)|style\.textContent|appendChild\(style\)/);
+  assert.doesNotMatch(title,/createElement\(['"]style['"]\)|\.style\.setProperty|--insight-page-title-offset/);
+  assert.match(css,/\.insight-theme-switch-track\{/);
+  assert.match(css,/\.page>\.page-header>\.page-title\.insight-page-title-aligned\{/);
+});
+
 test('曜日別平均カードと廃棄悪化色の表示契約を維持する',()=>{
   const sales=read('insight_sales_count_v1.js');
   const visual=read('insight_ai_visual_v1.js');
