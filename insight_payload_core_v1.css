@@ -889,3 +889,15 @@ html.dark body,body.dark{background:#251b26}
 .storage-load-error-actions{display:flex;gap:8px;flex-wrap:wrap;}
 .storage-load-error-export{border:0;border-radius:10px;background:#1a1a1a;color:#fff;padding:10px 14px;font-weight:700;font-family:inherit;}
 .ios-install-hint{position:fixed;bottom:0;left:0;right:0;background:#1a1a1a;color:#fff;border-radius:18px 18px 0 0;padding:20px 24px 32px;z-index:9999;box-shadow:0 -8px 30px rgba(0,0,0,0.3);font-family:-apple-system,sans-serif;}
+
+.install-banner-action{background:#fff;color:#1a1a1a;border:none;border-radius:8px;padding:6px 14px;font-weight:800;font-size:12px;cursor:pointer;}
+.install-banner-close{background:transparent;color:rgba(255,255,255,0.5);border:none;font-size:16px;cursor:pointer;padding:0 4px;}
+.ios-install-head{display:flex;justify-content:space-between;align-items:center;margin-bottom:14px;}
+.ios-install-title{font-size:15px;font-weight:800;}
+.ios-install-later{background:rgba(255,255,255,0.15);color:#fff;border:none;border-radius:8px;padding:5px 10px;font-size:12px;cursor:pointer;}
+.ios-install-copy{font-size:13px;color:rgba(255,255,255,0.75);line-height:1.7;}
+.ios-install-strong{color:#fff;}
+.ios-install-steps{margin-top:14px;display:flex;gap:12px;align-items:center;}
+.ios-install-step-icon{text-align:center;background:rgba(255,255,255,0.1);border-radius:10px;padding:8px 12px;font-size:20px;}
+.ios-install-step-label{font-size:11px;color:rgba(255,255,255,0.5);}
+.ios-install-arrow{font-size:20px;}
