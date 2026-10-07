@@ -75,30 +75,8 @@
     '.hourly-input-group input{font-size:14px!important}',
     '.hourly-dialog-summary{font-size:14px!important}',
 
-    '#pageSettings .insight-settings-section h2{font-size:17px!important}',
-    '#pageSettings .insight-settings-section>p{font-size:13px!important;line-height:1.6!important}',
-    '#pageSettings .insight-settings-actions .sidebar-btn,#pageSettings #insightDataHealthButton{font-size:14px!important;line-height:1.4!important}',
-    '#pageSettings .insight-settings-actions .sidebar-btn-sub{font-size:12px!important}',
-    '#pageSettings .insight-theme-toggle{font-size:14px!important}',
-
-    '.ai-workspace-target-label{font-size:12px!important}',
-    '.ai-workspace-period-btn{font-size:13px!important}',
-    '.ai-workspace-side-title{font-size:12px!important}',
-    '.ai-workspace-section-title{font-size:17px!important}',
-    '.ai-workspace-section-hint{font-size:11.5px!important}',
     '.ai-analysis-workspace .ai-analysis-card-title{font-size:13px!important}',
-    '.ai-analysis-workspace .ai-analysis-comment,.ai-analysis-workspace .ai-analysis-empty{font-size:14px!important;line-height:1.6!important}',
-    '.ai-insight-title{font-size:13px!important}',
-    '.ai-insight-state{font-size:11.5px!important}',
-    '.ai-insight-detail{font-size:13px!important;line-height:1.55!important}',
-    '.ai-insight-item.is-primary .ai-insight-title{font-size:13.5px!important}',
-    '.ai-insight-item.is-primary .ai-insight-detail{font-size:13.5px!important}',
-    '.ai-check-text{font-size:13px!important;line-height:1.55!important}',
-    '.ai-sales-count-block-title{font-size:13px!important}',
-    '.ai-history-mode-btn,.ai-history-period-btn{font-size:12px!important}',
-    '.ai-analysis-question-input{font-size:14px!important}',
-    '.ai-analysis-question-send{font-size:13px!important}',
-    '.ai-analysis-question-answer{font-size:13px!important;line-height:1.6!important}'
+    '.ai-analysis-workspace .ai-analysis-comment,.ai-analysis-workspace .ai-analysis-empty{font-size:14px!important;line-height:1.6!important}'
   ].join('');
   doc.head.appendChild(style);
   if(root.InsightPageTitleLayout&&typeof root.InsightPageTitleLayout.alignAll==='function')root.InsightPageTitleLayout.alignAll();

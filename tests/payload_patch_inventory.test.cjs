@@ -43,7 +43,7 @@ test('canonical payloadはinline script/styleを持たず外部assetを順序固
   const core=read('insight_payload_core_v1.js');
   const ai=read('insight_payload_ai_legacy_v1.js');
   const css=read('insight_payload_core_v1.css');
-  assert.match(payload,/insight_payload_core_v1\.css\?v=20261007-temperature-css-1/);
+  assert.match(payload,/insight_payload_core_v1\.css\?v=20261007-readability-settings-ai-css-1/);
   assert.match(payload,/insight_payload_core_v1\.js\?v=20261006-payload-assets-1/);
   assert.match(payload,/insight_payload_ai_legacy_v1\.js\?v=20261006-payload-assets-1/);
   assert.match(payload,/insight_payload_bindings_v1\.js\?v=20261006-inline-bindings-1/);
@@ -238,7 +238,8 @@ test('ダッシュボードKPIカードは補助月表示を削除し年比ラ�
 test('STEP17の可読性CSSは独立moduleで主要ページへ横展開する',()=>{
   const index=readShell();
   const readability=read('insight_readability_v1.js');
-  assert.match(index,/insight_readability_v1\.js\?v=20261005-kpi-yoy-nowrap/);
+  const css=read('insight_payload_core_v1.css');
+  assert.match(index,/insight_readability_v1\.js\?v=20261007-csp-style-readability-settings-ai-1/);
   assert.ok(index.indexOf('insight_dark_theme_v1.js')<index.indexOf('insight_readability_v1.js'));
   assert.match(readability,/insightReadabilityStyle/);
   assert.match(readability,/#main\{padding-left:0!important;padding-right:0!important;min-width:0!important;box-sizing:border-box!important\}/);
@@ -256,8 +257,12 @@ test('STEP17の可読性CSSは独立moduleで主要ページへ横展開する',
   assert.match(readability,/#pageSales #issRow \.iss-stat,#pageKyaku #ikyRow \.iky-stat\{font-size:13px!important/);
   assert.match(readability,/#iwcRow \.iwc-kpi-value\{font-size:16px!important/);
   assert.match(readability,/#pageSalesCount \.sc-col-head,#pageSalesCount \.sc-average-head\{font-size:12\.5px!important/);
-  assert.match(readability,/#pageSettings \.insight-settings-section h2\{font-size:17px!important/);
+  assert.match(css,/#pageSettings \.insight-settings-section h2\{font-size:17px!important/);
   assert.match(readability,/\.ai-analysis-workspace \.ai-analysis-card-title\{font-size:13px!important/);
+  assert.match(readability,/\.ai-analysis-workspace \.ai-analysis-comment,\.ai-analysis-workspace \.ai-analysis-empty\{font-size:14px!important;line-height:1\.6!important/);
+  assert.doesNotMatch(readability,/#pageSettings \.insight-settings-section|\.ai-workspace-|\.ai-insight-|\.ai-check-text|\.ai-sales-count-block-title|\.ai-history-mode-btn|\.ai-analysis-question-/);
+  assert.match(css,/#pageSettings \.insight-settings-actions \.sidebar-btn,#pageSettings #insightDataHealthButton\{font-size:14px!important;line-height:1\.4!important\}/);
+  assert.match(css,/\.ai-analysis-question-answer\{font-size:13px!important;line-height:1\.6!important\}/);
   assert.match(readability,/\.hourly-dialog h2\{font-size:18px!important/);
   assert.match(readability,/root\.InsightReadability=\{VERSION:1\}/);
   assert.doesNotMatch(readability,/\bfetch\s*\(|XMLHttpRequest|WebSocket|localStorage|InsightStorage/);
