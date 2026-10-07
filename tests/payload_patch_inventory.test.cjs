@@ -310,7 +310,7 @@ test('AI表示CSSはIndexの文字列置換ではなくpresentation moduleが所
   assert.match(index,/insight_ai_presentation_v1\.js\?v=20261006-header-compact-1/);
   assert.doesNotMatch(presentation,/insightAiPresentationStyle|createElement\(['\"]style/);
   assert.doesNotMatch(presentation,/数値と要点を優先して表示/);
-  assert.match(presentation,/body\.ai-analysis-open #main\{margin-right:0!important\}/);
+  assert.match(css,/body\.ai-analysis-open #main\{margin-right:0!important\}/);
   assert.match(presentation,/\.ai-analysis-panel\.ai-analysis-workspace/);
   assert.match(presentation,/\.ai-workspace-grid/);
   assert.match(presentation,/\.ai-analysis-question-row/);
