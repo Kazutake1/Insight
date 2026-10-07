@@ -573,12 +573,12 @@ function switchStore(id){
   else if(currentNav===1)refreshDash();
   else initInputPage(["","","sales","kyaku","haiki"][currentNav]);
   updateMissingBadge();
-  document.getElementById("storeMenu").style.display="none";
+  document.getElementById("storeMenu").classList.remove("is-open");
 }
 
 function showStoreMenu(){
   const menu=document.getElementById("storeMenu");
-  if(menu.style.display!=="none"){menu.style.display="none";return;}
+  if(menu.classList.contains("is-open")){menu.classList.remove("is-open");return;}
   menu.innerHTML="";
 
   // 店舗名変更
@@ -591,7 +591,7 @@ function showStoreMenu(){
     if(name&&name.trim()){
       cur.name=name.trim();persist();renderStoreSel();
     }
-    menu.style.display="none";
+    menu.classList.remove("is-open");
   };
   menu.appendChild(rename);
 
@@ -608,7 +608,7 @@ function showStoreMenu(){
       persist();
       switchStore(id);
     }
-    menu.style.display="none";
+    menu.classList.remove("is-open");
   };
   menu.appendChild(add);
 
@@ -623,25 +623,25 @@ function showStoreMenu(){
     del.onclick=()=>{
       const cur=allStores.stores[allStores.current];
       if(!confirm(`「${cur.name}」を削除します。\nこの店舗のデータはすべて消えます。よろしいですか？`)){
-        menu.style.display="none";return;
+        menu.classList.remove("is-open");return;
       }
       const ids=Object.keys(allStores.stores);
       const nextId=ids.find(id=>id!==allStores.current)||ids[0];
       delete allStores.stores[allStores.current];
       persist();
       switchStore(nextId);
-      menu.style.display="none";
+      menu.classList.remove("is-open");
     };
     menu.appendChild(del);
   }
 
-  menu.style.display="block";
+  menu.classList.add("is-open");
 
   // メニュー外クリックで閉じる
   setTimeout(()=>{
     document.addEventListener("click",function closeMenu(e){
       if(!menu.contains(e.target)&&e.target.id!=="storeMenuBtn"){
-        menu.style.display="none";
+        menu.classList.remove("is-open");
       }
       document.removeEventListener("click",closeMenu);
     });
