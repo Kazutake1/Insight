@@ -884,8 +884,8 @@ function saveQuick(){
   persist();
   // Flash feedback
   const btn=document.querySelector(".quick-save");
-  btn.textContent="✓ 保存しました";btn.style.background="#16a34a";
-  setTimeout(()=>{btn.textContent="保存する";btn.style.background="";},2000);
+  btn.textContent="✓ 保存しました";btn.classList.add("is-saved-feedback");
+  setTimeout(()=>{btn.textContent="保存する";btn.classList.remove("is-saved-feedback");},2000);
   updateMissingBadge();
 }
 
