@@ -44,7 +44,7 @@ test('canonical payloadはinline script/styleを持たず外部assetを順序固
   const ai=read('insight_payload_ai_legacy_v1.js');
   const css=read('insight_payload_core_v1.css');
   assert.match(payload,/insight_payload_core_v1\.css\?v=20261007-step3-donut-mode-css-1/);
-  assert.match(payload,/insight_payload_core_v1\.js\?v=20261007-step4-budget-static-colors-1/);
+  assert.match(payload,/insight_payload_core_v1\.js\?v=20261007-step4-ai-static-css-1/);
   assert.doesNotMatch(core,/label\.style\.color/);
   assert.doesNotMatch(core,/msg\.style\.display/);
   assert.doesNotMatch(core,/badge\.style\.display/);
@@ -133,6 +133,10 @@ test('canonical payloadはinline script/styleを持たず外部assetを順序固
   assert.match(css,/\.donut-color-0\{/);
   assert.match(css,/\.legend-sales-bar\{/);
   assert.match(css,/\.hf-budget-bar::\-webkit-progress-value\{/);
+  assert.doesNotMatch(aiPresentation,/createElement\(['\"]style/);
+  assert.doesNotMatch(readability,/createElement\(['\"]style/);
+  assert.match(css,/\.ai-analysis-panel\.ai-analysis-workspace\{/);
+  assert.match(css,/\.ai-analysis-workspace \.ai-analysis-card-title\{font-size:13px!important\}/);
   assert.match(css,/#donutBtnAmt\.active,#donutBtnPct\.active\{background:#1a1a1a;color:#fff;\}/);
   assert.match(core,/msg\.classList\.add\("is-visible"\)/);
   assert.match(core,/msg\.classList\.remove\("is-visible"\)/);
