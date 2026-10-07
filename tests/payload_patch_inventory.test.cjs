@@ -962,21 +962,21 @@ test('イベント実績は過去開催・日付カード・時間帯グラフ�
   assert.match(eventResults,/er-hour-value/);
   assert.match(css,/\.er-occurrence-date\{font-size:14px\}/);
   assert.match(css,/\.er-occurrence-metrics\{[^}]*font-size:13px/);
-  assert.match(eventResults,/\.er-summary-card span\{[^}]*font-size:12\.5px/);
-  assert.match(eventResults,/\.er-summary-card strong\{[^}]*font-size:18px/);
-  assert.match(eventResults,/\.er-category-card>h3\{[^}]*font-size:14px/);
-  assert.match(eventResults,/\.er-demand-card>h3\{[^}]*font-size:14\.5px/);
+  assert.match(css,/\.er-summary-card span\{[^}]*font-size:12\.5px/);
+  assert.match(css,/\.er-summary-card strong\{[^}]*font-size:18px/);
+  assert.match(css,/\.er-category-card>h3\{[^}]*font-size:14px/);
+  assert.match(css,/\.er-demand-card>h3\{[^}]*font-size:14\.5px/);
   assert.doesNotMatch(eventResults,/item\.append\(el\('strong',String\(value\)\)/);
-  assert.match(eventResults,/\.er-hour-chart\{[^}]*gap:2px;[^}]*min-width:0/);
-  assert.match(eventResults,/grid-template-columns:repeat\(24,minmax\(0,1fr\)\)/);
+  assert.match(css,/\.er-hour-chart\{[^}]*gap:2px;[^}]*min-width:0/);
+  assert.match(css,/grid-template-columns:repeat\(24,minmax\(0,1fr\)\)/);
   assert.match(eventResults,/createReadOnlyDayCard/);
   assert.match(eventResults,/カテゴリー実績/);
   assert.match(eventResults,/特需商品/);
   assert.match(eventResults,/function demandComparison\(/);
   assert.match(eventResults,/er-demand-grid/);
   assert.match(eventResults,/前回：用意 /);
-  assert.match(eventResults,/grid-template-columns:repeat\(4,minmax\(0,1fr\)\)/);
-  assert.match(eventResults,/@media\(max-width:1000px\)\{\.er-category-grid,\.er-demand-grid\{grid-template-columns:repeat\(2,minmax\(0,1fr\)\)\}\}/);
+  assert.match(css,/grid-template-columns:repeat\(4,minmax\(0,1fr\)\)/);
+  assert.match(css,/@media\(max-width:1000px\)\{\.er-category-grid,\.er-demand-grid\{grid-template-columns:repeat\(2,minmax\(0,1fr\)\)\}\}/);
   assert.doesNotMatch(eventResults,/max-width:280px/);
   assert.doesNotMatch(eventResults,/カテゴリー別・便別実績/);
   assert.match(eventResults,/hourly\.complete/);
@@ -1100,13 +1100,14 @@ test('分析AIはダッシュボード再掲ではなく4ブロックの意思�
   assert.doesNotThrow(()=>new vm.Script(interpretation),'AI interpretation module must be valid JavaScript');
 });
 
-test('店舗運営UIのCSSはops moduleが所有する',()=>{
+test('店舗運営UIのCSSは外部CSSが所有しops moduleはruntime styleを使わない',()=>{
   const index=readShell();
   const ops=read('insight_ops_v1.js');
+  const css=read('insight_payload_core_v1.css');
   assert.ok(!index.includes("html=html.replace('</style>'"));
-  assert.match(ops,/insightOpsV1Style/);
-  assert.match(ops,/\.ops-daily-wrap/);
-  assert.match(ops,/\.monthly-ops-card/);
+  assert.match(css,/\.ops-daily-wrap\{/);
+  assert.match(css,/\.monthly-ops-card\{/);
+  assert.doesNotMatch(ops,/createElement\(['"]style['"]\)|\.style\.|cssText|style=/);
 });
 
 test('安全・互換処理はbootstrap文字列パッチではなく各所有層へ分離済み',()=>{
