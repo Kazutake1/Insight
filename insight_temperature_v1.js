@@ -115,25 +115,7 @@
     avg.textContent=Number.isFinite(max)&&Number.isFinite(min)?((max+min)/2).toFixed(1)+'℃':'—';
   }
 
-  function ensureStyle(){
-    if(document.getElementById('insightTemperatureV1Style'))return;
-    var style=document.createElement('style');
-    style.id='insightTemperatureV1Style';
-    style.textContent=[
-      '.quick-temperature{display:flex;align-items:center;gap:6px;padding:3px 7px;border:1px solid var(--border,#e5e7eb);border-radius:9px;background:var(--surface,#fff)}',
-      '.quick-temperature label{display:flex;align-items:center;gap:3px;font-size:10px;font-weight:700;color:var(--text3,#666);white-space:nowrap}',
-      '.quick-temperature input{width:52px;height:28px;box-sizing:border-box;border:1px solid var(--border,#ddd);border-radius:7px;background:var(--input-bg,#fff);color:var(--text,#1a1a1a);padding:0 5px;text-align:right;font:700 12px/1 -apple-system,BlinkMacSystemFont,"Noto Sans JP",sans-serif;outline:none}',
-      '.quick-temperature input:focus{border-color:var(--text3,#666)}',
-      '.quick-temperature .qt-unit{font-size:10px;color:var(--text4,#888)}',
-      '.quick-temperature .qt-average{display:flex;align-items:center;gap:3px;padding-left:5px;border-left:1px solid var(--border,#ddd);font-size:10px;color:var(--text4,#888);white-space:nowrap}',
-      '.quick-temperature .qt-average strong{font-size:11px;color:var(--text2,#444)}',
-      '@media(max-width:700px){.quick-temperature{order:3}.quick-temperature input{width:48px}}'
-    ].join('');
-    document.head.appendChild(style);
-  }
-
   function renderTemperature(){
-    ensureStyle();
     var weather=document.getElementById('qWeatherSel');
     if(!weather)return;
     var wrap=document.getElementById('qTemperatureInputs');

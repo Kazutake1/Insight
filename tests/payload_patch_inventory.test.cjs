@@ -43,7 +43,7 @@ test('canonical payloadはinline script/styleを持たず外部assetを順序固
   const core=read('insight_payload_core_v1.js');
   const ai=read('insight_payload_ai_legacy_v1.js');
   const css=read('insight_payload_core_v1.css');
-  assert.match(payload,/insight_payload_core_v1\.css\?v=20261007-weather-compact-css-1/);
+  assert.match(payload,/insight_payload_core_v1\.css\?v=20261007-temperature-css-1/);
   assert.match(payload,/insight_payload_core_v1\.js\?v=20261006-payload-assets-1/);
   assert.match(payload,/insight_payload_ai_legacy_v1\.js\?v=20261006-payload-assets-1/);
   assert.match(payload,/insight_payload_bindings_v1\.js\?v=20261006-inline-bindings-1/);
@@ -80,6 +80,25 @@ test('トップページはキャッシュ抑止とシェル・機能manifestの
   assert.match(index,/cache:'no-store'/);
   assert.match(index,/location\.replace\('\.\/Index\.html\?insight_build='/);
   assert.doesNotMatch(index,/if\(params\.get\('insight_build'\)===BUILD\)return/);
+});
+
+test('クイック入力の気温UIは固定スタイルを外部CSSで維持し入力・平均・保存ロジックを保持する',()=>{
+  const index=readShell();
+  const temperature=read('insight_temperature_v1.js');
+  const css=read('insight_payload_core_v1.css');
+  assert.match(index,/insight_temperature_v1\.js\?v=20261007-csp-style-temperature-1/);
+  assert.match(temperature,/function renderTemperature\(/);
+  assert.match(temperature,/function updateAverage\(/);
+  assert.match(temperature,/function readAndValidate\(/);
+  assert.match(temperature,/temperature-save/);
+  assert.match(temperature,/syncWeatherAndTemperatureForMunicipality/);
+  assert.match(css,/\.quick-temperature\{display:flex;align-items:center;gap:6px/);
+  assert.match(css,/\.quick-temperature input\{width:52px;height:28px/);
+  assert.match(css,/\.quick-temperature \.qt-average\{display:flex;align-items:center;gap:3px/);
+  assert.match(css,/@media\(max-width:700px\)\{\.quick-temperature\{order:3\}/);
+  assert.doesNotMatch(temperature,/createElement\(['"]style['"]\)|style\.textContent|appendChild\(style\)|function ensureStyle\(/);
+  assert.doesNotMatch(temperature,/localStorage/);
+  assert.doesNotThrow(()=>new vm.Script(temperature),'temperature module must be valid JavaScript');
 });
 
 test('クイック入力の天気セレクタは固定スタイルを外部CSSで維持し選択ロジックを保持する',()=>{
