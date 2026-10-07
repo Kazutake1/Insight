@@ -947,7 +947,7 @@ test('イベント実績は過去開催・日付カード・時間帯グラフ�
   assert.match(eventResults,/finite\(day&&day\.metrics&&day\.metrics\[key\]\)!==null/);
   assert.doesNotMatch(eventResults,/summaryMetric\('客単価'/);
   assert.doesNotMatch(eventResults,/summaryMetric\('買上点数'/);
-  assert.match(eventResults,/\.er-overview-grid\{[^}]*grid-template-columns:repeat\(2,minmax\(230px,1fr\)\)/);
+  assert.match(css,/\.er-overview-grid\{[^}]*grid-template-columns:repeat\(2,minmax\(230px,1fr\)\)/);
   assert.match(eventResults,/\.er-overview-values\{[^}]*grid-template-columns:repeat\(2,minmax\(0,1fr\)\)/);
   assert.match(eventResults,/客数 /);
   assert.match(eventResults,/er-day-tab/);
@@ -1009,7 +1009,7 @@ test('全ページタイトルはダッシュボード基準の共通モジュ�
   assert.match(layout,/var SELECTOR='\.page > \.page-header > \.page-title'/);
   assert.match(layout,/document\.getElementById\('pageDash'\)/);
   assert.match(layout,/MutationObserver/);
-  assert.match(layout,/align-self:flex-start!important/);
+  assert.match(css,/\.page>\.page-header>\.page-title\.insight-page-title-aligned\{[^}]*align-self:flex-start!important/);
   assert.doesNotMatch(layout,/localStorage|InsightStorage/);
   assert.doesNotThrow(()=>new vm.Script(layout),'page title layout module must be valid JavaScript');
 });
@@ -1043,7 +1043,7 @@ test('セール実績ページは販売数入力直後に読み込み同一日�
   assert.match(sales,/model\.createReadOnlyDayCard=createReadOnlyDayCard/);
   assert.match(css,/\.sc-totals b\{font-size:14px;text-align:center\}/);
   assert.match(css,/\.sc-average-totals b\{font-size:14px;text-align:center\}/);
-  assert.match(sales,/\.sc-totals b,\.sc-average-totals b\{font-size:14px\}/);
+  assert.match(css,/\.sc-totals b,\.sc-average-totals b\{font-size:14px\}/);
   assert.doesNotMatch(saleResults,/localStorage|InsightStorage/);
   assert.doesNotThrow(()=>new vm.Script(saleResults),'sale results module must be valid JavaScript');
 });
@@ -1180,7 +1180,7 @@ test('曜日別平均カードと廃棄悪化色の表示契約を維持する',
   const sales=read('insight_sales_count_v1.js');
   const visual=read('insight_ai_visual_v1.js');
   assert.match(css,/\.sc-page\{[^}]*min-width:0;width:100%;max-width:100%;box-sizing:border-box/);
-  assert.match(sales,/\.sc-calendar\{[^}]*grid-template-columns:repeat\(7,minmax\(160px,1fr\)\);gap:8px;[^}]*min-width:0;width:100%;max-width:100%;box-sizing:border-box/);
+  assert.match(css,/\.sc-calendar\{[^}]*grid-template-columns:repeat\(7,minmax\(160px,1fr\)\);gap:8px;[^}]*min-width:0;width:100%;max-width:100%;box-sizing:border-box/);
   assert.match(sales,/\.sc-average-grid\{[^}]*grid-template-columns:repeat\(7,minmax\(160px,1fr\)\);gap:8px;[^}]*min-width:0;width:100%;max-width:100%;box-sizing:border-box/);
   assert.match(sales,/@media\(max-width:1200px\)\{\.sc-calendar,\.sc-average-grid\{grid-template-columns:repeat\(7,minmax\(0,1fr\)\);gap:6px\}/);
   assert.match(sales,/@media\(max-width:800px\)\{\.sc-calendar,\.sc-average-grid\{grid-template-columns:repeat\(7,minmax\(102px,1fr\)\);gap:7px\}/);
