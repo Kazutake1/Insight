@@ -2338,12 +2338,13 @@ const BACKUP_KEY="insight_last_backup";
 function updateBackupDaysLabel(){
   const label=document.getElementById("backupDaysLabel");
   if(!label)return;
+  label.classList.remove("backup-status-missing","backup-status-today","backup-status-recent","backup-status-stale");
   const last=localStorage.getItem(BACKUP_KEY);
-  if(!last){label.textContent="未バックアップ";label.style.color="#dc2626";return;}
+  if(!last){label.textContent="未バックアップ";label.classList.add("backup-status-missing");return;}
   const days=Math.floor((Date.now()-parseInt(last))/(1000*60*60*24));
-  if(days===0){label.textContent="今日バックアップ済";label.style.color="#15803d";}
-  else if(days<=7){label.textContent=`${days}日前`;label.style.color="#888";}
-  else{label.textContent=`${days}日経過 ⚠️`;label.style.color="#dc2626";}
+  if(days===0){label.textContent="今日バックアップ済";label.classList.add("backup-status-today");}
+  else if(days<=7){label.textContent=`${days}日前`;label.classList.add("backup-status-recent");}
+  else{label.textContent=`${days}日経過 ⚠️`;label.classList.add("backup-status-stale");}
 }
 
 function backupData(){
