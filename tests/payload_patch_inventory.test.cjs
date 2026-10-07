@@ -43,7 +43,7 @@ test('canonical payloadはinline script/styleを持たず外部assetを順序固
   const core=read('insight_payload_core_v1.js');
   const ai=read('insight_payload_ai_legacy_v1.js');
   const css=read('insight_payload_core_v1.css');
-  assert.match(payload,/insight_payload_core_v1\.css\?v=20261007-temperature-css-1/);
+  assert.match(payload,/insight_payload_core_v1\.css\?v=20261007-readability-settings-ai-css-1/);
   assert.match(payload,/insight_payload_core_v1\.js\?v=20261006-payload-assets-1/);
   assert.match(payload,/insight_payload_ai_legacy_v1\.js\?v=20261006-payload-assets-1/);
   assert.match(payload,/insight_payload_bindings_v1\.js\?v=20261006-inline-bindings-1/);
@@ -238,6 +238,7 @@ test('ダッシュボードKPIカードは補助月表示を削除し年比ラ�
 test('STEP17の可読性CSSは独立moduleで主要ページへ横展開する',()=>{
   const index=readShell();
   const readability=read('insight_readability_v1.js');
+  const css=read('insight_payload_core_v1.css');
   assert.match(index,/insight_readability_v1\.js\?v=20261007-csp-style-readability-settings-ai-1/);
   assert.ok(index.indexOf('insight_dark_theme_v1.js')<index.indexOf('insight_readability_v1.js'));
   assert.match(readability,/insightReadabilityStyle/);
