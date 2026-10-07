@@ -779,3 +779,24 @@ html.dark body,body.dark{background:#251b26}
 .ai-analysis-question-input{font-size:14px!important}
 .ai-analysis-question-send{font-size:13px!important}
 .ai-analysis-question-answer{font-size:13px!important;line-height:1.6!important}
+
+/* Readability STEP2-10B: sales, customer, and waste insight card fixed typography externalized from runtime JS. */
+#pageSales #issRow .iss-title,#pageKyaku #ikyRow .iky-title{font-size:15px!important}
+#pageSales #issRow .iss-stat,#pageKyaku #ikyRow .iky-stat{font-size:13px!important}
+#pageSales #issRow .iss-stat strong,#pageKyaku #ikyRow .iky-stat strong{font-size:20px!important}
+#pageSales #issRow .iss-note,#pageKyaku #ikyRow .iky-note{font-size:12px!important;line-height:1.5!important}
+#iwcRow{--iwc-height:178px!important}
+#iwcRow .iwc-title{font-size:14px!important}
+#iwcRow .iwc-sub{font-size:11.5px!important;line-height:1.35}
+#iwcRow .iwc-switch button{font-size:11.5px!important}
+#iwcRow .iwc-legends .donut-leg,#iwcRow .iwc-legends .donut-val{font-size:11.5px!important}
+#iwcRow .iwc-total{font-size:11.5px!important}
+#iwcRow .iwc-total strong{font-size:13px!important}
+#iwcRow .iwc-kpi-label{font-size:11.5px!important;line-height:1.2!important}
+#iwcRow .iwc-kpi-value{font-size:16px!important}
+#iwcRow .iwc-rank-tabs button{font-size:10.5px!important}
+#iwcRow .iwc-rank-title{font-size:11px!important}
+#iwcRow .iwc-increase-head .iwc-switch button{font-size:10.5px!important}
+#iwcRow .iwc-rank-line{font-size:11px!important;line-height:1.35!important}
+#iwcRow .iwc-increase-percent{font-size:10.5px!important}
+#iwcRow .iwc-empty{font-size:11.5px!important}
