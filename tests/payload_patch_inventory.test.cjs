@@ -1,12 +1,12 @@
 const test=require('node:test');
 const assert=require('node:assert/strict');
 const fs=require('node:fs');
-const css=read('insight_payload_core_v1.css');
 const path=require('node:path');
 const vm=require('node:vm');
 
 const root=path.join(__dirname,'..');
 const read=name=>fs.readFileSync(path.join(root,name),'utf8');
+const css=read('insight_payload_core_v1.css');
 const readShell=()=>[read('Index.html'),read('insight_shell_boot_v1.js'),read('insight_shell_loader_v1.js')].join('\n');
 
 test('payload文字列互換パッチは0件でshell loaderもbootstrap patcherへ依存しない',()=>{
