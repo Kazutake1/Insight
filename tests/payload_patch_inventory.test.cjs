@@ -43,7 +43,7 @@ test('canonical payloadはinline script/styleを持たず外部assetを順序固
   const core=read('insight_payload_core_v1.js');
   const ai=read('insight_payload_ai_legacy_v1.js');
   const css=read('insight_payload_core_v1.css');
-  assert.match(payload,/insight_payload_core_v1\.css\?v=20261007-readability-global-containers-css-1/);
+  assert.match(payload,/insight_payload_core_v1\.css\?v=20261007-step3-data-health-status-css-1/);
   assert.match(payload,/insight_payload_core_v1\.js\?v=20261006-payload-assets-1/);
   assert.match(payload,/insight_payload_ai_legacy_v1\.js\?v=20261006-payload-assets-1/);
   assert.match(payload,/insight_payload_bindings_v1\.js\?v=20261006-inline-bindings-1/);
@@ -665,7 +665,7 @@ test('保存データ健全性チェックは読み取り専用で不整合を�
   const index=readShell();
   const health=read('insight_data_health_v1.js');
   const css=read('insight_payload_core_v1.css');
-  assert.match(index,/insight_data_health_v1\.js\?v=20261007-csp-style-data-health-1/);
+  assert.match(index,/insight_data_health_v1\.js\?v=20261007-step3-data-health-status-1/);
   assert.ok(index.indexOf('insight_backup_guard_v1.js')<index.indexOf('insight_data_health_v1.js'));
   assert.match(health,/function check\(snapshot\)/);
   assert.match(health,/orphan_data_year/);
@@ -678,6 +678,12 @@ test('保存データ健全性チェックは読み取り専用で不整合を�
   assert.match(css,/#insightDataHealthOverlay\{position:fixed;inset:0;z-index:26000/);
   assert.match(css,/#insightDataHealthDialog\{width:min\(620px,100%\);max-height:82vh/);
   assert.match(css,/\.insight-health-error strong\{color:#b42318\}\.insight-health-warning strong\{color:#a16207\}/);
+  assert.match(health,/function applyStatusClass\(node,report\)/);
+  assert.match(health,/classList\.toggle\('insight-health-status-ok',ok\)/);
+  assert.match(health,/classList\.toggle\('insight-health-status-error',!ok\)/);
+  assert.doesNotMatch(health,/style\.color|statusColor/);
+  assert.match(css,/#insightDataHealthButton\.insight-health-status-ok,#insightDataHealthSummary\.insight-health-status-ok\{color:#15803d!important\}/);
+  assert.match(css,/#insightDataHealthButton\.insight-health-status-error,#insightDataHealthSummary\.insight-health-status-error\{color:#b42318!important\}/);
   assert.doesNotMatch(health,/createElement\(['"]style['"]\)|style\.textContent|appendChild\(style\)|function ensureStyle\(/);
   assert.doesNotMatch(health,/localStorage\.setItem|InsightStorage\.writeSnapshot|InsightStorage\.persistCurrent/);
   assert.doesNotThrow(()=>new vm.Script(health),'data health module must be valid JavaScript');
