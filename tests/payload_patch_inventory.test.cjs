@@ -43,7 +43,7 @@ test('canonical payloadはinline script/styleを持たず外部assetを順序固
   const core=read('insight_payload_core_v1.js');
   const ai=read('insight_payload_ai_legacy_v1.js');
   const css=read('insight_payload_core_v1.css');
-  assert.match(payload,/insight_payload_core_v1\.css\?v=20261007-step3-quick-save-feedback-css-1/);
+  assert.match(payload,/insight_payload_core_v1\.css\?v=20261007-step3-settings-hidden-css-1/);
   assert.match(payload,/insight_payload_core_v1\.js\?v=20261007-step3-quick-save-feedback-1/);
   assert.doesNotMatch(core,/label\.style\.color/);
   assert.match(core,/label\.classList\.remove\("backup-status-missing","backup-status-today","backup-status-recent","backup-status-stale"\)/);
@@ -443,7 +443,8 @@ test('STEP7で将来AI接続用の共通analysisContext境界を追加する',()
 test('設定ページはサイドバー下部の管理項目を集約する',()=>{
   const index=readShell();
   const settings=fs.readFileSync(path.join(root,'insight_settings_v1.js'),'utf8');
-  assert.match(index,/insight_settings_v1\.js\?v=20261003-theme-bridge-hidden/);
+  const css=read('insight_payload_core_v1.css');
+  assert.match(index,/insight_settings_v1\.js\?v=20261007-step3-settings-hidden-class-1/);
   assert.ok(index.indexOf('insight_data_health_v1.js')<index.indexOf('insight_settings_v1.js'));
   assert.match(settings,/nav\.id='navSettings'/);
   assert.match(settings,/page\.id='pageSettings'/);
@@ -451,7 +452,10 @@ test('設定ページはサイドバー下部の管理項目を集約する',()=
   assert.match(settings,/append\(backup,restore,health,csv,restoreFile,csvFile\)/);
   assert.doesNotMatch(settings,/insightSettingsDisplayActions/);
   assert.match(settings,/themeBridge\.append\(dark\)/);
-  assert.match(settings,/themeBridge\.style\.setProperty\('display','none','important'\)/);
+  assert.match(settings,/dark\.classList\.add\('insight-settings-legacy-hidden'\)/);
+  assert.match(settings,/themeBridge\.classList\.add\('insight-settings-legacy-hidden'\)/);
+  assert.doesNotMatch(settings,/\.style\.setProperty\('display','none','important'\)/);
+  assert.match(css,/\.insight-settings-legacy-hidden\{display:none!important\}/);
   assert.match(settings,/sidebarActions\.replaceChildren\(themeWrap,nav\)/);
 });
 

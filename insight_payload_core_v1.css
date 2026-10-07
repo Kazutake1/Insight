@@ -870,3 +870,6 @@ html.dark body,body.dark{background:#251b26}
 #pageDash .kpi-value.insight-kpi-value-normal{color:#1a1a1a}
 #pageDash .kpi-value.insight-kpi-value-alert{color:#dc2626}
 .quick-save.is-saved-feedback{background:#16a34a;}
+
+/* STEP3-7: finite settings legacy visibility state uses class instead of inline display. */
+.insight-settings-legacy-hidden{display:none!important}
