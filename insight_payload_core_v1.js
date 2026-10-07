@@ -1121,6 +1121,10 @@ function renderDonutDayPicker(){
   sel.innerHTML=Array.from({length:days},(_,i)=>`<option value="${i}">${i+1}日</option>`).join("");
   if(prev&&parseInt(prev)<days)sel.value=prev;
 }
+function applyDynamicColors(root){
+  root.querySelectorAll("[data-color]").forEach(el=>el.style.setProperty("--dynamic-color",el.dataset.color));
+}
+
 function refreshDonut(){
   const haiki=buildDonutData();
   const vals=HAIKI_CATS.map(c=>haiki[c]);
@@ -1157,6 +1161,7 @@ function refreshDonut(){
     empty.textContent="データなし";
     leg.appendChild(empty);
   }
+  applyDynamicColors(leg);
 }
 
 function setDonutMode(mode){
@@ -1226,6 +1231,7 @@ function renderLegend(){
       row.appendChild(div);
     });
   }
+  applyDynamicColors(row);
 }
 
 /* ══ Main chart ══ */
