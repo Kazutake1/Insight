@@ -36,5 +36,5 @@ test('テーマ切替UIは設定ボタン直上のトグルスイッチとして
   assert.match(settings,/dark\.hidden=true/);
   assert.match(settings,/insight-theme-sun/);
   assert.match(settings,/insight-theme-moon/);
-  assert.match(settings,/\.insight-theme-icon\{display:block;width:18px;height:18px/);
+  assert.match(css,/\.insight-theme-icon\{display:block;width:18px;height:18px/);
 });
