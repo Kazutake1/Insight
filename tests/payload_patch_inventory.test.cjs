@@ -292,10 +292,8 @@ test('旧コア配色補正はbootstrap文字列置換ではなくruntime style 
   assert.match(index,/insight_legacy_style_compat_v1\.js\?v=20261006-core-contrast-runtime-1/);
   assert.ok(index.indexOf('insight_legacy_style_compat_v1.js')<index.indexOf('insight_yoy_policy_v1.js'));
   assert.doesNotMatch(bootstrap,/background:#1a1a1a;color:#fff;box-shadow:0 6px 24px var\(--shadow\)/);
-  assert.match(compat,/getPropertyValue\('background'\)/);
-  assert.doesNotMatch(compat,/rule\.style|cssRules|setProperty\(/);
+  assert.doesNotMatch(compat,/getPropertyValue|rule\.style|cssRules|setProperty\(/);
   assert.match(css,/\.ai-analysis-toggle\{background:#1a1a1a;color:#fff\}/);
-  assert.match(compat,/setProperty\('color','#fff'\)/);
   assert.doesNotMatch(compat,/localStorage|InsightStorage|\bfetch\s*\(|XMLHttpRequest|WebSocket/);
   assert.doesNotThrow(()=>new vm.Script(compat),'legacy style compat module must be valid JavaScript');
 });
