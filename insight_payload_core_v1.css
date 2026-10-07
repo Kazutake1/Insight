@@ -910,3 +910,7 @@ html.dark body,body.dark{background:#251b26}
 .add-year-inline{display:inline-flex;align-items:center;gap:5px;}
 .add-year-input{width:90px;padding:5px 8px;border:1.5px solid #ddd;border-radius:8px;font-size:12px;font-weight:600;color:var(--text);font-family:inherit;outline:none;text-align:center;}
 .add-year-button{padding:5px 10px;border-radius:8px;font-size:12px;font-weight:700;border:none;cursor:pointer;font-family:inherit;background:#e8eaed;color:#444;}
+
+.kpi-month-note{font-weight:500;font-size:8.5px;color:var(--text5);}
+.donut-total-label{font-size:11px;font-weight:700;color:var(--text3);}
+.donut-total-value{font-size:13px;font-weight:800;color:#b91c1c;}
