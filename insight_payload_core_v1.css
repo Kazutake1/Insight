@@ -869,3 +869,4 @@ html.dark body,body.dark{background:#251b26}
 /* STEP3-5: finite dashboard KPI value color state. */
 #pageDash .kpi-value.insight-kpi-value-normal{color:#1a1a1a}
 #pageDash .kpi-value.insight-kpi-value-alert{color:#dc2626}
+.quick-save.is-saved-feedback{background:#16a34a;}
