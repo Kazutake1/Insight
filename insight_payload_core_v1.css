@@ -407,9 +407,12 @@ input[type=number]{-moz-appearance:textfield;}
 .hf-budget-actual{font-size:12.5px;font-weight:700;color:var(--text);text-align:right;min-width:80px;}
 .hf-budget-actual.over{color:#dc2626;}
 .hf-budget-limit{font-size:11px;color:var(--text4);text-align:right;min-width:80px;}
-.hf-budget-bar-wrap{width:60px;height:8px;border-radius:4px;background:var(--border);overflow:hidden;flex-shrink:0;}
-.hf-budget-bar{height:100%;border-radius:4px;background:#16a34a;transition:width .3s;}
-.hf-budget-bar.over{background:#dc2626;}
+.hf-budget-bar{width:60px;height:8px;border:0;border-radius:4px;background:var(--border);overflow:hidden;flex-shrink:0;appearance:none;-webkit-appearance:none;}
+.hf-budget-bar::-webkit-progress-bar{background:var(--border);border-radius:4px;}
+.hf-budget-bar::-webkit-progress-value{background:#16a34a;border-radius:4px;transition:width .3s;}
+.hf-budget-bar::-moz-progress-bar{background:#16a34a;border-radius:4px;transition:width .3s;}
+.hf-budget-bar.over::-webkit-progress-value{background:#dc2626;}
+.hf-budget-bar.over::-moz-progress-bar{background:#dc2626;}
 .hf-budget-total-row{display:flex;align-items:center;padding:10px 0 0;margin-top:4px;
   border-top:2px solid var(--border);}
 
@@ -932,7 +935,8 @@ html.dark body,body.dark{background:#251b26}
 .sales-reference-total{background:#f0fdf4;}
 .sales-reference-total-value{color:#166534;}
 
-.donut-dot,.legend-color-box,.legend-line{background:var(--dynamic-color);}
+.donut-color-0{background:#7f1d1d}.donut-color-1{background:#991b1b}.donut-color-2{background:#b91c1c}.donut-color-3{background:#dc2626}.donut-color-4{background:#ef4444}.donut-color-5{background:#f87171}.donut-color-6{background:#fca5a5}.donut-color-7{background:#fecaca}
+.legend-sales-bar{background:#166534bb}.legend-customers-line{background:#555}.legend-compare-bar{background:rgba(180,180,180,.7)}
 .legend-color-box{width:12px;height:12px;border-radius:3px;}
 .legend-line{width:18px;height:2.5px;border-radius:2px;}
 .sum-yoy.positive{color:#16a34a;}
