@@ -1138,7 +1138,7 @@ function refreshDonut(){
   // 合計行
   if(total>0){
     const totRow=document.createElement("div");
-    totRow.style.cssText="display:flex;justify-content:space-between;padding:5px 0 7px;border-bottom:2px solid #e8e8e8;margin-bottom:2px;";
+    totRow.className="donut-total-row";
     totRow.innerHTML=`<span style="font-size:11px;font-weight:700;color:var(--text3);">合計</span>
       <span style="font-size:13px;font-weight:800;color:#b91c1c;">¥${total.toLocaleString()}</span>`;
     leg.appendChild(totRow);
@@ -1155,7 +1155,7 @@ function refreshDonut(){
   });
   if(total===0){
     const empty=document.createElement("div");
-    empty.style.cssText="font-size:11px;color:#bbb;text-align:center;padding:12px 0;";
+    empty.className="donut-empty";
     empty.textContent="データなし";
     leg.appendChild(empty);
   }
