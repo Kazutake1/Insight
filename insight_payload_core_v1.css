@@ -349,7 +349,7 @@ input[type=number]{-moz-appearance:textfield;}
 .dark .clear-btn{border-color:rgba(248,113,113,0.4);color:#f87171;}
 .dark .clear-btn:active{background:rgba(248,113,113,0.1);}
 .saved-msg{display:none;align-items:center;gap:5px;font-size:11.5px;font-weight:600;
-  color:#15803d;background:#dcfce7;border-radius:9px;padding:6px 12px;}
+.saved-msg.is-visible{display:flex;}\n  color:#15803d;background:#dcfce7;border-radius:9px;padding:6px 12px;}
 
 /* 客数 カードグリッド */
 .kyaku-grid-wrap{flex:1;overflow-y:auto;-webkit-overflow-scrolling:touch;}
