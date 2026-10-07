@@ -44,7 +44,7 @@ test('canonical payloadはinline script/styleを持たず外部assetを順序固
   const ai=read('insight_payload_ai_legacy_v1.js');
   const css=read('insight_payload_core_v1.css');
   assert.match(payload,/insight_payload_core_v1\.css\?v=20261007-step3-donut-mode-css-1/);
-  assert.match(payload,/insight_payload_core_v1\.js\?v=20261007-step3-fixed-layout-styles-1/);
+  assert.match(payload,/insight_payload_core_v1\.js\?v=20261007-step3-error-ios-fixed-styles-1/);
   assert.doesNotMatch(core,/label\.style\.color/);
   assert.doesNotMatch(core,/msg\.style\.display/);
   assert.doesNotMatch(core,/badge\.style\.display/);
@@ -75,6 +75,16 @@ test('canonical payloadはinline script/styleを持たず外部assetを順序固
   assert.match(core,/banner\.className="install-banner"/);
   assert.match(css,/\.input-year-tab-wrap\{/);
   assert.match(css,/\.install-banner\{/);
+  assert.doesNotMatch(core,/box\.style\.cssText/);
+  assert.doesNotMatch(core,/heading\.style\.cssText/);
+  assert.doesNotMatch(core,/reason\.style\.cssText/);
+  assert.doesNotMatch(core,/exportButton\.style\.cssText/);
+  assert.match(core,/box\.className="storage-load-error-box"/);
+  assert.match(core,/exportButton\.className="storage-load-error-export"/);
+  assert.doesNotMatch(core,/hint\.style\.cssText=`position:fixed/);
+  assert.match(core,/hint\.className="ios-install-hint"/);
+  assert.match(css,/\.storage-load-error-box\{/);
+  assert.match(css,/\.ios-install-hint\{/);
   assert.match(css,/#donutBtnAmt\.active,#donutBtnPct\.active\{background:#1a1a1a;color:#fff;\}/);
   assert.match(core,/msg\.classList\.add\("is-visible"\)/);
   assert.match(core,/msg\.classList\.remove\("is-visible"\)/);
