@@ -1117,10 +1117,6 @@ function renderDonutDayPicker(){
   sel.innerHTML=Array.from({length:days},(_,i)=>`<option value="${i}">${i+1}日</option>`).join("");
   if(prev&&parseInt(prev)<days)sel.value=prev;
 }
-function applyDynamicColors(root){
-  root.querySelectorAll("[data-color]").forEach(el=>el.style.setProperty("--dynamic-color",el.dataset.color));
-}
-
 function refreshDonut(){
   const haiki=buildDonutData();
   const vals=HAIKI_CATS.map(c=>haiki[c]);
@@ -1146,7 +1142,7 @@ function refreshDonut(){
     const pct=total>0?(vals[i]/total*100).toFixed(1):"0.0";
     const dispVal=donutMode==="amount"?`¥${vals[i].toLocaleString()}`:`${pct}%`;
     const div=document.createElement("div");div.className="donut-leg";
-    div.innerHTML=`<span class="donut-dot" data-color="${HAIKI_COLORS[i]}"></span>
+    div.innerHTML=`<span class="donut-dot donut-color-${i}"></span>
       <span class="donut-name">${c}</span>
       <span class="donut-val">${dispVal}</span>`;
     leg.appendChild(div);
@@ -1157,7 +1153,6 @@ function refreshDonut(){
     empty.textContent="データなし";
     leg.appendChild(empty);
   }
-  applyDynamicColors(leg);
 }
 
 function setDonutMode(mode){
@@ -1211,8 +1206,8 @@ function renderLegend(){
   [{meta:mSales,type:"bar"},{meta:mKyaku,type:"line"}].forEach(({meta,type})=>{
     const div=document.createElement("div");div.className="legend-item";
     const indicator=type==="bar"
-      ?`<div class="legend-color-box" data-color="${meta.color}bb"></div>`
-      :`<div class="legend-line" data-color="${meta.color}"></div>`;
+      ?`<div class="legend-color-box legend-sales-bar"></div>`
+      :`<div class="legend-line legend-customers-line"></div>`;
     div.innerHTML=`${indicator}<span>${meta.label}（${meta.unit}）</span>`;
     row.appendChild(div);
   });
@@ -1221,13 +1216,12 @@ function renderLegend(){
      {color:"#aaa",label:`${cmpYear}年 客数`,type:"line"}].forEach(l=>{
       const div=document.createElement("div");div.className="legend-item";
       const indicator=l.type==="bar"
-        ?`<div class="legend-color-box" data-color="${l.color}"></div>`
+        ?`<div class="legend-color-box legend-compare-bar"></div>`
         :`<div class="legend-dashed-line"></div>`;
       div.innerHTML=`${indicator}<span class="legend-label">${l.label}</span>`;
       row.appendChild(div);
     });
   }
-  applyDynamicColors(row);
 }
 
 /* ══ Main chart ══ */
@@ -1453,7 +1447,7 @@ function renderHaikiBudgetSection(actualTotal, actualCats){
       const pct=limit>0?Math.min(100,Math.round(actual/limit*100)):0;
       html+=`<div class="hf-budget-row">
         <span class="hf-budget-label">${c}</span>
-        <div class="hf-budget-bar-wrap"><div class="hf-budget-bar${over?" over":""}" style="width:${pct}%;"></div></div>
+        <progress class="hf-budget-bar${over?" over":""}" value="${pct}" max="100"></progress>
         <span class="hf-budget-actual${over?" over":""}">¥${actual.toLocaleString()}</span>
         <span class="hf-budget-limit">/ ¥${limit.toLocaleString()}</span>
       </div>`;
