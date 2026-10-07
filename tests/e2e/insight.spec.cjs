@@ -1883,7 +1883,7 @@ test('イベント実績は過去開催→複数日→時間帯グラフ→カ�
   await expect(page.locator('.er-hour-item>strong')).toHaveCount(0);
   await expect(page.locator('.er-hour-plot')).toHaveCount(24);
   await expect(page.locator('.er-hour-value:visible')).toHaveCount(0);
-  const hourlyBarColor=await page.locator('.er-hour-bar').first().evaluate(el=>getComputedStyle(el).backgroundColor);
+  const hourlyBarColor=await page.locator('.er-hour-bar').first().evaluate(el=>getComputedStyle(el).color);
   expect(hourlyBarColor).toBe('rgb(59, 130, 246)');
   const timeFontSize=await page.locator('.er-hour-item>span').first().evaluate(el=>getComputedStyle(el).fontSize);
   expect(timeFontSize).toBe('13px');
