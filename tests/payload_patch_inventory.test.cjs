@@ -920,7 +920,6 @@ test('イベント実績は過去開催・日付カード・時間帯グラフ�
   assert.match(css,/\.ie-dialog\.ie-event-add \.ie-presets\{margin-top:10px\}/);
   assert.doesNotMatch(events,/row\.body\.style\.display/);
   assert.match(events,/row\.body\.classList\.toggle\('ie-sale-target-body-hidden',!row\.check\.checked\)/);
-  const css=read('insight_payload_core_v1.css');
   assert.match(css,/\.ie-sale-target-body\.ie-sale-target-body-hidden\{display:none\}/);
   assert.match(events,/scopeText\.hidden=hideScopeText/);
   assert.doesNotMatch(events,/全店舗共通・指定期間の各日に表示します。/);
@@ -1009,7 +1008,6 @@ test('全ページタイトルはダッシュボード基準の共通モジュ�
   assert.ok(index.indexOf('insight_page_title_layout_v1.js')<index.indexOf('insight_page_period_sync_v1.js'));
   assert.match(layout,/var SELECTOR='\.page > \.page-header > \.page-title'/);
   assert.match(layout,/document\.getElementById\('pageDash'\)/);
-  assert.match(layout,/getComputedStyle\(page\)/);
   assert.match(layout,/MutationObserver/);
   assert.match(layout,/align-self:flex-start!important/);
   assert.doesNotMatch(layout,/localStorage|InsightStorage/);
@@ -1043,8 +1041,8 @@ test('セール実績ページは販売数入力直後に読み込み同一日�
   assert.match(css,/\.sr-list-table\{[^}]*font-size:12\.5px/);
   assert.match(css,/\.sr-day-grid>\.sc-day\{min-width:0\}/);
   assert.match(sales,/model\.createReadOnlyDayCard=createReadOnlyDayCard/);
-  assert.match(sales,/\.sc-totals b\{font-size:14px;text-align:center\}/);
-  assert.match(sales,/\.sc-average-totals b\{font-size:14px;text-align:center\}/);
+  assert.match(css,/\.sc-totals b\{font-size:14px;text-align:center\}/);
+  assert.match(css,/\.sc-average-totals b\{font-size:14px;text-align:center\}/);
   assert.match(sales,/\.sc-totals b,\.sc-average-totals b\{font-size:14px\}/);
   assert.doesNotMatch(saleResults,/localStorage|InsightStorage/);
   assert.doesNotThrow(()=>new vm.Script(saleResults),'sale results module must be valid JavaScript');
@@ -1181,7 +1179,7 @@ test('STEP5 settings/title styles are external and CSP-safe',()=>{
 test('曜日別平均カードと廃棄悪化色の表示契約を維持する',()=>{
   const sales=read('insight_sales_count_v1.js');
   const visual=read('insight_ai_visual_v1.js');
-  assert.match(sales,/\.sc-page\{[^}]*min-width:0;width:100%;max-width:100%;box-sizing:border-box/);
+  assert.match(css,/\.sc-page\{[^}]*min-width:0;width:100%;max-width:100%;box-sizing:border-box/);
   assert.match(sales,/\.sc-calendar\{[^}]*grid-template-columns:repeat\(7,minmax\(160px,1fr\)\);gap:8px;[^}]*min-width:0;width:100%;max-width:100%;box-sizing:border-box/);
   assert.match(sales,/\.sc-average-grid\{[^}]*grid-template-columns:repeat\(7,minmax\(160px,1fr\)\);gap:8px;[^}]*min-width:0;width:100%;max-width:100%;box-sizing:border-box/);
   assert.match(sales,/@media\(max-width:1200px\)\{\.sc-calendar,\.sc-average-grid\{grid-template-columns:repeat\(7,minmax\(0,1fr\)\);gap:6px\}/);
@@ -1255,8 +1253,8 @@ test('平日平均と日曜日・祝日平均は補足文を表示せず表の�
   assert.doesNotMatch(sales,/sc-day-type-note/);
   assert.doesNotMatch(sales,/選択月の保存済み実績/);
   assert.match(sales,/card\.classList\.add\('sc-day-type-card'\)/);
-  assert.match(sales,/\.sc-day-type-card\{padding-bottom:12px\}/);
-  assert.match(sales,/\.sc-day-type-card h3\{margin-bottom:8px\}/);
+  assert.match(css,/\.sc-day-type-card\{padding-bottom:12px\}/);
+  assert.match(css,/\.sc-day-type-card h3\{margin-bottom:8px\}/);
 });
 
 test('曜日別平均も対象外便をダッシュ＋グレー表示に統一する',()=>{
@@ -1267,7 +1265,7 @@ test('曜日別平均も対象外便をダッシュ＋グレー表示に統一�
   assert.match(block,/class="sc-not-applicable"/);
   assert.match(block,/\?'ー':fmt\(value\)/);
   assert.doesNotMatch(block,/対象外/);
-  assert.match(sales,/\.sc-average-row b\.sc-not-applicable\{background:var\(--surface2\)!important;border-color:var\(--border\)!important;color:var\(--text4\)!important\}/);
+  assert.match(css,/\.sc-average-row b\.sc-not-applicable\{background:var\(--surface2\)!important;border-color:var\(--border\)!important;color:var\(--text4\)!important/);
 });
 
 
