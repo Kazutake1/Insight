@@ -102,12 +102,12 @@
     dark.hidden=true;
     dark.setAttribute('aria-hidden','true');
     dark.tabIndex=-1;
-    dark.style.setProperty('display','none','important');
+    dark.classList.add('insight-settings-legacy-hidden');
     var themeBridge=doc.createElement('div');
     themeBridge.id='insightThemeBridge';
     themeBridge.hidden=true;
     themeBridge.setAttribute('aria-hidden','true');
-    themeBridge.style.setProperty('display','none','important');
+    themeBridge.classList.add('insight-settings-legacy-hidden');
     themeBridge.append(dark);
     doc.body.append(themeBridge);
     sidebarActions.replaceChildren(themeWrap,nav);
