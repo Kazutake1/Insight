@@ -287,8 +287,8 @@ test('トップページは外部shellと機能manifestの最新版確認をno-s
   expect(source).toContain('https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js');
   expect(source).toContain('integrity="sha512-CQBWl4fJHWbryGE+Pc7UAxWMUMNMWzWxF4SQo9CgkJIN1kx6djDQZjh3Y8SZ1d+6I+1zze6Z7kHXO7q3UyZAWw=="');
   expect(loader).not.toContain('stripPayloadChartScript');
-  expect(payload).toContain('insight_payload_core_v1.css?v=20261007-step3-kpi-value-state-css-2');
-  expect(payload).toContain('insight_payload_core_v1.js?v=20261007-step3-kpi-value-state-2');
+  expect(payload).toContain('insight_payload_core_v1.css?v=20261007-step3-quick-save-feedback-css-1');
+  expect(payload).toContain('insight_payload_core_v1.js?v=20261007-step3-quick-save-feedback-1');
   expect(payload).toContain('insight_payload_ai_legacy_v1.js?v=20261006-payload-assets-1');
   expect(payload).toContain('insight_payload_bindings_v1.js?v=20261006-inline-bindings-1');
   expect(payload).not.toMatch(/\son(?:click|change)\s*=/i);
@@ -1568,6 +1568,21 @@ test('販売数入力で未登録の過年度へ移動すると年度を正式�
   expect(errors).toEqual([]);
 });
 
+
+test('今日の入力の保存完了フィードバックはclass状態で2秒後に戻る',async({page})=>{
+  const errors=await openInsight(page);
+  await page.locator('#nav0').click();
+  const button=page.locator('#quickSaveBtn');
+  await expect(button).toBeVisible();
+  await expect(button).toHaveText('保存する');
+  await button.click();
+  await expect(button).toHaveText('✓ 保存しました');
+  await expect(button).toHaveClass(/is-saved-feedback/);
+  await expect.poll(()=>button.evaluate(node=>getComputedStyle(node).backgroundColor)).toBe('rgb(22, 163, 74)');
+  await expect(button).toHaveText('保存する',{timeout:3500});
+  await expect(button).not.toHaveClass(/is-saved-feedback/);
+  expect(errors).toEqual([]);
+});
 
 test('今日の入力の日付ピッカーは年月変更でも入力要素を維持する',async({page})=>{
   const errors=await openInsight(page);
