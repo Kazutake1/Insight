@@ -43,10 +43,10 @@ test('canonical payloadはinline script/styleを持たず外部assetを順序固
   const core=read('insight_payload_core_v1.js');
   const ai=read('insight_payload_ai_legacy_v1.js');
   const css=read('insight_payload_core_v1.css');
-  assert.match(payload,/insight_payload_core_v1\.css\?v=20261007-step3-saved-message-css-1/);
-  assert.match(payload,/insight_payload_core_v1\.js\?v=20261007-step3-saved-message-visibility-1/);
+  assert.match(payload,/insight_payload_core_v1\.css\?v=20261007-step3-today-badge-css-1/);
+  assert.match(payload,/insight_payload_core_v1\.js\?v=20261007-step3-today-badge-visibility-1/);
   assert.doesNotMatch(core,/label\.style\.color/);
-  assert.doesNotMatch(core,/msg\.style\.display/);
+  assert.doesNotMatch(core,/msg\.style\.display/);\n  assert.doesNotMatch(core,/badge\.style\.display/);\n  assert.match(core,/badge\.classList\.remove\("is-hidden"\)/);\n  assert.match(core,/badge\.classList\.add\("is-hidden"\)/);\n  assert.match(css,/\.today-badge\.is-hidden\{display:none;\}/);
   assert.match(core,/msg\.classList\.add\("is-visible"\)/);
   assert.match(core,/msg\.classList\.remove\("is-visible"\)/);
   assert.match(css,/\.saved-msg\.is-visible\{display:flex;\}/);
