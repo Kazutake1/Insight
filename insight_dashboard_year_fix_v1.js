@@ -4,28 +4,6 @@
   if(window.__insightDashboardYearFixV1)return;
   window.__insightDashboardYearFixV1=true;
 
-  var css=document.createElement('style');
-  css.id='insightDashboardYearFixStyle';
-  css.textContent=[
-    '#kpiRow{padding-left:5px!important;scroll-padding-left:5px}',
-    '#insightDeleteYearButton{color:#b42318!important;border-color:#b42318!important}',
-    '#insightDeleteYearButton:disabled{cursor:not-allowed}',
-    '#modalBg,.btn-del-year{display:none!important}',
-    '#insightYearDeleteOverlay{position:fixed;inset:0;z-index:25000;background:rgba(0,0,0,.46);display:flex;align-items:center;justify-content:center;padding:20px;box-sizing:border-box}',
-    '#insightYearDeleteOverlay[hidden]{display:none!important}',
-    '#insightYearDeleteDialog{box-sizing:border-box;width:min(100%,410px);padding:22px;border-radius:16px;background:var(--surface,#fff);color:var(--text,#222);box-shadow:0 18px 60px rgba(0,0,0,.25);font-family:inherit}',
-    '#insightYearDeleteDialog h2{font-size:18px;line-height:1.45;margin:0 0 15px}',
-    '#insightYearDeleteDialog label{display:block;font-size:13px;margin-bottom:6px;font-weight:700}',
-    '#insightYearDeleteDialog select{width:100%;padding:11px;border:1px solid var(--border,#ccc);border-radius:8px;background:var(--surface,#fff);color:var(--text,#222);font-size:15px}',
-    '#insightYearDeleteQuestion{font-size:15px;font-weight:750;line-height:1.5;margin:17px 0 8px}',
-    '#insightYearDeleteWarning{font-size:12px;line-height:1.6;color:#b42318;margin:0 0 19px}',
-    '#insightYearDeleteActions{display:flex;justify-content:flex-end;gap:9px}',
-    '#insightYearDeleteActions button{font:700 13px/1.2 inherit;font-family:inherit;border-radius:8px;padding:11px 14px;cursor:pointer}',
-    '#insightYearDeleteCancel{background:var(--surface,#fff);color:var(--text,#222);border:1px solid var(--border,#ccc)}',
-    '#insightYearDeleteConfirm{background:#b42318;color:#fff;border:1px solid #b42318}'
-  ].join('');
-  document.head.appendChild(css);
-
   function removeLegacyYearDeleteUi(){
     var modal=document.getElementById('modalBg');
     if(modal&&modal.parentNode)modal.parentNode.removeChild(modal);
@@ -119,7 +97,6 @@
     if(!deleteButton){
       deleteButton=document.createElement('button');deleteButton.type='button';
       deleteButton.id='insightDeleteYearButton';deleteButton.className=addButton.className;
-      deleteButton.style.cssText=addButton.style.cssText;
       deleteButton.textContent='− 年度削除';deleteButton.title='対象年度を選び、確認して削除します';
       deleteButton.addEventListener('click',openDialog);
       addButton.insertAdjacentElement('afterend',deleteButton);
