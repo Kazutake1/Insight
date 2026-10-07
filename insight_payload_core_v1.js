@@ -2549,9 +2549,9 @@ function updateMissingBadge(){
     if(allDone){
       badge.textContent="✓ 完了";
       badge.className="today-badge";
-      badge.style.display="";
+      badge.classList.remove("is-hidden");
     } else {
-      badge.style.display="none";
+      badge.classList.add("is-hidden");
     }
   }
 
