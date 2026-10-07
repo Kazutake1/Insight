@@ -648,16 +648,12 @@ function showStoreMenu(){
   },50);
 }
 
-const THEMES={
-  mono:{primary:"#1a1a1a",secondary:"#888",accent:"#555",bg:"rgba(26,26,26,0.07)"},
-};
+const THEMES={mono:"theme-mono"};
 
 function applyTheme(t){
-  const th=THEMES[t]||THEMES.mono;
-  document.documentElement.style.setProperty("--c-primary",th.primary);
-  document.documentElement.style.setProperty("--c-secondary",th.secondary);
-  document.documentElement.style.setProperty("--c-accent",th.accent);
-  document.documentElement.style.setProperty("--c-bg",th.bg);
+  const themeClass=THEMES[t]||THEMES.mono;
+  Object.values(THEMES).forEach(c=>document.documentElement.classList.remove(c));
+  document.documentElement.classList.add(themeClass);
   document.querySelectorAll(".theme-btn").forEach(b=>{
     b.classList.toggle("active",b.onclick?.toString().includes(`'${t}'`)||b.getAttribute("onclick")?.includes(`'${t}'`));
   });
@@ -2299,7 +2295,7 @@ function clearDayData(type){
   persist();
   initInputPage(type);
   updateMissingBadge();
-  showToast(`🗑 ${m}${day}日のデータをクリアしました`,"#dc2626","#fef2f2");
+  showToast(`🗑 ${m}${day}日のデータをクリアしました`,"danger");
 }
 
 function clearKyakuMonth(){
@@ -2314,7 +2310,7 @@ function clearKyakuMonth(){
   persist();
   initInputPage("kyaku");
   updateMissingBadge();
-  showToast(`🗑 ${m}の客数データをクリアしました`,"#dc2626","#fef2f2");
+  showToast(`🗑 ${m}の客数データをクリアしました`,"danger");
 }
 
 function clearTodayData(){
@@ -2332,7 +2328,7 @@ function clearTodayData(){
   persist();
   initQuickPage();
   updateMissingBadge();
-  showToast("🗑 本日のデータをクリアしました","#dc2626","#fef2f2");
+  showToast("🗑 本日のデータをクリアしました","danger");
 }
 
 /* ══ バックアップ・復元 ══ */
@@ -2365,7 +2361,7 @@ function backupData(){
   URL.revokeObjectURL(url);
   localStorage.setItem(BACKUP_KEY,String(Date.now()));
   updateBackupDaysLabel();
-  showToast("📥 バックアップを保存しました","#15803d","#f0fdf4");
+  showToast("📥 バックアップを保存しました","success");
 }
 
 function restoreData(e){
@@ -2397,7 +2393,7 @@ function restoreData(e){
       else if(currentNav>1)initInputPage(["","","sales","kyaku","haiki"][currentNav]);
       else initQuickPage();
       updateMissingBadge();
-      showToast("📤 データを復元しました","#1d4ed8","#eff6ff");
+      showToast("📤 データを復元しました","info");
     }catch(err){
       alert("ファイルの読み込みに失敗しました。\n正しいバックアップファイルを選択してください。");
     }
@@ -2518,7 +2514,7 @@ function importCSV(e){
       editYear={sales:baseYear,kyaku:baseYear,haiki:baseYear};
       if(currentNav===1)refreshDash();
       updateMissingBadge();
-      showToast(`📊 ${imported}件のデータを取り込みました${skipped>0?' ('+skipped+'件スキップ)':''}`, '#1d4ed8','#eff6ff');
+      showToast(`📊 ${imported}件のデータを取り込みました${skipped>0?' ('+skipped+'件スキップ)':''}`, 'info');
     }catch(err){
       alert('CSVの読み込みに失敗しました。\n\n'+err.message+'\n\n形式例:\n日付,売上,客数,買上点数,廃棄金額\n2025-01-01,1234,150,3.45,25000');
     }
@@ -2610,12 +2606,9 @@ function attachValidation(input,key,getDraftFn){
   });
 }
 
-function showToast(msg,color,bg){
+function showToast(msg,type="info"){
   const t=document.createElement("div");
-  t.style.cssText=`position:fixed;bottom:24px;left:50%;transform:translateX(-50%);
-    background:${bg};color:${color};border-radius:12px;padding:10px 20px;
-    font-size:13px;font-weight:700;z-index:9999;box-shadow:0 4px 20px rgba(0,0,0,0.12);
-    white-space:nowrap;font-family:-apple-system,sans-serif;`;
+  t.className=`app-toast app-toast-${type}`;
   t.textContent=msg;
   document.body.appendChild(t);
   setTimeout(()=>t.remove(),3000);
