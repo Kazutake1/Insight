@@ -43,7 +43,7 @@ test('canonical payloadはinline script/styleを持たず外部assetを順序固
   const core=read('insight_payload_core_v1.js');
   const ai=read('insight_payload_ai_legacy_v1.js');
   const css=read('insight_payload_core_v1.css');
-  assert.match(payload,/insight_payload_core_v1\.css\?v=20261007-base-year-arrow-light-1/);
+  assert.match(payload,/insight_payload_core_v1\.css\?v=20261007-weather-compact-css-1/);
   assert.match(payload,/insight_payload_core_v1\.js\?v=20261006-payload-assets-1/);
   assert.match(payload,/insight_payload_ai_legacy_v1\.js\?v=20261006-payload-assets-1/);
   assert.match(payload,/insight_payload_bindings_v1\.js\?v=20261006-inline-bindings-1/);
@@ -80,6 +80,26 @@ test('トップページはキャッシュ抑止とシェル・機能manifestの
   assert.match(index,/cache:'no-store'/);
   assert.match(index,/location\.replace\('\.\/Index\.html\?insight_build='/);
   assert.doesNotMatch(index,/if\(params\.get\('insight_build'\)===BUILD\)return/);
+});
+
+test('クイック入力の天気セレクタは固定スタイルを外部CSSで維持し選択ロジックを保持する',()=>{
+  const index=readShell();
+  const weather=read('insight_weather_compact_v1.js');
+  const css=read('insight_payload_core_v1.css');
+  assert.match(index,/insight_weather_compact_v1\.js\?v=20261007-csp-style-weather-compact-1/);
+  assert.match(weather,/function selectedWeather\(/);
+  assert.match(weather,/function choose\(wx\)/);
+  assert.match(weather,/root\.setWeather\(wx\)/);
+  assert.match(weather,/function ensureControl\(/);
+  assert.match(weather,/MutationObserver\(sync\)/);
+  assert.match(css,/#qWeatherSel\{display:none!important\}/);
+  assert.match(css,/\.qwc-trigger\{height:36px;display:inline-flex/);
+  assert.match(css,/\.qwc-menu\{position:absolute;z-index:1200/);
+  assert.match(css,/\.qwc-option\.active\{border-color:var\(--text,#1a1a1a\)/);
+  assert.match(css,/@media\(max-width:759px\)\{\.qwc-menu\{left:auto;right:0\}/);
+  assert.doesNotMatch(weather,/createElement\(['"]style['"]\)|style\.textContent|appendChild\(style\)|function ensureStyle\(/);
+  assert.doesNotMatch(weather,/localStorage/);
+  assert.doesNotThrow(()=>new vm.Script(weather),'weather compact module must be valid JavaScript');
 });
 
 test('天気アイコン拡張はruntime moduleが所有しbootstrap patch件数に含めない',()=>{
