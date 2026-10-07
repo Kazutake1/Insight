@@ -225,42 +225,8 @@
     syncWorkspaceState();
   }
 
-  function sidebarRect(button){
-    if(!button)return null;
-    var sidebar=button.closest&&button.closest('.sidebar');
-    if(sidebar){
-      var direct=sidebar.getBoundingClientRect();
-      if(direct.width>40&&direct.height>200)return direct;
-    }
-    var node=button.parentElement,best=null;
-    while(node&&node!==document.body&&node!==document.documentElement){
-      var rect=node.getBoundingClientRect();
-      if(
-        rect.width>=120&&rect.width<=360&&
-        rect.height>=Math.max(320,window.innerHeight*.55)&&
-        rect.left>=0&&rect.left<80&&rect.top>=0&&rect.top<160
-      ){
-        if(!best||rect.height>best.height)best=rect;
-      }
-      node=node.parentElement;
-    }
-    return best;
-  }
-
   function syncWorkspacePosition(){
-    var panel=document.getElementById('aiAnalysisPanel');
-    var button=document.getElementById('aiAnalysisToggle');
-    if(!panel)return;
-    var navHost=button&&button.parentElement;
-    var left=12,top=12;
-    if(navHost){
-      var rect=navHost.getBoundingClientRect();
-      if(rect.width>40&&rect.right>0&&rect.right<window.innerWidth-280)left=Math.round(rect.right+12);
-    }
-    var side=sidebarRect(button);
-    if(side&&side.top>=0&&side.top<window.innerHeight-120)top=Math.round(side.top);
-    panel.style.setProperty('--ai-workspace-left',left+'px');
-    panel.style.setProperty('--ai-workspace-top',top+'px');
+    /* Position is fully owned by external CSS for CSP compatibility. */
   }
 
   function syncWorkspaceState(){
