@@ -639,7 +639,8 @@ body.ai-analysis-open .ai-analysis-toggle{display:none;}
 #donutBtnAmt,#donutBtnPct{
   padding:3px 9px;border:none;font-size:10px;font-weight:700;cursor:pointer;font-family:inherit;
 }
-#donutBtnAmt,#donutBtnPct{background:#fff;color:#999;}\n#donutBtnAmt.active,#donutBtnPct.active{background:#1a1a1a;color:#fff;}
+#donutBtnAmt,#donutBtnPct{background:#fff;color:#999;}
+#donutBtnAmt.active,#donutBtnPct.active{background:#1a1a1a;color:#fff;}
 #donutDaySelect{
   font-size:9.5px;font-weight:700;border:1px solid #eee;border-radius:6px;padding:3px 5px;
   color:var(--text3);background:var(--input-bg);font-family:inherit;
