@@ -937,3 +937,9 @@ html.dark body,body.dark{background:#251b26}
 .legend-line{width:18px;height:2.5px;border-radius:2px;}
 .sum-yoy.positive{color:#16a34a;}
 .sum-yoy.negative{color:#dc2626;}
+
+.theme-mono{--c-primary:#1a1a1a;--c-secondary:#888;--c-accent:#555;--c-bg:rgba(26,26,26,.07);}
+.app-toast{position:fixed;bottom:24px;left:50%;transform:translateX(-50%);border-radius:12px;padding:10px 20px;font-size:13px;font-weight:700;z-index:9999;box-shadow:0 4px 20px rgba(0,0,0,.12);white-space:nowrap;font-family:-apple-system,sans-serif;}
+.app-toast-danger{background:#fef2f2;color:#dc2626;}
+.app-toast-success{background:#f0fdf4;color:#15803d;}
+.app-toast-info{background:#eff6ff;color:#1d4ed8;}
