@@ -43,7 +43,7 @@ test('canonical payloadはinline script/styleを持たず外部assetを順序固
   const core=read('insight_payload_core_v1.js');
   const ai=read('insight_payload_ai_legacy_v1.js');
   const css=read('insight_payload_core_v1.css');
-  assert.match(payload,/insight_payload_core_v1\.css\?v=20261007-readability-dashboard-kpi-css-1/);
+  assert.match(payload,/insight_payload_core_v1\.css\?v=20261007-readability-ops-css-1/);
   assert.match(payload,/insight_payload_core_v1\.js\?v=20261006-payload-assets-1/);
   assert.match(payload,/insight_payload_ai_legacy_v1\.js\?v=20261006-payload-assets-1/);
   assert.match(payload,/insight_payload_bindings_v1\.js\?v=20261006-inline-bindings-1/);
@@ -239,7 +239,7 @@ test('STEP17の可読性CSSは独立moduleで主要ページへ横展開する',
   const index=readShell();
   const readability=read('insight_readability_v1.js');
   const css=read('insight_payload_core_v1.css');
-  assert.match(index,/insight_readability_v1\.js\?v=20261007-csp-style-readability-dashboard-kpi-1/);
+  assert.match(index,/insight_readability_v1\.js\?v=20261007-csp-style-readability-ops-1/);
   assert.ok(index.indexOf('insight_dark_theme_v1.js')<index.indexOf('insight_readability_v1.js'));
   assert.match(readability,/insightReadabilityStyle/);
   assert.match(readability,/#main\{padding-left:0!important;padding-right:0!important;min-width:0!important;box-sizing:border-box!important\}/);
@@ -256,7 +256,12 @@ test('STEP17の可読性CSSは独立moduleで主要ページへ横展開する',
   assert.match(css,/#pageDash \.kpi-prev\{[^}]*margin-left:0!important;[^}]*font-size:11px!important;[^}]*white-space:nowrap!important;[^}]*flex:0 0 auto!important/);
   assert.doesNotMatch(readability,/#pageDash \.kpi-/);
   assert.match(css,/#pageDash \.kpi-unit\{font-size:12px!important\}/);
-  assert.match(readability,/#pageDash \.qs-title\{font-size:15px!important\}/);
+  assert.match(css,/#pageDash \.qs-title\{font-size:15px!important\}/);
+  assert.doesNotMatch(readability,/#pageDash \.qs-title|\.ops-field-title|\.ops-memo|\.ops-stockout|\.monthly-ops-/);
+  assert.match(css,/\.ops-field-title\{font-size:13px!important\}/);
+  assert.match(css,/\.ops-memo,\.ops-stockout\{font-size:14px!important;line-height:1\.5\}/);
+  assert.match(css,/\.monthly-ops-title\{font-size:14px!important\}/);
+  assert.match(css,/\.monthly-ops-saved\{font-size:12px!important\}/);
   assert.match(css,/#pageSales #issRow \.iss-stat,#pageKyaku #ikyRow \.iky-stat\{font-size:13px!important/);
   assert.match(css,/#iwcRow \.iwc-kpi-value\{font-size:16px!important/);
   assert.doesNotMatch(readability,/#pageSales #issRow|#pageKyaku #ikyRow|#iwcRow/);
