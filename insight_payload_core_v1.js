@@ -2716,12 +2716,10 @@ function showInstallBanner(){
   banner.id="installBanner";
   banner.className="install-banner";
   banner.innerHTML=`<span>📲 ホーム画面に追加して使う</span>
-    <button onclick="doInstall()" style="background:#fff;color:#1a1a1a;border:none;
-      border-radius:8px;padding:6px 14px;font-weight:800;font-size:12px;cursor:pointer;">
+    <button onclick="doInstall()" class="install-banner-action">
       追加する
     </button>
-    <button onclick="this.closest('#installBanner').remove()" style="background:transparent;
-      color:rgba(255,255,255,0.5);border:none;font-size:16px;cursor:pointer;padding:0 4px;">✕</button>`;
+    <button onclick="this.closest('#installBanner').remove()" class="install-banner-close">✕</button>`;
   document.body.appendChild(banner);
   setTimeout(()=>banner.remove&&banner.remove(),15000);
 }
