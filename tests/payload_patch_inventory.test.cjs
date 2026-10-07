@@ -44,7 +44,7 @@ test('canonical payloadはinline script/styleを持たず外部assetを順序固
   const ai=read('insight_payload_ai_legacy_v1.js');
   const css=read('insight_payload_core_v1.css');
   assert.match(payload,/insight_payload_core_v1\.css\?v=20261007-step3-donut-mode-css-1/);
-  assert.match(payload,/insight_payload_core_v1\.js\?v=20261007-step4-dynamic-colors-1/);
+  assert.match(payload,/insight_payload_core_v1\.js\?v=20261007-step4-theme-toast-1/);
   assert.doesNotMatch(core,/label\.style\.color/);
   assert.doesNotMatch(core,/msg\.style\.display/);
   assert.doesNotMatch(core,/badge\.style\.display/);
@@ -118,6 +118,14 @@ test('canonical payloadはinline script/styleを持たず外部assetを順序固
   assert.match(core,/sum-yoy \$\{\(m\.up\?yoyVal\.up:!yoyVal\.up\)\?"positive":"negative"\}/);
   assert.match(css,/\.sum-yoy\.positive\{/);
   assert.match(css,/\.sum-yoy\.negative\{/);
+  assert.match(core,/const THEMES=\{mono:"theme-mono"\}/);
+  assert.match(core,/t\.className=`app-toast app-toast-\$\{type\}`/);
+  assert.doesNotMatch(core,/document\.documentElement\.style\.setProperty\("--c-/);
+  assert.doesNotMatch(core,/t\.style\.cssText/);
+  assert.match(css,/\.theme-mono\{/);
+  assert.match(css,/\.app-toast-danger\{/);
+  assert.match(css,/\.app-toast-success\{/);
+  assert.match(css,/\.app-toast-info\{/);
   assert.match(css,/#donutBtnAmt\.active,#donutBtnPct\.active\{background:#1a1a1a;color:#fff;\}/);
   assert.match(core,/msg\.classList\.add\("is-visible"\)/);
   assert.match(core,/msg\.classList\.remove\("is-visible"\)/);
