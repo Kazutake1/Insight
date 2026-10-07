@@ -32,29 +32,7 @@
     '#pageSales .table-card input,#pageSales .table-card select,#pageSales .table-card button,#pageKyaku .table-card input,#pageKyaku .table-card select,#pageKyaku .table-card button,#pageHaiki .table-card input,#pageHaiki .table-card select,#pageHaiki .table-card button{font-size:13px!important}',
 
 
-    '#pageSalesCount .sc-toolbar{font-size:13.5px}',
-    '#pageSalesCount .sc-status{font-size:12.5px!important}',
-    '#pageSalesCount .sc-legend{font-size:13px!important}',
-    '#pageSalesCount .sc-col-head,#pageSalesCount .sc-average-head{font-size:12.5px!important}',
-    '#pageSalesCount .sc-trip input{font-size:13.5px!important}',
-    '#pageSalesCount .sc-trip input.sc-not-applicable{font-size:11.5px!important}',
-    '#pageSalesCount .sc-average-title{font-size:16px!important}',
-    '#pageSalesCount .sc-average-row b{font-size:13px!important}',
-    '#pageSalesCount .sc-card h3{font-size:15px!important}',
-    '#pageSalesCount .sc-card table{font-size:12.5px!important}',
-    '.sc-dialog{font-size:13px}',
-    '.sc-dialog .sc-category-trips-label{font-size:12px!important}',
-    '.sc-dialog .sc-category-trips label,.sc-dialog .sc-category-state{font-size:12.5px!important}',
 
-    '.hourly-quick-status{font-size:12.5px!important;line-height:1.4}',
-    '.hourly-quick-button{font-size:13px!important}',
-    '.hourly-dialog{font-size:14px!important}',
-    '.hourly-dialog h2{font-size:18px!important}',
-    '.hourly-help{font-size:12.5px!important;line-height:1.5}',
-    '.hourly-input-group h3{font-size:13px!important}',
-    '.hourly-input-group label span{font-size:13px!important}',
-    '.hourly-input-group input{font-size:14px!important}',
-    '.hourly-dialog-summary{font-size:14px!important}',
 
     '.ai-analysis-workspace .ai-analysis-card-title{font-size:13px!important}',
     '.ai-analysis-workspace .ai-analysis-comment,.ai-analysis-workspace .ai-analysis-empty{font-size:14px!important;line-height:1.6!important}'
