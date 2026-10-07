@@ -44,7 +44,7 @@ test('canonical payloadはinline script/styleを持たず外部assetを順序固
   const ai=read('insight_payload_ai_legacy_v1.js');
   const css=read('insight_payload_core_v1.css');
   assert.match(payload,/insight_payload_core_v1\.css\?v=20261007-step3-donut-mode-css-1/);
-  assert.match(payload,/insight_payload_core_v1\.js\?v=20261007-step3-donut-mode-state-1/);
+  assert.match(payload,/insight_payload_core_v1\.js\?v=20261007-step3-weather-button-state-1/);
   assert.doesNotMatch(core,/label\.style\.color/);
   assert.doesNotMatch(core,/msg\.style\.display/);
   assert.doesNotMatch(core,/badge\.style\.display/);
@@ -58,6 +58,9 @@ test('canonical payloadはinline script/styleを持たず外部assetを順序固
   assert.doesNotMatch(core,/btnPct\.style\.(?:background|color)/);
   assert.match(core,/btnAmt\.classList\.toggle\("active",mode==="amount"\)/);
   assert.match(core,/btnPct\.classList\.toggle\("active",mode==="percent"\)/);
+  assert.doesNotMatch(core,/btn\.style\.borderColor=w===wx/);
+  assert.doesNotMatch(core,/btn\.style\.background=w===wx/);
+  assert.match(core,/btn\.classList\.toggle\("active",w===wx\)/);
   assert.match(css,/#donutBtnAmt\.active,#donutBtnPct\.active\{background:#1a1a1a;color:#fff;\}/);
   assert.match(core,/msg\.classList\.add\("is-visible"\)/);
   assert.match(core,/msg\.classList\.remove\("is-visible"\)/);
