@@ -1458,7 +1458,7 @@ function renderHaikiBudgetSection(actualTotal, actualCats){
       const pct=Math.min(100,Math.round(actualTotal/budget.total*100));
       html+=`<div class="hf-budget-total-row">
         <span class="hf-budget-label hf-budget-label-total">合計</span>
-        <div class="hf-budget-bar-wrap"><div class="hf-budget-bar${over?" over":""}" style="width:${pct}%;"></div></div>
+        <progress class="hf-budget-bar${over?" over":""}" value="${pct}" max="100"></progress>
         <span class="hf-budget-actual${over?" over":""} hf-budget-actual-total">¥${actualTotal.toLocaleString()}</span>
         <span class="hf-budget-limit">/ ¥${budget.total.toLocaleString()}</span>
       </div>`;
