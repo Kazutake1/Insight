@@ -1118,7 +1118,7 @@ function buildDonutData(){
 }
 function renderDonutDayPicker(){
   const isDaily=viewMode==="日";
-  document.getElementById("donutDayPicker").style.display=isDaily?"block":"none";
+  document.getElementById("donutDayPicker").classList.toggle("is-visible",isDaily);
   if(!isDaily)return;
   const sel=document.getElementById("donutDaySelect");
   const mi=MONTHS.indexOf(selMonth);const days=DAYS_IN_MONTH[mi];const prev=sel.value;
