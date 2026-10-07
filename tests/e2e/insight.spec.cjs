@@ -1957,7 +1957,6 @@ test('セール追加ダイアログは補足文を省きプリセット一覧�
   await expect(eventDialog).toBeVisible();
   await expect(eventDialog.getByLabel('イベント種別')).toHaveValue('sale');
   const saleTargets=eventDialog.locator('.ie-sale-target');
-  await expect(saleTargets).toHaveCount(await saleTargets.count());
   expect(await saleTargets.count()).toBeGreaterThan(1);
   const firstTarget=saleTargets.nth(0);
   const secondTarget=saleTargets.nth(1);
