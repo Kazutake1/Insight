@@ -834,3 +834,13 @@ html.dark body,body.dark{background:#251b26}
 #pageDash .kpi-unit{font-size:12px!important}
 #pageDash .kpi-badge{font-size:11.5px!important;font-weight:700!important;background:transparent!important;border:0!important;border-radius:0!important;padding:0!important;box-shadow:none!important;white-space:nowrap!important;flex:0 0 auto!important;line-height:1!important}
 #pageDash .kpi-prev{margin-left:0!important;font-size:11px!important;font-weight:500!important;color:var(--text4)!important;white-space:nowrap!important;flex:0 0 auto!important;line-height:1!important}
+
+/* Readability STEP2-10D2: store operations fixed typography externalized from runtime JS. */
+#pageDash .qs-title{font-size:15px!important}
+.ops-field-title{font-size:13px!important}
+.ops-memo,.ops-stockout{font-size:14px!important;line-height:1.5}
+.monthly-ops-title{font-size:14px!important}
+.monthly-ops-label{font-size:12px!important}
+.monthly-ops-input{font-size:14px!important}
+.monthly-ops-save{font-size:13px!important}
+.monthly-ops-saved{font-size:12px!important}
