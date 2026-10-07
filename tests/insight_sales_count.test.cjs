@@ -146,7 +146,8 @@ test('曜日別平均の対象外便はダッシュ表示かつグレー表示�
   assert.match(block,/class="sc-not-applicable"/);
   assert.match(block,/\?'ー':fmt\(value\)/);
   assert.doesNotMatch(block,/対象外/);
-  assert.match(source,/\.sc-average-row b\.sc-not-applicable\{background:var\(--surface2\)!important;border-color:var\(--border\)!important;color:var\(--text4\)!important\}/);
+  const css=fs.readFileSync(path.join(__dirname,'..','insight_payload_core_v1.css'),'utf8');
+  assert.match(css,/\.sc-average-row b\.sc-not-applicable\{background:var\(--surface2\)!important;border-color:var\(--border\)!important;color:var\(--text4\)!important/);
 });
 
 

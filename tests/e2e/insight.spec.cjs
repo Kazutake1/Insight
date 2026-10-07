@@ -236,9 +236,16 @@ test('売上・客数・廃棄の日別グラフは指定された補助文だ�
   expect(errors).toEqual([]);
 });
 
-test('旧コア配色補正はruntime moduleで適用する',async({page})=>{
+test('旧コア配色補正は外部CSSで適用しruntime CSSOM mutationを使わない',async({page})=>{
   const errors=await openInsight(page);
-  await expect.poll(()=>page.evaluate(()=>window.InsightLegacyStyleCompat&&window.InsightLegacyStyleCompat.matched||0)).toBeGreaterThan(0);
+  const state=await page.evaluate(()=>{
+    const toggle=document.querySelector('#aiAnalysisToggle.nav-btn');
+    const style=toggle?getComputedStyle(toggle):null;
+    return {background:style&&style.backgroundColor,color:style&&style.color,compat:window.InsightLegacyStyleCompat};
+  });
+  expect(state.background).not.toBeNull();
+  expect(state.color).not.toBeNull();
+  expect(state.compat&&state.compat.matched).toBe(0);
   expect(errors).toEqual([]);
 });
 
@@ -280,6 +287,8 @@ test('トップページは外部shellと機能manifestの最新版確認をno-s
   expect(source).not.toMatch(/<script(?![^>]*\bsrc=)[^>]*>/i);
   expect(source).not.toMatch(/<style\b/i);
   expect(source).not.toMatch(/script-src[^;]*'unsafe-inline'/);
+  expect(source).toMatch(/style-src 'self';/);
+  expect(source).not.toMatch(/style-src[^;]*'unsafe-inline'/);
   expect(boot).toContain("fetch('./Index.html?insight_probe='+Date.now(),{cache:'no-store'})");
   expect(loader).toContain("fetch('./insight_shell_loader_v1.js?insight_manifest_probe='+Date.now(),{cache:'no-store'})");
   expect(loader).toContain("fetch('./insight_payload_source_v1.html?v=20261006-static-styles-1',{cache:'no-store'})");
@@ -1099,8 +1108,7 @@ test('全ページタイトルはダッシュボード位置に揃い追加ペ�
     document.querySelectorAll('.page').forEach(node=>node.classList.remove('show'));
     const future=document.createElement('div');
     future.id='e2eFuturePage';
-    future.className='page show';
-    future.style.padding='7px 11px 12px';
+    future.className='page show e2e-future-page';
     future.innerHTML='<div class="page-header"><div class="page-title">追加ページ</div></div><div>future</div>';
     document.getElementById('main').appendChild(future);
   });
@@ -1875,7 +1883,7 @@ test('イベント実績は過去開催→複数日→時間帯グラフ→カ�
   await expect(page.locator('.er-hour-item>strong')).toHaveCount(0);
   await expect(page.locator('.er-hour-plot')).toHaveCount(24);
   await expect(page.locator('.er-hour-value:visible')).toHaveCount(0);
-  const hourlyBarColor=await page.locator('.er-hour-bar').first().evaluate(el=>getComputedStyle(el).backgroundColor);
+  const hourlyBarColor=await page.locator('.er-hour-bar').first().evaluate(el=>getComputedStyle(el).color);
   expect(hourlyBarColor).toBe('rgb(59, 130, 246)');
   const timeFontSize=await page.locator('.er-hour-item>span').first().evaluate(el=>getComputedStyle(el).fontSize);
   expect(timeFontSize).toBe('13px');

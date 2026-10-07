@@ -40,10 +40,7 @@
     {type:'haiki',pageId:'pageHaiki',yearId:'haikiYearRow',monthId:'haikiMonthTabs',label:'廃棄'}
   ];
 
-  var css=doc.createElement('style');
-  css.id='insightInputPeriodControlsStyle';
-  css.textContent='.insight-input-period-toolbar{margin-bottom:10px}';
-  doc.head.appendChild(css);
+
 
   function currentStore(){
     try{return typeof allStores!=='undefined'&&allStores&&allStores.stores?allStores.stores[allStores.current]:null;}catch(_){return null;}

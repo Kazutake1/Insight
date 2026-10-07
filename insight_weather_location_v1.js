@@ -106,7 +106,7 @@
     btn.appendChild(document.createTextNode(' 天気地点：'+currentLabel()));
     btn.onclick=async function(e){
       if(e)e.stopPropagation();
-      menu.style.display='none';
+      menu.classList.add('insight-weather-menu-hidden');
       await configureLocation();
     };
     var children=menu.children;

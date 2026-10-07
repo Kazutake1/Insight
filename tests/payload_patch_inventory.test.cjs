@@ -6,6 +6,7 @@ const vm=require('node:vm');
 
 const root=path.join(__dirname,'..');
 const read=name=>fs.readFileSync(path.join(root,name),'utf8');
+const css=read('insight_payload_core_v1.css');
 const readShell=()=>[read('Index.html'),read('insight_shell_boot_v1.js'),read('insight_shell_loader_v1.js')].join('\n');
 
 test('payload文字列互換パッチは0件でshell loaderもbootstrap patcherへ依存しない',()=>{
@@ -30,6 +31,8 @@ test('Index shellはinline script/styleを持たず外部assetへ分離する',(
   assert.doesNotMatch(index,/<script(?![^>]*\bsrc=)[^>]*>/i);
   assert.doesNotMatch(index,/<style\b/i);
   assert.doesNotMatch(index,/script-src[^;]*'unsafe-inline'/);
+  assert.match(index,/style-src 'self';/);
+  assert.doesNotMatch(index,/style-src[^;]*'unsafe-inline'/);
   assert.match(boot,/fetch\('\.\/Index\.html\?insight_probe='/);
   assert.match(loader,/fetch\('\.\/insight_shell_loader_v1\.js\?insight_manifest_probe='/);
   assert.match(loader,/document\.open\(\);document\.write\(html\);document\.close\(\)/);
@@ -290,9 +293,8 @@ test('旧コア配色補正はbootstrap文字列置換ではなくruntime style 
   assert.match(index,/insight_legacy_style_compat_v1\.js\?v=20261006-core-contrast-runtime-1/);
   assert.ok(index.indexOf('insight_legacy_style_compat_v1.js')<index.indexOf('insight_yoy_policy_v1.js'));
   assert.doesNotMatch(bootstrap,/background:#1a1a1a;color:#fff;box-shadow:0 6px 24px var\(--shadow\)/);
-  assert.match(compat,/getPropertyValue\('background'\)/);
-  assert.match(compat,/setProperty\('background','#1a1a1a'\)/);
-  assert.match(compat,/setProperty\('color','#fff'\)/);
+  assert.doesNotMatch(compat,/getPropertyValue|rule\.style|cssRules|setProperty\(/);
+  assert.match(css,/\.ai-analysis-toggle\{background:#1a1a1a;color:#fff\}/);
   assert.doesNotMatch(compat,/localStorage|InsightStorage|\bfetch\s*\(|XMLHttpRequest|WebSocket/);
   assert.doesNotThrow(()=>new vm.Script(compat),'legacy style compat module must be valid JavaScript');
 });
@@ -311,10 +313,10 @@ test('AI表示CSSはIndexの文字列置換ではなくpresentation moduleが所
   assert.doesNotMatch(presentation,/insightAiPresentationStyle|createElement\(['\"]style/);
   assert.doesNotMatch(presentation,/数値と要点を優先して表示/);
   assert.match(css,/body\.ai-analysis-open #main\{margin-right:0!important\}/);
-  assert.match(presentation,/\.ai-analysis-panel\.ai-analysis-workspace/);
-  assert.match(presentation,/\.ai-workspace-grid/);
-  assert.match(presentation,/\.ai-analysis-question-row/);
-  assert.match(presentation,/@media\(max-width:920px\)/);
+  assert.match(css,/\.ai-analysis-panel\.ai-analysis-workspace/);
+  assert.match(css,/\.ai-workspace-grid/);
+  assert.match(css,/\.ai-analysis-question-row/);
+  assert.match(css,/@media\(max-width:920px\)/);
   assert.doesNotThrow(()=>new vm.Script(presentation), 'presentation module must be valid JavaScript');
   assert.match(presentation,/var selected=currentNav===i;/);
   assert.doesNotMatch(presentation,/var selected=!open&&currentNav===i;/);
@@ -915,10 +917,9 @@ test('イベント実績は過去開催・日付カード・時間帯グラフ�
   assert.match(index,/insight_event_results_v1\.js\?v=20261006-single-day-1/);
   assert.ok(index.indexOf('insight_analysis_context_v1.js')<index.indexOf('insight_event_results_v1.js'));
   assert.ok(index.indexOf('insight_event_results_v1.js')<index.indexOf('insight_daily_anomaly_v1.js'));
-  assert.match(events,/\.ie-dialog\.ie-event-add \.ie-presets\{margin-top:10px\}/);
+  assert.match(css,/\.ie-dialog\.ie-event-add \.ie-presets\{margin-top:10px\}/);
   assert.doesNotMatch(events,/row\.body\.style\.display/);
   assert.match(events,/row\.body\.classList\.toggle\('ie-sale-target-body-hidden',!row\.check\.checked\)/);
-  const css=read('insight_payload_core_v1.css');
   assert.match(css,/\.ie-sale-target-body\.ie-sale-target-body-hidden\{display:none\}/);
   assert.match(events,/scopeText\.hidden=hideScopeText/);
   assert.doesNotMatch(events,/全店舗共通・指定期間の各日に表示します。/);
@@ -934,7 +935,7 @@ test('イベント実績は過去開催・日付カード・時間帯グラフ�
   assert.match(eventResults,/data-kind="special">催事/);
   assert.match(eventResults,/collectSpecial/);
   assert.match(eventResults,/specialNames/);
-  assert.match(eventResults,/\.er-toolbar \[hidden\]\{display:none!important\}/);
+  assert.match(css,/\.er-toolbar \[hidden\]\{display:none!important\}/);
   assert.match(eventResults,/売上 /);
   assert.match(eventResults,/Math\.trunc\(Number\(value\)\/1000\)/);
   assert.match(eventResults,/\+'千円'/);
@@ -946,36 +947,36 @@ test('イベント実績は過去開催・日付カード・時間帯グラフ�
   assert.match(eventResults,/finite\(day&&day\.metrics&&day\.metrics\[key\]\)!==null/);
   assert.doesNotMatch(eventResults,/summaryMetric\('客単価'/);
   assert.doesNotMatch(eventResults,/summaryMetric\('買上点数'/);
-  assert.match(eventResults,/\.er-overview-grid\{[^}]*grid-template-columns:repeat\(2,minmax\(230px,1fr\)\)/);
-  assert.match(eventResults,/\.er-overview-values\{[^}]*grid-template-columns:repeat\(2,minmax\(0,1fr\)\)/);
+  assert.match(css,/\.er-overview-grid\{[^}]*grid-template-columns:repeat\(2,minmax\(230px,1fr\)\)/);
+  assert.match(css,/\.er-overview-values\{[^}]*grid-template-columns:repeat\(2,minmax\(0,1fr\)\)/);
   assert.match(eventResults,/客数 /);
   assert.match(eventResults,/er-day-tab/);
   assert.doesNotMatch(eventResults,/er-daily-summary|er-daily-grid/);
-  assert.match(eventResults,/\.er-day-tab\{[^}]*flex:0 0 210px;[^}]*padding:13px 15px/);
-  assert.match(eventResults,/\.er-day-tab strong\{font-size:15px\}/);
-  assert.match(eventResults,/\.er-day-tab span\{font-size:13\.5px/);
+  assert.match(css,/\.er-day-tab\{[^}]*flex:0 0 210px;[^}]*padding:13px 15px/);
+  assert.match(css,/\.er-day-tab strong\{font-size:15px\}/);
+  assert.match(css,/\.er-day-tab span\{font-size:13\.5px/);
   assert.match(eventResults,/時間帯別客数/);
-  assert.match(eventResults,/\.er-hour-bar\{[^}]*background:#3b82f6/);
+  assert.match(css,/\.er-hour-bar[^}]*\{[^}]*#3b82f6|\.er-hour-bar\{[^}]*color:#3b82f6/);
   assert.match(eventResults,/el\('button',undefined,'er-hour-plot'\)/);
   assert.match(eventResults,/aria-pressed/);
   assert.match(eventResults,/er-hour-value/);
-  assert.match(eventResults,/\.er-occurrence-date\{font-size:14px\}/);
-  assert.match(eventResults,/\.er-occurrence-metrics\{[^}]*font-size:13px/);
-  assert.match(eventResults,/\.er-summary-card span\{[^}]*font-size:12\.5px/);
-  assert.match(eventResults,/\.er-summary-card strong\{[^}]*font-size:18px/);
-  assert.match(eventResults,/\.er-category-card>h3\{[^}]*font-size:14px/);
-  assert.match(eventResults,/\.er-demand-card>h3\{[^}]*font-size:14\.5px/);
+  assert.match(css,/\.er-occurrence-date\{font-size:14px\}/);
+  assert.match(css,/\.er-occurrence-metrics\{[^}]*font-size:13px/);
+  assert.match(css,/\.er-summary-card span\{[^}]*font-size:12\.5px/);
+  assert.match(css,/\.er-summary-card strong\{[^}]*font-size:18px/);
+  assert.match(css,/\.er-category-card>h3\{[^}]*font-size:14px/);
+  assert.match(css,/\.er-demand-card>h3\{[^}]*font-size:14\.5px/);
   assert.doesNotMatch(eventResults,/item\.append\(el\('strong',String\(value\)\)/);
-  assert.match(eventResults,/\.er-hour-chart\{[^}]*gap:2px;[^}]*min-width:0/);
-  assert.match(eventResults,/grid-template-columns:repeat\(24,minmax\(0,1fr\)\)/);
+  assert.match(css,/\.er-hour-chart\{[^}]*gap:2px;[^}]*min-width:0/);
+  assert.match(css,/grid-template-columns:repeat\(24,minmax\(0,1fr\)\)/);
   assert.match(eventResults,/createReadOnlyDayCard/);
   assert.match(eventResults,/カテゴリー実績/);
   assert.match(eventResults,/特需商品/);
   assert.match(eventResults,/function demandComparison\(/);
   assert.match(eventResults,/er-demand-grid/);
   assert.match(eventResults,/前回：用意 /);
-  assert.match(eventResults,/grid-template-columns:repeat\(4,minmax\(0,1fr\)\)/);
-  assert.match(eventResults,/@media\(max-width:1000px\)\{\.er-category-grid,\.er-demand-grid\{grid-template-columns:repeat\(2,minmax\(0,1fr\)\)\}\}/);
+  assert.match(css,/grid-template-columns:repeat\(4,minmax\(0,1fr\)\)/);
+  assert.match(css,/@media\(max-width:1000px\)\{\.er-category-grid,\.er-demand-grid\{grid-template-columns:repeat\(2,minmax\(0,1fr\)\)\}\}/);
   assert.doesNotMatch(eventResults,/max-width:280px/);
   assert.doesNotMatch(eventResults,/カテゴリー別・便別実績/);
   assert.match(eventResults,/hourly\.complete/);
@@ -1007,9 +1008,8 @@ test('全ページタイトルはダッシュボード基準の共通モジュ�
   assert.ok(index.indexOf('insight_page_title_layout_v1.js')<index.indexOf('insight_page_period_sync_v1.js'));
   assert.match(layout,/var SELECTOR='\.page > \.page-header > \.page-title'/);
   assert.match(layout,/document\.getElementById\('pageDash'\)/);
-  assert.match(layout,/getComputedStyle\(page\)/);
   assert.match(layout,/MutationObserver/);
-  assert.match(layout,/align-self:flex-start!important/);
+  assert.match(css,/\.page>\.page-header>\.page-title\.insight-page-title-aligned\{[^}]*align-self:flex-start!important/);
   assert.doesNotMatch(layout,/localStorage|InsightStorage/);
   assert.doesNotThrow(()=>new vm.Script(layout),'page title layout module must be valid JavaScript');
 });
@@ -1025,25 +1025,25 @@ test('セール実績ページは販売数入力直後に読み込み同一日�
   assert.match(saleResults,/id='navSaleResults'|nav\.id='navSaleResults'/);
   assert.match(saleResults,/page\.id='pageSaleResults'/);
   assert.match(saleResults,/InsightSalesCount\.createReadOnlyDayCard/);
-  assert.match(saleResults,/grid-template-columns:repeat\(7,minmax\(0,1fr\)\)/);
+  assert.match(css,/\.sr-day-grid\{[^}]*grid-template-columns:repeat\(7,minmax\(0,1fr\)\)/);
   assert.match(saleResults,/group\.occurrences\.forEach\(function\(occurrence\)/);
   assert.match(saleResults,/sr-occurrence-grids/);
-  assert.match(saleResults,/\.sr-occurrence-grids\{display:grid;gap:9px\}/);
+  assert.match(css,/\.sr-occurrence-grids\{display:grid;gap:9px\}/);
   assert.doesNotMatch(saleResults,/\['開催日数',group\.days\.length\+'日'\]/);
-  assert.match(saleResults,/\.sr-group-stats\{[^}]*grid-template-columns:repeat\(3,minmax\(88px,1fr\)\)/);
+  assert.match(css,/\.sr-group-stats\{[^}]*grid-template-columns:repeat\(3,minmax\(88px,1fr\)\)/);
   assert.match(saleResults,/\['平均納品',fmt\(group\.averageDelivery,1\)\]/);
   assert.match(saleResults,/\['平均販売',fmt\(group\.averageSales,1\)\]/);
   assert.match(saleResults,/\['消化率',group\.sellThrough/);
-  assert.match(saleResults,/\.sr-stat span\{[^}]*font-size:12px/);
-  assert.match(saleResults,/\.sr-stat strong\{[^}]*font-size:16px/);
-  assert.match(saleResults,/\.sr-group-head\{[^}]*align-items:flex-start/);
-  assert.match(saleResults,/\.sr-group-head h2\{[^}]*font-size:17px/);
-  assert.match(saleResults,/\.sr-list-table\{[^}]*font-size:12\.5px/);
-  assert.match(saleResults,/\.sr-day-grid>\.sc-day\{min-width:0\}/);
+  assert.match(css,/\.sr-stat span\{[^}]*font-size:12px/);
+  assert.match(css,/\.sr-stat strong\{[^}]*font-size:16px/);
+  assert.match(css,/\.sr-group-head\{[^}]*align-items:flex-start/);
+  assert.match(css,/\.sr-group-head h2\{[^}]*font-size:17px/);
+  assert.match(css,/\.sr-list-table\{[^}]*font-size:12\.5px/);
+  assert.match(css,/\.sr-day-grid>\.sc-day\{min-width:0\}/);
   assert.match(sales,/model\.createReadOnlyDayCard=createReadOnlyDayCard/);
-  assert.match(sales,/\.sc-totals b\{font-size:14px;text-align:center\}/);
-  assert.match(sales,/\.sc-average-totals b\{font-size:14px;text-align:center\}/);
-  assert.match(sales,/\.sc-totals b,\.sc-average-totals b\{font-size:14px\}/);
+  assert.match(css,/\.sc-totals b\{font-size:14px;text-align:center\}/);
+  assert.match(css,/\.sc-average-totals b\{font-size:14px;text-align:center\}/);
+  assert.match(css,/\.sc-totals b,\.sc-average-totals b\{font-size:14px\}/);
   assert.doesNotMatch(saleResults,/localStorage|InsightStorage/);
   assert.doesNotThrow(()=>new vm.Script(saleResults),'sale results module must be valid JavaScript');
 });
@@ -1100,13 +1100,14 @@ test('分析AIはダッシュボード再掲ではなく4ブロックの意思�
   assert.doesNotThrow(()=>new vm.Script(interpretation),'AI interpretation module must be valid JavaScript');
 });
 
-test('店舗運営UIのCSSはops moduleが所有する',()=>{
+test('店舗運営UIのCSSは外部CSSが所有しops moduleはruntime styleを使わない',()=>{
   const index=readShell();
   const ops=read('insight_ops_v1.js');
+  const css=read('insight_payload_core_v1.css');
   assert.ok(!index.includes("html=html.replace('</style>'"));
-  assert.match(ops,/insightOpsV1Style/);
-  assert.match(ops,/\.ops-daily-wrap/);
-  assert.match(ops,/\.monthly-ops-card/);
+  assert.match(css,/\.ops-daily-wrap\{/);
+  assert.match(css,/\.monthly-ops-card\{/);
+  assert.doesNotMatch(ops,/createElement\(['"]style['"]\)|\.style\.|cssText|style=/);
 });
 
 test('安全・互換処理はbootstrap文字列パッチではなく各所有層へ分離済み',()=>{
@@ -1154,14 +1155,36 @@ test('分析AIの位置は外部CSSだけで決まりruntime inline styleを使�
   assert.match(css,/left:8px!important;right:8px!important;top:8px!important/);
 });
 
+test('STEP5 hourly bars and legacy contrast are CSP-safe',()=>{
+  const eventResults=read('insight_event_results_v1.js');
+  const compat=read('insight_legacy_style_compat_v1.js');
+  const css=read('insight_payload_core_v1.css');
+  assert.doesNotMatch(eventResults,/\.style\.|style\.setProperty/);
+  assert.match(eventResults,/el\('progress'/);
+  assert.match(eventResults,/bar\.max=/);
+  assert.match(eventResults,/bar\.value=/);
+  assert.doesNotMatch(compat,/rule\.style|cssRules|setProperty\(/);
+  assert.match(css,/\.er-hour-bar\{appearance:none/);
+});
+
+test('STEP5 settings/title styles are external and CSP-safe',()=>{
+  const settings=read('insight_settings_v1.js');
+  const title=read('insight_page_title_layout_v1.js');
+  const css=read('insight_payload_core_v1.css');
+  assert.doesNotMatch(settings,/createElement\(['"]style['"]\)|style\.textContent|appendChild\(style\)/);
+  assert.doesNotMatch(title,/createElement\(['"]style['"]\)|\.style\.setProperty|--insight-page-title-offset/);
+  assert.match(css,/\.insight-theme-switch-track\{/);
+  assert.match(css,/\.page>\.page-header>\.page-title\.insight-page-title-aligned\{/);
+});
+
 test('曜日別平均カードと廃棄悪化色の表示契約を維持する',()=>{
   const sales=read('insight_sales_count_v1.js');
   const visual=read('insight_ai_visual_v1.js');
-  assert.match(sales,/\.sc-page\{[^}]*min-width:0;width:100%;max-width:100%;box-sizing:border-box/);
-  assert.match(sales,/\.sc-calendar\{[^}]*grid-template-columns:repeat\(7,minmax\(160px,1fr\)\);gap:8px;[^}]*min-width:0;width:100%;max-width:100%;box-sizing:border-box/);
-  assert.match(sales,/\.sc-average-grid\{[^}]*grid-template-columns:repeat\(7,minmax\(160px,1fr\)\);gap:8px;[^}]*min-width:0;width:100%;max-width:100%;box-sizing:border-box/);
-  assert.match(sales,/@media\(max-width:1200px\)\{\.sc-calendar,\.sc-average-grid\{grid-template-columns:repeat\(7,minmax\(0,1fr\)\);gap:6px\}/);
-  assert.match(sales,/@media\(max-width:800px\)\{\.sc-calendar,\.sc-average-grid\{grid-template-columns:repeat\(7,minmax\(102px,1fr\)\);gap:7px\}/);
+  assert.match(css,/\.sc-page\{[^}]*min-width:0;width:100%;max-width:100%;box-sizing:border-box/);
+  assert.match(css,/\.sc-calendar\{[^}]*grid-template-columns:repeat\(7,minmax\(160px,1fr\)\);gap:8px;[^}]*min-width:0;width:100%;max-width:100%;box-sizing:border-box/);
+  assert.match(css,/\.sc-average-grid\{[^}]*grid-template-columns:repeat\(7,minmax\(160px,1fr\)\);gap:8px;[^}]*min-width:0;width:100%;max-width:100%;box-sizing:border-box/);
+  assert.match(css,/@media\(max-width:1200px\)\{\.sc-calendar,\.sc-average-grid\{grid-template-columns:repeat\(7,minmax\(0,1fr\)\);gap:6px\}/);
+  assert.match(css,/@media\(max-width:800px\)\{\.sc-calendar,\.sc-average-grid\{grid-template-columns:repeat\(7,minmax\(102px,1fr\)\);gap:7px\}/);
   assert.match(sales,/sc-day sc-average-card/);
   assert.match(sales,/sc-trip sc-delivery-row/);
   assert.match(sales,/sc-trip sc-sales-row/);
@@ -1231,8 +1254,8 @@ test('平日平均と日曜日・祝日平均は補足文を表示せず表の�
   assert.doesNotMatch(sales,/sc-day-type-note/);
   assert.doesNotMatch(sales,/選択月の保存済み実績/);
   assert.match(sales,/card\.classList\.add\('sc-day-type-card'\)/);
-  assert.match(sales,/\.sc-day-type-card\{padding-bottom:12px\}/);
-  assert.match(sales,/\.sc-day-type-card h3\{margin-bottom:8px\}/);
+  assert.match(css,/\.sc-day-type-card\{padding-bottom:12px\}/);
+  assert.match(css,/\.sc-day-type-card h3\{margin-bottom:8px\}/);
 });
 
 test('曜日別平均も対象外便をダッシュ＋グレー表示に統一する',()=>{
@@ -1243,7 +1266,7 @@ test('曜日別平均も対象外便をダッシュ＋グレー表示に統一�
   assert.match(block,/class="sc-not-applicable"/);
   assert.match(block,/\?'ー':fmt\(value\)/);
   assert.doesNotMatch(block,/対象外/);
-  assert.match(sales,/\.sc-average-row b\.sc-not-applicable\{background:var\(--surface2\)!important;border-color:var\(--border\)!important;color:var\(--text4\)!important\}/);
+  assert.match(css,/\.sc-average-row b\.sc-not-applicable\{background:var\(--surface2\)!important;border-color:var\(--border\)!important;color:var\(--text4\)!important/);
 });
 
 

@@ -6,24 +6,7 @@
   var page=document.getElementById('pageSales');
   if(!page)return;
 
-  var css=document.createElement('style');
-  css.id='insightSalesInsightsStyle';
-  css.textContent=[
-    '#pageSales #issRow{display:grid;grid-template-columns:minmax(0,1fr);gap:10px;flex:0 0 auto;min-width:0;margin-bottom:10px}',
-    '#pageSales #issRow .iss-card{box-sizing:border-box;min-width:0;border-radius:14px;padding:11px 14px;background:var(--surface);box-shadow:0 2px 10px var(--shadow)}',
-    '#pageSales #issRow .iss-title{font-size:13px;font-weight:750;color:var(--text);margin-bottom:8px}',
-    '#pageSales #issRow .iss-stats{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));min-width:0}',
-    '#pageSales #issRow .iss-stat{display:flex;flex-direction:column;align-items:flex-start;gap:4px;min-width:0;padding:2px 12px;font-size:11px;color:var(--text3)}',
-    '#pageSales #issRow .iss-stat:first-child{padding-left:0}',
-    '#pageSales #issRow .iss-stat+.iss-stat{border-left:1px solid var(--border)}',
-    '#pageSales #issRow .iss-stat strong{font-size:19px;line-height:1.2;font-weight:800;color:var(--text);white-space:nowrap}',
-    '#pageSales #issRow .iss-stat strong.up{color:#15803d}',
-    '#pageSales #issRow .iss-stat strong.down{color:#b91c1c}',
-    '#pageSales #issRow .iss-note{font-size:9px;color:var(--text4);line-height:1.3;margin-top:9px;padding-top:6px;border-top:1px solid var(--border2)}',
-    '#pageSales #issDailyAverage{font-size:10px;font-weight:500;color:var(--text4);line-height:1.3;margin-top:2px;white-space:nowrap}',
-    '@media(max-width:600px){#pageSales #issRow .iss-stat{padding:2px 6px;font-size:10px}#pageSales #issRow .iss-stat strong{font-size:15px}}'
-  ].join('');
-  document.head.appendChild(css);
+
 
   function numeric(v){var n=Number(v);return Number.isFinite(n)&&n>0?n:0;}
   function label(id,value,cls){
