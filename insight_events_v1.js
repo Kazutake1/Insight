@@ -400,7 +400,7 @@
       try{validate(allStores);list(allStores,allStores.current,selectedDate()).forEach(function(e){
         var chip=el('div',undefined,'ie-chip');chip.title=e.startDate+' 〜 '+e.endDate+(e.snapshot.note?'\n'+e.snapshot.note:'');
         var desc=summary(e.snapshot);
-        var details=button(desc,function(){var d=dialog(TYPES[e.type]||e.type);d.append(el('p',desc),el('p',e.startDate+' 〜 '+e.endDate),el('p',e.scope==='global'?'全店舗共通':'この店舗のみ'));if(e.type==='nearby'&&e.snapshot.location)d.append(el('p','場所：'+e.snapshot.location.split(/\r?\n/).join('・')));if(e.snapshot.note){var note=el('p',e.snapshot.note);note.style.whiteSpace='pre-wrap';d.append(note);}});details.className='ie-summary';
+        var details=button(desc,function(){var d=dialog(TYPES[e.type]||e.type);d.append(el('p',desc),el('p',e.startDate+' 〜 '+e.endDate),el('p',e.scope==='global'?'全店舗共通':'この店舗のみ'));if(e.type==='nearby'&&e.snapshot.location)d.append(el('p','場所：'+e.snapshot.location.split(/\r?\n/).join('・')));if(e.snapshot.note){var note=el('p',e.snapshot.note);note.className='ie-note-prewrap';d.append(note);}});details.className='ie-summary';
         var edit=button('編集',function(){openEvent(e);});edit.className='ie-edit';edit.setAttribute('aria-label',desc+'を編集');
         chip.append(el('small',TYPES[e.type]||e.type),details,el('small',e.scope==='global'?'全店舗':'この店舗'));
         var remove=button('×',function(){
