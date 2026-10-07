@@ -43,7 +43,7 @@ test('canonical payloadはinline script/styleを持たず外部assetを順序固
   const core=read('insight_payload_core_v1.js');
   const ai=read('insight_payload_ai_legacy_v1.js');
   const css=read('insight_payload_core_v1.css');
-  assert.match(payload,/insight_payload_core_v1\.css\?v=20261007-readability-ops-css-1/);
+  assert.match(payload,/insight_payload_core_v1\.css\?v=20261007-readability-input-tables-css-1/);
   assert.match(payload,/insight_payload_core_v1\.js\?v=20261006-payload-assets-1/);
   assert.match(payload,/insight_payload_ai_legacy_v1\.js\?v=20261006-payload-assets-1/);
   assert.match(payload,/insight_payload_bindings_v1\.js\?v=20261006-inline-bindings-1/);
@@ -239,7 +239,7 @@ test('STEP17の可読性CSSは独立moduleで主要ページへ横展開する',
   const index=readShell();
   const readability=read('insight_readability_v1.js');
   const css=read('insight_payload_core_v1.css');
-  assert.match(index,/insight_readability_v1\.js\?v=20261007-csp-style-readability-ops-1/);
+  assert.match(index,/insight_readability_v1\.js\?v=20261007-csp-style-readability-input-tables-1/);
   assert.ok(index.indexOf('insight_dark_theme_v1.js')<index.indexOf('insight_readability_v1.js'));
   assert.match(readability,/insightReadabilityStyle/);
   assert.match(readability,/#main\{padding-left:0!important;padding-right:0!important;min-width:0!important;box-sizing:border-box!important\}/);
@@ -269,6 +269,11 @@ test('STEP17の可読性CSSは独立moduleで主要ページへ横展開する',
   assert.match(css,/#pageSales #issRow \.iss-note,#pageKyaku #ikyRow \.iky-note\{font-size:12px!important;line-height:1\.5!important\}/);
   assert.match(css,/#iwcRow\{--iwc-height:178px!important\}/);
   assert.match(css,/#iwcRow \.iwc-rank-line\{font-size:11px!important;line-height:1\.35!important\}/);
+  assert.doesNotMatch(readability,/#pageSales #issDailyAverage|#pageKyaku #ikyDailyAverage|#pageSales \.table-card|#pageKyaku \.table-card|#pageHaiki \.table-card/);
+  assert.match(css,/#pageSales #issDailyAverage,#pageKyaku #ikyDailyAverage\{font-size:12\.5px!important;line-height:1\.45!important\}/);
+  assert.match(css,/#pageSales \.table-card,#pageKyaku \.table-card,#pageHaiki \.table-card\{font-size:13px!important\}/);
+  assert.match(css,/#pageSales \.table-card th,#pageSales \.table-card td,#pageKyaku \.table-card th,#pageKyaku \.table-card td,#pageHaiki \.table-card th,#pageHaiki \.table-card td\{font-size:12\.5px!important\}/);
+  assert.match(css,/#pageSales \.table-card input,#pageSales \.table-card select,#pageSales \.table-card button,#pageKyaku \.table-card input,#pageKyaku \.table-card select,#pageKyaku \.table-card button,#pageHaiki \.table-card input,#pageHaiki \.table-card select,#pageHaiki \.table-card button\{font-size:13px!important\}/);
   assert.match(css,/#pageSalesCount \.sc-col-head,#pageSalesCount \.sc-average-head\{font-size:12\.5px!important/);
   assert.doesNotMatch(readability,/#pageSalesCount |\.sc-dialog|\.hourly-/);
   assert.match(css,/#pageSalesCount \.sc-toolbar\{font-size:13\.5px\}/);

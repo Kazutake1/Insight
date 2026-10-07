@@ -287,7 +287,7 @@ test('トップページは外部shellと機能manifestの最新版確認をno-s
   expect(source).toContain('https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js');
   expect(source).toContain('integrity="sha512-CQBWl4fJHWbryGE+Pc7UAxWMUMNMWzWxF4SQo9CgkJIN1kx6djDQZjh3Y8SZ1d+6I+1zze6Z7kHXO7q3UyZAWw=="');
   expect(loader).not.toContain('stripPayloadChartScript');
-  expect(payload).toContain('insight_payload_core_v1.css?v=20261007-readability-ops-css-1');
+  expect(payload).toContain('insight_payload_core_v1.css?v=20261007-readability-input-tables-css-1');
   expect(payload).toContain('insight_payload_core_v1.js?v=20261006-payload-assets-1');
   expect(payload).toContain('insight_payload_ai_legacy_v1.js?v=20261006-payload-assets-1');
   expect(payload).toContain('insight_payload_bindings_v1.js?v=20261006-inline-bindings-1');
@@ -487,13 +487,20 @@ test('STEP17の文字階層をダッシュボード・入力・販売数・分�
 
   await page.locator('#nav2').click();
   await expect(page.locator('#pageSales #issRow .iss-card')).toBeVisible();
-  const salesType=await page.evaluate(()=>({
-    title:getComputedStyle(document.querySelector('#pageSales #issRow .iss-title')).fontSize,
-    label:getComputedStyle(document.querySelector('#pageSales #issRow .iss-stat')).fontSize,
-    value:getComputedStyle(document.querySelector('#pageSales #issRow .iss-stat strong')).fontSize,
-    note:getComputedStyle(document.querySelector('#pageSales #issRow .iss-note')).fontSize
-  }));
-  expect(salesType).toEqual({title:'15px',label:'13px',value:'20px',note:'12px'});
+  const salesType=await page.evaluate(()=>{
+    const table=document.querySelector('#pageSales .table-card');
+    const control=table&&table.querySelector('input,select,button');
+    return {
+      title:getComputedStyle(document.querySelector('#pageSales #issRow .iss-title')).fontSize,
+      label:getComputedStyle(document.querySelector('#pageSales #issRow .iss-stat')).fontSize,
+      value:getComputedStyle(document.querySelector('#pageSales #issRow .iss-stat strong')).fontSize,
+      note:getComputedStyle(document.querySelector('#pageSales #issRow .iss-note')).fontSize,
+      dailyAverage:getComputedStyle(document.querySelector('#pageSales #issDailyAverage')).fontSize,
+      table:table?getComputedStyle(table).fontSize:null,
+      control:control?getComputedStyle(control).fontSize:null
+    };
+  });
+  expect(salesType).toEqual({title:'15px',label:'13px',value:'20px',note:'12px',dailyAverage:'12.5px',table:'13px',control:'13px'});
 
   await page.locator('#nav3').click();
   await expect(page.locator('#pageKyaku #ikyRow .iky-card')).toBeVisible();
@@ -501,9 +508,10 @@ test('STEP17の文字階層をダッシュボード・入力・販売数・分�
     title:getComputedStyle(document.querySelector('#pageKyaku #ikyRow .iky-title')).fontSize,
     label:getComputedStyle(document.querySelector('#pageKyaku #ikyRow .iky-stat')).fontSize,
     value:getComputedStyle(document.querySelector('#pageKyaku #ikyRow .iky-stat strong')).fontSize,
-    note:getComputedStyle(document.querySelector('#pageKyaku #ikyRow .iky-note')).fontSize
+    note:getComputedStyle(document.querySelector('#pageKyaku #ikyRow .iky-note')).fontSize,
+    dailyAverage:getComputedStyle(document.querySelector('#pageKyaku #ikyDailyAverage')).fontSize
   }));
-  expect(customerType).toEqual({title:'15px',label:'13px',value:'20px',note:'12px'});
+  expect(customerType).toEqual({title:'15px',label:'13px',value:'20px',note:'12px',dailyAverage:'12.5px'});
 
   await page.locator('#nav4').click();
   await expect(page.locator('#iwcRow .iwc-card')).toHaveCount(2);

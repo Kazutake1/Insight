@@ -844,3 +844,9 @@ html.dark body,body.dark{background:#251b26}
 .monthly-ops-input{font-size:14px!important}
 .monthly-ops-save{font-size:13px!important}
 .monthly-ops-saved{font-size:12px!important}
+
+/* Readability STEP2-10B2: input DailyAverage and table-card fixed typography externalized from runtime JS. */
+#pageSales #issDailyAverage,#pageKyaku #ikyDailyAverage{font-size:12.5px!important;line-height:1.45!important}
+#pageSales .table-card,#pageKyaku .table-card,#pageHaiki .table-card{font-size:13px!important}
+#pageSales .table-card th,#pageSales .table-card td,#pageKyaku .table-card th,#pageKyaku .table-card td,#pageHaiki .table-card th,#pageHaiki .table-card td{font-size:12.5px!important}
+#pageSales .table-card input,#pageSales .table-card select,#pageSales .table-card button,#pageKyaku .table-card input,#pageKyaku .table-card select,#pageKyaku .table-card button,#pageHaiki .table-card input,#pageHaiki .table-card select,#pageHaiki .table-card button{font-size:13px!important}
