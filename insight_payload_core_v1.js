@@ -1374,7 +1374,7 @@ function initInputPage(type){
   const moId={sales:"salesMonthTabs",kyaku:"kyakuMonthTabs",haiki:"haikiMonthTabs"}[type];
   const row=document.getElementById(yrId);row.innerHTML="";
   store.years.forEach(y=>{
-    const wrap=document.createElement("span");wrap.style.cssText="display:inline-flex;align-items:center;gap:2px;";
+    const wrap=document.createElement("span");wrap.className="input-year-tab-wrap";
     const btn=document.createElement("button");btn.className="iytab"+(y===editYear[type]?" active":"");
     btn.textContent=y+"年";btn.onclick=()=>{
       editYear[type]=y;
@@ -2714,11 +2714,7 @@ if(localStorage.getItem("insight_dark")==="1")applyDarkMode(true);
 function showInstallBanner(){
   const banner=document.createElement("div");
   banner.id="installBanner";
-  banner.style.cssText=`position:fixed;bottom:20px;left:50%;transform:translateX(-50%);
-    background:#1a1a1a;color:#fff;border-radius:14px;padding:12px 20px;
-    display:flex;align-items:center;gap:12px;z-index:9999;
-    box-shadow:0 8px 30px rgba(0,0,0,0.3);font-family:-apple-system,sans-serif;
-    font-size:13px;font-weight:600;white-space:nowrap;`;
+  banner.className="install-banner";
   banner.innerHTML=`<span>📲 ホーム画面に追加して使う</span>
     <button onclick="doInstall()" style="background:#fff;color:#1a1a1a;border:none;
       border-radius:8px;padding:6px 14px;font-weight:800;font-size:12px;cursor:pointer;">
