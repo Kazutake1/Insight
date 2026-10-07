@@ -317,6 +317,7 @@ test('トップページは外部shellと機能manifestの最新版確認をno-s
   await expect(storeMenu).toHaveClass(/is-open/);
   await expect(storeMenu).toBeVisible();
   expect(await storeMenu.evaluate(node=>getComputedStyle(node).display)).toBe('block');
+  await page.waitForTimeout(75);
   await page.locator('#main').click({position:{x:200,y:200}});
   await expect(storeMenu).not.toHaveClass(/is-open/);
   await expect(storeMenu).toBeHidden();
