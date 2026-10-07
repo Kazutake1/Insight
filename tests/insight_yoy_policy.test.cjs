@@ -8,7 +8,8 @@ const read=name=>fs.readFileSync(path.join(root,name),'utf8');
 const payload=read('insight_payload_core_v1.js');
 const engineSource=payload.slice(payload.indexOf('function kpiNum('),payload.indexOf('function blankMonthData('));
 function element(label=''){
-  return {textContent:label,style:{},children:[],append(...xs){xs.forEach(x=>{x.parent=this;this.children.push(x);});},appendChild(x){this.append(x);},remove(){this.parent.children=this.parent.children.filter(x=>x!==this);},querySelector(s){if(s==='.kpi-label')return this.label;if(s==='.kpi-value')return this.value;return this.children.find(x=>x.className===s.slice(1))||null;},querySelectorAll(){return this.children;}};
+  const classes=new Set();
+  return {textContent:label,style:{},children:[],classList:{toggle(name,force){if(force===undefined){if(classes.has(name)){classes.delete(name);return false;}classes.add(name);return true;}if(force)classes.add(name);else classes.delete(name);return !!force;},contains(name){return classes.has(name);}},append(...xs){xs.forEach(x=>{x.parent=this;this.children.push(x);});},appendChild(x){this.append(x);},remove(){this.parent.children=this.parent.children.filter(x=>x!==this);},querySelector(s){if(s==='.kpi-label')return this.label;if(s==='.kpi-value')return this.value;return this.children.find(x=>x.className===s.slice(1))||null;},querySelectorAll(){return this.children;}};
 }
 function setup(){
   const cards=['売上','客数','買上点数','廃棄金額','客単価','廃棄率','人件費','粗利率'].map(label=>{const c=element();c.label=element(label);c.value=element();return c;});
