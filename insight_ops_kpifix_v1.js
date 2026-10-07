@@ -1,12 +1,4 @@
 (function(){
-  var aiButtonStyle=document.getElementById('aiCircularButtonStyle');
-  if(!aiButtonStyle){
-    aiButtonStyle=document.createElement('style');
-    aiButtonStyle.id='aiCircularButtonStyle';
-    aiButtonStyle.textContent='.ai-analysis-toggle{width:64px!important;min-width:64px!important;max-width:64px!important;height:64px!important;padding:0 4px!important;border-radius:50%!important;display:flex!important;align-items:center!important;justify-content:center!important;gap:0!important;text-align:center!important;white-space:normal!important;line-height:1.15!important;font-size:10px!important;font-weight:800!important;overflow:hidden!important;}';
-    document.head.appendChild(aiButtonStyle);
-  }
-
   function getMonthlyOps(year,month){
     var y=String(year!=null?year:(typeof baseYear!=='undefined'?baseYear:''));
     var m=month||(typeof selMonth!=='undefined'?selMonth:'');
@@ -35,7 +27,7 @@
       var positive=type==='labor'?!comparison.up:comparison.up;
       badge='<div class="kpi-yoy"><span class="kpi-badge '+(positive?'up':'dn')+'">'+(comparison.up?'▲':'▼')+' '+comparison.str+'</span><span class="kpi-prev">'+prevLabel+'</span></div>';
     }
-    card.innerHTML='<div class="kpi-label">'+label+' <span style="font-weight:500;font-size:8.5px;color:var(--text5);">'+selMonth+'</span></div><div class="kpi-value">'+valueHtml+'</div>'+badge;
+    card.innerHTML='<div class="kpi-label">'+label+' <span class="monthly-ops-kpi-month">'+selMonth+'</span></div><div class="kpi-value">'+valueHtml+'</div>'+badge;
     return card;
   }
 
@@ -85,93 +77,11 @@
 
 
 
-(function(){
-  if(document.getElementById('insightWasteCompactStyle'))return;
-  var compact=document.createElement('style');
-  compact.id='insightWasteCompactStyle';
-  compact.textContent='#iwcRow .iwc-head>div:first-child{display:flex;align-items:baseline;gap:6px;min-width:0;white-space:nowrap}#iwcRow .iwc-head .iwc-sub{margin-top:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}#iwcRow .iwc-card{padding:7px 10px}#iwcRow .iwc-head{margin-bottom:3px}#iwcRow .iwc-kpis{gap:5px;margin-bottom:3px}#iwcRow .iwc-kpi{padding:2px 5px}#iwcRow .iwc-kpi-label{font-size:8px;line-height:1}#iwcRow .iwc-kpi-value{font-size:13px;line-height:1.1}#iwcRow .iwc-rank-grid{gap:3px}#iwcRow .iwc-rank-tabs button{font:700 9px/1.1 -apple-system,BlinkMacSystemFont,sans-serif;font-family:inherit}#iwcRow .iwc-rank{padding:3px 5px;display:flex;flex-direction:column}#iwcRow .iwc-rank-title{font-size:8px;line-height:1.1;margin-bottom:2px;flex-shrink:0}#iwcRow #iwcShare,#iwcRow #iwcIncrease{display:flex;flex-direction:column;flex:1;min-height:0}#iwcRow .iwc-rank-line{font-size:8px;line-height:1.1;padding:1px 0;flex:1;min-height:0}#iwcRow .iwc-legends .donut-leg{padding:2px 0}';
-  document.head.appendChild(compact);
-})();
 
-(function(){
-  'use strict';
-  if(document.getElementById('insightWasteSpacingV1Style'))return;
-  var style=document.createElement('style');
-  style.id='insightWasteSpacingV1Style';
-  style.textContent=[
-    '#pageHaiki #iwcRow .iwc-card{height:calc(var(--iwc-height) + 50px)}',
-    '#pageHaiki #iwcRow .iwc-kpi{padding:5px 7px}',
-    '#pageHaiki #iwcRow .iwc-kpi-label{font-size:9px;line-height:1.2}',
-    '#pageHaiki #iwcRow .iwc-kpi-value{font-size:15px;line-height:1.3}',
-    '#pageHaiki #iwcRow .iwc-rank-tabs button{font-size:10px;line-height:1.2;padding:5px 3px}',
-    '#pageHaiki #iwcRow .iwc-rank-line{font-size:10px;line-height:1.25;padding:3px 0}',
-    '#pageHaiki #iwcRow .iwc-rank{padding:5px 8px}',
-    '#pageHaiki #iwcSharePanel>.iwc-rank-title,#pageHaiki #iwcIncreasePanel .iwc-increase-head>span{display:none}',
-    '#pageHaiki #iwcIncreasePanel .iwc-increase-head{justify-content:flex-end}',
-    '#pageHaiki .haiki-day-btn{padding:8px 11px}',
-    '#pageHaiki .haiki-form{padding:10px 22px}',
-    '#pageHaiki .hf-title{margin-bottom:10px}',
-    '#pageHaiki .hf-field{padding:7px 0}',
-    '#pageHaiki .hf-input-wrap input{padding:7px 14px}',
-    '#pageHaiki .hf-total{margin-top:10px;padding:10px 16px}'
-  ].join('');
-  document.head.appendChild(style);
-  function relabel(){
-    var row=document.getElementById('iwcRow');if(!row)return false;
-    var share=row.querySelector('#iwcShareTab'),increase=row.querySelector('#iwcIncreaseTab');
-    if(!share||!increase)return false;
-    share.textContent='構成比 上位3カテゴリ';
-    increase.textContent='廃棄増加 上位3カテゴリ';
-    return true;
-  }
-  if(!relabel()){
-    var page=document.getElementById('pageHaiki');
-    if(page&&typeof MutationObserver!=='undefined'){
-      var observer=new MutationObserver(function(){if(relabel())observer.disconnect();});
-      observer.observe(page,{childList:true,subtree:true});
-    }
-  }
-})();
 
-(function(){
-  'use strict';
-  if(document.getElementById('insightWasteHeaderMetricsStyle'))return;
-  var style=document.createElement('style');
-  style.id='insightWasteHeaderMetricsStyle';
-  style.textContent=[
-    '#pageHaiki #iwcRow .iwc-analysis-head{align-items:center;gap:10px;margin-bottom:8px}',
-    '#pageHaiki #iwcRow .iwc-analysis-head>.iwc-analysis-heading{display:flex;flex-direction:column;align-items:flex-start;flex:1;min-width:0;gap:2px;white-space:normal}',
-    '#pageHaiki #iwcRow .iwc-analysis-heading .iwc-title{font-size:13px;line-height:1.25}',
-    '#pageHaiki #iwcRow .iwc-analysis-heading #iwcAnalysisSub{font-size:9px;line-height:1.3;margin:0;white-space:normal;overflow:visible;text-overflow:clip}',
-    '#pageHaiki #iwcRow .iwc-analysis-metrics{display:flex;align-items:center;gap:10px;flex:0 0 auto}',
-    '#pageHaiki #iwcRow .iwc-analysis-metrics .iwc-kpi{border:0;border-left:1px solid var(--border);border-radius:0;padding:0 0 0 10px;min-width:0;text-align:right}',
-    '#pageHaiki #iwcRow .iwc-analysis-metrics .iwc-kpi-label{font-size:9px;line-height:1.2}',
-    '#pageHaiki #iwcRow .iwc-analysis-metrics .iwc-kpi-value{font-size:15px;line-height:1.25}'
-  ].join('');
-  document.head.appendChild(style);
-  function moveMetrics(){
-    var row=document.getElementById('iwcRow');if(!row)return false;
-    var card=row.querySelector('section[aria-label="廃棄分析"]');if(!card)return false;
-    if(card.querySelector('.iwc-analysis-metrics'))return true;
-    var head=card.querySelector('.iwc-head'),kpis=card.querySelector('.iwc-kpis');
-    var rate=kpis&&kpis.querySelector('#iwcWasteRate'),yoy=kpis&&kpis.querySelector('#iwcWasteYoy');
-    if(!head||!rate||!yoy)return false;
-    var heading=document.createElement('div');heading.className='iwc-analysis-heading';
-    while(head.firstChild)heading.appendChild(head.firstChild);
-    var metrics=document.createElement('div');metrics.className='iwc-analysis-metrics';
-    metrics.setAttribute('aria-label','廃棄率と前年比');
-    metrics.appendChild(rate.parentElement);metrics.appendChild(yoy.parentElement);
-    kpis.remove();head.classList.add('iwc-analysis-head');head.appendChild(heading);head.appendChild(metrics);
-    return true;
-  }
-  if(!moveMetrics()){
-    var page=document.getElementById('pageHaiki');
-    if(page&&typeof MutationObserver!=='undefined'){
-      var observer=new MutationObserver(function(){if(moveMetrics())observer.disconnect();});
-      observer.observe(page,{childList:true,subtree:true});
-    }
-  }
-})();
+
+
+
 
 
 
