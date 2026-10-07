@@ -74,7 +74,7 @@ test('比較年度なしは前年を自動選択せず、カード・AI・入力
   assert.doesNotMatch(c.ManagementCommentEngine.getPeriod('2026','9月',20,null).text,/前年比[+\-]?\d/);
 });
 test('前年平均0・前年データなしは算出不可、現在0で前年ありはマイナス100%',()=>{
-  const {c,get}=setup();c.store.data['2025']['9月'].forEach(r=>{r.売上=0;r.廃棄金額=0;});
+  const {c,cards,get}=setup();c.store.data['2025']['9月'].forEach(r=>{r.売上=0;r.廃棄金額=0;});
   assert.equal(get().comparison.salesYen,null);assert.equal(get().comparison.wasteYen,null);
   c.store.data['2026']['9月'].forEach(r=>r.客数=0);close(get().comparison.customers.pct,-100);
   c.InsightDashboardKPISync.refresh();
