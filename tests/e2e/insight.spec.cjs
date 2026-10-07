@@ -287,7 +287,7 @@ test('トップページは外部shellと機能manifestの最新版確認をno-s
   expect(source).toContain('https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js');
   expect(source).toContain('integrity="sha512-CQBWl4fJHWbryGE+Pc7UAxWMUMNMWzWxF4SQo9CgkJIN1kx6djDQZjh3Y8SZ1d+6I+1zze6Z7kHXO7q3UyZAWw=="');
   expect(loader).not.toContain('stripPayloadChartScript');
-  expect(payload).toContain('insight_payload_core_v1.css?v=20261007-readability-insight-cards-css-1');
+  expect(payload).toContain('insight_payload_core_v1.css?v=20261007-readability-sales-count-hourly-css-1');
   expect(payload).toContain('insight_payload_core_v1.js?v=20261006-payload-assets-1');
   expect(payload).toContain('insight_payload_ai_legacy_v1.js?v=20261006-payload-assets-1');
   expect(payload).toContain('insight_payload_bindings_v1.js?v=20261006-inline-bindings-1');
@@ -1622,10 +1622,24 @@ test('今日の入力で時間帯別客数を途中保存し24時間入力を完
   await expect(page.locator('#insightEvents')).toBeVisible();
   const initialOrder=await page.evaluate(()=>Array.from(document.getElementById('opsDailyWrap').children).map(node=>node.id));
   expect(initialOrder.indexOf('hourlyCustomersQuick')).toBeLessThan(initialOrder.indexOf('insightEvents'));
+  const hourlyQuickType=await page.evaluate(()=>({
+    status:getComputedStyle(document.querySelector('#hourlyCustomersQuick .hourly-quick-status')).fontSize,
+    button:getComputedStyle(document.querySelector('#hourlyCustomersQuick .hourly-quick-button')).fontSize
+  }));
+  expect(hourlyQuickType).toEqual({status:'12.5px',button:'13px'});
 
   await page.locator('#hourlyCustomersQuick .hourly-quick-button').click();
   await expect(page.locator('.hourly-dialog')).toBeVisible();
   await expect(page.locator('.hourly-dialog .hourly-help')).toHaveCount(0);
+  const hourlyDialogType=await page.evaluate(()=>({
+    dialog:getComputedStyle(document.querySelector('.hourly-dialog')).fontSize,
+    heading:getComputedStyle(document.querySelector('.hourly-dialog h2')).fontSize,
+    groupTitle:getComputedStyle(document.querySelector('.hourly-input-group h3')).fontSize,
+    label:getComputedStyle(document.querySelector('.hourly-input-group label span')).fontSize,
+    input:getComputedStyle(document.querySelector('.hourly-input-group input')).fontSize,
+    summary:getComputedStyle(document.querySelector('.hourly-dialog-summary')).fontSize
+  }));
+  expect(hourlyDialogType).toEqual({dialog:'14px',heading:'18px',groupTitle:'13px',label:'13px',input:'14px',summary:'14px'});
   const inputs=page.locator('.hourly-dialog .hourly-input-group input');
   await expect(inputs).toHaveCount(24);
   await inputs.nth(0).fill('0');
