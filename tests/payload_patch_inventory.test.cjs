@@ -50,7 +50,10 @@ test('canonical payloadはinline script/styleを持たず外部assetを順序固
   assert.doesNotMatch(core,/badge\.style\.display/);
   assert.match(core,/badge\.classList\.remove\("is-hidden"\)/);
   assert.match(core,/badge\.classList\.add\("is-hidden"\)/);
-  assert.match(css,/\.today-badge\.is-hidden\{display:none;\}/);\n  assert.doesNotMatch(core,/donutDayPicker"\)\.style\.display/);\n  assert.match(core,/donutDayPicker"\)\.classList\.toggle\("is-visible",isDaily\)/);\n  assert.match(css,/#donutDayPicker\.is-visible\{display:block;\}/);
+  assert.match(css,/\.today-badge\.is-hidden\{display:none;\}/);
+  assert.doesNotMatch(core,/donutDayPicker"\)\.style\.display/);
+  assert.match(core,/donutDayPicker"\)\.classList\.toggle\("is-visible",isDaily\)/);
+  assert.match(css,/#donutDayPicker\.is-visible\{display:block;\}/);
   assert.match(core,/msg\.classList\.add\("is-visible"\)/);
   assert.match(core,/msg\.classList\.remove\("is-visible"\)/);
   assert.match(css,/\.saved-msg\.is-visible\{display:flex;\}/);
