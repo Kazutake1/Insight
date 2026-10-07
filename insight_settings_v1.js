@@ -16,39 +16,7 @@
     })||null;
   }
 
-  function addStyle(){
-    if(doc.getElementById('insightSettingsStyle'))return;
-    var style=doc.createElement('style');
-    style.id='insightSettingsStyle';
-    style.textContent=[
-      '.sidebar-btn.insight-settings-nav{font-size:13.5px;font-weight:500;line-height:normal;gap:9px;padding:11px 12px}',
-      '.sidebar-btn.insight-settings-nav.active{background:var(--text);color:#fff}',
-      '.sidebar-btn.insight-settings-nav.active .nav-icon{opacity:1}',
-      '.dark .sidebar-btn.insight-settings-nav.active{background:#e0e0e8;color:#111}',
-      '.insight-settings-page{overflow:auto}',
-      '.insight-settings-content{display:grid;gap:14px;max-width:760px;width:100%}',
-      '.insight-settings-section{border:1px solid var(--border);border-radius:14px;background:var(--surface);padding:16px}',
-      '.insight-settings-section h2{margin:0 0 5px;font-size:15px;color:var(--text)}',
-      '.insight-settings-section>p{margin:0 0 12px;color:var(--text4);font-size:11px;line-height:1.55}',
-      '.insight-settings-actions{display:grid;gap:8px}',
-      '.insight-settings-actions .sidebar-btn,#pageSettings #insightDataHealthButton{display:flex;width:100%;box-sizing:border-box;align-items:center;gap:9px;margin:0;padding:11px 12px;border:1px solid var(--border);border-radius:11px;background:var(--surface2);color:var(--text3);font:600 12px/1.35 -apple-system,BlinkMacSystemFont,"Noto Sans JP",sans-serif;text-align:left;cursor:pointer}',
-      '.insight-settings-actions .sidebar-btn:hover,#pageSettings #insightDataHealthButton:hover{background:var(--surface3)}',
-      '#pageSettings #insightDataHealthButton{color:#15803d}',
-      '.dark #pageSettings #insightDataHealthButton{color:#86efac}',
-      '.insight-settings-actions .sidebar-btn-sub{font-size:9px;color:var(--text5)}',
-      '.insight-theme-toggle{display:flex;align-items:center;justify-content:space-between;gap:10px;width:100%;box-sizing:border-box;padding:10px 12px;margin:0 0 8px;border:0;background:transparent;color:var(--text3);font:600 12px/1.35 -apple-system,BlinkMacSystemFont,"Noto Sans JP",sans-serif}',
-      '.insight-theme-icon{display:block;width:18px;height:18px;flex:0 0 18px}',
-      '.insight-theme-switch{position:relative;width:42px;height:24px;flex:0 0 auto}',
-      '.insight-theme-switch input{position:absolute;opacity:0;pointer-events:none}',
-      '.insight-theme-switch-track{position:absolute;inset:0;border-radius:999px;background:var(--border);transition:.18s ease;cursor:pointer}',
-      '.insight-theme-switch-track:after{content:"";position:absolute;width:18px;height:18px;left:3px;top:3px;border-radius:50%;background:var(--surface);box-shadow:0 1px 3px rgba(0,0,0,.22);transition:.18s ease}',
-      '.insight-theme-switch input:checked+.insight-theme-switch-track{background:var(--text)}',
-      '.insight-theme-switch input:checked+.insight-theme-switch-track:after{transform:translateX(18px)}',
-      '.insight-theme-switch input:focus-visible+.insight-theme-switch-track{outline:2px solid var(--text3);outline-offset:2px}',
-      '@media(max-width:800px){.insight-settings-content{max-width:none}.insight-settings-section{padding:13px}}'
-    ].join('');
-    doc.head.appendChild(style);
-  }
+  function addStyle(){ /* Static rules live in insight_payload_core_v1.css for CSP. */ }
 
   function build(){
     var sidebarActions=doc.querySelector('.sidebar-btns');
