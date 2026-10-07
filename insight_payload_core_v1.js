@@ -1121,6 +1121,10 @@ function renderDonutDayPicker(){
   sel.innerHTML=Array.from({length:days},(_,i)=>`<option value="${i}">${i+1}日</option>`).join("");
   if(prev&&parseInt(prev)<days)sel.value=prev;
 }
+function applyDynamicColors(root){
+  root.querySelectorAll("[data-color]").forEach(el=>el.style.setProperty("--dynamic-color",el.dataset.color));
+}
+
 function refreshDonut(){
   const haiki=buildDonutData();
   const vals=HAIKI_CATS.map(c=>haiki[c]);
@@ -1146,7 +1150,7 @@ function refreshDonut(){
     const pct=total>0?(vals[i]/total*100).toFixed(1):"0.0";
     const dispVal=donutMode==="amount"?`¥${vals[i].toLocaleString()}`:`${pct}%`;
     const div=document.createElement("div");div.className="donut-leg";
-    div.innerHTML=`<span class="donut-dot" style="background:${HAIKI_COLORS[i]};"></span>
+    div.innerHTML=`<span class="donut-dot" data-color="${HAIKI_COLORS[i]}"></span>
       <span class="donut-name">${c}</span>
       <span class="donut-val">${dispVal}</span>`;
     leg.appendChild(div);
@@ -1157,6 +1161,7 @@ function refreshDonut(){
     empty.textContent="データなし";
     leg.appendChild(empty);
   }
+  applyDynamicColors(leg);
 }
 
 function setDonutMode(mode){
@@ -1210,8 +1215,8 @@ function renderLegend(){
   [{meta:mSales,type:"bar"},{meta:mKyaku,type:"line"}].forEach(({meta,type})=>{
     const div=document.createElement("div");div.className="legend-item";
     const indicator=type==="bar"
-      ?`<div style="width:12px;height:12px;border-radius:3px;background:${meta.color}bb;"></div>`
-      :`<div class="legend-line" style="background:${meta.color};width:18px;height:2.5px;border-radius:2px;"></div>`;
+      ?`<div class="legend-color-box" data-color="${meta.color}bb"></div>`
+      :`<div class="legend-line" data-color="${meta.color}"></div>`;
     div.innerHTML=`${indicator}<span>${meta.label}（${meta.unit}）</span>`;
     row.appendChild(div);
   });
@@ -1220,12 +1225,13 @@ function renderLegend(){
      {color:"#aaa",label:`${cmpYear}年 客数`,type:"line"}].forEach(l=>{
       const div=document.createElement("div");div.className="legend-item";
       const indicator=l.type==="bar"
-        ?`<div style="width:12px;height:12px;border-radius:3px;background:${l.color};"></div>`
+        ?`<div class="legend-color-box" data-color="${l.color}"></div>`
         :`<div class="legend-dashed-line"></div>`;
       div.innerHTML=`${indicator}<span class="legend-label">${l.label}</span>`;
       row.appendChild(div);
     });
   }
+  applyDynamicColors(row);
 }
 
 /* ══ Main chart ══ */
@@ -1332,7 +1338,7 @@ function renderSummary(aNow,aPrev){
     const div=document.createElement("div");div.className="sum-row";
     div.innerHTML=`<div class="sum-left"><div class="sum-bar${isAct?" act":""}"></div><span class="sum-name">${m.label}</span></div>
       <div class="sum-right"><div class="sum-val">${m.short(aNow[m.key])}</div>
-      ${yoyVal?`<div class="sum-yoy" style="color:${(m.up?yoyVal.up:!yoyVal.up)?"#16a34a":"#dc2626"}">${yoyVal.up?"▲":"▼"} ${yoyVal.str}</div>`:""}</div>`;
+      ${yoyVal?`<div class="sum-yoy ${(m.up?yoyVal.up:!yoyVal.up)?"positive":"negative"}">${yoyVal.up?"▲":"▼"} ${yoyVal.str}</div>`:""}</div>`;
     body.appendChild(div);
   });
 }
