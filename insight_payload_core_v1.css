@@ -1162,3 +1162,6 @@ body.ai-analysis-open #main{margin-right:0!important}
     @media(max-width:800px){#iwcRow{grid-template-columns:1fr;}#iwcRow .iwc-card{height:var(--iwc-height);}}
 #iwcRow.iwc-height-tall{--iwc-height:198px}
 #iwcRow .iwc-donut-color-0{background:#ef4444}#iwcRow .iwc-donut-color-1{background:#f97316}#iwcRow .iwc-donut-color-2{background:#eab308}#iwcRow .iwc-donut-color-3{background:#22c55e}#iwcRow .iwc-donut-color-4{background:#06b6d4}#iwcRow .iwc-donut-color-5{background:#3b82f6}#iwcRow .iwc-donut-color-6{background:#8b5cf6}#iwcRow .iwc-donut-color-7{background:#ec4899}
+
+/* STEP5 CSP: weather menu visibility without inline style. */
+.insight-weather-menu-hidden{display:none!important}
