@@ -43,8 +43,8 @@ test('canonical payloadはinline script/styleを持たず外部assetを順序固
   const core=read('insight_payload_core_v1.js');
   const ai=read('insight_payload_ai_legacy_v1.js');
   const css=read('insight_payload_core_v1.css');
-  assert.match(payload,/insight_payload_core_v1\.css\?v=20261007-step3-kpi-value-state-css-2/);
-  assert.match(payload,/insight_payload_core_v1\.js\?v=20261007-step3-kpi-value-state-2/);
+  assert.match(payload,/insight_payload_core_v1\.css\?v=20261007-step3-quick-save-feedback-css-1/);
+  assert.match(payload,/insight_payload_core_v1\.js\?v=20261007-step3-quick-save-feedback-1/);
   assert.doesNotMatch(core,/label\.style\.color/);
   assert.match(core,/label\.classList\.remove\("backup-status-missing","backup-status-today","backup-status-recent","backup-status-stale"\)/);
   assert.match(core,/label\.classList\.add\("backup-status-missing"\)/);
@@ -54,6 +54,10 @@ test('canonical payloadはinline script/styleを持たず外部assetを順序固
   assert.match(css,/#backupDaysLabel\.backup-status-missing,#backupDaysLabel\.backup-status-stale\{color:#dc2626\}/);
   assert.match(css,/#backupDaysLabel\.backup-status-today\{color:#15803d\}/);
   assert.match(css,/#backupDaysLabel\.backup-status-recent\{color:#888\}/);
+  assert.doesNotMatch(core,/btn\.style\.background="#16a34a"/);
+  assert.match(core,/btn\.classList\.add\("is-saved-feedback"\)/);
+  assert.match(core,/btn\.classList\.remove\("is-saved-feedback"\)/);
+  assert.match(css,/\.quick-save\.is-saved-feedback\{background:#16a34a;\}/);
   assert.match(payload,/insight_payload_ai_legacy_v1\.js\?v=20261006-payload-assets-1/);
   assert.match(payload,/insight_payload_bindings_v1\.js\?v=20261006-inline-bindings-1/);
   assert.doesNotMatch(payload,/\son(?:click|change)\s*=/i);
