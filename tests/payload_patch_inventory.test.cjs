@@ -43,7 +43,7 @@ test('canonical payloadはinline script/styleを持たず外部assetを順序固
   const core=read('insight_payload_core_v1.js');
   const ai=read('insight_payload_ai_legacy_v1.js');
   const css=read('insight_payload_core_v1.css');
-  assert.match(payload,/insight_payload_core_v1\.css\?v=20261007-readability-input-tables-css-1/);
+  assert.match(payload,/insight_payload_core_v1\.css\?v=20261007-readability-global-containers-css-1/);
   assert.match(payload,/insight_payload_core_v1\.js\?v=20261006-payload-assets-1/);
   assert.match(payload,/insight_payload_ai_legacy_v1\.js\?v=20261006-payload-assets-1/);
   assert.match(payload,/insight_payload_bindings_v1\.js\?v=20261006-inline-bindings-1/);
@@ -239,11 +239,12 @@ test('STEP17の可読性CSSは独立moduleで主要ページへ横展開する',
   const index=readShell();
   const readability=read('insight_readability_v1.js');
   const css=read('insight_payload_core_v1.css');
-  assert.match(index,/insight_readability_v1\.js\?v=20261007-csp-style-readability-input-tables-1/);
+  assert.match(index,/insight_readability_v1\.js\?v=20261007-csp-style-readability-global-containers-1/);
   assert.ok(index.indexOf('insight_dark_theme_v1.js')<index.indexOf('insight_readability_v1.js'));
   assert.match(readability,/insightReadabilityStyle/);
-  assert.match(readability,/#main\{padding-left:0!important;padding-right:0!important;min-width:0!important;box-sizing:border-box!important\}/);
-  assert.match(readability,/\.page\{padding-left:12px!important;padding-right:12px!important;box-sizing:border-box!important;min-width:0!important;max-width:100%!important\}/);
+  assert.match(css,/#main\{padding-left:0!important;padding-right:0!important;min-width:0!important;box-sizing:border-box!important\}/);
+  assert.match(css,/\.page\{padding-left:12px!important;padding-right:12px!important;box-sizing:border-box!important;min-width:0!important;max-width:100%!important\}/);
+  assert.doesNotMatch(readability,/#main\{|\.page\{/);
   assert.match(readability,/InsightPageTitleLayout&&typeof root\.InsightPageTitleLayout\.alignAll==='function'/);
   assert.match(css,/#pageDash \.kpi-card\{[^}]*height:110px!important;[^}]*border-radius:16px!important;[^}]*box-shadow:0 5px 16px rgba\(15,23,42,\.08\)!important/);
   assert.match(css,/#pageDash \.kpi-label\{[^}]*left:16px!important;top:13px!important;[^}]*font-size:13px!important/);
