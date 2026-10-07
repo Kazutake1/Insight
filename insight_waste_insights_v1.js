@@ -4,52 +4,7 @@
   if(window.__insightWasteInsightsV1)return;
   window.__insightWasteInsightsV1=true;
   var chart=null,mode='amount',rankTab='share';
-  var style=document.createElement('style');
-  style.id='insightWasteInsightsStyle';
-  style.textContent=`
-    #iwcRow{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px;margin-bottom:10px;flex-shrink:0;min-width:0;--iwc-height:148px;}
-    #iwcRow .iwc-card{box-sizing:border-box;height:var(--iwc-height);min-width:0;min-height:0;overflow:hidden;background:var(--surface);border-radius:14px;padding:9px 12px;box-shadow:0 2px 10px rgba(0,0,0,.07);display:flex;flex-direction:column;}
-    #iwcRow .iwc-head{display:flex;align-items:start;justify-content:space-between;gap:6px;flex:0 0 auto;margin-bottom:5px;}
-    #iwcRow .iwc-title{font-size:12px;font-weight:750;color:var(--text);}
-    #iwcRow .iwc-sub{font-size:9px;color:var(--text4);margin-top:2px;}
-    #iwcRow .iwc-switch{display:flex;border:1px solid var(--border);border-radius:7px;overflow:hidden;flex-shrink:0;}
-    #iwcRow .iwc-switch button{border:0;padding:4px 8px;font:700 10px/1.1 -apple-system,BlinkMacSystemFont,sans-serif;font-family:inherit;cursor:pointer;background:var(--surface);color:var(--text4);}
-    #iwcRow .iwc-switch button.active{background:var(--text);color:var(--surface);}
-    #iwcRow .iwc-donut-inner{display:grid;grid-template-columns:minmax(90px,35%) minmax(0,1fr);gap:9px;align-items:center;flex:1;min-height:0;}
-    #iwcRow .iwc-donut-wrap{position:relative;width:min(100%,110px);height:min(100%,110px);aspect-ratio:1;margin:auto;}
-    #iwcRow .iwc-donut-wrap canvas{display:block;width:100%!important;height:100%!important;}
-    #iwcRow .iwc-legends{height:100%;min-height:0;min-width:0;overflow-y:auto;overscroll-behavior:contain;-webkit-overflow-scrolling:touch;scrollbar-width:thin;}
-    #iwcRow .iwc-legends .donut-leg{font-size:10px;padding:3px 0;}
-    #iwcRow .iwc-legends .donut-dot{width:8px;height:8px;margin-right:5px;}
-    #iwcRow .iwc-legends .donut-name{min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
-    #iwcRow .iwc-legends .donut-val{white-space:nowrap;margin-left:4px;font-size:10px;}
-    #iwcRow .iwc-total{display:flex;justify-content:space-between;align-items:center;padding:2px 0 4px;border-bottom:2px solid var(--border);font-size:10px;font-weight:750;color:var(--text3);}
-    #iwcRow .iwc-total strong{color:#b91c1c;font-size:11px;}
-    #iwcRow .iwc-kpis{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:6px;margin-bottom:3px;flex:0 0 auto;}
-    #iwcRow .iwc-kpi{border:1px solid var(--border);border-radius:8px;padding:3px 5px;min-width:0;}
-    #iwcRow .iwc-kpi-label{font-size:9px;font-weight:700;color:var(--text3);line-height:1.1;}
-    #iwcRow .iwc-kpi-value{font-size:13px;font-weight:800;white-space:nowrap;color:var(--text);line-height:1.2;}
-    #iwcRow .iwc-kpi-value.up{color:#b91c1c;}#iwcRow .iwc-kpi-value.down{color:#15803d;}
-    #iwcRow .iwc-rank-grid{display:flex;flex-direction:column;gap:3px;flex:1;min-height:0;}
-    #iwcRow .iwc-rank-tabs{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:4px;flex:0 0 auto;}
-    #iwcRow .iwc-rank-tabs button{min-width:0;border:1px solid var(--border);border-radius:6px;padding:3px 4px;background:var(--surface);color:var(--text3);font:700 9px/1.1 inherit;cursor:pointer;white-space:nowrap;}
-    #iwcRow .iwc-rank-tabs button.active{background:var(--text);border-color:var(--text);color:var(--surface);}
-    #iwcRow .iwc-rank{display:flex;flex-direction:column;flex:1;min-width:0;min-height:0;overflow:hidden;border:1px solid var(--border);border-radius:8px;padding:4px 6px;}
-    #iwcRow .iwc-rank[hidden]{display:none!important;}
-    #iwcRow .iwc-rank-title{font-size:9px;font-weight:750;white-space:nowrap;color:var(--text);margin-bottom:2px;flex-shrink:0;}
-    #iwcRow .iwc-increase-head{display:flex;align-items:center;justify-content:space-between;gap:4px;min-width:0;}
-    #iwcRow .iwc-increase-head>span{min-width:0;overflow:hidden;text-overflow:ellipsis;}
-    #iwcRow .iwc-increase-head .iwc-switch button{padding:2px 4px;font-size:8px;}
-    #iwcRow .iwc-rank-lines{display:flex;flex-direction:column;flex:1;min-height:0;}
-    #iwcRow .iwc-rank-line{display:flex;align-items:center;gap:4px;justify-content:space-between;font-size:9px;line-height:1.25;min-width:0;padding:1px 0;border-top:1px solid var(--border2);flex:1;min-height:0;}
-    #iwcRow .iwc-rank-name{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:var(--text3);}
-    #iwcRow .iwc-rank-value{flex-shrink:0;font-weight:750;color:var(--text);white-space:nowrap;}
-    #iwcRow .iwc-rank-value.up{color:#b91c1c;}
-    #iwcRow .iwc-increase-percent{font-size:9px;font-weight:600;color:var(--text4);}
-    #iwcRow .iwc-empty{font-size:10px;color:var(--text4);padding:7px 2px;}
-    @media(max-width:800px){#iwcRow{grid-template-columns:1fr;}#iwcRow .iwc-card{height:var(--iwc-height);}}
-  `;
-  document.head.appendChild(style);
+
   function number(v){var n=Number(v);return Number.isFinite(n)&&n>0?n:0;}
   function yen(v){return '¥'+Math.round(v).toLocaleString('ja-JP');}
   function cats(){return typeof HAIKI_CATS==='undefined'?[]:HAIKI_CATS;}
@@ -84,7 +39,7 @@
     var header=el('div','iwc-total');header.append(el('span','','合計'),el('strong','',yen(total)));root.appendChild(header);
     cats().forEach(function(cat,i){
       if(c.values[i]===0)return;
-      var line=el('div','donut-leg'),dot=el('span','donut-dot');dot.style.background=colors()[i];
+      var line=el('div','donut-leg'),dot=el('span','donut-dot iwc-donut-color-'+(i%8));
       var name=el('span','donut-name',cat);name.title=cat;
       var value=el('span','donut-val',mode==='amount'?yen(c.values[i]):(c.values[i]/total*100).toFixed(1)+'%');
       line.append(dot,name,value);root.appendChild(line);
@@ -137,7 +92,7 @@
   function syncHeight(){
     var bar=document.getElementById('haikiChartCard'),row=document.getElementById('iwcRow');if(!bar||!row)return;
     var height=bar.getBoundingClientRect().height;
-    if(height>=110)row.style.setProperty('--iwc-height',Math.round(height)+'px');
+    row.classList.toggle('iwc-height-tall',height>=198);
     if(chart)chart.resize();
   }
   function mount(){
