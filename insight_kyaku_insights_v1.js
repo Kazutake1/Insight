@@ -5,25 +5,7 @@
   window.__insightKyakuInsightsV1=true;
   var page=document.getElementById('pageKyaku');
   if(!page)return;
-  var css=document.createElement('style');
-  css.id='insightKyakuInsightsStyle';
-  css.textContent=[
-    '#pageKyaku #ikyRow{display:grid;grid-template-columns:minmax(0,1fr);gap:10px;flex:0 0 auto;min-width:0;margin-bottom:10px}',
-    '#pageKyaku #ikyRow .iky-card{box-sizing:border-box;min-width:0;border-radius:14px;padding:11px 14px;background:var(--surface);box-shadow:0 2px 10px var(--shadow)}',
-    '#pageKyaku #ikyRow .iky-title{font-size:13px;font-weight:750;color:var(--text);margin-bottom:8px}',
-    '#pageKyaku #ikyRow .iky-stats{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));min-width:0}',
-    '#pageKyaku #ikyRow .iky-stat{display:flex;flex-direction:column;align-items:flex-start;gap:4px;min-width:0;padding:2px 12px;font-size:11px;color:var(--text3)}',
-    '#pageKyaku #ikyRow .iky-stat:first-child{padding-left:0}',
-    '#pageKyaku #ikyRow .iky-stat+.iky-stat{border-left:1px solid var(--border)}',
-    '#pageKyaku #ikyRow .iky-stat strong{font-size:19px;line-height:1.2;font-weight:800;color:var(--text);white-space:nowrap}',
-    '#pageKyaku #ikyRow .iky-stat strong.up{color:#b91c1c}',
-    '#pageKyaku #ikyRow .iky-stat strong.down{color:#b91c1c}',
-    '#pageKyaku #ikyRow .iky-note{font-size:9px;color:var(--text4);line-height:1.3;margin-top:9px;padding-top:6px;border-top:1px solid var(--border2)}',
-    '@media(max-width:600px){#pageKyaku #ikyRow .iky-stat{padding:2px 6px;font-size:10px}#pageKyaku #ikyRow .iky-stat strong{font-size:15px}}',
-    '#pageKyaku #kyakuMonthTotal{display:none!important}',
-    '#pageKyaku #ikyDailyAverage{font-size:10px;font-weight:500;color:var(--text4);line-height:1.3;margin-top:2px;white-space:nowrap}'
-  ].join('');
-  document.head.appendChild(css);
+
 
   function numeric(v){var n=Number(v);return Number.isFinite(n)&&n>0?n:0;}
   function label(id,value,cls){var node=document.getElementById(id);if(!node)return;node.textContent=value;node.classList.remove('up','down');if(cls)node.classList.add(cls);}
