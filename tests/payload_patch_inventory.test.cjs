@@ -46,7 +46,7 @@ test('canonical payloadはinline script/styleを持たず外部assetを順序固
   const readability=read('insight_readability_v1.js');
   const css=read('insight_payload_core_v1.css');
   assert.match(payload,/insight_payload_core_v1\.css\?v=20261007-step3-donut-mode-css-1/);
-  assert.match(payload,/insight_payload_core_v1\.js\?v=20261007-step4-ai-static-css-1/);
+  assert.match(payload,/insight_payload_core_v1\.js\?v=20261007-step4-ai-position-css-1/);
   assert.doesNotMatch(core,/label\.style\.color/);
   assert.doesNotMatch(core,/msg\.style\.display/);
   assert.doesNotMatch(core,/badge\.style\.display/);
@@ -310,7 +310,7 @@ test('AI表示CSSはIndexの文字列置換ではなくpresentation moduleが所
   assert.match(index,/insight_ai_presentation_v1\.js\?v=20261006-header-compact-1/);
   assert.doesNotMatch(presentation,/insightAiPresentationStyle|createElement\(['\"]style/);
   assert.doesNotMatch(presentation,/数値と要点を優先して表示/);
-  assert.match(presentation,/body\.ai-analysis-open #main\{margin-right:0!important\}/);
+  assert.match(css,/body\.ai-analysis-open #main\{margin-right:0!important\}/);
   assert.match(presentation,/\.ai-analysis-panel\.ai-analysis-workspace/);
   assert.match(presentation,/\.ai-workspace-grid/);
   assert.match(presentation,/\.ai-analysis-question-row/);
@@ -1146,13 +1146,12 @@ test('分析AI workspace assetはcache bustされている',()=>{
   assert.match(index,/insight_ops_v1\.js\?v=20260930-step5-2/);
 });
 
-test('分析AIの上端は実際のサイドバー上端へ追従する',()=>{
+test('分析AIの位置は外部CSSだけで決まりruntime inline styleを使わない',()=>{
   const presentation=read('insight_ai_presentation_v1.js');
-  assert.match(presentation,/function sidebarRect\(button\)/);
-  assert.match(presentation,/button\.closest&&button\.closest\('\.sidebar'\)/);
-  assert.match(presentation,/--ai-workspace-top/);
-  assert.match(css,/top:var\(--ai-workspace-top,12px\)!important/);
-  assert.match(css,/top:var\(--ai-workspace-top,8px\)!important/);
+  const css=read('insight_payload_core_v1.css');
+  assert.doesNotMatch(presentation,/sidebarRect|getBoundingClientRect|\.style\.setProperty|--ai-workspace-(?:left|top)/);
+  assert.match(css,/left:202px!important;right:12px!important;top:12px!important/);
+  assert.match(css,/left:8px!important;right:8px!important;top:8px!important/);
 });
 
 test('曜日別平均カードと廃棄悪化色の表示契約を維持する',()=>{
