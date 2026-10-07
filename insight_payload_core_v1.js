@@ -1167,8 +1167,8 @@ function setDonutMode(mode){
   donutMode=mode;
   const btnAmt=document.getElementById("donutBtnAmt");
   const btnPct=document.getElementById("donutBtnPct");
-  if(btnAmt){btnAmt.style.background=mode==="amount"?"#1a1a1a":"#fff";btnAmt.style.color=mode==="amount"?"#fff":"#999";}
-  if(btnPct){btnPct.style.background=mode==="percent"?"#1a1a1a":"#fff";btnPct.style.color=mode==="percent"?"#fff":"#999";}
+  if(btnAmt)btnAmt.classList.toggle("active",mode==="amount");
+  if(btnPct)btnPct.classList.toggle("active",mode==="percent");
   refreshDonut();
 }
 
