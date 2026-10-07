@@ -43,8 +43,8 @@ test('canonical payloadはinline script/styleを持たず外部assetを順序固
   const core=read('insight_payload_core_v1.js');
   const ai=read('insight_payload_ai_legacy_v1.js');
   const css=read('insight_payload_core_v1.css');
-  assert.match(payload,/insight_payload_core_v1\.css\?v=20261007-step3-donut-picker-css-1/);
-  assert.match(payload,/insight_payload_core_v1\.js\?v=20261007-step3-donut-picker-visibility-1/);
+  assert.match(payload,/insight_payload_core_v1\.css\?v=20261007-step3-donut-mode-css-1/);
+  assert.match(payload,/insight_payload_core_v1\.js\?v=20261007-step3-donut-mode-state-1/);
   assert.doesNotMatch(core,/label\.style\.color/);
   assert.doesNotMatch(core,/msg\.style\.display/);
   assert.doesNotMatch(core,/badge\.style\.display/);
@@ -54,6 +54,11 @@ test('canonical payloadはinline script/styleを持たず外部assetを順序固
   assert.doesNotMatch(core,/donutDayPicker"\)\.style\.display/);
   assert.match(core,/donutDayPicker"\)\.classList\.toggle\("is-visible",isDaily\)/);
   assert.match(css,/#donutDayPicker\.is-visible\{display:block;\}/);
+  assert.doesNotMatch(core,/btnAmt\.style\.(?:background|color)/);
+  assert.doesNotMatch(core,/btnPct\.style\.(?:background|color)/);
+  assert.match(core,/btnAmt\.classList\.toggle\("active",mode==="amount"\)/);
+  assert.match(core,/btnPct\.classList\.toggle\("active",mode==="percent"\)/);
+  assert.match(css,/#donutBtnAmt\.active,#donutBtnPct\.active\{background:#1a1a1a;color:#fff;\}/);
   assert.match(core,/msg\.classList\.add\("is-visible"\)/);
   assert.match(core,/msg\.classList\.remove\("is-visible"\)/);
   assert.match(css,/\.saved-msg\.is-visible\{display:flex;\}/);
