@@ -113,8 +113,8 @@ test('canonical payloadはinline script/styleを持たず外部assetを順序固
   assert.match(core,/sales-reference-total/);
   assert.match(css,/\.sales-weather-btn\.active\{/);
   assert.match(css,/\.sales-yen-note\{/);
-  assert.match(core,/function applyDynamicColors\(root\)/);
-  assert.match(core,/data-color="\$\{HAIKI_COLORS\[i\]\}"/);
+  assert.doesNotMatch(core,/function applyDynamicColors\(root\)/);
+  assert.doesNotMatch(core,/data-color=/);
   assert.match(core,/sum-yoy \$\{\(m\.up\?yoyVal\.up:!yoyVal\.up\)\?"positive":"negative"\}/);
   assert.match(css,/\.sum-yoy\.positive\{/);
   assert.match(css,/\.sum-yoy\.negative\{/);
@@ -128,7 +128,6 @@ test('canonical payloadはinline script/styleを持たず外部assetを順序固
   assert.match(css,/\.app-toast-info\{/);
   assert.doesNotMatch(core,/\.style\b/);
   assert.doesNotMatch(core,/style="/);
-  assert.doesNotMatch(core,/data-color=/);
   assert.ok(core.includes('<progress class="hf-budget-bar${over?" over":""}" value="${pct}" max="100"></progress>'));
   assert.match(core,/donut-dot donut-color-\$\{i\}/);
   assert.match(css,/\.donut-color-0\{/);
