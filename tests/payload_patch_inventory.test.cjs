@@ -42,6 +42,8 @@ test('canonical payloadはinline script/styleを持たず外部assetを順序固
   const payload=read('insight_payload_source_v1.html');
   const core=read('insight_payload_core_v1.js');
   const ai=read('insight_payload_ai_legacy_v1.js');
+  const aiPresentation=read('insight_ai_presentation_v1.js');
+  const readability=read('insight_readability_v1.js');
   const css=read('insight_payload_core_v1.css');
   assert.match(payload,/insight_payload_core_v1\.css\?v=20261007-step3-donut-mode-css-1/);
   assert.match(payload,/insight_payload_core_v1\.js\?v=20261007-step4-ai-static-css-1/);
