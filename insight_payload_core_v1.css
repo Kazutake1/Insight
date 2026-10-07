@@ -914,3 +914,11 @@ html.dark body,body.dark{background:#251b26}
 .kpi-month-note{font-weight:500;font-size:8.5px;color:var(--text5);}
 .donut-total-label{font-size:11px;font-weight:700;color:var(--text3);}
 .donut-total-value{font-size:13px;font-weight:800;color:#b91c1c;}
+
+.legend-dashed-line{width:18px;height:0;border-top:2px dashed #aaa;}
+.legend-label{color:var(--text5);}
+.hf-budget-empty{font-size:11px;color:var(--text5);padding:8px 0;}
+.hf-budget-label-total{font-weight:700;}
+.hf-budget-actual-total{font-size:14px;}
+.budget-edit-row-total{margin-top:4px;border-top:2px solid var(--border);padding-top:10px;border-bottom:none;}
+.budget-edit-label-total{font-weight:700;}
