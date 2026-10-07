@@ -248,7 +248,8 @@ input[type=number]{-moz-appearance:textfield;}
 .wx-btn.active{border-color:#1a1a1a;background:#f8f8f8;}
 
 .quick-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px;flex:1;overflow-y:auto;
-  -webkit-overflow-scrolling:touch;}.quick-section{background:#fff;border-radius:16px;padding:14px 16px;
+  -webkit-overflow-scrolling:touch;}
+.quick-section{background:#fff;border-radius:16px;padding:14px 16px;
   box-shadow:0 2px 10px rgba(0,0,0,0.06);display:flex;flex-direction:column;gap:10px;}
 .quick-section.wide{grid-column:1/-1;}
 .qs-title{font-size:10px;font-weight:700;letter-spacing:0.1em;text-transform:uppercase;color:#c8c8d0;margin-bottom:4px;}
