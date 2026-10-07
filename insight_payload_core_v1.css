@@ -1045,7 +1045,7 @@ body.ai-analysis-open #main{margin-right:0!important}
 .ie-note-prewrap{white-space:pre-wrap}
 
 /* STEP5 CSP: semantic hourly bars and legacy contrast override. */
-.er-hour-bar{appearance:none;-webkit-appearance:none;width:100%;height:150px;background:transparent;border:0;writing-mode:vertical-lr;direction:rtl}
+.er-hour-bar{appearance:none;-webkit-appearance:none;width:100%;height:150px;background:transparent;color:#3b82f6;border:0;writing-mode:vertical-lr;direction:rtl}
 .er-hour-bar::-webkit-progress-bar{background:transparent}
 .er-hour-bar::-webkit-progress-value{background:currentColor}
 .er-hour-bar::-moz-progress-bar{background:currentColor}
