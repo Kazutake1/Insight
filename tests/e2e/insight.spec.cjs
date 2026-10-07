@@ -280,6 +280,8 @@ test('トップページは外部shellと機能manifestの最新版確認をno-s
   expect(source).not.toMatch(/<script(?![^>]*\bsrc=)[^>]*>/i);
   expect(source).not.toMatch(/<style\b/i);
   expect(source).not.toMatch(/script-src[^;]*'unsafe-inline'/);
+  expect(source).toMatch(/style-src 'self';/);
+  expect(source).not.toMatch(/style-src[^;]*'unsafe-inline'/);
   expect(boot).toContain("fetch('./Index.html?insight_probe='+Date.now(),{cache:'no-store'})");
   expect(loader).toContain("fetch('./insight_shell_loader_v1.js?insight_manifest_probe='+Date.now(),{cache:'no-store'})");
   expect(loader).toContain("fetch('./insight_payload_source_v1.html?v=20261006-static-styles-1',{cache:'no-store'})");
