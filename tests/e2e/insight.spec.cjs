@@ -287,7 +287,7 @@ test('トップページは外部shellと機能manifestの最新版確認をno-s
   expect(source).toContain('https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js');
   expect(source).toContain('integrity="sha512-CQBWl4fJHWbryGE+Pc7UAxWMUMNMWzWxF4SQo9CgkJIN1kx6djDQZjh3Y8SZ1d+6I+1zze6Z7kHXO7q3UyZAWw=="');
   expect(loader).not.toContain('stripPayloadChartScript');
-  expect(payload).toContain('insight_payload_core_v1.css?v=20261007-readability-dashboard-kpi-css-1');
+  expect(payload).toContain('insight_payload_core_v1.css?v=20261007-readability-ops-css-1');
   expect(payload).toContain('insight_payload_core_v1.js?v=20261006-payload-assets-1');
   expect(payload).toContain('insight_payload_ai_legacy_v1.js?v=20261006-payload-assets-1');
   expect(payload).toContain('insight_payload_bindings_v1.js?v=20261006-inline-bindings-1');
@@ -1620,6 +1620,11 @@ test('今日の入力で時間帯別客数を途中保存し24時間入力を完
   await page.locator('#nav0').click();
   await expect(page.locator('#hourlyCustomersQuick')).toBeVisible();
   await expect(page.locator('#insightEvents')).toBeVisible();
+  const opsType=await page.evaluate(()=>({
+    title:getComputedStyle(document.querySelector('#opsDailyWrap .ops-field-title')).fontSize,
+    memo:getComputedStyle(document.querySelector('#opsDailyWrap .ops-memo')).fontSize
+  }));
+  expect(opsType).toEqual({title:'13px',memo:'14px'});
   const initialOrder=await page.evaluate(()=>Array.from(document.getElementById('opsDailyWrap').children).map(node=>node.id));
   expect(initialOrder.indexOf('hourlyCustomersQuick')).toBeLessThan(initialOrder.indexOf('insightEvents'));
   const hourlyQuickType=await page.evaluate(()=>({
