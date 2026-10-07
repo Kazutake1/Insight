@@ -43,7 +43,7 @@ test('canonical payloadはinline script/styleを持たず外部assetを順序固
   const core=read('insight_payload_core_v1.js');
   const ai=read('insight_payload_ai_legacy_v1.js');
   const css=read('insight_payload_core_v1.css');
-  assert.match(payload,/insight_payload_core_v1\.css\?v=20261007-step3-data-health-status-css-1/);
+  assert.match(payload,/insight_payload_core_v1\.css\?v=20261007-step3-event-target-visibility-css-1/);
   assert.match(payload,/insight_payload_core_v1\.js\?v=20261006-payload-assets-1/);
   assert.match(payload,/insight_payload_ai_legacy_v1\.js\?v=20261006-payload-assets-1/);
   assert.match(payload,/insight_payload_bindings_v1\.js\?v=20261006-inline-bindings-1/);
@@ -782,11 +782,15 @@ test('イベント実績は過去開催・日付カード・時間帯グラフ�
   const index=readShell();
   const eventResults=read('insight_event_results_v1.js');
   const events=read('insight_events_v1.js');
-  assert.match(index,/insight_events_v1\.js\?v=20261006-date-fields-1/);
+  assert.match(index,/insight_events_v1\.js\?v=20261007-step3-event-target-visibility-1/);
   assert.match(index,/insight_event_results_v1\.js\?v=20261006-single-day-1/);
   assert.ok(index.indexOf('insight_analysis_context_v1.js')<index.indexOf('insight_event_results_v1.js'));
   assert.ok(index.indexOf('insight_event_results_v1.js')<index.indexOf('insight_daily_anomaly_v1.js'));
   assert.match(events,/\.ie-dialog\.ie-event-add \.ie-presets\{margin-top:10px\}/);
+  assert.doesNotMatch(events,/row\.body\.style\.display/);
+  assert.match(events,/row\.body\.classList\.toggle\('ie-sale-target-body-hidden',!row\.check\.checked\)/);
+  const css=read('insight_payload_core_v1.css');
+  assert.match(css,/\.ie-sale-target-body\.ie-sale-target-body-hidden\{display:none\}/);
   assert.match(events,/scopeText\.hidden=hideScopeText/);
   assert.doesNotMatch(events,/全店舗共通・指定期間の各日に表示します。/);
   assert.doesNotMatch(events,/選ぶと上記の期間で登録します。個別の条件は下で入力できます。/);

@@ -342,7 +342,7 @@
         });
       }
       function syncRow(row){
-        row.body.style.display=row.check.checked?'':'none';
+        row.body.classList.toggle('ie-sale-target-body-hidden',!row.check.checked);
         row.patterns.forEach(function(pattern){
           pattern.method.disabled=!row.check.checked;pattern.label.disabled=!row.check.checked;
           Object.keys(pattern.inputs).forEach(function(key){pattern.inputs[key].disabled=!row.check.checked;});
