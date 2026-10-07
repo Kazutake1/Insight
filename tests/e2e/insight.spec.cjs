@@ -287,7 +287,7 @@ test('トップページは外部shellと機能manifestの最新版確認をno-s
   expect(source).toContain('https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js');
   expect(source).toContain('integrity="sha512-CQBWl4fJHWbryGE+Pc7UAxWMUMNMWzWxF4SQo9CgkJIN1kx6djDQZjh3Y8SZ1d+6I+1zze6Z7kHXO7q3UyZAWw=="');
   expect(loader).not.toContain('stripPayloadChartScript');
-  expect(payload).toContain('insight_payload_core_v1.css?v=20261007-weather-compact-css-1');
+  expect(payload).toContain('insight_payload_core_v1.css?v=20261007-temperature-css-1');
   expect(payload).toContain('insight_payload_core_v1.js?v=20261006-payload-assets-1');
   expect(payload).toContain('insight_payload_ai_legacy_v1.js?v=20261006-payload-assets-1');
   expect(payload).toContain('insight_payload_bindings_v1.js?v=20261006-inline-bindings-1');
@@ -651,6 +651,23 @@ test('設定ボタンは他のサイドバーナビと文字・アイコン配�
   expect(styles.settings).not.toBeNull();
   expect(styles.reference).not.toBeNull();
   expect(styles.settings).toEqual(styles.reference);
+  expect(errors).toEqual([]);
+});
+
+test('クイック入力の最高・最低気温は表示され入力に応じて平均気温を更新する',async({page})=>{
+  const errors=await openInsight(page);
+  const max=page.locator('#qi_tempMaxC');
+  const min=page.locator('#qi_tempMinC');
+  const avg=page.locator('#qi_tempAvgC');
+
+  await expect(max).toBeVisible();
+  await expect(min).toBeVisible();
+  await expect(max).toBeEnabled();
+  await expect(min).toBeEnabled();
+
+  await max.fill('30');
+  await min.fill('20');
+  await expect(avg).toHaveText('25.0℃');
   expect(errors).toEqual([]);
 });
 
