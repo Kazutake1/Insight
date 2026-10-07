@@ -1108,8 +1108,7 @@ test('全ページタイトルはダッシュボード位置に揃い追加ペ�
     document.querySelectorAll('.page').forEach(node=>node.classList.remove('show'));
     const future=document.createElement('div');
     future.id='e2eFuturePage';
-    future.className='page show';
-    future.style.padding='7px 11px 12px';
+    future.className='page show e2e-future-page';
     future.innerHTML='<div class="page-header"><div class="page-title">追加ページ</div></div><div>future</div>';
     document.getElementById('main').appendChild(future);
   });
