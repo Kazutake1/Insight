@@ -1080,8 +1080,6 @@ function setWdPeriod(months){
 }
 
 function refreshCorrCharts(){
-  const corrRow=document.getElementById("corrRow");
-  corrRow.style.display="block";
   const {wdAvg}=getCorrData(baseYear,wdPeriod);
   const p=METRICS.find(m=>m.key===activeMetrics[0]);
   const pri=p.color||"#1a1a1a";
