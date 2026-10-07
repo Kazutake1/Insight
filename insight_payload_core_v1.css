@@ -922,3 +922,12 @@ html.dark body,body.dark{background:#251b26}
 .hf-budget-actual-total{font-size:14px;}
 .budget-edit-row-total{margin-top:4px;border-top:2px solid var(--border);padding-top:10px;border-bottom:none;}
 .budget-edit-label-total{font-weight:700;}
+
+.sales-weather-field{margin-bottom:10px;}
+.sales-weather-label{font-size:9px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;color:var(--text5);margin-bottom:6px;}
+.sales-weather-options{display:flex;gap:5px;flex-wrap:wrap;}
+.sales-weather-btn{font-size:16px;padding:5px 8px;border-radius:8px;border:2px solid transparent;background:#fff;cursor:pointer;line-height:1;}
+.sales-weather-btn.active{border-color:#1a1a1a;background:#f8f8f8;}
+.sales-yen-note{font-size:10px;color:#bbb;padding:3px 0 8px;text-align:right;}
+.sales-reference-total{background:#f0fdf4;}
+.sales-reference-total-value{color:#166534;}
