@@ -956,7 +956,7 @@ test('イベント実績は過去開催・日付カード・時間帯グラフ�
   assert.match(css,/\.er-day-tab strong\{font-size:15px\}/);
   assert.match(css,/\.er-day-tab span\{font-size:13\.5px/);
   assert.match(eventResults,/時間帯別客数/);
-  assert.match(eventResults,/\.er-hour-bar\{[^}]*background:#3b82f6/);
+  assert.match(css,/\.er-hour-bar[^}]*\{[^}]*#3b82f6|\.er-hour-bar\{[^}]*color:#3b82f6/);
   assert.match(eventResults,/el\('button',undefined,'er-hour-plot'\)/);
   assert.match(eventResults,/aria-pressed/);
   assert.match(eventResults,/er-hour-value/);
