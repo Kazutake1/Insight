@@ -2737,21 +2737,20 @@ function showIOSInstallHint(){
   hint.id="iosHint";
   hint.className="ios-install-hint";
   hint.innerHTML=`
-    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px;">
-      <div style="font-size:15px;font-weight:800;">📲 アプリとして使う</div>
-      <button onclick="this.closest('#iosHint').remove()" style="background:rgba(255,255,255,0.15);
-        color:#fff;border:none;border-radius:8px;padding:5px 10px;font-size:12px;cursor:pointer;">後で</button>
+    <div class="ios-install-head">
+      <div class="ios-install-title">📲 アプリとして使う</div>
+      <button onclick="this.closest('#iosHint').remove()" class="ios-install-later">後で</button>
     </div>
-    <div style="font-size:13px;color:rgba(255,255,255,0.75);line-height:1.7;">
-      Safariのアドレスバー下の <strong style="color:#fff;">共有ボタン（□↑）</strong> をタップして<br>
-      <strong style="color:#fff;">「ホーム画面に追加」</strong> を選ぶとアプリとして起動できます。
+    <div class="ios-install-copy">
+      Safariのアドレスバー下の <strong class="ios-install-strong">共有ボタン（□↑）</strong> をタップして<br>
+      <strong class="ios-install-strong">「ホーム画面に追加」</strong> を選ぶとアプリとして起動できます。
     </div>
-    <div style="margin-top:14px;display:flex;gap:12px;align-items:center;">
-      <div style="text-align:center;background:rgba(255,255,255,0.1);border-radius:10px;padding:8px 12px;font-size:20px;">□↑</div>
-      <div style="font-size:11px;color:rgba(255,255,255,0.5);">ブラウザの共有ボタン</div>
-      <div style="font-size:20px;">→</div>
-      <div style="text-align:center;background:rgba(255,255,255,0.1);border-radius:10px;padding:8px 12px;font-size:20px;">＋</div>
-      <div style="font-size:11px;color:rgba(255,255,255,0.5);">ホーム画面に追加</div>
+    <div class="ios-install-steps">
+      <div class="ios-install-step-icon">□↑</div>
+      <div class="ios-install-step-label">ブラウザの共有ボタン</div>
+      <div class="ios-install-arrow">→</div>
+      <div class="ios-install-step-icon">＋</div>
+      <div class="ios-install-step-label">ホーム画面に追加</div>
     </div>`;
   document.body.appendChild(hint);
 }
