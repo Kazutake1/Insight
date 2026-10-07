@@ -44,7 +44,7 @@ test('canonical payloadはinline script/styleを持たず外部assetを順序固
   const ai=read('insight_payload_ai_legacy_v1.js');
   const css=read('insight_payload_core_v1.css');
   assert.match(payload,/insight_payload_core_v1\.css\?v=20261007-step3-donut-mode-css-1/);
-  assert.match(payload,/insight_payload_core_v1\.js\?v=20261007-step3-legend-budget-fixed-styles-1/);
+  assert.match(payload,/insight_payload_core_v1\.js\?v=20261007-step3-sales-form-fixed-styles-1/);
   assert.doesNotMatch(core,/label\.style\.color/);
   assert.doesNotMatch(core,/msg\.style\.display/);
   assert.doesNotMatch(core,/badge\.style\.display/);
@@ -107,6 +107,12 @@ test('canonical payloadはinline script/styleを持たず外部assetを順序固
   assert.match(core,/budget-edit-row budget-edit-row-total/);
   assert.match(css,/\.legend-dashed-line\{/);
   assert.match(css,/\.hf-budget-empty\{/);
+  assert.match(core,/class="sales-weather-field"/);
+  assert.match(core,/class="sales-weather-btn\$\{row\.weather===w\?" active":""\}"/);
+  assert.match(core,/class="sales-yen-note" id="sfYen"/);
+  assert.match(core,/sales-reference-total/);
+  assert.match(css,/\.sales-weather-btn\.active\{/);
+  assert.match(css,/\.sales-yen-note\{/);
   assert.match(css,/#donutBtnAmt\.active,#donutBtnPct\.active\{background:#1a1a1a;color:#fff;\}/);
   assert.match(core,/msg\.classList\.add\("is-visible"\)/);
   assert.match(core,/msg\.classList\.remove\("is-visible"\)/);
