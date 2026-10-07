@@ -30,6 +30,8 @@ test('Index shellはinline script/styleを持たず外部assetへ分離する',(
   assert.doesNotMatch(index,/<script(?![^>]*\bsrc=)[^>]*>/i);
   assert.doesNotMatch(index,/<style\b/i);
   assert.doesNotMatch(index,/script-src[^;]*'unsafe-inline'/);
+  assert.match(index,/style-src 'self';/);
+  assert.doesNotMatch(index,/style-src[^;]*'unsafe-inline'/);
   assert.match(boot,/fetch\('\.\/Index\.html\?insight_probe='/);
   assert.match(loader,/fetch\('\.\/insight_shell_loader_v1\.js\?insight_manifest_probe='/);
   assert.match(loader,/document\.open\(\);document\.write\(html\);document\.close\(\)/);
