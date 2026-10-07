@@ -38,7 +38,11 @@ test('月途中は今年10日・前年12日の平均を比較し、カードとA
   assert.equal(r.current.inputDays,10);assert.equal(r.previous.inputDays,12);
   for(const [key,label] of [['salesYen','売上'],['customers','客数'],['items','買上点数'],['wasteYen','廃棄金額']]){
     close(r.comparison[key].pct,20);
-    assert.match(cards.find(x=>x.label.textContent===label).querySelector('.kpi-yoy').children[0].textContent,/\+20\.0%/);
+    const card=cards.find(x=>x.label.textContent===label);
+    assert.match(card.querySelector('.kpi-yoy').children[0].textContent,/\+20\.0%/);
+    assert.equal(card.value.style.color,undefined);
+    assert.equal(card.value.classList.contains('insight-kpi-value-normal'),true);
+    assert.equal(card.value.classList.contains('insight-kpi-value-alert'),false);
     assert.match(c.buildAIQuestionAnswer(label),/前年比\+20\.0%/);
   }
   for(const mode of ['sales','customers','waste'])assert.match(c.InsightAIPageComments.build(mode).summary.join('\n'),/前年比\+20\.0%/);
@@ -73,6 +77,11 @@ test('前年平均0・前年データなしは算出不可、現在0で前年あ
   const {c,get}=setup();c.store.data['2025']['9月'].forEach(r=>{r.売上=0;r.廃棄金額=0;});
   assert.equal(get().comparison.salesYen,null);assert.equal(get().comparison.wasteYen,null);
   c.store.data['2026']['9月'].forEach(r=>r.客数=0);close(get().comparison.customers.pct,-100);
+  c.InsightDashboardKPISync.refresh();
+  const customerCard=cards.find(x=>x.label.textContent==='客数');
+  assert.equal(customerCard.value.style.color,undefined);
+  assert.equal(customerCard.value.classList.contains('insight-kpi-value-normal'),false);
+  assert.equal(customerCard.value.classList.contains('insight-kpi-value-alert'),true);
   c.store.data['2025']['9月']=[];Object.values(get().comparison).forEach(x=>assert.equal(x,null));
 });
 test('人件費は月途中に比較せず、月終了後のみ月額前年比、年境界も正しく判定',()=>{
