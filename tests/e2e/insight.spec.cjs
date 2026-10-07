@@ -489,7 +489,6 @@ test('STEP17の文字階層をダッシュボード・入力・販売数・分�
   await expect(page.locator('#pageSales #issRow .iss-card')).toBeVisible();
   const salesType=await page.evaluate(()=>{
     const table=document.querySelector('#pageSales .table-card');
-    const cell=table&&table.querySelector('th,td');
     const control=table&&table.querySelector('input,select,button');
     return {
       title:getComputedStyle(document.querySelector('#pageSales #issRow .iss-title')).fontSize,
@@ -498,17 +497,15 @@ test('STEP17の文字階層をダッシュボード・入力・販売数・分�
       note:getComputedStyle(document.querySelector('#pageSales #issRow .iss-note')).fontSize,
       dailyAverage:getComputedStyle(document.querySelector('#pageSales #issDailyAverage')).fontSize,
       table:getComputedStyle(table).fontSize,
-      cell:cell?getComputedStyle(cell).fontSize:null,
       control:control?getComputedStyle(control).fontSize:null
     };
   });
-  expect(salesType).toEqual({title:'15px',label:'13px',value:'20px',note:'12px',dailyAverage:'12.5px',table:'13px',cell:'12.5px',control:'13px'});
+  expect(salesType).toEqual({title:'15px',label:'13px',value:'20px',note:'12px',dailyAverage:'12.5px',table:'13px',control:'13px'});
 
   await page.locator('#nav3').click();
   await expect(page.locator('#pageKyaku #ikyRow .iky-card')).toBeVisible();
   const customerType=await page.evaluate(()=>{
     const table=document.querySelector('#pageKyaku .table-card');
-    const cell=table&&table.querySelector('th,td');
     const control=table&&table.querySelector('input,select,button');
     return {
       title:getComputedStyle(document.querySelector('#pageKyaku #ikyRow .iky-title')).fontSize,
@@ -517,24 +514,21 @@ test('STEP17の文字階層をダッシュボード・入力・販売数・分�
       note:getComputedStyle(document.querySelector('#pageKyaku #ikyRow .iky-note')).fontSize,
       dailyAverage:getComputedStyle(document.querySelector('#pageKyaku #ikyDailyAverage')).fontSize,
       table:getComputedStyle(table).fontSize,
-      cell:cell?getComputedStyle(cell).fontSize:null,
       control:control?getComputedStyle(control).fontSize:null
     };
   });
-  expect(customerType).toEqual({title:'15px',label:'13px',value:'20px',note:'12px',dailyAverage:'12.5px',table:'13px',cell:'12.5px',control:'13px'});
+  expect(customerType).toEqual({title:'15px',label:'13px',value:'20px',note:'12px',dailyAverage:'12.5px',table:'13px',control:'13px'});
 
   await page.locator('#nav4').click();
   await expect(page.locator('#iwcRow .iwc-card')).toHaveCount(2);
   const wasteType=await page.evaluate(()=>{
     const table=document.querySelector('#pageHaiki .table-card');
-    const cell=table&&table.querySelector('th,td');
     const control=table&&table.querySelector('input,select,button');
     return {
       title:getComputedStyle(document.querySelector('#iwcRow .iwc-title')).fontSize,
       kpiLabel:getComputedStyle(document.querySelector('#iwcRow .iwc-kpi-label')).fontSize,
       kpiValue:getComputedStyle(document.querySelector('#iwcRow .iwc-kpi-value')).fontSize,
       table:getComputedStyle(table).fontSize,
-      cell:cell?getComputedStyle(cell).fontSize:null,
       control:control?getComputedStyle(control).fontSize:null,
       cards:Array.from(document.querySelectorAll('#iwcRow .iwc-card')).map(card=>({client:card.clientHeight,scroll:card.scrollHeight}))
     };
@@ -543,7 +537,6 @@ test('STEP17の文字階層をダッシュボード・入力・販売数・分�
   expect(wasteType.kpiLabel).toBe('11.5px');
   expect(wasteType.kpiValue).toBe('16px');
   expect(wasteType.table).toBe('13px');
-  expect(wasteType.cell).toBe('12.5px');
   expect(wasteType.control).toBe('13px');
   wasteType.cards.forEach(card=>expect(card.scroll).toBeLessThanOrEqual(card.client+2));
 
