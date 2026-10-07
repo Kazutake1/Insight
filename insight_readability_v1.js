@@ -7,8 +7,6 @@
   var style=doc.createElement('style');
   style.id='insightReadabilityStyle';
   style.textContent=[
-    '#main{padding-left:0!important;padding-right:0!important;min-width:0!important;box-sizing:border-box!important}',
-    '.page{padding-left:12px!important;padding-right:12px!important;box-sizing:border-box!important;min-width:0!important;max-width:100%!important}',
 
 
 
