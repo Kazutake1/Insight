@@ -768,8 +768,6 @@ html.dark body,body.dark{background:#251b26}
 .ai-workspace-side-title{font-size:12px!important}
 .ai-workspace-section-title{font-size:17px!important}
 .ai-workspace-section-hint{font-size:11.5px!important}
-.ai-analysis-workspace .ai-analysis-card-title{font-size:13px!important}
-.ai-analysis-workspace .ai-analysis-comment,.ai-analysis-workspace .ai-analysis-empty{font-size:14px!important;line-height:1.6!important}
 .ai-insight-title{font-size:13px!important}
 .ai-insight-state{font-size:11.5px!important}
 .ai-insight-detail{font-size:13px!important;line-height:1.55!important}
