@@ -952,7 +952,7 @@ test('イベント実績は過去開催・日付カード・時間帯グラフ�
   assert.match(eventResults,/客数 /);
   assert.match(eventResults,/er-day-tab/);
   assert.doesNotMatch(eventResults,/er-daily-summary|er-daily-grid/);
-  assert.match(eventResults,/\.er-day-tab\{[^}]*flex:0 0 210px;[^}]*padding:13px 15px/);
+  assert.match(css,/\.er-day-tab\{[^}]*flex:0 0 210px;[^}]*padding:13px 15px/);
   assert.match(eventResults,/\.er-day-tab strong\{font-size:15px\}/);
   assert.match(eventResults,/\.er-day-tab span\{font-size:13\.5px/);
   assert.match(eventResults,/時間帯別客数/);
@@ -1182,7 +1182,7 @@ test('曜日別平均カードと廃棄悪化色の表示契約を維持する',
   assert.match(css,/\.sc-page\{[^}]*min-width:0;width:100%;max-width:100%;box-sizing:border-box/);
   assert.match(css,/\.sc-calendar\{[^}]*grid-template-columns:repeat\(7,minmax\(160px,1fr\)\);gap:8px;[^}]*min-width:0;width:100%;max-width:100%;box-sizing:border-box/);
   assert.match(css,/\.sc-average-grid\{[^}]*grid-template-columns:repeat\(7,minmax\(160px,1fr\)\);gap:8px;[^}]*min-width:0;width:100%;max-width:100%;box-sizing:border-box/);
-  assert.match(sales,/@media\(max-width:1200px\)\{\.sc-calendar,\.sc-average-grid\{grid-template-columns:repeat\(7,minmax\(0,1fr\)\);gap:6px\}/);
+  assert.match(css,/@media\(max-width:1200px\)\{\.sc-calendar,\.sc-average-grid\{grid-template-columns:repeat\(7,minmax\(0,1fr\)\);gap:6px\}/);
   assert.match(sales,/@media\(max-width:800px\)\{\.sc-calendar,\.sc-average-grid\{grid-template-columns:repeat\(7,minmax\(102px,1fr\)\);gap:7px\}/);
   assert.match(sales,/sc-day sc-average-card/);
   assert.match(sales,/sc-trip sc-delivery-row/);
