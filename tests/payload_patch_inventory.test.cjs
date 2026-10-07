@@ -293,7 +293,8 @@ test('旧コア配色補正はbootstrap文字列置換ではなくruntime style 
   assert.ok(index.indexOf('insight_legacy_style_compat_v1.js')<index.indexOf('insight_yoy_policy_v1.js'));
   assert.doesNotMatch(bootstrap,/background:#1a1a1a;color:#fff;box-shadow:0 6px 24px var\(--shadow\)/);
   assert.match(compat,/getPropertyValue\('background'\)/);
-  assert.match(compat,/setProperty\('background','#1a1a1a'\)/);
+  assert.doesNotMatch(compat,/rule\.style|cssRules|setProperty\(/);
+  assert.match(css,/\.ai-analysis-toggle\{background:#1a1a1a;color:#fff\}/);
   assert.match(compat,/setProperty\('color','#fff'\)/);
   assert.doesNotMatch(compat,/localStorage|InsightStorage|\bfetch\s*\(|XMLHttpRequest|WebSocket/);
   assert.doesNotThrow(()=>new vm.Script(compat),'legacy style compat module must be valid JavaScript');
@@ -1154,6 +1155,18 @@ test('分析AIの位置は外部CSSだけで決まりruntime inline styleを使�
   assert.doesNotMatch(presentation,/sidebarRect|getBoundingClientRect|\.style\.setProperty|--ai-workspace-(?:left|top)/);
   assert.match(css,/left:202px!important;right:12px!important;top:12px!important/);
   assert.match(css,/left:8px!important;right:8px!important;top:8px!important/);
+});
+
+test('STEP5 hourly bars and legacy contrast are CSP-safe',()=>{
+  const eventResults=read('insight_event_results_v1.js');
+  const compat=read('insight_legacy_style_compat_v1.js');
+  const css=read('insight_payload_core_v1.css');
+  assert.doesNotMatch(eventResults,/\.style\.|style\.setProperty/);
+  assert.match(eventResults,/el\('progress'/);
+  assert.match(eventResults,/bar\.max=/);
+  assert.match(eventResults,/bar\.value=/);
+  assert.doesNotMatch(compat,/rule\.style|cssRules|setProperty\(/);
+  assert.match(css,/\.er-hour-bar\{appearance:none/);
 });
 
 test('STEP5 settings/title styles are external and CSP-safe',()=>{
