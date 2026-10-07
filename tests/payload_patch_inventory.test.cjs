@@ -258,8 +258,9 @@ test('STEP17の可読性CSSは独立moduleで主要ページへ横展開する',
   assert.match(readability,/#iwcRow \.iwc-kpi-value\{font-size:16px!important/);
   assert.match(readability,/#pageSalesCount \.sc-col-head,#pageSalesCount \.sc-average-head\{font-size:12\.5px!important/);
   assert.match(css,/#pageSettings \.insight-settings-section h2\{font-size:17px!important/);
-  assert.match(css,/\.ai-analysis-workspace \.ai-analysis-card-title\{font-size:13px!important/);
-  assert.doesNotMatch(readability,/#pageSettings \.insight-settings-section|\.ai-workspace-|\.ai-analysis-workspace \.ai-analysis-card-title|\.ai-insight-|\.ai-check-text|\.ai-sales-count-block-title|\.ai-history-mode-btn|\.ai-analysis-question-/);
+  assert.match(readability,/\.ai-analysis-workspace \.ai-analysis-card-title\{font-size:13px!important/);
+  assert.match(readability,/\.ai-analysis-workspace \.ai-analysis-comment,\.ai-analysis-workspace \.ai-analysis-empty\{font-size:14px!important;line-height:1\.6!important/);
+  assert.doesNotMatch(readability,/#pageSettings \.insight-settings-section|\.ai-workspace-|\.ai-insight-|\.ai-check-text|\.ai-sales-count-block-title|\.ai-history-mode-btn|\.ai-analysis-question-/);
   assert.match(css,/#pageSettings \.insight-settings-actions \.sidebar-btn,#pageSettings #insightDataHealthButton\{font-size:14px!important;line-height:1\.4!important\}/);
   assert.match(css,/\.ai-analysis-question-answer\{font-size:13px!important;line-height:1\.6!important\}/);
   assert.match(readability,/\.hourly-dialog h2\{font-size:18px!important/);
