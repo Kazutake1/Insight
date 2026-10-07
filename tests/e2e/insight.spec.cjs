@@ -461,10 +461,9 @@ test('STEP17の文字階層をダッシュボード・入力・販売数・分�
       computedColor:value?getComputedStyle(value).color:null
     };
   }));
-  const comparedPrimaryKpis=primaryKpiColorStates.filter(item=>item.hasComparison);
-  expect(comparedPrimaryKpis.length).toBeGreaterThan(0);
-  comparedPrimaryKpis.forEach(item=>{
-    expect(item.inlineColor).toBe('');
+  expect(primaryKpiColorStates.length).toBeGreaterThan(0);
+  primaryKpiColorStates.forEach(item=>expect(item.inlineColor).toBe(''));
+  primaryKpiColorStates.filter(item=>item.normal||item.alert).forEach(item=>{
     expect(Number(item.normal)+Number(item.alert)).toBe(1);
     expect(['rgb(26, 26, 26)','rgb(220, 38, 38)']).toContain(item.computedColor);
   });
