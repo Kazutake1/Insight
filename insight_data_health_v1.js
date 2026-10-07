@@ -129,7 +129,11 @@
     if(report.status==='ok')return 'データ状態：正常';
     return 'データ状態：要確認 '+report.counts.total+'件';
   }
-  function statusColor(report){return report.status==='ok'?'#15803d':'#b42318';}
+  function applyStatusClass(node,report){
+    var ok=report.status==='ok';
+    node.classList.toggle('insight-health-status-ok',ok);
+    node.classList.toggle('insight-health-status-error',!ok);
+  }
   function findRestoreAnchor(){
     var nodes=Array.prototype.slice.call(document.querySelectorAll('button,label,a'));
     return nodes.find(function(node){return /データ復元/.test(String(node.textContent||''));})||null;
@@ -149,13 +153,13 @@
     var issues=overlay.querySelector('#insightDataHealthIssues');
     if(report.status==='ok'){
       summary.textContent='構造上の問題は見つかりませんでした。';
-      summary.style.color='#15803d';
+      applyStatusClass(summary,report);
       issues.innerHTML='';
       var ok=document.createElement('div');ok.className='insight-health-issue';ok.textContent='正式年度、日別データ、販売数、時間帯別客数の保存構造を確認しました。';
       issues.appendChild(ok);
     }else{
       summary.textContent='要確認：'+report.counts.total+'件（重大 '+report.counts.errors+'件／注意 '+report.counts.warnings+'件）';
-      summary.style.color='#b42318';issues.innerHTML='';
+      applyStatusClass(summary,report);issues.innerHTML='';
       report.issues.slice(0,100).forEach(function(item){
         var card=document.createElement('div');card.className='insight-health-issue insight-health-'+item.severity;
         var title=document.createElement('strong');
@@ -171,7 +175,7 @@
   }
   function refresh(){
     lastReport=check(snapshot());
-    if(button){button.textContent=statusText(lastReport);button.style.color=statusColor(lastReport);button.title='保存データの構造チェック結果を表示';}
+    if(button){button.textContent=statusText(lastReport);applyStatusClass(button,lastReport);button.title='保存データの構造チェック結果を表示';}
     return lastReport;
   }
   function open(){var report=refresh();renderDialog(report);return report;}
