@@ -1033,7 +1033,7 @@ function renderKPI(aNow,aPrev){
     card.dataset.key=m.key;
     card.onclick=()=>toggleMetric(m.key);
     card.innerHTML=`<div class="kpi-dot"></div>
-      <div class="kpi-label">${m.label} <span style="font-weight:500;font-size:8.5px;color:var(--text5);">${selMonth} 1日平均</span></div>
+      <div class="kpi-label">${m.label} <span class="kpi-month-note">${selMonth} 1日平均</span></div>
       <div class="kpi-value${valueState}">${m.short(avgNow)}</div>
       ${yoyVal?`<div class="kpi-yoy"><span class="kpi-badge ${m.key==='廃棄金額'?(yoyVal.up?'dn':'up'):(yoyVal.up?'up':'dn')}">${yoyVal.up?"▲":"▼"} ${yoyVal.str}</span>
         <span class="kpi-prev">${cmpYear}年比</span></div>`:""}`;
@@ -1060,7 +1060,7 @@ function renderDerived(aNow,aPrev){
     const pos=yoyVal?(item.good?yoyVal.up:!yoyVal.up):null;
     const card=document.createElement("div");card.className="kpi-card";
     card.innerHTML=`
-      <div class="kpi-label">${item.label} <span style="font-weight:500;font-size:8.5px;color:var(--text5);">${selMonth}</span></div>
+      <div class="kpi-label">${item.label} <span class="kpi-month-note">${selMonth}</span></div>
       <div class="kpi-value">${item.value}<span class="kpi-unit">${item.unit}</span></div>
       ${yoyVal?`<div class="kpi-yoy"><span class="kpi-badge ${pos?"up":"dn"}">${yoyVal.up?"▲":"▼"} ${yoyVal.str}</span>
         <span class="kpi-prev">${cmpYear}年比</span></div>`:""}`;
@@ -1137,8 +1137,8 @@ function refreshDonut(){
   if(total>0){
     const totRow=document.createElement("div");
     totRow.className="donut-total-row";
-    totRow.innerHTML=`<span style="font-size:11px;font-weight:700;color:var(--text3);">合計</span>
-      <span style="font-size:13px;font-weight:800;color:#b91c1c;">¥${total.toLocaleString()}</span>`;
+    totRow.innerHTML=`<span class="donut-total-label">合計</span>
+      <span class="donut-total-value">¥${total.toLocaleString()}</span>`;
     leg.appendChild(totRow);
   }
   HAIKI_CATS.forEach((c,i)=>{
