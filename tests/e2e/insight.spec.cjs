@@ -287,8 +287,8 @@ test('トップページは外部shellと機能manifestの最新版確認をno-s
   expect(source).toContain('https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js');
   expect(source).toContain('integrity="sha512-CQBWl4fJHWbryGE+Pc7UAxWMUMNMWzWxF4SQo9CgkJIN1kx6djDQZjh3Y8SZ1d+6I+1zze6Z7kHXO7q3UyZAWw=="');
   expect(loader).not.toContain('stripPayloadChartScript');
-  expect(payload).toContain('insight_payload_core_v1.css?v=20261007-step3-backup-status-css-1');
-  expect(payload).toContain('insight_payload_core_v1.js?v=20261007-step3-backup-status-1');
+  expect(payload).toContain('insight_payload_core_v1.css?v=20261007-step3-kpi-value-state-css-2');
+  expect(payload).toContain('insight_payload_core_v1.js?v=20261007-step3-kpi-value-state-2');
   expect(payload).toContain('insight_payload_ai_legacy_v1.js?v=20261006-payload-assets-1');
   expect(payload).toContain('insight_payload_bindings_v1.js?v=20261006-inline-bindings-1');
   expect(payload).not.toMatch(/\son(?:click|change)\s*=/i);
@@ -450,6 +450,23 @@ test('STEP17の文字階層をダッシュボード・入力・販売数・分�
   });
   expect(dashboardType.kpiLabel).toBe('13px');
   expect(dashboardType.cards.length).toBeGreaterThan(0);
+  const primaryKpiColorStates=await page.evaluate(()=>Array.from(document.querySelectorAll('#pageDash #kpiRow .kpi-card[data-key]')).map(card=>{
+    const value=card.querySelector('.kpi-value');
+    return {
+      key:card.dataset.key||'',
+      inlineColor:value?value.style.color:'',
+      normal:value?value.classList.contains('insight-kpi-value-normal'):false,
+      alert:value?value.classList.contains('insight-kpi-value-alert'):false,
+      computedColor:value?getComputedStyle(value).color:null
+    };
+  }));
+  expect(primaryKpiColorStates.length).toBeGreaterThan(0);
+  primaryKpiColorStates.forEach(item=>{
+    expect(item.inlineColor).toBe('');
+    expect(Number(item.normal)+Number(item.alert)).toBe(1);
+    expect(['rgb(26, 26, 26)','rgb(220, 38, 38)']).toContain(item.computedColor);
+  });
+
   dashboardType.cards.forEach(card=>{
     expect(card.height).toBe('110px');
     expect(card.boxSizing).toBe('border-box');
