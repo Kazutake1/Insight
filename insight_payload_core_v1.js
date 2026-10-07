@@ -1747,10 +1747,10 @@ function renderSalesForm(fy,mi,day){
   form.innerHTML=`
     <div class="hf-title">${editMonth.sales} ${day}日（${WEEKDAYS[wd]}曜日）</div>
 
-    <div style="margin-bottom:10px;">
-      <div style="font-size:9px;font-weight:700;letter-spacing:0.1em;text-transform:uppercase;color:var(--text5);margin-bottom:6px;">天気</div>
-      <div style="display:flex;gap:5px;flex-wrap:wrap;">
-        ${WX_KEYS.map(w=>`<button onclick="setSalesWeather(${ri},'${w}')" style="font-size:16px;padding:5px 8px;border-radius:8px;border:2px solid ${row.weather===w?"#1a1a1a":"transparent"};background:${row.weather===w?"#f8f8f8":"#fff"};cursor:pointer;line-height:1;" id="swx_${ri}_${w}">${WX_ICONS[w]}</button>`).join("")}
+    <div class="sales-weather-field">
+      <div class="sales-weather-label">天気</div>
+      <div class="sales-weather-options">
+        ${WX_KEYS.map(w=>`<button onclick="setSalesWeather(${ri},'${w}')" class="sales-weather-btn${row.weather===w?" active":""}" id="swx_${ri}_${w}">${WX_ICONS[w]}</button>`).join("")}
       </div>
     </div>
 
@@ -1762,7 +1762,7 @@ function renderSalesForm(fy,mi,day){
         <span class="hf-unit">千円</span>
       </div>
     </div>
-    <div style="font-size:10px;color:#bbb;padding:3px 0 8px;text-align:right;" id="sfYen" style="font-size:10px;color:var(--text5);padding:3px 0 8px;text-align:right;">
+    <div class="sales-yen-note" id="sfYen">
       ${売上val>0?`= ¥${(売上val*1000).toLocaleString()}`:""}
     </div>
 
@@ -1775,9 +1775,9 @@ function renderSalesForm(fy,mi,day){
       </div>
     </div>
 
-    <div class="hf-total" style="background:#f0fdf4;">
+    <div class="hf-total sales-reference-total">
       <span class="hf-total-label">客単価（参考）</span>
-      <span class="hf-total-val" id="sfTanka" style="color:#166534;">
+      <span class="hf-total-val sales-reference-total-value" id="sfTanka">
         ${row.客数>0?"¥"+(Math.round(売上val*1000/row.客数)).toLocaleString():"-"}
       </span>
     </div>`;
