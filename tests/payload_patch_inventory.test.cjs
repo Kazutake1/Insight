@@ -948,7 +948,7 @@ test('イベント実績は過去開催・日付カード・時間帯グラフ�
   assert.doesNotMatch(eventResults,/summaryMetric\('客単価'/);
   assert.doesNotMatch(eventResults,/summaryMetric\('買上点数'/);
   assert.match(css,/\.er-overview-grid\{[^}]*grid-template-columns:repeat\(2,minmax\(230px,1fr\)\)/);
-  assert.match(eventResults,/\.er-overview-values\{[^}]*grid-template-columns:repeat\(2,minmax\(0,1fr\)\)/);
+  assert.match(css,/\.er-overview-values\{[^}]*grid-template-columns:repeat\(2,minmax\(0,1fr\)\)/);
   assert.match(eventResults,/客数 /);
   assert.match(eventResults,/er-day-tab/);
   assert.doesNotMatch(eventResults,/er-daily-summary|er-daily-grid/);
@@ -1181,7 +1181,7 @@ test('曜日別平均カードと廃棄悪化色の表示契約を維持する',
   const visual=read('insight_ai_visual_v1.js');
   assert.match(css,/\.sc-page\{[^}]*min-width:0;width:100%;max-width:100%;box-sizing:border-box/);
   assert.match(css,/\.sc-calendar\{[^}]*grid-template-columns:repeat\(7,minmax\(160px,1fr\)\);gap:8px;[^}]*min-width:0;width:100%;max-width:100%;box-sizing:border-box/);
-  assert.match(sales,/\.sc-average-grid\{[^}]*grid-template-columns:repeat\(7,minmax\(160px,1fr\)\);gap:8px;[^}]*min-width:0;width:100%;max-width:100%;box-sizing:border-box/);
+  assert.match(css,/\.sc-average-grid\{[^}]*grid-template-columns:repeat\(7,minmax\(160px,1fr\)\);gap:8px;[^}]*min-width:0;width:100%;max-width:100%;box-sizing:border-box/);
   assert.match(sales,/@media\(max-width:1200px\)\{\.sc-calendar,\.sc-average-grid\{grid-template-columns:repeat\(7,minmax\(0,1fr\)\);gap:6px\}/);
   assert.match(sales,/@media\(max-width:800px\)\{\.sc-calendar,\.sc-average-grid\{grid-template-columns:repeat\(7,minmax\(102px,1fr\)\);gap:7px\}/);
   assert.match(sales,/sc-day sc-average-card/);
