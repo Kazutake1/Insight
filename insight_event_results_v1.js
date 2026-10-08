@@ -335,7 +335,7 @@
       });
       section.append(grid);return section;
     }
-    function specialPeriodCategoriesSection(occurrence){
+    function periodCategoriesSection(occurrence){
       if(occurrence.days.length<=1)return null;
       root.InsightSalesCount.ensure(allStores);
       var store=allStores.stores[currentStoreId()],records=store&&store.salesCounts||{};
@@ -412,8 +412,8 @@
       );
       head.append(cards);results.append(head);
 
-      if(data.kind==='special'&&occurrence.days.length>1){
-        var periodCategories=specialPeriodCategoriesSection(occurrence);
+      if(occurrence.days.length>1){
+        var periodCategories=periodCategoriesSection(occurrence);
         if(periodCategories)results.append(periodCategories);
       }
       var tabs=renderDayTabs(occurrence);if(tabs)results.append(tabs);
