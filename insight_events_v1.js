@@ -367,7 +367,8 @@
           var customOption=el('option','その他（自由入力）');customOption.value='custom';
           var unsetOption=el('option','未分類');unsetOption.value='';
           otherGroup.append(customOption,unsetOption);categorySelect.append(otherGroup);
-          if(oldChoice&&Array.from(categorySelect.options).some(function(o){return o.value===oldChoice;})){
+          var renamedFavorite=oldFavorite&&favoriteItems.some(function(c){return c.id===oldFavorite.id&&c.name!==oldFavorite.name;});
+          if(oldChoice&&!renamedFavorite&&Array.from(categorySelect.options).some(function(o){return o.value===oldChoice;})){
             categorySelect.value=oldChoice;
           }else if(oldChoice.indexOf('favorite:')===0&&oldName){
             categorySelect.value='custom';customCategory.value=oldName;
