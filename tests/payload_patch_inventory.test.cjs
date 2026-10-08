@@ -992,7 +992,9 @@ test('イベント実績は過去開催・日付カード・時間帯グラフ�
   assert.match(events,/function nearbyPresetEditor\(/);
   assert.match(events,/function manageNearbyPresets\(/);
   assert.match(events,/syncDemandPreset/);
-  assert.match(events,/既存カテゴリーを選択するか、独自カテゴリー名を入力できます/);
+  assert.match(events,/カテゴリーを選択するか、自由に入力できます/);
+  assert.match(events,/よく使うカテゴリーを管理/);
+  assert.match(events,/takeDemandFavorites/);
   assert.match(events,/var unsetOption=el\('option','未分類'\)/);
   assert.match(eventResults,/er-demand-category/);
   assert.match(events,/specialPresets/);
