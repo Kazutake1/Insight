@@ -331,7 +331,8 @@
       section.append(head,el('p',templateOnly?'商品名とカテゴリーを登録します。用意数と販売数は開催ごとに入力します。':'カテゴリーを選択するか、自由に入力できます。','ie-muted'),listBox);parent.append(section);
       function addRow(seed){
         seed=seed||{};
-        var rowEl=el('div',undefined,'ie-demand-row'),categoryField=el('label','カテゴリー','ie-demand-category-field'),categorySelect=el('select'),customCategory=el('input');
+        var rowEl=el('div',undefined,'ie-demand-row'),categoryField=el('div',undefined,'ie-demand-category-field'),categorySelect=el('select'),customCategory=el('input');
+        categoryField.append(el('span','カテゴリー'));
         categorySelect.setAttribute('aria-label','カテゴリー');
         customCategory.type='text';customCategory.placeholder='独自カテゴリー名';
         customCategory.setAttribute('aria-label','独自カテゴリー名');customCategory.maxLength=2000;
@@ -345,7 +346,7 @@
           customCategory.hidden=!isCustom;favoriteLabel.hidden=!isCustom;
         }
         function refreshCategoryOptions(){
-          var oldChoice=categorySelect.value,oldFavorite=oldChoice.indexOf('favorite:')===0?knownFavorites.find(function(c){return c.id===oldChoice.slice(9);}):null;
+          var oldChoice=categorySelect.options.length?categorySelect.value:(seed.categoryId?'master:'+seed.categoryId:seed.category&&demandCategories(allStores).find(function(c){return c.name===seed.category;})?'favorite:'+demandCategories(allStores).find(function(c){return c.name===seed.category;}).id:seed.category?'custom':''),oldFavorite=oldChoice.indexOf('favorite:')===0?knownFavorites.find(function(c){return c.id===oldChoice.slice(9);}):null;
           var oldName=oldFavorite&&oldFavorite.name||'';
           var currentCustom=customCategory.value;
           categorySelect.replaceChildren();
@@ -366,7 +367,7 @@
           var customOption=el('option','その他（自由入力）');customOption.value='custom';
           var unsetOption=el('option','未分類');unsetOption.value='';
           otherGroup.append(customOption,unsetOption);categorySelect.append(otherGroup);
-          if(oldChoice&&Array.from(categorySelect.options).some(function(o){return o.value===oldChoice})){
+          if(oldChoice&&Array.from(categorySelect.options).some(function(o){return o.value===oldChoice;})){
             categorySelect.value=oldChoice;
           }else if(oldChoice.indexOf('favorite:')===0&&oldName){
             categorySelect.value='custom';customCategory.value=oldName;
@@ -573,6 +574,7 @@
         try{
           requireValue(storeId===allStores.current,'店舗が変更されています。画面を開き直してください。');
           var e={type:type.value,scope:type.value==='sale'||type.value==='campaign'?'global':type.value==='other'?scope.value:'store',startDate:start.value,endDate:end.value,snapshot:snapshot};
+          var pendingFavorites=takeDemandFavorites(e.snapshot);
           if(editing)e.id=source.id;
           if(presetId)e.presetId=presetId;
           else if(editing&&source.presetId&&type.value===source.type)e.presetId=source.presetId;
@@ -582,9 +584,9 @@
           }
           if(editing){
             if(!confirm('登録済みイベントを変更します。\n期間中の表示や関連する比較にも変更内容が反映されます。よろしいですか？'))return;
-            if(transaction(function(next){syncDemandPreset(next,e);replaceRegisteredEvent(next,e);}))d.close();
+            if(transaction(function(next){appendDemandFavorites(next,pendingFavorites);syncDemandPreset(next,e);replaceRegisteredEvent(next,e);}))d.close();
           }else{
-            if(transaction(function(next){syncDemandPreset(next,e);add(next,storeId,e);}))d.close();
+            if(transaction(function(next){appendDemandFavorites(next,pendingFavorites);syncDemandPreset(next,e);add(next,storeId,e);}))d.close();
           }
         }catch(err){alert(err.message);}
       }
@@ -627,9 +629,10 @@
         body.replaceChildren();var form=el('form');body.append(form);var read=nearbyPresetEditor(form,p&&p.snapshot);
         var actions=el('div',undefined,'ie-actions'),saveButton=el('button','保存する','ie-primary');saveButton.type='submit';actions.append(button('戻る',draw),saveButton);form.append(actions);
         form.onsubmit=function(e){e.preventDefault();try{
-          var snapshot=read();
-          if(p&&!confirm('よく使うイベントを変更します。登録済みの開催記録は変更されません。よろしいですか？'))return;
+          var snapshot=read(),pendingFavorites=takeDemandFavorites(snapshot);
+          if(p&&!confirm('よく使うイベントを変更します.登録済みの開催記録は変更されません。よろしいですか？'))return;
           if(transaction(function(next){
+            appendDemandFavorites(next,pendingFavorites);
             var items=mutableNearbyPresets(next),duplicate=items.find(function(item){return item.id!==(p&&p.id)&&item.snapshot.title.trim()===snapshot.title.trim()&&item.snapshot.location.trim()===snapshot.location.trim();});
             requireValue(!duplicate,'同じイベント名・場所が「よく使うイベント」に登録されています。');
             if(p){var item=items.find(function(v){return v.id===p.id;});requireValue(!!item,'対象が見つかりません。');item.snapshot=copy(snapshot);}
@@ -654,9 +657,10 @@
         body.replaceChildren();var form=el('form');body.append(form);var read=specialPresetEditor(form,p&&p.snapshot);
         var actions=el('div',undefined,'ie-actions'),saveButton=el('button','保存する','ie-primary');saveButton.type='submit';actions.append(button('戻る',draw),saveButton);form.append(actions);
         form.onsubmit=function(e){e.preventDefault();try{
-          var snapshot=read();
-          if(p&&!confirm('よく使う催事を変更します。登録済みの開催記録は変更されません。よろしいですか？'))return;
+          var snapshot=read(),pendingFavorites=takeDemandFavorites(snapshot);
+          if(p&&!confirm('よく使う催事を変更します.登録済みの開催記録は変更されません。よろしいですか？'))return;
           if(transaction(function(next){
+            appendDemandFavorites(next,pendingFavorites);
             var items=mutableSpecialPresets(next),duplicate=items.find(function(item){return item.id!==(p&&p.id)&&item.snapshot.title.trim()===snapshot.title.trim();});
             requireValue(!duplicate,'同じ催事名が「よく使う催事」に登録されています。');
             if(p){var item=items.find(function(v){return v.id===p.id;});requireValue(!!item,'対象が見つかりません。');item.snapshot=copy(snapshot);}
