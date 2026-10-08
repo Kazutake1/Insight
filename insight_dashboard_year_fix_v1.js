@@ -89,7 +89,7 @@
   }
   function ensureButton(){
     removeLegacyYearDeleteUi();
-    var addButton=Array.prototype.find.call(document.querySelectorAll('button'),function(button){
+    var addButton=document.getElementById('addYearBtn')||Array.prototype.find.call(document.querySelectorAll('button'),function(button){
       return /年度追加/.test(button.textContent||'')&&!button.closest('#insightYearDeleteOverlay');
     });
     if(!addButton)return;
@@ -97,7 +97,7 @@
     if(!deleteButton){
       deleteButton=document.createElement('button');deleteButton.type='button';
       deleteButton.id='insightDeleteYearButton';deleteButton.className=addButton.className;
-      deleteButton.textContent='− 年度削除';deleteButton.title='対象年度を選び、確認して削除します';
+      deleteButton.textContent='− 削除';deleteButton.title='対象年度を選び、確認して削除します';
       deleteButton.addEventListener('click',openDialog);
       addButton.insertAdjacentElement('afterend',deleteButton);
     }

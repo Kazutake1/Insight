@@ -74,7 +74,7 @@
     if(!dash||!section){state={moved:false,monthsInline:false};return false;}
     var actions=section.querySelector('#insightSettingsYearActions');
     var inlineHost=section.querySelector('#insightSettingsYearInlineHost');
-    var addButton=findButton(dash,/年度追加/)||findButton(section,/年度追加/)||findButton(doc,/年度追加/);
+    var addButton=doc.getElementById('addYearBtn')||findButton(dash,/年度追加/)||findButton(section,/年度追加/)||findButton(doc,/年度追加/);
     var monthRow=findMonthRow(dash,yearRow);
     var row=findYearRow(dash,addButton,monthRow);
 
