@@ -147,3 +147,15 @@ test('標準Evidenceが無効なら従来crossAnalysisへフォールバック�
   const result=interpretation.monthly(monthlyReview(),'dashboard',cross,{contract:'unknown',items:[]});
   assert.ok(result.relations.some(x=>/火曜日の客数が弱い/.test(x)));
 });
+
+
+test('廃棄増加は改善傾向の状態でも「改善」と誤表示しない',()=>{
+  const waste=item({key:'waste',type:'waste',theme:'waste',direction:'up',title:'廃棄増加',summary:'廃棄金額 +15.0%',state:'improving',stateLabel:'改善傾向',positive:false});
+  const review={items:[waste],forTheme(){return [waste];}};
+  const result=interpretation.weekly(review,'waste');
+  assert.ok(result.priorities.some(x=>/【注意】廃棄増加/.test(x)));
+  assert.ok(!result.priorities.some(x=>/【改善】廃棄増加/.test(x)));
+  const daily=interpretation.daily({display:[waste],opportunities:[]},{checks:[]});
+  assert.ok(daily.priorities.some(x=>/【注意】廃棄増加/.test(x)));
+  assert.ok(!daily.priorities.some(x=>/【改善】廃棄増加/.test(x)));
+});
