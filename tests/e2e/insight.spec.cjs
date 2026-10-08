@@ -2085,6 +2085,60 @@ test('イベント実績の催事は場所選択なしで過去開催を参照�
   expect(errors).toEqual([]);
 });
 
+test('催事8日間は同じ便別カードを7日ごとに折り返し、1日開催には期間一覧を表示しない',async({page})=>{
+  const errors=await openInsight(page);
+  await page.evaluate(()=>{
+    const store=allStores.stores[allStores.current];
+    store.events=(store.events||[]).filter(event=>!String(event.id||'').startsWith('e2e_period_'));
+    store.events.push(
+      {id:'e2e_period_long',type:'special',scope:'store',startDate:'2026-11-01',endDate:'2026-11-08',snapshot:{version:1,title:'E2E八日間催事'}},
+      {id:'e2e_period_single',type:'special',scope:'store',startDate:'2026-11-10',endDate:'2026-11-10',snapshot:{version:1,title:'E2E一日催事'}}
+    );
+    window.InsightSalesCount.ensure(allStores);
+    const category=allStores.salesCountManagement.categories.find(item=>!item.hidden);
+    store.salesCounts=store.salesCounts||{};
+    store.salesCounts['2026-11-01']={
+      [category.id]:{trips:[{delivery:15,sales:12},{delivery:null,sales:null},{delivery:null,sales:null}]}
+    };
+    store.salesCounts['2026-11-08']={
+      [category.id]:{trips:[{delivery:10,sales:9},{delivery:null,sales:null},{delivery:null,sales:null}]}
+    };
+    window.InsightEventResults.render();
+  });
+  await page.locator('#navEventResults').click();
+  await page.locator('.er-kind-btn[data-kind="special"]').click();
+  await page.locator('#erEvent').selectOption({label:'E2E八日間催事'});
+  await page.locator('.er-occurrence').first().click();
+  const grid=page.locator('.er-period-day-grid').first();
+  await expect(page.locator('.er-period-category')).toHaveCount(1);
+  await expect(grid.locator('.sc-day')).toHaveCount(8);
+  await expect(grid.getByLabel('2026-11-03 1便 販売数')).toHaveValue('');
+  await expect(grid.getByLabel('2026-11-08 1便 販売数')).toHaveValue('9');
+  for(const [viewport,columns] of [[{width:1194,height:834},7],[{width:834,height:1194},3]]){
+    await page.setViewportSize(viewport);
+    const layout=await grid.evaluate(el=>{
+      const cards=Array.from(el.querySelectorAll('.sc-day'));
+      const rects=cards.map(card=>card.getBoundingClientRect());
+      return {
+        columns:getComputedStyle(el).gridTemplateColumns.split(' ').filter(Boolean).length,
+        overflow:el.scrollWidth-el.clientWidth,
+        firstTop:rects[0].top,
+        beforeWrapTop:rects[window.innerWidth>1000?6:2].top,
+        wrappedTop:rects[window.innerWidth>1000?7:3].top
+      };
+    });
+    expect(layout.columns).toBe(columns);
+    expect(layout.overflow).toBeLessThanOrEqual(1);
+    expect(Math.abs(layout.beforeWrapTop-layout.firstTop)).toBeLessThan(2);
+    expect(layout.wrappedTop).toBeGreaterThan(layout.firstTop+10);
+  }
+  await page.locator('.er-back').click();
+  await page.locator('#erEvent').selectOption({label:'E2E一日催事'});
+  await page.locator('.er-occurrence').first().click();
+  await expect(page.locator('.er-period-section')).toHaveCount(0);
+  expect(errors).toEqual([]);
+});
+
 test('セール追加ダイアログは補足文を省きプリセット一覧に余白を設ける',async({page})=>{
   const errors=await openInsight(page);
   await page.locator('#nav0').click();
