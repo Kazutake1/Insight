@@ -1875,8 +1875,8 @@ test('イベント実績は過去開催→複数日→カテゴリー便別実�
     };
   });
   expect(sectionOrder.dayTabs).toBeGreaterThan(0);
-  expect(sectionOrder.dayTabs).toBeLessThan(sectionOrder.period);
-  expect(sectionOrder.period).toBeLessThan(sectionOrder.hourly);
+  expect(sectionOrder.dayTabs).toBeLessThan(sectionOrder.hourly);
+  expect(sectionOrder.hourly).toBeLessThan(sectionOrder.period);
   await expect(periodSection.locator('.er-period-category')).toHaveCount(2);
   const periodGrids=periodSection.locator('.er-period-day-grid');
   await expect(periodGrids).toHaveCount(2);
@@ -2199,8 +2199,8 @@ test('イベント実績の催事は場所選択なしで過去開催を参照�
     };
   });
   expect(orderedSections.tabs).toBeGreaterThan(0);
-  expect(orderedSections.tabs).toBeLessThan(orderedSections.period);
-  expect(orderedSections.period).toBeLessThan(orderedSections.hourly);
+  expect(orderedSections.tabs).toBeLessThan(orderedSections.hourly);
+  expect(orderedSections.hourly).toBeLessThan(orderedSections.period);
   await expect(period.locator('h2')).toHaveText('開催期間のカテゴリー実績');
   await expect(period.locator('.er-period-category')).toHaveCount(2);
   const grids=period.locator('.er-period-day-grid');
@@ -2283,8 +2283,8 @@ test('催事8日間は同じ便別カードを7日ごとに折り返し、1日�
     };
   });
   expect(sectionOrder.tabs).toBeGreaterThan(0);
-  expect(sectionOrder.tabs).toBeLessThan(sectionOrder.period);
-  expect(sectionOrder.period).toBeLessThan(sectionOrder.hourly);
+  expect(sectionOrder.tabs).toBeLessThan(sectionOrder.hourly);
+  expect(sectionOrder.hourly).toBeLessThan(sectionOrder.period);
   const grid=page.locator('.er-period-day-grid').first();
   await expect(page.locator('.er-period-category')).toHaveCount(1);
   await expect(grid.locator('.sc-day')).toHaveCount(8);
