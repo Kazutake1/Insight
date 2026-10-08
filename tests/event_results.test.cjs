@@ -95,3 +95,19 @@ test('複数場所のイベントは各場所から同じ開催記録を1件だ�
   assert.equal(value.occurrences[0].metrics.salesYen,200021);
   assert.equal(results.collect(all,'a','文化フォーラム','秋まつり',analysis).occurrences.length,2);
 });
+
+
+test('特需商品のカテゴリーを正規化しても過去の未分類商品・前回比較を維持する',()=>{
+  const all=data();
+  all.stores.a.events[0].snapshot.specialDemand[0].category='アイス';
+  all.stores.a.events[0].snapshot.specialDemand[0].categoryId='cat_ice';
+  all.stores.a.events[0].snapshot.specialDemand[1].category='催事限定';
+  const value=results.collect(all,'a','文化フォーラム','秋まつり',analysis);
+  const current=value.occurrences[0];
+  assert.equal(current.specialDemand[0].category,'アイス');
+  assert.equal(current.specialDemand[0].categoryId,'cat_ice');
+  assert.equal(current.specialDemand[1].category,'催事限定');
+  const prior=results.demandComparison(value.occurrences,current)[0].previous;
+  assert.equal(prior.category,undefined);
+  assert.equal(prior.sold,45);
+});
