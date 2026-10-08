@@ -1907,6 +1907,31 @@ test('イベント実績は過去開催→複数日→時間帯グラフ→カ�
   await expect(page.locator('.er-hour-value:visible')).toHaveCount(0);
   const hourlyBarColor=await page.locator('.er-hour-bar').first().evaluate(el=>getComputedStyle(el).color);
   expect(hourlyBarColor).toBe('rgb(59, 130, 246)');
+  const originalBarGeometry=await page.locator('.er-hour-chart').evaluate(chart=>{
+    const items=Array.from(chart.querySelectorAll('.er-hour-item'));
+    const firstPlot=items[0].querySelector('.er-hour-plot');
+    const firstBar=items[0].querySelector('.er-hour-bar');
+    const peakPlot=items[18].querySelector('.er-hour-plot');
+    const peakBar=items[18].querySelector('.er-hour-bar');
+    return {
+      firstHeight:Math.round(firstBar.getBoundingClientRect().height),
+      peakHeight:Math.round(peakBar.getBoundingClientRect().height),
+      firstWidth:firstBar.getBoundingClientRect().width,
+      firstExpectedWidth:Math.min(28,firstPlot.getBoundingClientRect().width*.64),
+      peakWidth:peakBar.getBoundingClientRect().width,
+      peakExpectedWidth:Math.min(28,peakPlot.getBoundingClientRect().width*.64),
+      radius:getComputedStyle(firstBar).borderRadius,
+      background:getComputedStyle(firstBar).backgroundColor,
+      noInlineStyles:items.every(item=>!item.querySelector('.er-hour-plot').hasAttribute('style')&&!item.querySelector('.er-hour-bar').hasAttribute('style'))
+    };
+  });
+  expect(originalBarGeometry.firstHeight).toBe(16); // 20 customers / 186 peak * 150px
+  expect(originalBarGeometry.peakHeight).toBe(150);
+  expect(originalBarGeometry.firstWidth).toBeCloseTo(originalBarGeometry.firstExpectedWidth,0);
+  expect(originalBarGeometry.peakWidth).toBeCloseTo(originalBarGeometry.peakExpectedWidth,0);
+  expect(originalBarGeometry.radius).toBe('5px 5px 2px 2px');
+  expect(originalBarGeometry.background).toBe('rgb(59, 130, 246)');
+  expect(originalBarGeometry.noInlineStyles).toBe(true);
   const timeFontSize=await page.locator('.er-hour-item>span').first().evaluate(el=>getComputedStyle(el).fontSize);
   expect(timeFontSize).toBe('13px');
   const hourlyGap=await page.locator('.er-hour-chart').evaluate(el=>getComputedStyle(el).gap);
@@ -1920,6 +1945,13 @@ test('イベント実績は過去開催→複数日→時間帯グラフ→カ�
   await expect(page.locator('.er-hour-value:visible')).toHaveText('186人');
   await expect(page.locator('.er-hour-plot').first()).toHaveAttribute('aria-pressed','false');
   await expect(page.locator('.er-hour-plot').nth(18)).toHaveAttribute('aria-pressed','true');
+  const tipOffset=await page.locator('.er-hour-plot').nth(18).evaluate(plot=>{
+    const barTop=plot.querySelector('.er-hour-bar').getBoundingClientRect().top;
+    const labelBottom=plot.querySelector('.er-hour-value').getBoundingClientRect().bottom;
+    return barTop-labelBottom;
+  });
+  expect(tipOffset).toBeGreaterThanOrEqual(5);
+  expect(tipOffset).toBeLessThanOrEqual(7);
 
   const horizontal=await page.evaluate(()=>{
     const scroll=document.querySelector('.er-hour-scroll');
