@@ -2134,6 +2134,10 @@ test('催事8日間は同じ便別カードを7日ごとに折り返し、1日�
   await page.locator('.er-kind-btn[data-kind="special"]').click();
   await page.locator('#erEvent').selectOption({label:'E2E八日間催事'});
   await page.locator('.er-occurrence').first().click();
+  const overview=page.locator('.er-overview-grid');
+  await expect(overview.locator('.er-overview-value')).toHaveCount(4);
+  await expect(overview).toContainText('期間合計');
+  await expect(overview).toContainText('1日平均');
   const grid=page.locator('.er-period-day-grid').first();
   await expect(page.locator('.er-period-category')).toHaveCount(1);
   await expect(grid.locator('.sc-day')).toHaveCount(8);
@@ -2160,6 +2164,12 @@ test('催事8日間は同じ便別カードを7日ごとに折り返し、1日�
   await page.locator('.er-back').click();
   await page.locator('#erEvent').selectOption({label:'E2E一日催事'});
   await page.locator('.er-occurrence').first().click();
+  await expect(page.locator('.er-detail-title h2')).toHaveText('E2E一日催事');
+  await expect(overview.locator('.er-overview-value')).toHaveCount(2);
+  await expect(overview.locator('.er-overview-title')).toHaveText(['売上','客数']);
+  await expect(overview).not.toContainText('期間合計');
+  await expect(overview).not.toContainText('1日平均');
+  await expect(page.locator('.er-overview-values.is-single-day')).toHaveCount(2);
   await expect(page.locator('.er-period-section')).toHaveCount(0);
   expect(errors).toEqual([]);
 });
