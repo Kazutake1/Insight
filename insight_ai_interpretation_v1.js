@@ -11,7 +11,7 @@
   function uniq(list){return Array.from(new Set((list||[]).filter(Boolean)));}
   function levelLabel(item){
     if(item&&item.positive)return '改善';
-    if(item&&item.state&&(item.state==='improving'||item.state==='resolved'))return '改善';
+    if(item&&item.state==='resolved')return '改善';
     return item&&item.level==='important'?'重要':'注意';
   }
   function itemPriority(item){
@@ -30,7 +30,7 @@
     }
     items=items.filter(function(item){return item&&item.level!=='internal';});
     var bad=items.filter(function(item){return !item.positive&&item.state!=='resolved';}).sort(function(a,b){return itemPriority(b)-itemPriority(a);});
-    var good=items.filter(function(item){return item.positive||item.state==='improving'||item.state==='resolved';}).sort(function(a,b){return itemPriority(b)-itemPriority(a);});
+    var good=items.filter(function(item){return item.positive||item.state==='resolved';}).sort(function(a,b){return itemPriority(b)-itemPriority(a);});
     var out=bad.slice(0,4);
     if(out.length<5&&good.length)out.push(good[0]);
     return out.slice(0,5);
@@ -138,7 +138,7 @@
   }
   function conclusion(items,kind){
     var bad=items.filter(function(i){return !i.positive&&i.state!=='resolved';});
-    var good=items.filter(function(i){return i.positive||i.state==='improving'||i.state==='resolved';});
+    var good=items.filter(function(i){return i.positive||i.state==='resolved';});
     var period=kind==='week'?'今週':'今月';
     if(bad.length){
       return ['【結論】'+period+'は「'+bad.slice(0,2).map(function(i){return i.title;}).join('」「')+'」の確認を優先してください。'];
@@ -222,7 +222,7 @@
     var items=display.slice(0,4);
     if(items.length<5&&opportunities.length)items.push(Object.assign({positive:true},opportunities[0]));
     var priorities=items.map(function(item){
-      var positive=!!item.positive||item.direction==='up'&&/増加|改善|機会/.test(String(item.title||''));
+      var positive=!!item.positive||item.type!=='waste'&&item.direction==='up'&&/増加|改善|機会/.test(String(item.title||''));
       var label=positive?'改善':item.level==='important'?'重要':'注意';
       return '【'+label+'】'+item.title+'：'+item.summary;
     });
