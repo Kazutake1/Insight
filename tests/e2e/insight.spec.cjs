@@ -1853,6 +1853,28 @@ test('イベント実績は過去開催→複数日→時間帯グラフ→カ�
   await expect(overviewCards.nth(0)).toHaveText(/売上\s*期間合計\s*226千円\s*1日平均\s*113千円/);
   await expect(overviewCards.nth(1)).toHaveText(/客数\s*期間合計\s*205人\s*1日平均\s*103人/);
   await expect(overviewCards.locator('.er-overview-value')).toHaveCount(4);
+  const periodSection=page.locator('.er-period-section');
+  await expect(periodSection.locator('h2')).toHaveText('開催期間のカテゴリー実績');
+  await expect(periodSection.locator('.er-period-category')).toHaveCount(2);
+  const periodGrids=periodSection.locator('.er-period-day-grid');
+  await expect(periodGrids).toHaveCount(2);
+  await expect(periodGrids.first().locator('.sc-day')).toHaveCount(2);
+  await expect(periodGrids.first().locator('.sc-day-num')).toHaveText(['9/12（土）','9/13（日）']);
+  await expect(periodGrids.first().getByLabel('2026-09-12 1便 納品数')).toHaveValue('40');
+  await expect(periodGrids.first().getByLabel('2026-09-12 1便 販売数')).toHaveValue('36');
+  await expect(periodGrids.first().getByLabel('2026-09-13 1便 販売数')).toHaveValue('');
+  expect(await periodSection.locator('input').evaluateAll(inputs=>inputs.every(input=>input.readOnly))).toBe(true);
+  const periodOriginalViewport=page.viewportSize();
+  for(const viewport of [{width:1194,height:834},{width:834,height:1194}]){
+    await page.setViewportSize(viewport);
+    const fit=await periodGrids.first().evaluate(grid=>({
+      overflow:grid.scrollWidth-grid.clientWidth,
+      columns:getComputedStyle(grid).gridTemplateColumns.split(' ').filter(Boolean).length
+    }));
+    expect(fit.overflow).toBeLessThanOrEqual(1);
+    expect(fit.columns).toBe(2);
+  }
+  await page.setViewportSize(periodOriginalViewport);
   const overviewLayout=await page.locator('.er-overview-grid').evaluate(el=>({
     columns:getComputedStyle(el).gridTemplateColumns.split(' ').filter(Boolean).length,
     innerColumns:getComputedStyle(el.querySelector('.er-overview-values')).gridTemplateColumns.split(' ').filter(Boolean).length
@@ -1962,6 +1984,8 @@ test('イベント実績は過去開催→複数日→時間帯グラフ→カ�
   await expect(page.locator('.er-day-tab').nth(1)).toHaveClass(/active/);
   await expect(page.locator('.er-hourly-section')).toHaveCount(0);
   await expect(page.locator('.er-category-card')).toHaveCount(0);
+  await expect(periodSection.locator('.er-period-category')).toHaveCount(2);
+  await expect(periodGrids.first().locator('.sc-day')).toHaveCount(2);
 
   await page.locator('.er-back').click();
   await page.locator('.er-occurrence').nth(1).click();
@@ -1974,6 +1998,7 @@ test('イベント実績は過去開催→複数日→時間帯グラフ→カ�
     align:getComputedStyle(el).textAlign
   }));
   expect(singleLayout).toEqual({columns:1,align:'center'});
+  await expect(page.locator('.er-period-section')).toHaveCount(0);
   await expect(page.locator('.er-day-tabs')).toHaveCount(0);
   await expect(page.locator('.er-daily-summary')).toHaveCount(0);
   expect(errors).toEqual([]);
