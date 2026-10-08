@@ -247,7 +247,7 @@
     bad.forEach(function(item){
       p.caution.push('【'+item.stateLabel+'】'+item.title+'：'+item.summary);
     });
-    var positive=items.filter(function(item){return item.positive||item.state==='improving'||item.state==='resolved';}).slice(0,2);
+    var positive=items.filter(function(item){return item.positive||item.state==='resolved';}).slice(0,2);
     positive.forEach(function(item){
       p.good.push('【'+item.stateLabel+'】'+item.title+'：'+item.summary);
     });
@@ -519,7 +519,7 @@
     items.filter(function(item){return !item.positive&&item.state!=='resolved';}).slice(0,3).forEach(function(item){
       p.caution.push(historyItemLine(item,bundle.kind));
     });
-    items.filter(function(item){return item.positive||item.state==='improving'||item.state==='resolved';}).slice(0,2).forEach(function(item){
+    items.filter(function(item){return item.positive||item.state==='resolved';}).slice(0,2).forEach(function(item){
       p.good.push(historyItemLine(item,bundle.kind));
     });
     if(!items.length)p.good.push('この期間に表示対象となる大きな変化はありません。');
@@ -552,7 +552,7 @@
       else out.push('この期間に該当する継続異常の履歴はありません。');
     }else{
       if(!explicit&&theme==='dashboard')out=out.concat(entry.conclusion||[]);
-      if(/良い|改善|機会/.test(q))items=items.filter(function(item){return item.positive||item.state==='improving'||item.state==='resolved';});
+      if(/良い|改善|機会/.test(q))items=items.filter(function(item){return item.positive||item.state==='resolved';});
       else if(/問題|悪い|注意|課題/.test(q))items=items.filter(function(item){return !item.positive&&item.state!=='resolved';});
       items.slice(0,5).forEach(function(item){out.push(historyItemLine(item,bundle.kind));});
       if(!out.length)out.push('選択した履歴に該当する重要項目はありません。');
