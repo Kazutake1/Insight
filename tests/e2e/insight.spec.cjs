@@ -1815,12 +1815,20 @@ test('イベント実績は過去開催→複数日→時間帯グラフ→カ�
     const categories=allStores.salesCountManagement.categories.filter(category=>!category.hidden).slice(0,2);
     store.salesCounts=store.salesCounts||{};
     store.salesCounts['2026-09-12']=store.salesCounts['2026-09-12']||{};
+    store.salesCounts['2025-09-10']=store.salesCounts['2025-09-10']||{};
     categories.forEach((category,index)=>{
       store.salesCounts['2026-09-12'][category.id]={
         trips:[
           {delivery:40+index,sales:36+index},
           {delivery:50+index,sales:46+index},
           {delivery:45+index,sales:41+index}
+        ]
+      };
+      store.salesCounts['2025-09-10'][category.id]={
+        trips:[
+          {delivery:30+index,sales:26+index},
+          {delivery:25+index,sales:21+index},
+          {delivery:20+index,sales:16+index}
         ]
       };
     });
@@ -1853,8 +1861,20 @@ test('イベント実績は過去開催→複数日→時間帯グラフ→カ�
   await expect(overviewCards.nth(0)).toHaveText(/売上\s*期間合計\s*226千円\s*1日平均\s*113千円/);
   await expect(overviewCards.nth(1)).toHaveText(/客数\s*期間合計\s*205人\s*1日平均\s*103人/);
   await expect(overviewCards.locator('.er-overview-value')).toHaveCount(4);
+  await expect(page.locator('.er-sales-section')).toHaveCount(0);
   const periodSection=page.locator('.er-period-section');
   await expect(periodSection.locator('h2')).toHaveText('開催期間のカテゴリー実績');
+  const sectionOrder=await page.locator('#erResults').evaluate(container=>{
+    const children=Array.from(container.children);
+    return {
+      dayTabs:children.findIndex(child=>child.classList.contains('er-day-tabs')),
+      period:children.findIndex(child=>child.classList.contains('er-period-section')),
+      hourly:children.findIndex(child=>child.classList.contains('er-hourly-section'))
+    };
+  });
+  expect(sectionOrder.dayTabs).toBeGreaterThan(0);
+  expect(sectionOrder.dayTabs).toBeLessThan(sectionOrder.period);
+  expect(sectionOrder.period).toBeLessThan(sectionOrder.hourly);
   await expect(periodSection.locator('.er-period-category')).toHaveCount(2);
   const periodGrids=periodSection.locator('.er-period-day-grid');
   await expect(periodGrids).toHaveCount(2);
@@ -1882,7 +1902,7 @@ test('イベント実績は過去開催→複数日→時間帯グラフ→カ�
   expect(overviewLayout).toEqual({columns:2,innerColumns:2});
   const eventDetailTypography=await page.evaluate(()=>({
     detailTitle:getComputedStyle(document.querySelector('.er-detail-title h2')).fontSize,
-    sectionTitle:getComputedStyle(document.querySelector('.er-sales-section > h2')).fontSize,
+    sectionTitle:getComputedStyle(document.querySelector('.er-period-section > h2')).fontSize,
     metricLabel:getComputedStyle(document.querySelector('.er-overview-value span')).fontSize,
     metricValue:getComputedStyle(document.querySelector('.er-overview-value strong')).fontSize
   }));
@@ -1986,17 +2006,10 @@ test('イベント実績は過去開催→複数日→時間帯グラフ→カ�
   await page.setViewportSize(originalViewport);
 
 
-  await expect(page.locator('.er-sales-section > h2')).toHaveText('カテゴリー実績');
-  await expect(page.locator('.er-category-card')).toHaveCount(2);
-  await expect(page.locator('.er-category-card .sc-day')).toHaveCount(2);
-  const categoryGrid=await page.locator('.er-category-grid').evaluate(grid=>({
-    columns:getComputedStyle(grid).gridTemplateColumns.split(' ').filter(Boolean).length,
-    width:Math.round(grid.getBoundingClientRect().width)
-  }));
-  expect(categoryGrid.columns).toBe(4);
-  const eventTotalFont=await page.locator('.er-category-card .sc-totals b').first().evaluate(el=>getComputedStyle(el).fontSize);
+  await expect(page.locator('.er-sales-section')).toHaveCount(0);
+  const eventTotalFont=await periodSection.locator('.sc-totals b').first().evaluate(el=>getComputedStyle(el).fontSize);
   expect(eventTotalFont).toBe('14px');
-  const readOnly=await page.locator('.er-category-card input').evaluateAll(inputs=>inputs.every(input=>input.readOnly));
+  const readOnly=await periodSection.locator('input').evaluateAll(inputs=>inputs.every(input=>input.readOnly));
   expect(readOnly).toBe(true);
   await expect(page.locator('.er-demand-section')).toBeVisible();
   await expect(page.locator('.er-demand-card')).toHaveCount(2);
@@ -2006,16 +2019,16 @@ test('イベント実績は過去開催→複数日→時間帯グラフ→カ�
   await expect(page.locator('.er-demand-card').first()).toContainText('86.7%');
   await expect(page.locator('.er-demand-card').first()).toContainText('前回：用意 50　販売 45　消化率 90.0%');
   const cardTypography=await page.evaluate(()=>({
-    category:getComputedStyle(document.querySelector('.er-category-card > h3')).fontSize,
+    category:getComputedStyle(document.querySelector('.er-period-category > h3')).fontSize,
     demand:getComputedStyle(document.querySelector('.er-demand-card > h3')).fontSize,
     previous:getComputedStyle(document.querySelector('.er-demand-previous')).fontSize
   }));
-  expect(cardTypography).toEqual({category:'14px',demand:'14.5px',previous:'12px'});
+  expect(cardTypography).toEqual({category:'15px',demand:'14.5px',previous:'12px'});
 
   await page.locator('.er-day-tab').nth(1).click();
   await expect(page.locator('.er-day-tab').nth(1)).toHaveClass(/active/);
   await expect(page.locator('.er-hourly-section')).toHaveCount(0);
-  await expect(page.locator('.er-category-card')).toHaveCount(0);
+  await expect(page.locator('.er-sales-section')).toHaveCount(0);
   await expect(periodSection.locator('.er-period-category')).toHaveCount(2);
   await expect(periodGrids.first().locator('.sc-day')).toHaveCount(2);
 
@@ -2031,6 +2044,18 @@ test('イベント実績は過去開催→複数日→時間帯グラフ→カ�
   }));
   expect(singleLayout).toEqual({columns:1,align:'center'});
   await expect(page.locator('.er-period-section')).toHaveCount(0);
+  await expect(page.locator('.er-sales-section > h2')).toHaveText('カテゴリー実績');
+  await expect(page.locator('.er-category-card')).toHaveCount(2);
+  await expect(page.locator('.er-category-card .sc-day')).toHaveCount(2);
+  await expect(page.locator('.er-category-card').first().getByLabel('2025-09-10 1便 販売数')).toHaveValue('26');
+  const singleCategoryGrid=await page.locator('.er-category-grid').evaluate(grid=>({
+    columns:getComputedStyle(grid).gridTemplateColumns.split(' ').filter(Boolean).length,
+    width:Math.round(grid.getBoundingClientRect().width)
+  }));
+  expect(singleCategoryGrid.columns).toBe(4);
+  const singleCategoryFont=await page.locator('.er-category-card > h3').first().evaluate(el=>getComputedStyle(el).fontSize);
+  expect(singleCategoryFont).toBe('14px');
+  expect(await page.locator('.er-category-card input').evaluateAll(inputs=>inputs.every(input=>input.readOnly))).toBe(true);
   await expect(page.locator('.er-day-tabs')).toHaveCount(0);
   await expect(page.locator('.er-daily-summary')).toHaveCount(0);
   expect(errors).toEqual([]);
@@ -2112,7 +2137,17 @@ test('イベント実績の催事は場所選択なしで過去開催を参照�
   await page.locator('.er-occurrence').first().click();
   await expect(page.locator('.er-detail-title h2')).toHaveText('E2Eクリスマス');
   await expect(page.locator('.er-day-tab')).toHaveCount(2);
+  await expect(page.locator('.er-sales-section')).toHaveCount(0);
   const period=page.locator('.er-period-section');
+  const orderedSections=await page.locator('#erResults').evaluate(container=>{
+    const children=Array.from(container.children);
+    return {
+      tabs:children.findIndex(child=>child.classList.contains('er-day-tabs')),
+      period:children.findIndex(child=>child.classList.contains('er-period-section'))
+    };
+  });
+  expect(orderedSections.tabs).toBeGreaterThan(0);
+  expect(orderedSections.tabs).toBeLessThan(orderedSections.period);
   await expect(period.locator('h2')).toHaveText('開催期間のカテゴリー実績');
   await expect(period.locator('.er-period-category')).toHaveCount(2);
   const grids=period.locator('.er-period-day-grid');
@@ -2134,6 +2169,8 @@ test('イベント実績の催事は場所選択なしで過去開催を参照�
     expect(fit.columns).toBe(2);
   }
   await page.locator('.er-day-tab').nth(1).click();
+  await expect(page.locator('.er-day-tab').nth(1)).toHaveClass(/active/);
+  await expect(page.locator('.er-sales-section')).toHaveCount(0);
   await expect(period.locator('.er-period-category')).toHaveCount(2);
   await expect(grids.first().locator('.sc-day')).toHaveCount(2);
   await page.locator('.er-back').click();
@@ -2160,6 +2197,9 @@ test('催事8日間は同じ便別カードを7日ごとに折り返し、1日�
     store.salesCounts['2026-11-08']={
       [category.id]:{trips:[{delivery:10,sales:9},{delivery:null,sales:null},{delivery:null,sales:null}]}
     };
+    store.salesCounts['2026-11-10']={
+      [category.id]:{trips:[{delivery:6,sales:0},{delivery:4,sales:3},{delivery:null,sales:null}]}
+    };
     window.InsightEventResults.render();
   });
   await page.locator('#navEventResults').click();
@@ -2170,11 +2210,25 @@ test('催事8日間は同じ便別カードを7日ごとに折り返し、1日�
   await expect(overview.locator('.er-overview-value')).toHaveCount(4);
   await expect(overview).toContainText('期間合計');
   await expect(overview).toContainText('1日平均');
+  await expect(page.locator('.er-sales-section')).toHaveCount(0);
+  const sectionOrder=await page.locator('#erResults').evaluate(container=>{
+    const children=Array.from(container.children);
+    return {
+      tabs:children.findIndex(child=>child.classList.contains('er-day-tabs')),
+      period:children.findIndex(child=>child.classList.contains('er-period-section'))
+    };
+  });
+  expect(sectionOrder.tabs).toBeGreaterThan(0);
+  expect(sectionOrder.tabs).toBeLessThan(sectionOrder.period);
   const grid=page.locator('.er-period-day-grid').first();
   await expect(page.locator('.er-period-category')).toHaveCount(1);
   await expect(grid.locator('.sc-day')).toHaveCount(8);
   await expect(grid.getByLabel('2026-11-03 1便 販売数')).toHaveValue('');
   await expect(grid.getByLabel('2026-11-08 1便 販売数')).toHaveValue('9');
+  await page.locator('.er-day-tab').nth(7).click();
+  await expect(page.locator('.er-day-tab').nth(7)).toHaveClass(/active/);
+  await expect(page.locator('.er-sales-section')).toHaveCount(0);
+  await expect(grid.locator('.sc-day')).toHaveCount(8);
   for(const [viewport,columns] of [[{width:1194,height:834},7],[{width:834,height:1194},3]]){
     await page.setViewportSize(viewport);
     const layout=await grid.evaluate(el=>{
@@ -2203,6 +2257,13 @@ test('催事8日間は同じ便別カードを7日ごとに折り返し、1日�
   await expect(overview).not.toContainText('1日平均');
   await expect(page.locator('.er-overview-values.is-single-day')).toHaveCount(2);
   await expect(page.locator('.er-period-section')).toHaveCount(0);
+  await expect(page.locator('.er-day-tabs')).toHaveCount(0);
+  await expect(page.locator('.er-sales-section > h2')).toHaveText('カテゴリー実績');
+  await expect(page.locator('.er-category-card')).toHaveCount(1);
+  await expect(page.locator('.er-category-card').getByLabel('2026-11-10 1便 販売数')).toHaveValue('0');
+  await expect(page.locator('.er-category-card').getByLabel('2026-11-10 2便 販売数')).toHaveValue('3');
+  await expect(page.locator('.er-category-card').getByLabel('2026-11-10 3便 販売数')).toHaveValue('');
+  expect(await page.locator('.er-category-card input').evaluateAll(inputs=>inputs.every(input=>input.readOnly))).toBe(true);
   expect(errors).toEqual([]);
 });
 
