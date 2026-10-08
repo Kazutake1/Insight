@@ -1185,38 +1185,39 @@ test('販売数ページはデータ本体の置換後に古いdraftを残さな
   expect(errors).toEqual([]);
 });
 
-test('分析AIの上端は左サイドバーの上端と揃う',async({page})=>{
+test('分析AIの上下端と高さはiPadの縦横・ライト/ダークでサイドバーに一致する',async({page})=>{
   const errors=await openInsight(page);
   await page.locator('#aiAnalysisToggle').click();
   await expect(page.locator('body')).toHaveClass(/ai-analysis-open/);
 
-  const positions=await page.evaluate(()=>{
-    const panel=document.getElementById('aiAnalysisPanel');
-    const button=document.getElementById('aiAnalysisToggle');
-    let sidebar=button.closest&&button.closest('.sidebar');
-    if(!sidebar){
-      let node=button.parentElement,best=null;
-      while(node&&node!==document.body&&node!==document.documentElement){
-        const rect=node.getBoundingClientRect();
-        if(
-          rect.width>=120&&rect.width<=360&&
-          rect.height>=Math.max(320,window.innerHeight*.55)&&
-          rect.left>=0&&rect.left<80&&rect.top>=0&&rect.top<160
-        ){
-          if(!best||rect.height>best.rect.height)best={node,rect};
-        }
-        node=node.parentElement;
-      }
-      sidebar=best&&best.node;
+  const originalViewport=page.viewportSize();
+  const themeToggle=page.locator('.insight-theme-switch-track');
+  for(const dark of [false,true]){
+    const isDark=await page.evaluate(()=>document.documentElement.classList.contains('dark')||document.body.classList.contains('dark'));
+    if(isDark!==dark){
+      await themeToggle.click();
+      await page.waitForFunction(expected=>
+        (document.documentElement.classList.contains('dark')||document.body.classList.contains('dark'))===expected,
+      dark);
     }
-    return {
-      panelTop:panel.getBoundingClientRect().top,
-      sidebarTop:sidebar&&sidebar.getBoundingClientRect().top
-    };
-  });
 
-  expect(positions.sidebarTop).not.toBeNull();
-  expect(Math.abs(positions.panelTop-positions.sidebarTop)).toBeLessThanOrEqual(1);
+    for(const viewport of [{width:1194,height:834},{width:834,height:1194}]){
+      await page.setViewportSize(viewport);
+      const positions=await page.evaluate(()=>{
+        const panel=document.getElementById('aiAnalysisPanel').getBoundingClientRect();
+        const sidebar=document.getElementById('sidebar').getBoundingClientRect();
+        return {
+          panel:{top:panel.top,bottom:panel.bottom,height:panel.height},
+          sidebar:{top:sidebar.top,bottom:sidebar.bottom,height:sidebar.height}
+        };
+      });
+      for(const edge of ['top','bottom','height']){
+        expect(Math.abs(positions.panel[edge]-positions.sidebar[edge]),
+          `Dark=${dark}, viewport=${viewport.width}x${viewport.height}, edge=${edge}`).toBeLessThanOrEqual(1);
+      }
+    }
+  }
+  await page.setViewportSize(originalViewport);
   expect(errors).toEqual([]);
 });
 
