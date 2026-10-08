@@ -256,3 +256,46 @@ test('よく使う催事への同期ではカテゴリーを保持し用意数�
   ]);
   assert.doesNotThrow(()=>events.validate(a));
 });
+
+
+test('よく使う特需商品カテゴリーは2店舗共通で保存し、順序と過去の実績を維持する',()=>{
+  const all=data(),before={version:1,title:'催事',note:'',specialDemand:[{id:'p1',name:'限定弁当',category:'弁当',prepared:100,sold:80}]};
+  all.stores.a.events=[{id:'e1',type:'special',scope:'store',startDate:'2026-10-08',endDate:'2026-10-08',snapshot:events.copy(before)}];
+  all.eventManagement={version:1,presets:[],events:[]};
+  assert.deepEqual(events.demandCategories(all),[]);
+  events.appendDemandFavorites(all,['弁当','特設グッズ','弁当']);
+  assert.deepEqual(events.demandCategories(all).map(item=>item.name),['弁当','特設グッズ']);
+  assert.equal(events.demandCategories(all),all.eventManagement.demandCategories);
+  const restored=JSON.parse(JSON.stringify(all));
+  assert.doesNotThrow(()=>events.validate(restored));
+  assert.deepEqual(restored.stores.a.events[0].snapshot,before);
+  assert.deepEqual(restored.eventManagement.demandCategories,all.eventManagement.demandCategories);
+  assert.deepEqual(events.demandCategories(restored),events.demandCategories(all));
+  assert.doesNotThrow(()=>events.validate({stores:{a:{},b:{}},eventManagement:{version:1,presets:[],events:[]}}));
+});
+
+test('よく使う特需商品カテゴリーは名前とIDの重複を許可しない',()=>{
+  const all=data();
+  all.eventManagement={version:1,presets:[],events:[],demandCategories:[{id:'c1',name:'お弁当'}]};
+  assert.doesNotThrow(()=>events.validate(all));
+  all.eventManagement.demandCategories.push({id:'c2',name:'お弁当'});
+  assert.throws(()=>events.validate(all),/重複/);
+  all.eventManagement.demandCategories[1].name='デザート';
+  all.eventManagement.demandCategories[1].id='c1';
+  assert.throws(()=>events.validate(all),/重複/);
+  all.eventManagement.demandCategories[1].id='c2';
+  assert.doesNotThrow(()=>events.validate(all));
+  all.eventManagement.demandCategories[1].name='';
+  assert.throws(()=>events.validate(all),/カテゴリー名/);
+});
+
+test('販売数入力の既存カテゴリーはよく使うカテゴリーに重複追加せずマスターを変更しない',()=>{
+  const all=data();
+  all.salesCountManagement={categories:[{id:'cat1',name:'おにぎり',hidden:false}]};
+  all.eventManagement={version:1,presets:[],events:[]};
+  const before=JSON.stringify(all.salesCountManagement);
+  events.appendDemandFavorites(all,['おにぎり','イベント限定','イベント限定']);
+  assert.deepEqual(events.demandCategories(all).map(item=>item.name),['イベント限定']);
+  assert.equal(JSON.stringify(all.salesCountManagement),before);
+  assert.doesNotThrow(()=>events.validate(all));
+});
