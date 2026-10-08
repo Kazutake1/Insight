@@ -1924,6 +1924,16 @@ test('イベント実績は過去開催→複数日→時間帯グラフ→カ�
   await expect(page.locator('.er-daily-summary')).toHaveCount(0);
   await expect(page.locator('.er-day-tab')).toHaveCount(2);
   await expect(page.locator('.er-day-tab').first()).toHaveClass(/active/);
+  const expectNoSelectedDayOutline=async()=>{
+    const frames=await page.locator('.er-day-tab').evaluateAll(cards=>cards.map(card=>{
+      const style=getComputedStyle(card);
+      return {borderColor:style.borderColor,boxShadow:style.boxShadow};
+    }));
+    expect(frames).toHaveLength(2);
+    expect(frames[0].borderColor).toBe(frames[1].borderColor);
+    expect(frames.every(frame=>frame.boxShadow==='none')).toBe(true);
+  };
+  await expectNoSelectedDayOutline();
   const dayCardStyle=await page.locator('.er-day-tab').first().evaluate(card=>({
     width:getComputedStyle(card).width,
     padding:getComputedStyle(card).padding,
@@ -2039,6 +2049,7 @@ test('イベント実績は過去開催→複数日→時間帯グラフ→カ�
 
   await page.locator('.er-day-tab').nth(1).click();
   await expect(page.locator('.er-day-tab').nth(1)).toHaveClass(/active/);
+  await expectNoSelectedDayOutline();
   await expect(page.locator('.er-hourly-section')).toHaveCount(0);
   await expect(page.locator('.er-sales-section')).toHaveCount(0);
   await expect(periodSection.locator('.er-period-category')).toHaveCount(2);
