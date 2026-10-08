@@ -1886,14 +1886,24 @@ test('イベント実績は過去開催→複数日→時間帯グラフ→カ�
   await expect(periodGrids.first().getByLabel('2026-09-13 1便 販売数')).toHaveValue('');
   expect(await periodSection.locator('input').evaluateAll(inputs=>inputs.every(input=>input.readOnly))).toBe(true);
   const periodOriginalViewport=page.viewportSize();
-  for(const viewport of [{width:1194,height:834},{width:834,height:1194}]){
+  const periodReferenceWidths=[];
+  for(const [viewport,expectedColumns] of [[{width:1194,height:834},7],[{width:834,height:1194},3]]){
     await page.setViewportSize(viewport);
-    const fit=await periodGrids.first().evaluate(grid=>({
-      overflow:grid.scrollWidth-grid.clientWidth,
-      columns:getComputedStyle(grid).gridTemplateColumns.split(' ').filter(Boolean).length
-    }));
+    const fit=await periodGrids.first().evaluate(grid=>{
+      const cols=getComputedStyle(grid).gridTemplateColumns.split(' ').filter(Boolean);
+      const cards=Array.from(grid.querySelectorAll('.sc-day'));
+      return {
+        overflow:grid.scrollWidth-grid.clientWidth,
+        columns:cols.length,
+        cardWidths:cards.map(card=>card.getBoundingClientRect().width),
+        trackWidth:parseFloat(cols[0])
+      };
+    });
     expect(fit.overflow).toBeLessThanOrEqual(1);
-    expect(fit.columns).toBe(2);
+    expect(fit.columns).toBe(expectedColumns);
+    expect(fit.cardWidths).toHaveLength(2);
+    for(const width of fit.cardWidths)expect(width).toBeCloseTo(fit.trackWidth,0);
+    periodReferenceWidths.push(fit.trackWidth);
   }
   await page.setViewportSize(periodOriginalViewport);
   const overviewLayout=await page.locator('.er-overview-grid').evaluate(el=>({
@@ -2059,11 +2069,27 @@ test('イベント実績は過去開催→複数日→時間帯グラフ→カ�
   await expect(page.locator('.er-category-card')).toHaveCount(2);
   await expect(page.locator('.er-category-card .sc-day')).toHaveCount(2);
   await expect(page.locator('.er-category-card').first().getByLabel('2025-09-10 1便 販売数')).toHaveValue('26');
-  const singleCategoryGrid=await page.locator('.er-category-grid').evaluate(grid=>({
-    columns:getComputedStyle(grid).gridTemplateColumns.split(' ').filter(Boolean).length,
-    width:Math.round(grid.getBoundingClientRect().width)
-  }));
-  expect(singleCategoryGrid.columns).toBe(4);
+  for(const [index,viewport] of [{width:1194,height:834},{width:834,height:1194}].entries()){
+    await page.setViewportSize(viewport);
+    const singleCategoryGrid=await page.locator('.er-category-grid').evaluate(grid=>{
+      const cols=getComputedStyle(grid).gridTemplateColumns.split(' ').filter(Boolean);
+      const cards=Array.from(grid.querySelectorAll('.er-category-card'));
+      return {
+        columns:cols.length,
+        overflow:grid.scrollWidth-grid.clientWidth,
+        cardWidths:cards.map(card=>card.getBoundingClientRect().width),
+        trackWidth:parseFloat(cols[0])
+      };
+    });
+    expect(singleCategoryGrid.columns).toBe(index===0?7:3);
+    expect(singleCategoryGrid.overflow).toBeLessThanOrEqual(1);
+    expect(singleCategoryGrid.cardWidths).toHaveLength(2);
+    for(const width of singleCategoryGrid.cardWidths){
+      expect(width).toBeCloseTo(singleCategoryGrid.trackWidth,0);
+      expect(width).toBeCloseTo(periodReferenceWidths[index],0);
+    }
+  }
+  await page.setViewportSize(periodOriginalViewport);
   const singleCategoryFont=await page.locator('.er-category-card > h3').first().evaluate(el=>getComputedStyle(el).fontSize);
   expect(singleCategoryFont).toBe('14px');
   expect(await page.locator('.er-category-card input').evaluateAll(inputs=>inputs.every(input=>input.readOnly))).toBe(true);
@@ -2174,14 +2200,21 @@ test('イベント実績の催事は場所選択なしで過去開催を参照�
   await expect(grids.nth(1).getByLabel('2026-12-24 1便 販売数')).toHaveValue('');
   const readonly=await period.locator('input').evaluateAll(inputs=>inputs.every(input=>input.readOnly));
   expect(readonly).toBe(true);
-  for(const viewport of [{width:1194,height:834},{width:834,height:1194}]){
+  for(const [viewport,expectedColumns] of [[{width:1194,height:834},7],[{width:834,height:1194},3]]){
     await page.setViewportSize(viewport);
-    const fit=await grids.first().evaluate(grid=>({
-      overflow:grid.scrollWidth-grid.clientWidth,
-      columns:getComputedStyle(grid).gridTemplateColumns.split(' ').filter(Boolean).length
-    }));
+    const fit=await grids.first().evaluate(grid=>{
+      const columns=getComputedStyle(grid).gridTemplateColumns.split(' ').filter(Boolean);
+      return {
+        overflow:grid.scrollWidth-grid.clientWidth,
+        columns:columns.length,
+        cardWidths:Array.from(grid.querySelectorAll('.sc-day')).map(card=>card.getBoundingClientRect().width),
+        trackWidth:parseFloat(columns[0])
+      };
+    });
     expect(fit.overflow).toBeLessThanOrEqual(1);
-    expect(fit.columns).toBe(2);
+    expect(fit.columns).toBe(expectedColumns);
+    expect(fit.cardWidths).toHaveLength(2);
+    for(const width of fit.cardWidths)expect(width).toBeCloseTo(fit.trackWidth,0);
   }
   await page.locator('.er-day-tab').nth(1).click();
   await expect(page.locator('.er-day-tab').nth(1)).toHaveClass(/active/);
@@ -2249,14 +2282,18 @@ test('催事8日間は同じ便別カードを7日ごとに折り返し、1日�
   await expect(page.locator('.er-day-tab').nth(7)).toHaveClass(/active/);
   await expect(page.locator('.er-sales-section')).toHaveCount(0);
   await expect(grid.locator('.sc-day')).toHaveCount(8);
+  const longPeriodCardWidths=[];
   for(const [viewport,columns] of [[{width:1194,height:834},7],[{width:834,height:1194},3]]){
     await page.setViewportSize(viewport);
     const layout=await grid.evaluate(el=>{
       const cards=Array.from(el.querySelectorAll('.sc-day'));
       const rects=cards.map(card=>card.getBoundingClientRect());
+      const tracks=getComputedStyle(el).gridTemplateColumns.split(' ').filter(Boolean);
       return {
-        columns:getComputedStyle(el).gridTemplateColumns.split(' ').filter(Boolean).length,
+        columns:tracks.length,
         overflow:el.scrollWidth-el.clientWidth,
+        widths:rects.map(rect=>rect.width),
+        trackWidth:parseFloat(tracks[0]),
         firstTop:rects[0].top,
         beforeWrapTop:rects[window.innerWidth>1000?6:2].top,
         wrappedTop:rects[window.innerWidth>1000?7:3].top
@@ -2264,8 +2301,10 @@ test('催事8日間は同じ便別カードを7日ごとに折り返し、1日�
     });
     expect(layout.columns).toBe(columns);
     expect(layout.overflow).toBeLessThanOrEqual(1);
+    for(const width of layout.widths)expect(width).toBeCloseTo(layout.trackWidth,0);
     expect(Math.abs(layout.beforeWrapTop-layout.firstTop)).toBeLessThan(2);
     expect(layout.wrappedTop).toBeGreaterThan(layout.firstTop+10);
+    longPeriodCardWidths.push(layout.trackWidth);
   }
   await page.locator('.er-back').click();
   await page.locator('#erEvent').selectOption({label:'E2E一日催事'});
@@ -2290,6 +2329,20 @@ test('催事8日間は同じ便別カードを7日ごとに折り返し、1日�
   expect(singleOrder.category).toBeGreaterThan(0);
   expect(singleOrder.category).toBeLessThan(singleOrder.hourly);
   await expect(page.locator('.er-category-card')).toHaveCount(1);
+  for(const [index,viewport] of [{width:1194,height:834},{width:834,height:1194}].entries()){
+    await page.setViewportSize(viewport);
+    const actual=await page.locator('.er-category-grid').evaluate(el=>{
+      const tracks=getComputedStyle(el).gridTemplateColumns.split(' ').filter(Boolean);
+      return {
+        columns:tracks.length,
+        overflow:el.scrollWidth-el.clientWidth,
+        cardWidth:el.querySelector('.er-category-card').getBoundingClientRect().width
+      };
+    });
+    expect(actual.columns).toBe(index===0?7:3);
+    expect(actual.overflow).toBeLessThanOrEqual(1);
+    expect(actual.cardWidth).toBeCloseTo(longPeriodCardWidths[index],0);
+  }
   await expect(page.locator('.er-category-card').getByLabel('2026-11-10 1便 販売数')).toHaveValue('0');
   await expect(page.locator('.er-category-card').getByLabel('2026-11-10 2便 販売数')).toHaveValue('3');
   await expect(page.locator('.er-category-card').getByLabel('2026-11-10 3便 販売数')).toHaveValue('');
