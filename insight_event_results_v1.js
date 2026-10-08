@@ -358,7 +358,6 @@
         var group=el('div',undefined,'er-period-category');
         group.append(el('h3',category.name));
         var grid=el('div',undefined,'er-period-day-grid');
-        grid.dataset.cols=String(Math.min(7,occurrence.days.length));
         occurrence.days.forEach(function(day){
           var saved=records[day.date]&&records[day.date][category.id];
           var card=root.InsightSalesCount.createReadOnlyDayCard(day.date,saved,category);
