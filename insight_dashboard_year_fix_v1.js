@@ -89,7 +89,7 @@
   }
   function ensureButton(){
     removeLegacyYearDeleteUi();
-    var addButton=Array.prototype.find.call(document.querySelectorAll('button'),function(button){
+    var addButton=document.getElementById('addYearBtn')||Array.prototype.find.call(document.querySelectorAll('button'),function(button){
       return /年度追加/.test(button.textContent||'')&&!button.closest('#insightYearDeleteOverlay');
     });
     if(!addButton)return;
