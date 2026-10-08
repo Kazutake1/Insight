@@ -111,6 +111,17 @@
           var key=p.snapshot.title.trim()+'|'+p.snapshot.location.trim();requireValue(!nearbyKeys.has(key),'同じイベント名・場所が重複しています。');nearbyKeys.add(key);
         });
       }
+      if(m.demandCategories!==undefined){
+        requireValue(Array.isArray(m.demandCategories),'よく使う特需商品カテゴリーの形式が不正です。');
+        var demandCategoryIds=new Set(),demandCategoryNames=new Set();
+        m.demandCategories.forEach(function(category){
+          requireValue(object(category),'よく使う特需商品カテゴリーが不正です。');
+          str(category.id,'特需商品カテゴリー識別番号');str(category.name,'特需商品カテゴリー名');
+          var name=category.name.trim();
+          requireValue(!demandCategoryIds.has(category.id)&&!demandCategoryNames.has(name),'よく使う特需商品カテゴリーが重複しています。');
+          demandCategoryIds.add(category.id);demandCategoryNames.add(name);
+        });
+      }
       events(m.events,'global');
     }
     Object.keys(all.stores||{}).forEach(function(id){var st=all.stores[id];if(st.events!==undefined)events(st.events,'store');});
@@ -172,6 +183,18 @@
   function mutableSpecialPresets(all){var m=management(all);return m.specialPresets||(m.specialPresets=[]);}
   function nearbyPresets(all){var m=all&&all.eventManagement;return m&&Array.isArray(m.nearbyPresets)?m.nearbyPresets:[];}
   function mutableNearbyPresets(all){var m=management(all);return m.nearbyPresets||(m.nearbyPresets=[]);}
+  function demandCategories(all){var m=all&&all.eventManagement;return m&&Array.isArray(m.demandCategories)?m.demandCategories:[];}
+  function mutableDemandCategories(all){var m=management(all);return m.demandCategories||(m.demandCategories=[]);}
+  function demandCategoryId(){return 'dcat_'+(root.crypto&&root.crypto.randomUUID?root.crypto.randomUUID():Date.now().toString(36)+'_'+Math.random().toString(36).slice(2));}
+  function appendDemandFavorites(all,names){
+    var stored=mutableDemandCategories(all),shared=all.salesCountManagement&&Array.isArray(all.salesCountManagement.categories)?all.salesCountManagement.categories:[];
+    (Array.isArray(names)?names:[]).forEach(function(raw){
+      var name=String(raw||'').trim();if(!name)return;str(name,'特需商品カテゴリー名');
+      if(stored.some(function(c){return c.name.trim()===name;})||shared.some(function(c){return c.name===name;}))return;
+      stored.push({id:demandCategoryId(),name:name});
+    });
+    return stored;
+  }
   function demandTemplate(items){return (Array.isArray(items)?items:[]).map(function(item){var template={id:item.id,name:item.name};if(item.category!==undefined)template.category=item.category;if(item.categoryId!==undefined)template.categoryId=item.categoryId;return template;});}
   function demandItems(snapshot){return copy(Array.isArray(snapshot&&snapshot.specialDemand)?snapshot.specialDemand:[]);}
   function syncDemandPreset(all,event){
@@ -203,7 +226,7 @@
     else{requireValue(!!all.stores[storeId],'対象店舗がありません。');(all.stores[storeId].events||(all.stores[storeId].events=[])).push(e);}
     validate(all);return e.id;
   }
-  var model={validate:validate,validateSnapshot:validateSnapshot,summary:summary,targetForCategory:targetForCategory,segmentsForCategory:segmentsForCategory,segmentSummary:segmentSummary,list:list,presets:presets,specialPresets:specialPresets,nearbyPresets:nearbyPresets,demandItems:demandItems,demandTemplate:demandTemplate,syncDemandPreset:syncDemandPreset,findDuplicateSpecial:findDuplicateSpecial,add:add,copy:copy};
+  var model={validate:validate,validateSnapshot:validateSnapshot,summary:summary,targetForCategory:targetForCategory,segmentsForCategory:segmentsForCategory,segmentSummary:segmentSummary,list:list,presets:presets,specialPresets:specialPresets,nearbyPresets:nearbyPresets,demandCategories:demandCategories,appendDemandFavorites:appendDemandFavorites,demandItems:demandItems,demandTemplate:demandTemplate,syncDemandPreset:syncDemandPreset,findDuplicateSpecial:findDuplicateSpecial,add:add,copy:copy};
   if(typeof module!=='undefined'&&module.exports)module.exports=model;
   if(!root.document)return;
   root.InsightEvents=model;
