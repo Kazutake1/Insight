@@ -2470,7 +2470,7 @@ test('よく使うイベントの特需商品は自由名で登録・編集で�
   await expect(eventDialog.getByLabel('イベント場所').nth(1)).toHaveValue('E2E駅前広場');
   const nearbySaved=await page.evaluate(()=>allStores.stores[allStores.current].events.filter(event=>event.type==='nearby'&&event.snapshot.title==='E2E夏祭り'));
   expect(nearbySaved).toHaveLength(1);
-  expect(nearbySaved[0].snapshot.location).toBe('E2E文化フォーラム\\nE2E駅前広場');
+  expect(nearbySaved[0].snapshot.location).toBe('E2E文化フォーラム\nE2E駅前広場');
   expect(nearbySaved[0].snapshot.specialDemand[0].categoryId).toBe(sharedCategory.id);
   expect(nearbySaved[0].snapshot.specialDemand[1].category).toBe('祭り限定');
   const synced=await page.evaluate(()=>allStores.eventManagement.nearbyPresets.find(p=>p.snapshot.title==='E2E夏祭り').snapshot.specialDemand);
