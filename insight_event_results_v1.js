@@ -335,6 +335,39 @@
       });
       section.append(grid);return section;
     }
+    function specialPeriodCategoriesSection(occurrence){
+      if(occurrence.days.length<=1)return null;
+      root.InsightSalesCount.ensure(allStores);
+      var store=allStores.stores[currentStoreId()],records=store&&store.salesCounts||{};
+      var categories=(allStores.salesCountManagement&&allStores.salesCountManagement.categories||[]).filter(function(category){
+        if(category.hidden)return false;
+        return occurrence.days.some(function(day){
+          var saved=records[day.date]&&records[day.date][category.id];
+          if(!saved)return false;
+          return root.InsightSalesCount.normalizeRecord(saved).trips.some(function(trip){
+            return trip.delivery!==null||trip.sales!==null;
+          });
+        });
+      });
+      if(!categories.length)return null;
+      var section=el('section',undefined,'er-section er-period-section');
+      section.append(el('h2','開催期間のカテゴリー実績'));
+      var list=el('div',undefined,'er-period-categories');
+      categories.forEach(function(category){
+        var group=el('div',undefined,'er-period-category');
+        group.append(el('h3',category.name));
+        var grid=el('div',undefined,'er-period-day-grid');
+        grid.dataset.cols=String(Math.min(7,occurrence.days.length));
+        occurrence.days.forEach(function(day){
+          var saved=records[day.date]&&records[day.date][category.id];
+          var card=root.InsightSalesCount.createReadOnlyDayCard(day.date,saved,category);
+          grid.append(card);
+        });
+        group.append(grid);list.append(group);
+      });
+      section.append(list);
+      return section;
+    }
     function specialDemandSection(data,occurrence){
       var comparisons=demandComparison(data.occurrences,occurrence);if(!comparisons.length)return null;
       var section=el('section',undefined,'er-section er-demand-section');section.append(el('h2','特需商品'));
@@ -379,6 +412,10 @@
       );
       head.append(cards);results.append(head);
 
+      if(data.kind==='special'&&occurrence.days.length>1){
+        var periodCategories=specialPeriodCategoriesSection(occurrence);
+        if(periodCategories)results.append(periodCategories);
+      }
       var tabs=renderDayTabs(occurrence);if(tabs)results.append(tabs);
       if(!state.selectedDate&&occurrence.days.length)state.selectedDate=occurrence.days[0].date;
       var selected=occurrence.days.find(function(day){return day.date===state.selectedDate;})||occurrence.days[0];

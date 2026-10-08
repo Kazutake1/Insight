@@ -2005,6 +2005,28 @@ test('イベント実績の催事は場所選択なしで過去開催を参照�
       const items=rows.reduce((sum,row)=>sum+row.items,0);
       return {metrics:{salesYen:sales,customers,customerUnitPrice:sales/customers,items,inputDays:rows.length}};
     };
+    window.InsightSalesCount.ensure(allStores);
+    const categories=allStores.salesCountManagement.categories.filter(category=>!category.hidden).slice(0,2);
+    store.salesCounts=store.salesCounts||{};
+    store.salesCounts['2026-12-24']={
+      [categories[0].id]:{trips:[
+        {delivery:12,sales:10},
+        {delivery:4,sales:0},
+        {delivery:null,sales:null}
+      ]}
+    };
+    store.salesCounts['2026-12-25']={
+      [categories[0].id]:{trips:[
+        {delivery:9,sales:7},
+        {delivery:null,sales:null},
+        {delivery:1,sales:1}
+      ]},
+      [categories[1].id]:{trips:[
+        {delivery:20,sales:18},
+        {delivery:null,sales:null},
+        {delivery:null,sales:null}
+      ]}
+    };
     window.InsightEventResults.render();
   });
 
@@ -2033,9 +2055,87 @@ test('イベント実績の催事は場所選択なしで過去開催を参照�
   await page.locator('.er-occurrence').first().click();
   await expect(page.locator('.er-detail-title h2')).toHaveText('E2Eクリスマス');
   await expect(page.locator('.er-day-tab')).toHaveCount(2);
+  const period=page.locator('.er-period-section');
+  await expect(period.locator('h2')).toHaveText('開催期間のカテゴリー実績');
+  await expect(period.locator('.er-period-category')).toHaveCount(2);
+  const grids=period.locator('.er-period-day-grid');
+  await expect(grids).toHaveCount(2);
+  await expect(grids.first().locator('.sc-day')).toHaveCount(2);
+  await expect(grids.first().locator('.sc-day-num')).toHaveText(['12/24（木）','12/25（金）']);
+  await expect(grids.first().getByLabel('2026-12-24 2便 販売数')).toHaveValue('0');
+  await expect(grids.first().getByLabel('2026-12-25 2便 販売数')).toHaveValue('');
+  await expect(grids.nth(1).getByLabel('2026-12-24 1便 販売数')).toHaveValue('');
+  const readonly=await period.locator('input').evaluateAll(inputs=>inputs.every(input=>input.readOnly));
+  expect(readonly).toBe(true);
+  for(const viewport of [{width:1194,height:834},{width:834,height:1194}]){
+    await page.setViewportSize(viewport);
+    const fit=await grids.first().evaluate(grid=>({
+      overflow:grid.scrollWidth-grid.clientWidth,
+      columns:getComputedStyle(grid).gridTemplateColumns.split(' ').filter(Boolean).length
+    }));
+    expect(fit.overflow).toBeLessThanOrEqual(1);
+    expect(fit.columns).toBe(2);
+  }
+  await page.locator('.er-day-tab').nth(1).click();
+  await expect(period.locator('.er-period-category')).toHaveCount(2);
+  await expect(grids.first().locator('.sc-day')).toHaveCount(2);
   await page.locator('.er-back').click();
   await page.locator('.er-kind-btn[data-kind="nearby"]').click();
   await expect(page.locator('#erLocationField')).toBeVisible();
+  expect(errors).toEqual([]);
+});
+
+test('催事8日間は同じ便別カードを7日ごとに折り返し、1日開催には期間一覧を表示しない',async({page})=>{
+  const errors=await openInsight(page);
+  await page.evaluate(()=>{
+    const store=allStores.stores[allStores.current];
+    store.events=(store.events||[]).filter(event=>!String(event.id||'').startsWith('e2e_period_'));
+    store.events.push(
+      {id:'e2e_period_long',type:'special',scope:'store',startDate:'2026-11-01',endDate:'2026-11-08',snapshot:{version:1,title:'E2E八日間催事'}},
+      {id:'e2e_period_single',type:'special',scope:'store',startDate:'2026-11-10',endDate:'2026-11-10',snapshot:{version:1,title:'E2E一日催事'}}
+    );
+    window.InsightSalesCount.ensure(allStores);
+    const category=allStores.salesCountManagement.categories.find(item=>!item.hidden);
+    store.salesCounts=store.salesCounts||{};
+    store.salesCounts['2026-11-01']={
+      [category.id]:{trips:[{delivery:15,sales:12},{delivery:null,sales:null},{delivery:null,sales:null}]}
+    };
+    store.salesCounts['2026-11-08']={
+      [category.id]:{trips:[{delivery:10,sales:9},{delivery:null,sales:null},{delivery:null,sales:null}]}
+    };
+    window.InsightEventResults.render();
+  });
+  await page.locator('#navEventResults').click();
+  await page.locator('.er-kind-btn[data-kind="special"]').click();
+  await page.locator('#erEvent').selectOption({label:'E2E八日間催事'});
+  await page.locator('.er-occurrence').first().click();
+  const grid=page.locator('.er-period-day-grid').first();
+  await expect(page.locator('.er-period-category')).toHaveCount(1);
+  await expect(grid.locator('.sc-day')).toHaveCount(8);
+  await expect(grid.getByLabel('2026-11-03 1便 販売数')).toHaveValue('');
+  await expect(grid.getByLabel('2026-11-08 1便 販売数')).toHaveValue('9');
+  for(const [viewport,columns] of [[{width:1194,height:834},7],[{width:834,height:1194},3]]){
+    await page.setViewportSize(viewport);
+    const layout=await grid.evaluate(el=>{
+      const cards=Array.from(el.querySelectorAll('.sc-day'));
+      const rects=cards.map(card=>card.getBoundingClientRect());
+      return {
+        columns:getComputedStyle(el).gridTemplateColumns.split(' ').filter(Boolean).length,
+        overflow:el.scrollWidth-el.clientWidth,
+        firstTop:rects[0].top,
+        beforeWrapTop:rects[window.innerWidth>1000?6:2].top,
+        wrappedTop:rects[window.innerWidth>1000?7:3].top
+      };
+    });
+    expect(layout.columns).toBe(columns);
+    expect(layout.overflow).toBeLessThanOrEqual(1);
+    expect(Math.abs(layout.beforeWrapTop-layout.firstTop)).toBeLessThan(2);
+    expect(layout.wrappedTop).toBeGreaterThan(layout.firstTop+10);
+  }
+  await page.locator('.er-back').click();
+  await page.locator('#erEvent').selectOption({label:'E2E一日催事'});
+  await page.locator('.er-occurrence').first().click();
+  await expect(page.locator('.er-period-section')).toHaveCount(0);
   expect(errors).toEqual([]);
 });
 
