@@ -2197,6 +2197,9 @@ test('催事8日間は同じ便別カードを7日ごとに折り返し、1日�
     store.salesCounts['2026-11-08']={
       [category.id]:{trips:[{delivery:10,sales:9},{delivery:null,sales:null},{delivery:null,sales:null}]}
     };
+    store.salesCounts['2026-11-10']={
+      [category.id]:{trips:[{delivery:6,sales:0},{delivery:4,sales:3},{delivery:null,sales:null}]}
+    };
     window.InsightEventResults.render();
   });
   await page.locator('#navEventResults').click();
@@ -2207,11 +2210,25 @@ test('催事8日間は同じ便別カードを7日ごとに折り返し、1日�
   await expect(overview.locator('.er-overview-value')).toHaveCount(4);
   await expect(overview).toContainText('期間合計');
   await expect(overview).toContainText('1日平均');
+  await expect(page.locator('.er-sales-section')).toHaveCount(0);
+  const sectionOrder=await page.locator('#erResults').evaluate(container=>{
+    const children=Array.from(container.children);
+    return {
+      tabs:children.findIndex(child=>child.classList.contains('er-day-tabs')),
+      period:children.findIndex(child=>child.classList.contains('er-period-section'))
+    };
+  });
+  expect(sectionOrder.tabs).toBeGreaterThan(0);
+  expect(sectionOrder.tabs).toBeLessThan(sectionOrder.period);
   const grid=page.locator('.er-period-day-grid').first();
   await expect(page.locator('.er-period-category')).toHaveCount(1);
   await expect(grid.locator('.sc-day')).toHaveCount(8);
   await expect(grid.getByLabel('2026-11-03 1便 販売数')).toHaveValue('');
   await expect(grid.getByLabel('2026-11-08 1便 販売数')).toHaveValue('9');
+  await page.locator('.er-day-tab').nth(7).click();
+  await expect(page.locator('.er-day-tab').nth(7)).toHaveClass(/active/);
+  await expect(page.locator('.er-sales-section')).toHaveCount(0);
+  await expect(grid.locator('.sc-day')).toHaveCount(8);
   for(const [viewport,columns] of [[{width:1194,height:834},7],[{width:834,height:1194},3]]){
     await page.setViewportSize(viewport);
     const layout=await grid.evaluate(el=>{
@@ -2240,6 +2257,13 @@ test('催事8日間は同じ便別カードを7日ごとに折り返し、1日�
   await expect(overview).not.toContainText('1日平均');
   await expect(page.locator('.er-overview-values.is-single-day')).toHaveCount(2);
   await expect(page.locator('.er-period-section')).toHaveCount(0);
+  await expect(page.locator('.er-day-tabs')).toHaveCount(0);
+  await expect(page.locator('.er-sales-section > h2')).toHaveText('カテゴリー実績');
+  await expect(page.locator('.er-category-card')).toHaveCount(1);
+  await expect(page.locator('.er-category-card').getByLabel('2026-11-10 1便 販売数')).toHaveValue('0');
+  await expect(page.locator('.er-category-card').getByLabel('2026-11-10 2便 販売数')).toHaveValue('3');
+  await expect(page.locator('.er-category-card').getByLabel('2026-11-10 3便 販売数')).toHaveValue('');
+  expect(await page.locator('.er-category-card input').evaluateAll(inputs=>inputs.every(input=>input.readOnly))).toBe(true);
   expect(errors).toEqual([]);
 });
 
