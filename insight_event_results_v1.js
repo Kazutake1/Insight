@@ -417,13 +417,12 @@
       var selected=occurrence.days.find(function(day){return day.date===state.selectedDate;})||occurrence.days[0];
       if(!selected)return;
 
-      if(occurrence.days.length>1){
-        var periodCategories=periodCategoriesSection(occurrence);
-        if(periodCategories)results.append(periodCategories);
-      }
       var hourly=hourlySection(selected.date);if(hourly)results.append(hourly);
       if(occurrence.days.length===1){
         var sales=salesCategoriesSection(selected.date);if(sales)results.append(sales);
+      }else{
+        var periodCategories=periodCategoriesSection(occurrence);
+        if(periodCategories)results.append(periodCategories);
       }
       var demand=specialDemandSection(data,occurrence);if(demand)results.append(demand);
     }
