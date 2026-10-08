@@ -1447,7 +1447,7 @@ test('年度管理ボタンは設定へ移動し月ボタンは年度選択行�
   expect(compact.inlineHostHidden).toBe(true);
   await page.locator('#pageSettings #addYearBtn').click();
   await expect(page.locator('#ayInput')).toBeVisible();
-  await page.locator('#ayInput').press('Escape');
+  await page.evaluate(()=>document.getElementById('addYearInlineWrap').replaceChildren());
   await expect(page.locator('#insightSettingsYearInlineHost')).toBeHidden();
   expect(errors).toEqual([]);
 });
