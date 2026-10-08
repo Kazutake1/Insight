@@ -76,7 +76,10 @@
     return (Array.isArray(items)?items:[]).map(function(item){
       var prepared=item&&item.prepared!==undefined&&item.prepared!==null?finite(item.prepared):null;
       var sold=item&&item.sold!==undefined&&item.sold!==null?finite(item.sold):null;
-      return {id:text(item&&item.id),name:text(item&&item.name),prepared:prepared,sold:sold,sellThrough:prepared!==null&&prepared>0&&sold!==null?sold/prepared*100:null};
+      var normalized={id:text(item&&item.id),name:text(item&&item.name),prepared:prepared,sold:sold,sellThrough:prepared!==null&&prepared>0&&sold!==null?sold/prepared*100:null};
+      if(item&&typeof item.category==='string'&&item.category.trim())normalized.category=item.category.trim();
+      if(item&&typeof item.categoryId==='string'&&item.categoryId)normalized.categoryId=item.categoryId;
+      return normalized;
     }).filter(function(item){return item.id&&item.name;});
   }
   function demandComparison(occurrences,occurrence){
@@ -371,19 +374,29 @@
     function specialDemandSection(data,occurrence){
       var comparisons=demandComparison(data.occurrences,occurrence);if(!comparisons.length)return null;
       var section=el('section',undefined,'er-section er-demand-section');section.append(el('h2','特需商品'));
-      var grid=el('div',undefined,'er-demand-grid');
+      var groups=new Map();
       comparisons.forEach(function(entry){
-        var item=entry.current,card=el('article',undefined,'er-demand-card');card.append(el('h3',item.name));
-        var metrics=el('div',undefined,'er-demand-metrics');
-        metrics.append(summaryMetric('用意数',item.prepared===null?'—':numberText(item.prepared,0)),summaryMetric('販売数',item.sold===null?'—':numberText(item.sold,0)),summaryMetric('消化率',item.sellThrough===null?'—':numberText(item.sellThrough,1)+'%'));
-        card.append(metrics);
-        if(entry.previous){
-          var old=entry.previous,previous='前回：用意 '+(old.prepared===null?'—':numberText(old.prepared,0))+'　販売 '+(old.sold===null?'—':numberText(old.sold,0))+'　消化率 '+(old.sellThrough===null?'—':numberText(old.sellThrough,1)+'%');
-          card.append(el('p',previous,'er-demand-previous'));
-        }
-        grid.append(card);
+        var label=entry.current.category||'未分類';
+        if(!groups.has(label))groups.set(label,[]);
+        groups.get(label).push(entry);
       });
-      section.append(grid);return section;
+      groups.forEach(function(entries,category){
+        var group=el('div',undefined,'er-demand-category');group.append(el('h3',category));
+        var grid=el('div',undefined,'er-demand-grid');
+        entries.forEach(function(entry){
+          var item=entry.current,card=el('article',undefined,'er-demand-card');card.append(el('h3',item.name));
+          var metrics=el('div',undefined,'er-demand-metrics');
+          metrics.append(summaryMetric('用意数',item.prepared===null?'—':numberText(item.prepared,0)),summaryMetric('販売数',item.sold===null?'—':numberText(item.sold,0)),summaryMetric('消化率',item.sellThrough===null?'—':numberText(item.sellThrough,1)+'%'));
+          card.append(metrics);
+          if(entry.previous){
+            var old=entry.previous,previous='前回：用意 '+(old.prepared===null?'—':numberText(old.prepared,0))+'　販売 '+(old.sold===null?'—':numberText(old.sold,0))+'　消化率 '+(old.sellThrough===null?'—':numberText(old.sellThrough,1)+'%');
+            card.append(el('p',previous,'er-demand-previous'));
+          }
+          grid.append(card);
+        });
+        group.append(grid);section.append(group);
+      });
+      return section;
     }
     function renderDayTabs(occurrence){
       if(occurrence.days.length<=1)return null;
