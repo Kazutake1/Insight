@@ -1045,7 +1045,10 @@ body.ai-analysis-open #main{margin-right:0!important}
 .ie-note-prewrap{white-space:pre-wrap}
 
 /* Hourly customer chart: restore original narrow, rounded bars using CSP-safe classes. */
-.er-hour-bar{width:64%;max-width:28px;height:var(--er-bar-height,2px);min-height:2px;border-radius:5px 5px 2px 2px;background:#3b82f6;color:#3b82f6;pointer-events:none}
+.er-hour-bar{appearance:none;-webkit-appearance:none;width:64%;max-width:28px;height:var(--er-bar-height,2px);min-height:2px;padding:0;border:0;border-radius:5px 5px 2px 2px;background:#3b82f6;color:#3b82f6;overflow:hidden;pointer-events:none}
+.er-hour-bar::-webkit-progress-bar{background:#3b82f6;border-radius:5px 5px 2px 2px}
+.er-hour-bar::-webkit-progress-value{background:currentColor;border-radius:5px 5px 2px 2px}
+.er-hour-bar::-moz-progress-bar{background:currentColor;border-radius:5px 5px 2px 2px}
 .er-hour-height-2{--er-bar-height:2px}
 .er-hour-height-3{--er-bar-height:3px}
 .er-hour-height-4{--er-bar-height:4px}
