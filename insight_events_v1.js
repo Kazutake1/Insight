@@ -392,7 +392,7 @@
           sold=field(rowEl,'販売数','number',seed.sold==null?'':seed.sold);sold.min='0';sold.step='1';
         }
         var remove=button('削除',function(){var at=rows.findIndex(function(row){return row.el===rowEl;});if(at>=0)rows.splice(at,1);rowEl.remove();});remove.className='ie-demand-remove';rowEl.append(remove);listBox.append(rowEl);
-        rows.push({id:seed.id||demandId(),el:rowEl,categorySelect:categorySelect,customCategory:customCategory,saveFavorite:saveFavorite,refreshCategoryOptions:refreshCategoryOptions,name:name,prepared:prepared,sold:sold});
+        rows.push({id:seed.id||demandId(),el:rowEl,categorySelect:categorySelect,customCategory:customCategory,saveFavorite:saveFavorite,master:master,refreshCategoryOptions:refreshCategoryOptions,name:name,prepared:prepared,sold:sold});
       }
       (Array.isArray(snapshot&&snapshot.specialDemand)?snapshot.specialDemand:[]).forEach(function(item){addRow(item);});
       return function(){
@@ -406,7 +406,7 @@
             var favoriteId=categoryChoice.slice(9),favorite=demandCategories(allStores).find(function(c){return c.id===favoriteId;});
             requireValue(!!favorite,'選択したカテゴリーが見つかりません。');item.category=favorite.name;
           }else if(categoryChoice.indexOf('master:')===0){
-            var masterId=categoryChoice.slice(7),selected=master.find(function(c){return c.id===masterId;});
+            var masterId=categoryChoice.slice(7),selected=row.master.find(function(c){return c.id===masterId;});
             requireValue(!!selected,'選択したカテゴリーが見つかりません。');item.category=selected.name;item.categoryId=selected.id;
           }
           if(!templateOnly){
