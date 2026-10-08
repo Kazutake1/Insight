@@ -217,3 +217,42 @@ test('複数場所は既存の文字列形式で保存しバックアップ往�
   assert.equal(restored.stores.a.events.length,1);
   assert.equal(restored.stores.a.events[0].snapshot.location,'中央公園\n駅前広場');
 });
+
+
+test('特需商品カテゴリーは任意指定・既存カテゴリー連携・独自名に対応し従来データを維持する',()=>{
+  const original={version:1,title:'秋祭り',note:'',specialDemand:[
+    {id:'d1',name:'おにぎりセット',category:'おにぎり',categoryId:'cat_onigiri',prepared:100,sold:85},
+    {id:'d2',name:'限定セット',category:'特設コーナー',prepared:40,sold:32},
+    {id:'d3',name:'旧商品',prepared:10,sold:5}
+  ]};
+  assert.doesNotThrow(()=>events.validateSnapshot(original));
+  assert.deepEqual(events.demandTemplate(original.specialDemand),[
+    {id:'d1',name:'おにぎりセット',category:'おにぎり',categoryId:'cat_onigiri'},
+    {id:'d2',name:'限定セット',category:'特設コーナー'},
+    {id:'d3',name:'旧商品'}
+  ]);
+  const a=data();
+  events.add(a,'a',{type:'special',scope:'store',startDate:'2026-10-08',endDate:'2026-10-08',snapshot:original});
+  events.validate(JSON.parse(JSON.stringify(a)));
+  assert.deepEqual(events.demandItems(a.stores.a.events[0].snapshot),original.specialDemand);
+  const missing=events.copy(original);missing.specialDemand[0].categoryId='cat_orphan';delete missing.specialDemand[0].category;
+  assert.throws(()=>events.validateSnapshot(missing),/カテゴリー/);
+  const blank=events.copy(original);blank.specialDemand[1].category='   ';
+  assert.doesNotThrow(()=>events.validateSnapshot(blank));
+});
+test('よく使う催事への同期ではカテゴリーを保持し用意数と販売数を引き継がない',()=>{
+  const a=data();
+  a.eventManagement={version:1,presets:[],events:[],specialPresets:[
+    {id:'sp_demand',snapshot:{version:1,title:'催事',note:'',specialDemand:[]}}
+  ]};
+  const event={presetId:'sp_demand',type:'special',snapshot:{specialDemand:[
+    {id:'d1',name:'特別弁当',categoryId:'cat_bento',category:'お弁当',prepared:100,sold:80},
+    {id:'d2',name:'記念品',category:'催事グッズ',prepared:50,sold:40}
+  ]}};
+  events.syncDemandPreset(a,event);
+  assert.deepEqual(a.eventManagement.specialPresets[0].snapshot.specialDemand,[
+    {id:'d1',name:'特別弁当',category:'お弁当',categoryId:'cat_bento'},
+    {id:'d2',name:'記念品',category:'催事グッズ'}
+  ]);
+  assert.doesNotThrow(()=>events.validate(a));
+});
