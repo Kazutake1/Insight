@@ -404,7 +404,7 @@
       var head=el('section',undefined,'er-section er-detail-head'),heading=el('div',undefined,'er-detail-title');
       heading.append(el('h2',data.title),el('p',periodLabel(occurrence)+(occurrence.days.length>1?'　'+occurrence.days.length+'日間':'　1日開催')));
       head.append(heading);
-      var singleDay=data.kind==='nearby'&&occurrence.startDate===occurrence.endDate;
+      var singleDay=occurrence.startDate===occurrence.endDate;
       var cards=el('div',undefined,'er-overview-grid');
       cards.append(
         overviewMetricGroup('売上',salesYen(occurrence.metrics.salesYen),salesYen(dailyAverage(occurrence,'salesYen')),singleDay),
