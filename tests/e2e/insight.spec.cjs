@@ -2137,7 +2137,17 @@ test('イベント実績の催事は場所選択なしで過去開催を参照�
   await page.locator('.er-occurrence').first().click();
   await expect(page.locator('.er-detail-title h2')).toHaveText('E2Eクリスマス');
   await expect(page.locator('.er-day-tab')).toHaveCount(2);
+  await expect(page.locator('.er-sales-section')).toHaveCount(0);
   const period=page.locator('.er-period-section');
+  const orderedSections=await page.locator('#erResults').evaluate(container=>{
+    const children=Array.from(container.children);
+    return {
+      tabs:children.findIndex(child=>child.classList.contains('er-day-tabs')),
+      period:children.findIndex(child=>child.classList.contains('er-period-section'))
+    };
+  });
+  expect(orderedSections.tabs).toBeGreaterThan(0);
+  expect(orderedSections.tabs).toBeLessThan(orderedSections.period);
   await expect(period.locator('h2')).toHaveText('開催期間のカテゴリー実績');
   await expect(period.locator('.er-period-category')).toHaveCount(2);
   const grids=period.locator('.er-period-day-grid');
@@ -2159,6 +2169,8 @@ test('イベント実績の催事は場所選択なしで過去開催を参照�
     expect(fit.columns).toBe(2);
   }
   await page.locator('.er-day-tab').nth(1).click();
+  await expect(page.locator('.er-day-tab').nth(1)).toHaveClass(/active/);
+  await expect(page.locator('.er-sales-section')).toHaveCount(0);
   await expect(period.locator('.er-period-category')).toHaveCount(2);
   await expect(grids.first().locator('.sc-day')).toHaveCount(2);
   await page.locator('.er-back').click();
