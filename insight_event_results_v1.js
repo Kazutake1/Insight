@@ -413,17 +413,19 @@
       );
       head.append(cards);results.append(head);
 
+      if(!state.selectedDate&&occurrence.days.length)state.selectedDate=occurrence.days[0].date;
+      var tabs=renderDayTabs(occurrence);if(tabs)results.append(tabs);
       if(occurrence.days.length>1){
         var periodCategories=periodCategoriesSection(occurrence);
         if(periodCategories)results.append(periodCategories);
       }
-      var tabs=renderDayTabs(occurrence);if(tabs)results.append(tabs);
-      if(!state.selectedDate&&occurrence.days.length)state.selectedDate=occurrence.days[0].date;
       var selected=occurrence.days.find(function(day){return day.date===state.selectedDate;})||occurrence.days[0];
       if(!selected)return;
 
       var hourly=hourlySection(selected.date);if(hourly)results.append(hourly);
-      var sales=salesCategoriesSection(selected.date);if(sales)results.append(sales);
+      if(occurrence.days.length===1){
+        var sales=salesCategoriesSection(selected.date);if(sales)results.append(sales);
+      }
       var demand=specialDemandSection(data,occurrence);if(demand)results.append(demand);
     }
     function render(){
