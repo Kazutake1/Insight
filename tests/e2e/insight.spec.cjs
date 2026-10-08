@@ -2009,6 +2009,18 @@ test('イベント実績の催事は場所選択なしで過去開催を参照�
   });
 
   await page.locator('#navEventResults').click();
+  const kindLayout=await page.locator('.er-kind-switch').evaluate(node=>{
+    const buttons=Array.from(node.querySelectorAll('.er-kind-btn'));
+    const rects=buttons.map(button=>button.getBoundingClientRect());
+    return {
+      gap:rects[1].left-rects[0].right,
+      fontSizes:buttons.map(button=>getComputedStyle(button).fontSize),
+      heights:rects.map(rect=>rect.height)
+    };
+  });
+  expect(kindLayout.gap).toBeGreaterThanOrEqual(12);
+  expect(kindLayout.fontSizes).toEqual(['16px','16px']);
+  expect(kindLayout.heights.every(height=>height>=44)).toBe(true);
   await page.locator('.er-kind-btn[data-kind="special"]').click();
   await expect(page.locator('.er-kind-btn[data-kind="special"]')).toHaveClass(/active/);
   await expect(page.locator('#erLocationField')).toBeHidden();
