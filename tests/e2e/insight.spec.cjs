@@ -2499,6 +2499,65 @@ test('よく使うイベントの特需商品は自由名で登録・編集で�
   expect(errors).toEqual([]);
 });
 
+test('特需商品のよく使うカテゴリーは管理・並べ替え・共有と自由入力からの登録に対応する',async({page})=>{
+  const errors=await openInsight(page);
+  await page.locator('#nav0').click();
+  await page.getByRole('button',{name:'＋イベントを追加'}).click();
+  let eventDialog=page.locator('.ie-dialog.ie-event-add');
+  await eventDialog.getByLabel('イベント種別').selectOption('special');
+
+  // Open category manager without losing the event editor.
+  await eventDialog.getByRole('button',{name:'カテゴリー管理'}).click();
+  let manager=page.locator('.ie-dialog.ie-preset-editor').last();
+  await expect(manager.getByRole('heading',{name:'よく使うカテゴリーを管理'})).toBeVisible();
+  await manager.getByRole('button',{name:'＋ カテゴリーを追加'}).click();
+  await manager.getByLabel('カテゴリー名').first().fill('催事グッズ');
+  await manager.getByRole('button',{name:'＋ カテゴリーを追加'}).click();
+  await manager.getByLabel('カテゴリー名').nth(1).fill('デザート');
+  await manager.getByRole('button',{name:'保存する'}).click();
+  await expect(manager).toHaveCount(0);
+  expect(await page.evaluate(()=>allStores.eventManagement.demandCategories.map(c=>c.name))).toEqual(['催事グッズ','デザート']);
+
+  await eventDialog.locator('.ie-demand-editor').getByRole('button',{name:'＋追加'}).click();
+  const demandRow=eventDialog.locator('.ie-demand-row').first();
+  await demandRow.getByLabel('名称').fill('試食セット');
+  await demandRow.getByLabel('カテゴリー',{exact:true}).selectOption({label:'催事グッズ'});
+  await expect(demandRow.getByLabel('カテゴリー',{exact:true})).toHaveValue(/favorite:/);
+
+  // Rename and reorder favorites; the editor's other fields stay in place.
+  await eventDialog.getByRole('button',{name:'カテゴリー管理'}).click();
+  manager=page.locator('.ie-dialog.ie-preset-editor').last();
+  await manager.getByLabel('カテゴリー名').nth(0).fill('イベント用品');
+  await manager.locator('.ie-demand-favorite-row').nth(1).getByRole('button',{name:'デザートを上へ移動'}).click();
+  await manager.getByRole('button',{name:'保存する'}).click();
+  expect(await page.evaluate(()=>allStores.eventManagement.demandCategories.map(c=>c.name))).toEqual(['デザート','イベント用品']);
+  await expect(demandRow.getByLabel('名称')).toHaveValue('試食セット');
+  await expect(demandRow.getByLabel('カテゴリー',{exact:true})).toHaveValue('custom');
+  await expect(demandRow.getByLabel('独自カテゴリー名')).toHaveValue('催事グッズ');
+
+  await demandRow.getByLabel('独自カテゴリー名').fill('お祝い商品');
+  await demandRow.getByLabel('よく使うカテゴリーに追加する').check();
+  await eventDialog.getByLabel('催事名').fill('E2Eカテゴリー検証');
+  await eventDialog.getByRole('button',{name:'登録する'}).click();
+  await expect(eventDialog).toHaveCount(0);
+  const stored=await page.evaluate(()=>{
+    const m=allStores.eventManagement;
+    const event=allStores.stores[allStores.current].events.find(e=>e.snapshot.title==='E2Eカテゴリー検証');
+    return {favorites:m.demandCategories.map(c=>c.name),item:event.snapshot.specialDemand[0]};
+  });
+  expect(stored.favorites).toEqual(['デザート','イベント用品','お祝い商品']);
+  expect(stored.item.category).toBe('お祝い商品');
+  expect(stored.item).not.toHaveProperty('__saveFavorite');
+
+  await page.getByRole('button',{name:'＋イベントを追加'}).click();
+  eventDialog=page.locator('.ie-dialog.ie-event-add');
+  await eventDialog.getByLabel('イベント種別').selectOption('special');
+  await eventDialog.locator('.ie-demand-editor').getByRole('button',{name:'＋追加'}).click();
+  await eventDialog.locator('.ie-demand-row').first().getByLabel('カテゴリー',{exact:true}).selectOption({label:'お祝い商品'});
+  await eventDialog.getByRole('button',{name:'キャンセル'}).click();
+  expect(errors).toEqual([]);
+});
+
 test('よく使う催事を登録して選択でき、同名同期間は重複警告する',async({page})=>{
   const errors=await openInsight(page);
   await page.locator('#nav0').click();
