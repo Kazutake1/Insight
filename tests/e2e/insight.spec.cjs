@@ -1365,7 +1365,7 @@ test('年度管理ボタンは設定へ移動し月ボタンは年度選択行�
   const errors=await openInsight(page);
   await page.locator('#nav1').click();
   await page.waitForFunction(()=>window.InsightYearControlsLayout&&window.InsightYearControlsLayout.getState().moved&&window.InsightYearControlsLayout.getState().monthsInline);
-  await expect(page.locator('#pageDash').getByRole('button',{name:/年度追加/})).toHaveCount(0);
+  await expect(page.locator('#pageDash #addYearBtn')).toHaveCount(0);
   await expect(page.locator('#pageDash #insightDeleteYearButton')).toHaveCount(0);
   await expect(page.locator('#modalBg')).toHaveCount(0);
   await expect(page.locator('.btn-del-year')).toHaveCount(0);
@@ -1406,12 +1406,12 @@ test('年度管理ボタンは設定へ移動し月ボタンは年度選択行�
 
   await page.locator('#navSettings').click();
   await expect(page.locator('#pageSettings #insightSettingsYearSection')).toBeVisible();
-  await expect(page.locator('#pageSettings').getByRole('button',{name:/年度追加/})).toBeVisible();
+  await expect(page.locator('#pageSettings #addYearBtn')).toHaveText('＋ 追加');
   await expect(page.locator('#pageSettings #insightDeleteYearButton')).toBeVisible();
   const settingsPlacement=await page.evaluate(()=>{
     const section=document.getElementById('insightSettingsYearSection');
     const actions=document.getElementById('insightSettingsYearActions');
-    const add=Array.from(actions.querySelectorAll('button')).find(button=>/年度追加/.test(button.textContent||''));
+    const add=document.getElementById('addYearBtn');
     const del=document.getElementById('insightDeleteYearButton');
     const wrap=document.getElementById('addYearInlineWrap');
     return {
@@ -1421,6 +1421,34 @@ test('年度管理ボタンは設定へ移動し月ボタンは年度選択行�
     };
   });
   expect(settingsPlacement).toEqual({addInside:true,deleteInside:true,inlineWrapInside:true});
+  await expect(page.locator('#pageSettings #insightDeleteYearButton')).toHaveText('− 削除');
+  const compact=await page.evaluate(()=>{
+    const section=document.getElementById('insightSettingsYearSection');
+    const add=document.getElementById('addYearBtn');
+    const del=document.getElementById('insightDeleteYearButton');
+    const a=add.getBoundingClientRect(),b=del.getBoundingClientRect();
+    return {
+      cardHeight:section.getBoundingClientRect().height,
+      buttonHeightDifference:Math.abs(a.height-b.height),
+      buttonTopDifference:Math.abs(a.top-b.top),
+      addBorderStyle:getComputedStyle(add).borderStyle,
+      deleteBorderStyle:getComputedStyle(del).borderStyle,
+      addFontSize:getComputedStyle(add).fontSize,
+      deleteFontSize:getComputedStyle(del).fontSize,
+      inlineHostHidden:getComputedStyle(document.getElementById('insightSettingsYearInlineHost')).display==='none'
+    };
+  });
+  expect(compact.cardHeight).toBeLessThan(130);
+  expect(compact.buttonHeightDifference).toBeLessThan(1);
+  expect(compact.buttonTopDifference).toBeLessThan(1);
+  expect(compact.addBorderStyle).toBe('solid');
+  expect(compact.deleteBorderStyle).toBe('solid');
+  expect(compact.addFontSize).toBe(compact.deleteFontSize);
+  expect(compact.inlineHostHidden).toBe(true);
+  await page.locator('#pageSettings #addYearBtn').click();
+  await expect(page.locator('#ayInput')).toBeVisible();
+  await page.locator('#ayInput').press('Escape');
+  await expect(page.locator('#insightSettingsYearInlineHost')).toBeHidden();
   expect(errors).toEqual([]);
 });
 
