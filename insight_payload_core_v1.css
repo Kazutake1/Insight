@@ -1333,3 +1333,13 @@ body.ai-analysis-open #main{margin-right:0!important}
 
 /* STEP5 CSP: weather menu visibility without inline style. */
 .insight-weather-menu-hidden{display:none!important}
+
+
+/* Special-demand categories: two-column editor and grouped event results. */
+.ie-dialog .ie-demand-row{grid-template-columns:repeat(2,minmax(0,1fr))}
+.ie-dialog .ie-demand-row>label{min-width:0}
+.ie-dialog .ie-demand-row .ie-demand-category-field input{margin-top:6px}
+.ie-dialog .ie-demand-row .ie-demand-category-field input[hidden]{display:none}
+.ie-dialog .ie-demand-row .ie-demand-remove{grid-column:2;justify-self:end}
+.er-demand-category+.er-demand-category{margin-top:16px}
+.er-demand-category>h3{margin:0 0 9px;font-size:14px;font-weight:800;color:var(--text3)}
