@@ -300,8 +300,9 @@
       var scroll=el('div',undefined,'er-hour-scroll'),chart=el('div',undefined,'er-hour-chart');
       hourly.hours.forEach(function(value,hour){
         var item=el('div',undefined,'er-hour-item'),plot=el('button',undefined,'er-hour-plot'),bar=el('progress',undefined,'er-hour-bar'),valueLabel=el('span',people(value),'er-hour-value');
+        var height=max>0?Math.max(2,Math.round(value/max*150)):2;
         plot.type='button';plot.setAttribute('aria-label',hour+'時台 '+people(value));plot.setAttribute('aria-pressed','false');
-        bar.max=max>0?max:1;bar.value=max>0?value:0;valueLabel.hidden=true;
+        plot.classList.add('er-hour-height-'+height);bar.max=1;bar.value=1;bar.setAttribute('aria-hidden','true');valueLabel.hidden=true;
         plot.append(bar,valueLabel);
         plot.onclick=function(){
           var active=chart.querySelector('.er-hour-plot.active');
