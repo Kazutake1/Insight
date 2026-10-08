@@ -1151,7 +1151,7 @@ test('分析AIの位置は外部CSSだけで決まりruntime inline styleを使�
   const presentation=read('insight_ai_presentation_v1.js');
   const css=read('insight_payload_core_v1.css');
   assert.doesNotMatch(presentation,/sidebarRect|getBoundingClientRect|\.style\.setProperty|--ai-workspace-(?:left|top)/);
-  assert.match(css,/left:202px!important;right:12px!important;top:calc\\(env\\(safe-area-inset-top\\) \\+ 12px\\)!important;bottom:calc\\(env\\(safe-area-inset-bottom\\) \\+ 12px\\)!important/);
+  assert.match(css,/left:202px!important;right:12px!important;top:calc\(env\(safe-area-inset-top\) \+ 12px\)!important;bottom:calc\(env\(safe-area-inset-bottom\) \+ 12px\)!important/);
   assert.match(css,/left:8px!important;right:8px!important}/);
 });
 
