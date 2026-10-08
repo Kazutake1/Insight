@@ -279,28 +279,110 @@
       };
     }
     function select(parent,label,options,value){var l=el('label',label),s=el('select');Object.keys(options).forEach(function(k){var o=el('option',options[k]);o.value=k;s.append(o);});s.value=value;s.setAttribute('aria-label',label);l.append(s);parent.append(l);return s;}
+    function takeDemandFavorites(snapshot){
+      var names=[];
+      (snapshot.specialDemand||[]).forEach(function(item){
+        if(item.__saveFavorite&&item.category)names.push(item.category);
+        delete item.__saveFavorite;
+      });
+      return Array.from(new Set(names));
+    }
+    function manageDemandCategories(onSaved){
+      var d=dialog('よく使うカテゴリーを管理'),body=el('div',undefined,'ie-demand-category-manager'),draft=copy(demandCategories(allStores));
+      d.classList.add('ie-preset-editor');d.append(body);
+      function draw(){
+        body.replaceChildren();
+        body.append(el('p','2店舗共通です。変更・削除しても過去のイベント・催事実績は変更されません。','ie-muted'));
+        var listBox=el('div',undefined,'ie-demand-favorites-list');
+        draft.forEach(function(category,index){
+          var row=el('div',undefined,'ie-demand-favorite-row'),name=field(row,'カテゴリー名','text',category.name);
+          name.maxLength=2000;name.oninput=function(){category.name=name.value;};
+          var controls=el('div',undefined,'ie-demand-favorite-controls');
+          var up=button('↑',function(){var item=draft.splice(index,1)[0];draft.splice(index-1,0,item);draw();});
+          var down=button('↓',function(){var item=draft.splice(index,1)[0];draft.splice(index+1,0,item);draw();});
+          up.disabled=index===0;down.disabled=index===draft.length-1;
+          up.setAttribute('aria-label',category.name+'を上へ移動');down.setAttribute('aria-label',category.name+'を下へ移動');
+          controls.append(up,down,button('削除',function(){draft.splice(index,1);draw();}));row.append(controls);listBox.append(row);
+        });
+        body.append(listBox,button('＋ カテゴリーを追加',function(){draft.push({id:demandCategoryId(),name:''});draw();}));
+        var actions=el('div',undefined,'ie-actions'),save=button('保存する',function(){
+          try{
+            var seen=new Set(),shared=allStores.salesCountManagement&&Array.isArray(allStores.salesCountManagement.categories)?allStores.salesCountManagement.categories:[];
+            draft.forEach(function(category){
+              category.name=category.name.trim();str(category.name,'特需商品カテゴリー名');
+              requireValue(!seen.has(category.name),'同じカテゴリー名は登録できません。');seen.add(category.name);
+              requireValue(!shared.some(function(c){return c.name===category.name;}),'販売数入力に同じカテゴリー名があります：'+category.name);
+            });
+            if(transaction(function(next){mutableDemandCategories(next).splice(0,mutableDemandCategories(next).length,...copy(draft));})){
+              d.close();if(onSaved)onSaved();
+            }
+          }catch(err){alert(err.message);}
+        });save.className='ie-primary';
+        actions.append(button('キャンセル',function(){d.close();}),save);body.append(actions);
+      }
+      draw();
+    }
     function specialDemandEditor(parent,snapshot,templateOnly){
       var section=el('section',undefined,'ie-demand-editor'),head=el('div',undefined,'ie-demand-head'),listBox=el('div',undefined,'ie-demand-list'),rows=[];
-      head.append(el('strong','特需商品'),button('＋追加',function(){addRow(null);}));section.append(head,el('p',templateOnly?'商品名とカテゴリーを登録します。用意数と販売数は開催ごとに入力します。':'既存カテゴリーを選択するか、独自カテゴリー名を入力できます。','ie-muted'),listBox);parent.append(section);
+      function refreshAll(){rows.forEach(function(row){row.refreshCategoryOptions();});}
+      var controls=el('div',undefined,'ie-demand-head-actions');
+      controls.append(button('カテゴリー管理',function(){manageDemandCategories(refreshAll);}),button('＋追加',function(){addRow(null);}));
+      head.append(el('strong','特需商品'),controls);
+      section.append(head,el('p',templateOnly?'商品名とカテゴリーを登録します。用意数と販売数は開催ごとに入力します。':'カテゴリーを選択するか、自由に入力できます。','ie-muted'),listBox);parent.append(section);
       function addRow(seed){
         seed=seed||{};
         var rowEl=el('div',undefined,'ie-demand-row'),categoryField=el('label','カテゴリー','ie-demand-category-field'),categorySelect=el('select'),customCategory=el('input');
         categorySelect.setAttribute('aria-label','カテゴリー');
-        var unsetOption=el('option','未分類');unsetOption.value='';categorySelect.append(unsetOption);
-        var master=allStores.salesCountManagement&&Array.isArray(allStores.salesCountManagement.categories)?allStores.salesCountManagement.categories:[];
-        master.forEach(function(c){
-          if(c.hidden&&c.id!==seed.categoryId)return;
-          var opt=el('option',c.name+(c.hidden?'（非表示）':''));opt.value='master:'+c.id;categorySelect.append(opt);
-        });
-        var customOption=el('option','その他（自由入力）');customOption.value='custom';categorySelect.append(customOption);
         customCategory.type='text';customCategory.placeholder='独自カテゴリー名';
         customCategory.setAttribute('aria-label','独自カテゴリー名');customCategory.maxLength=2000;
-        categoryField.append(categorySelect,customCategory);rowEl.append(categoryField);
-        var masterSeed=seed.categoryId&&master.find(function(c){return c.id===seed.categoryId;});
-        categorySelect.value=masterSeed?'master:'+masterSeed.id:seed.category?'custom':'';
+        var favoriteLabel=el('label',undefined,'ie-demand-favorite-check'),saveFavorite=el('input');
+        saveFavorite.type='checkbox';saveFavorite.setAttribute('aria-label','よく使うカテゴリーに追加する');
+        favoriteLabel.append(saveFavorite,el('span','よく使うカテゴリーに追加する'));
+        categoryField.append(categorySelect,customCategory,favoriteLabel);rowEl.append(categoryField);
+        var master=allStores.salesCountManagement&&Array.isArray(allStores.salesCountManagement.categories)?allStores.salesCountManagement.categories:[],knownFavorites=[];
+        function updateCategoryInput(){
+          var isCustom=categorySelect.value==='custom';
+          customCategory.hidden=!isCustom;favoriteLabel.hidden=!isCustom;
+        }
+        function refreshCategoryOptions(){
+          var oldChoice=categorySelect.value,oldFavorite=oldChoice.indexOf('favorite:')===0?knownFavorites.find(function(c){return c.id===oldChoice.slice(9);}):null;
+          var oldName=oldFavorite&&oldFavorite.name||'';
+          var currentCustom=customCategory.value;
+          categorySelect.replaceChildren();
+          var favoriteItems=demandCategories(allStores);
+          knownFavorites=favoriteItems.map(function(c){return {id:c.id,name:c.name};});
+          if(favoriteItems.length){
+            var favoriteGroup=el('optgroup');favoriteGroup.label='よく使うカテゴリー';
+            favoriteItems.forEach(function(c){var opt=el('option',c.name);opt.value='favorite:'+c.id;favoriteGroup.append(opt);});
+            categorySelect.append(favoriteGroup);
+          }
+          var sharedGroup=el('optgroup');sharedGroup.label='販売数入力のカテゴリー';
+          master.forEach(function(c){
+            if(c.hidden&&c.id!==seed.categoryId&&oldChoice!=='master:'+c.id)return;
+            var opt=el('option',c.name+(c.hidden?'（非表示）':''));opt.value='master:'+c.id;sharedGroup.append(opt);
+          });
+          if(sharedGroup.childElementCount)categorySelect.append(sharedGroup);
+          var otherGroup=el('optgroup');otherGroup.label='その他';
+          var customOption=el('option','その他（自由入力）');customOption.value='custom';
+          var unsetOption=el('option','未分類');unsetOption.value='';
+          otherGroup.append(customOption,unsetOption);categorySelect.append(otherGroup);
+          if(oldChoice&&Array.from(categorySelect.options).some(function(o){return o.value===oldChoice})){
+            categorySelect.value=oldChoice;
+          }else if(oldChoice.indexOf('favorite:')===0&&oldName){
+            categorySelect.value='custom';customCategory.value=oldName;
+          }else if(!oldChoice){
+            categorySelect.value='';
+          }else{
+            categorySelect.value='custom';customCategory.value=currentCustom||seed.category||'';
+          }
+          updateCategoryInput();
+        }
+        var favorites=demandCategories(allStores),favoriteSeed=!seed.categoryId&&seed.category&&favorites.find(function(c){return c.name===seed.category;});
+        var initialChoice=seed.categoryId?'master:'+seed.categoryId:favoriteSeed?'favorite:'+favoriteSeed.id:seed.category?'custom':'';
+        categorySelect.value=initialChoice;
         customCategory.value=seed.category||'';
-        function updateCategoryInput(){customCategory.hidden=categorySelect.value!=='custom';}
-        categorySelect.onchange=updateCategoryInput;updateCategoryInput();
+        refreshCategoryOptions();
+        categorySelect.onchange=function(){if(categorySelect.value!=='custom')saveFavorite.checked=false;updateCategoryInput();};
         var name=field(rowEl,'名称','text',seed.name||''),prepared=null,sold=null;
         name.required=true;
         if(!templateOnly){
@@ -308,7 +390,7 @@
           sold=field(rowEl,'販売数','number',seed.sold==null?'':seed.sold);sold.min='0';sold.step='1';
         }
         var remove=button('削除',function(){var at=rows.findIndex(function(row){return row.el===rowEl;});if(at>=0)rows.splice(at,1);rowEl.remove();});remove.className='ie-demand-remove';rowEl.append(remove);listBox.append(rowEl);
-        rows.push({id:seed.id||demandId(),el:rowEl,categorySelect:categorySelect,customCategory:customCategory,master:master,name:name,prepared:prepared,sold:sold});
+        rows.push({id:seed.id||demandId(),el:rowEl,categorySelect:categorySelect,customCategory:customCategory,saveFavorite:saveFavorite,refreshCategoryOptions:refreshCategoryOptions,name:name,prepared:prepared,sold:sold});
       }
       (Array.isArray(snapshot&&snapshot.specialDemand)?snapshot.specialDemand:[]).forEach(function(item){addRow(item);});
       return function(){
@@ -317,8 +399,12 @@
           var item={id:row.id,name:name},categoryChoice=row.categorySelect.value;
           if(categoryChoice==='custom'){
             var category=row.customCategory.value.trim();requireValue(category!=='','独自カテゴリー名を入力してください。');item.category=category;
+            if(row.saveFavorite.checked)item.__saveFavorite=true;
+          }else if(categoryChoice.indexOf('favorite:')===0){
+            var favoriteId=categoryChoice.slice(9),favorite=demandCategories(allStores).find(function(c){return c.id===favoriteId;});
+            requireValue(!!favorite,'選択したカテゴリーが見つかりません。');item.category=favorite.name;
           }else if(categoryChoice.indexOf('master:')===0){
-            var masterId=categoryChoice.slice(7),selected=row.master.find(function(c){return c.id===masterId;});
+            var masterId=categoryChoice.slice(7),selected=master.find(function(c){return c.id===masterId;});
             requireValue(!!selected,'選択したカテゴリーが見つかりません。');item.category=selected.name;item.categoryId=selected.id;
           }
           if(!templateOnly){
