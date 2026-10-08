@@ -1343,3 +1343,20 @@ body.ai-analysis-open #main{margin-right:0!important}
 .ie-dialog .ie-demand-row .ie-demand-remove{grid-column:2;justify-self:end}
 .er-demand-category+.er-demand-category{margin-top:16px}
 .er-demand-category>h3{margin:0 0 9px;font-size:14px;font-weight:800;color:var(--text3)}
+
+
+/* Special-demand shared favorite category selector and manager. */
+.ie-dialog .ie-demand-head-actions{display:flex;gap:7px;align-items:center}
+.ie-dialog .ie-demand-category-field{display:flex;flex-direction:column;gap:4px;min-width:0}
+.ie-dialog .ie-demand-category-field>span{font-weight:400}
+.ie-dialog .ie-demand-category-field select{min-width:0}
+.ie-dialog .ie-demand-favorite-check{display:flex;flex-direction:row;align-items:center;gap:6px;margin:5px 0 0;font-size:11px}
+.ie-dialog .ie-demand-favorite-check[hidden]{display:none}
+.ie-dialog .ie-demand-favorite-check input{width:auto;flex:none;margin:0;accent-color:var(--text)}
+.ie-dialog .ie-demand-favorite-check span{min-width:0}
+.ie-dialog .ie-demand-favorites-list{display:grid;gap:8px;margin:12px 0}
+.ie-dialog .ie-demand-favorite-row{display:flex;align-items:flex-end;gap:8px;padding:8px;border:1px solid var(--border);border-radius:10px;background:var(--surface2)}
+.ie-dialog .ie-demand-favorite-row>label{flex:1;min-width:0;margin:0}
+.ie-dialog .ie-demand-favorite-controls{display:flex;gap:5px;align-items:center}
+.ie-dialog .ie-demand-favorite-controls button{min-width:33px}
+@media(max-width:520px){.ie-dialog .ie-demand-favorite-row{flex-wrap:wrap}.ie-dialog .ie-demand-favorite-controls{width:100%;justify-content:flex-end}}
