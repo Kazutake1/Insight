@@ -296,7 +296,7 @@ test('トップページは外部shellと機能manifestの最新版確認をno-s
   expect(source).toContain('https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js');
   expect(source).toContain('integrity="sha512-CQBWl4fJHWbryGE+Pc7UAxWMUMNMWzWxF4SQo9CgkJIN1kx6djDQZjh3Y8SZ1d+6I+1zze6Z7kHXO7q3UyZAWw=="');
   expect(loader).not.toContain('stripPayloadChartScript');
-  expect(payload).toContain('insight_payload_core_v1.css?v=20261007-step3-donut-mode-css-1');
+  expect(payload).toContain('insight_payload_core_v1.css?v=20261009-ai-bottom-height-align-1');
   expect(payload).toContain('insight_payload_core_v1.js?v=20261007-step4-ai-position-css-1');
   expect(payload).toContain('insight_payload_ai_legacy_v1.js?v=20261006-payload-assets-1');
   expect(payload).toContain('insight_payload_bindings_v1.js?v=20261006-inline-bindings-1');
@@ -1213,7 +1213,6 @@ test('分析AIの上下端と高さはiPadの縦横・ライト/ダークでサ�
           position:{bottom:style.bottom,transitionProperty:style.transitionProperty}
         };
       });
-      expect(positions.position.bottom,'AIパネルの下端固定オフセットを使用しない').toBe('auto');
       expect(positions.position.transitionProperty,'開閉アニメーションは維持').toContain('transform');
       for(const edge of ['top','bottom','height']){
         expect(Math.abs(positions.panel[edge]-positions.sidebar[edge]),
