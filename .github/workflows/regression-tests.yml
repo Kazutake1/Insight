@@ -57,6 +57,7 @@ jobs:
           - weather_bulk.test.cjs
           - weekly_review.test.cjs
           - year_manager.test.cjs
+          - order_forecast.test.cjs
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
@@ -132,4 +133,5 @@ jobs:
             test-results/
           if-no-files-found: ignore
           retention-days: 3
+
 
