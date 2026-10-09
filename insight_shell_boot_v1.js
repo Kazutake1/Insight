@@ -2,7 +2,7 @@
 (function(){
   // Shell rule: bump BUILD whenever the loader, payload list, bootstrap loader, or shell HTML changes.
   // Feature-module ?v changes are detected independently by the manifest signature below.
-  var BUILD="20261010-forecast-event-detail-build-10";
+  var BUILD="20261010-forecast-event-center-build-11";
   window.__INSIGHT_SHELL_VERSION__=BUILD;
   try{
     fetch('./Index.html?insight_probe='+Date.now(),{cache:'no-store'}).then(function(r){

@@ -58,11 +58,27 @@ test('発注予測は閲覧専用・実績と平均・店舗カテゴリー切�
   await historic.locator('.of-event-trigger').filter({hasText:'セール'}).click();
   await expect(page.locator('#ofEventDialog')).toBeVisible();
   await expect(page.locator('#ofEventDialogTitle')).toContainText('セール');
+  const checkCentered=async()=>{
+    const position=await page.locator('#ofEventDialog').evaluate(dialog=>{
+      const box=dialog.getBoundingClientRect();
+      return {x:box.left+box.width/2,y:box.top+box.height/2,
+        viewportWidth:document.documentElement.clientWidth,viewportHeight:window.innerHeight,
+        computedPosition:getComputedStyle(dialog).position};
+    });
+    expect(position.computedPosition).toBe('fixed');
+    expect(Math.abs(position.x-position.viewportWidth/2)).toBeLessThanOrEqual(3);
+    expect(Math.abs(position.y-position.viewportHeight/2)).toBeLessThanOrEqual(3);
+  };
+  await checkCentered();
   await expect(page.locator('#ofEventDialog .of-event-dialog-list li')).toHaveText(['おにぎりセール','サンドイッチ2個割引']);
   await page.locator('.of-event-dialog-close').click();
   await expect(page.locator('#ofEventDialog')).toBeHidden();
   await historic.locator('.of-event-trigger').filter({hasText:'イベント'}).click();
   await expect(page.locator('#ofEventDialog .of-event-dialog-list li')).toHaveText(['秋まつり','創業記念日']);
+  await checkCentered();
+  await page.setViewportSize({width:768,height:1024});
+  await checkCentered();
+  await page.setViewportSize({width:1194,height:834});
   await page.keyboard.press('Escape');
   await expect(page.locator('#ofEventDialog')).toBeHidden();
   await expect(page.locator('#ofRecentCards [data-date="2026-10-16"]')).toHaveCount(0);await expect(page.locator('#ofRecentCards [data-date="2026-10-17"]')).toHaveCount(0);
