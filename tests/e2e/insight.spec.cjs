@@ -1206,11 +1206,15 @@ test('分析AIの上下端と高さはiPadの縦横・ライト/ダークでサ�
       const positions=await page.evaluate(()=>{
         const panel=document.getElementById('aiAnalysisPanel').getBoundingClientRect();
         const sidebar=document.getElementById('sidebar').getBoundingClientRect();
+        const style=getComputedStyle(document.getElementById('aiAnalysisPanel'));
         return {
           panel:{top:panel.top,bottom:panel.bottom,height:panel.height},
-          sidebar:{top:sidebar.top,bottom:sidebar.bottom,height:sidebar.height}
+          sidebar:{top:sidebar.top,bottom:sidebar.bottom,height:sidebar.height},
+          position:{bottom:style.bottom,transitionProperty:style.transitionProperty}
         };
       });
+      expect(positions.position.bottom,'AIパネルの下端固定オフセットを使用しない').toBe('auto');
+      expect(positions.position.transitionProperty,'開閉アニメーションは維持').toContain('transform');
       for(const edge of ['top','bottom','height']){
         expect(Math.abs(positions.panel[edge]-positions.sidebar[edge]),
           `Dark=${dark}, viewport=${viewport.width}x${viewport.height}, edge=${edge}`).toBeLessThanOrEqual(1);
