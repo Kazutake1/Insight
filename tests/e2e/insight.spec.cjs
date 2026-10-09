@@ -280,10 +280,10 @@ test('トップページは外部shellと機能manifestの最新版確認をno-s
     fetch('/insight_payload_source_v1.html?e2e-shell-check=1',{cache:'no-store'}).then(r=>r.text())
   ]));
   const [source,boot,loader,payload]=sources;
-  expect(source).toContain('name="insight-shell-version" content="20261006-csp-style-shell-1"');
-  expect(source).toContain('insight_shell_boot_v1.js?v=20261006-csp-style-shell-1');
-  expect(source).toContain('insight_shell_loader_v1.js?v=20261006-csp-style-shell-1');
-  expect(source).toContain('insight_shell_v1.css?v=20261006-csp-style-shell-1');
+  expect(source).toContain('name="insight-shell-version" content="20261009-ai-left-scroll-build-1"');
+  expect(source).toContain('insight_shell_boot_v1.js?v=20261009-ai-left-scroll-build-1');
+  expect(source).toContain('insight_shell_loader_v1.js?v=20261009-ai-left-scroll-build-1');
+  expect(source).toContain('insight_shell_v1.css?v=20261009-ai-left-scroll-build-1');
   expect(source).not.toMatch(/<script(?![^>]*\bsrc=)[^>]*>/i);
   expect(source).not.toMatch(/<style\b/i);
   expect(source).not.toMatch(/script-src[^;]*'unsafe-inline'/);
@@ -296,7 +296,7 @@ test('トップページは外部shellと機能manifestの最新版確認をno-s
   expect(source).toContain('https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js');
   expect(source).toContain('integrity="sha512-CQBWl4fJHWbryGE+Pc7UAxWMUMNMWzWxF4SQo9CgkJIN1kx6djDQZjh3Y8SZ1d+6I+1zze6Z7kHXO7q3UyZAWw=="');
   expect(loader).not.toContain('stripPayloadChartScript');
-  expect(payload).toContain('insight_payload_core_v1.css?v=20261009-ai-bottom-height-align-1');
+  expect(payload).toContain('insight_payload_core_v1.css?v=20261009-ai-left-scroll-css-1');
   expect(payload).toContain('insight_payload_core_v1.js?v=20261007-step4-ai-position-css-1');
   expect(payload).toContain('insight_payload_ai_legacy_v1.js?v=20261006-payload-assets-1');
   expect(payload).toContain('insight_payload_bindings_v1.js?v=20261006-inline-bindings-1');
@@ -1221,6 +1221,56 @@ test('分析AIの上下端と高さはiPadの縦横・ライト/ダークでサ�
     }
   }
   await page.setViewportSize(originalViewport);
+  expect(errors).toEqual([]);
+});
+
+test('分析AIの左側は長文をスクロールでき質問欄と右側表示は固定される',async({page})=>{
+  const errors=await openInsight(page);
+  await page.locator('#aiAnalysisToggle').click();
+  await expect(page.locator('body')).toHaveClass(/ai-analysis-open/);
+  const initialViewport=page.viewportSize();
+
+  for(const viewport of [{width:1194,height:834},{width:834,height:1194}]){
+    await page.setViewportSize(viewport);
+    const result=await page.evaluate(()=>{
+      const host=document.getElementById('aiAnalysisSummary');
+      host.replaceChildren();
+      for(let i=0;i<70;i++){
+        const p=document.createElement('p');
+        p.className='ai-analysis-comment';
+        p.textContent='表示内容が増えた場合も最後までスクロールして確認できる '+i;
+        host.appendChild(p);
+      }
+      const scroll=document.querySelector('.ai-workspace-main-scroll');
+      const dock=document.querySelector('.ai-workspace-question-dock');
+      const header=document.querySelector('.ai-workspace-header');
+      const right=document.querySelector('.ai-workspace-right');
+      const before={dockTop:dock.getBoundingClientRect().top,headerTop:header.getBoundingClientRect().top,rightTop:right.getBoundingClientRect().top,rightScroll:right.scrollTop};
+      scroll.scrollTop=scroll.scrollHeight;
+      const end=host.lastElementChild.getBoundingClientRect();
+      const rect=scroll.getBoundingClientRect();
+      return {
+        overflow:getComputedStyle(scroll).overflowY,
+        scrollHeight:scroll.scrollHeight,
+        clientHeight:scroll.clientHeight,
+        scrollTop:scroll.scrollTop,
+        lastVisible:end.bottom<=rect.bottom+1&&end.top>=rect.top-1,
+        dockDelta:Math.abs(dock.getBoundingClientRect().top-before.dockTop),
+        headerDelta:Math.abs(header.getBoundingClientRect().top-before.headerTop),
+        rightDelta:Math.abs(right.getBoundingClientRect().top-before.rightTop),
+        rightScrollDelta:Math.abs(right.scrollTop-before.rightScroll)
+      };
+    });
+    expect(result.overflow).toBe('auto');
+    expect(result.scrollHeight,JSON.stringify(viewport)).toBeGreaterThan(result.clientHeight);
+    expect(result.scrollTop).toBeGreaterThan(0);
+    expect(result.lastVisible).toBe(true);
+    expect(result.dockDelta).toBeLessThanOrEqual(1);
+    expect(result.headerDelta).toBeLessThanOrEqual(1);
+    expect(result.rightDelta).toBeLessThanOrEqual(1);
+    expect(result.rightScrollDelta).toBe(0);
+  }
+  await page.setViewportSize(initialViewport);
   expect(errors).toEqual([]);
 });
 

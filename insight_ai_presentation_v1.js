@@ -207,7 +207,10 @@
 
     summaryCard.classList.add('ai-workspace-summary-card');
     questionCard.classList.add('ai-workspace-question-dock');
-    main.append(mainHead,historyToolbar,summaryCard,questionCard);
+    var scrollRegion=document.createElement('div');
+    scrollRegion.className='ai-workspace-main-scroll';
+    scrollRegion.append(mainHead,historyToolbar,summaryCard);
+    main.append(scrollRegion,questionCard);
 
     var right=document.createElement('aside');
     right.className='ai-workspace-right';
