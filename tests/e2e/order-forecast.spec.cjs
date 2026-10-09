@@ -33,7 +33,7 @@ async function open(page,failed=false){
       {id:'of_e2e_nearby',type:'nearby',scope:'store',startDate:date,endDate:date,snapshot:{title:'秋まつり'}},
       {id:'of_e2e_special',type:'special',scope:'store',startDate:date,endDate:date,snapshot:{title:'創業記念日'}}
     );
-    allStores.stores.ofTestStore=JSON.parse(JSON.stringify(base));allStores.stores.ofTestStore.name='テスト店舗';allStores.stores.ofTestStore.events=[{id:'of_e2e_second_only',type:'nearby',scope:'store',startDate:'2026-10-11',endDate:'2026-10-11',snapshot:{title:'テスト店舗限定のお祭り'}}];allStores.stores.ofTestStore.salesCounts['2026-10-11'][cat.id].trips[0].delivery=42;allStores.stores.ofTestStore.data['2026']['10月'][10]=Object.assign({},allStores.stores.ofTestStore.data['2026']['10月'][10],{weather:'晴',tempMaxC:23.3,tempMinC:14.8});renderStoreSel();
+    allStores.stores.ofTestStore=JSON.parse(JSON.stringify(base));allStores.stores.ofTestStore.name='テスト店舗';allStores.stores.ofTestStore.events=[{id:'of_e2e_second_only',type:'nearby',scope:'store',startDate:'2026-10-11',endDate:'2026-10-11',snapshot:{title:'テスト店舗限定のお祭り'}},{id:'of_e2e_single_only',type:'nearby',scope:'store',startDate:'2026-10-15',endDate:'2026-10-15',snapshot:{title:'単独イベント'}}];allStores.stores.ofTestStore.salesCounts['2026-10-11'][cat.id].trips[0].delivery=42;allStores.stores.ofTestStore.data['2026']['10月'][10]=Object.assign({},allStores.stores.ofTestStore.data['2026']['10月'][10],{weather:'晴',tempMaxC:23.3,tempMinC:14.8});renderStoreSel();
     window.__ofBefore=JSON.stringify(allStores);window.__ofStored=localStorage.getItem('insight_v11');
   });
   return {errors,calls:()=>calls};
@@ -51,10 +51,13 @@ test('発注予測は閲覧専用・実績と平均・店舗カテゴリー切�
   await expect(historic.locator('.of-event-trigger')).toHaveText(['セール','イベント']);
   const eventFit=await historic.evaluate(card=>{
     const bounds=card.getBoundingClientRect(),buttons=Array.from(card.querySelectorAll('.of-event-trigger'));
-    return {overflow:card.scrollHeight-card.clientHeight,buttons:buttons.map(button=>{const rect=button.getBoundingClientRect();return {left:rect.left-bounds.left,right:bounds.right-rect.right,bottom:bounds.bottom-rect.bottom};})};
+    return {overflow:card.scrollHeight-card.clientHeight,buttons:buttons.map(button=>{const rect=button.getBoundingClientRect();return {left:rect.left-bounds.left,right:bounds.right-rect.right,bottom:bounds.bottom-rect.bottom,top:rect.top,width:rect.width,absoluteRight:rect.right,absoluteLeft:rect.left};})};
   });
   expect(eventFit.overflow).toBeLessThanOrEqual(1);
   for(const bounds of eventFit.buttons){expect(bounds.left).toBeGreaterThanOrEqual(0);expect(bounds.right).toBeGreaterThanOrEqual(0);expect(bounds.bottom).toBeGreaterThanOrEqual(5);}
+  expect(eventFit.buttons).toHaveLength(2);
+  expect(Math.abs(eventFit.buttons[0].top-eventFit.buttons[1].top)).toBeLessThanOrEqual(1);
+  expect(eventFit.buttons[0].absoluteRight).toBeLessThanOrEqual(eventFit.buttons[1].absoluteLeft+1);
   await historic.locator('.of-event-trigger').filter({hasText:'セール'}).click();
   await expect(page.locator('#ofEventDialog')).toBeVisible();
   await expect(page.locator('#ofEventDialogTitle')).toContainText('セール');
@@ -78,15 +81,30 @@ test('発注予測は閲覧専用・実績と平均・店舗カテゴリー切�
   await checkCentered();
   await page.setViewportSize({width:768,height:1024});
   await checkCentered();
+  const portraitButtons=await historic.locator('.of-event-trigger').evaluateAll(buttons=>buttons.map(b=>{const r=b.getBoundingClientRect();return {left:r.left,right:r.right,top:r.top,bottom:r.bottom,scrollWidth:b.scrollWidth,clientWidth:b.clientWidth};}));
+  expect(portraitButtons).toHaveLength(2);
+  expect(Math.abs(portraitButtons[0].top-portraitButtons[1].top)).toBeLessThanOrEqual(1);
+  expect(portraitButtons[0].right).toBeLessThanOrEqual(portraitButtons[1].left+1);
+  expect(portraitButtons.every(b=>b.scrollWidth<=b.clientWidth+1)).toBe(true);
   await page.setViewportSize({width:1194,height:834});
   await page.keyboard.press('Escape');
   await expect(page.locator('#ofEventDialog')).toBeHidden();
   await expect(page.locator('#ofRecentCards [data-date="2026-10-16"]')).toHaveCount(0);await expect(page.locator('#ofRecentCards [data-date="2026-10-17"]')).toHaveCount(0);
+  const averageTone=await page.locator('#ofWeekCards .sc-average-card').evaluate(card=>({
+    average:getComputedStyle(card).backgroundColor,
+    expected:getComputedStyle(card).getPropertyValue('--surface2').trim(),
+    normal:getComputedStyle(card.parentElement.querySelector('.sc-day:not(.sc-average-card)')).backgroundColor
+  }));
+  expect(averageTone.average).not.toBe(averageTone.normal);
   await expect(page.locator('#ofWeekCards .sc-average-card .sc-delivery-row input').first()).toHaveValue('9');await expect(page.locator('#ofWeekCards .sc-average-card .sc-delivery-row input').nth(1)).toHaveValue('ー');
   expect(await page.locator('#pageOrderForecast .sc-trip input').evaluateAll(inputs=>inputs.every(i=>i.readOnly))).toBe(true);
   const widths=await page.evaluate(()=>({year:document.querySelector('#ofYearCards .sc-day').getBoundingClientRect().width,week:document.querySelector('#ofWeekCards .sc-day').getBoundingClientRect().width,recent:document.querySelector('#ofRecentCards .sc-day').getBoundingClientRect().width,right:document.querySelector('#ofYearCards .sc-day:last-child').getBoundingClientRect().right,page:document.querySelector('#pageOrderForecast').getBoundingClientRect().right}));
   expect(Math.abs(widths.year-widths.week)).toBeLessThan(1);expect(Math.abs(widths.year-widths.recent)).toBeLessThan(1);expect(widths.right).toBeLessThanOrEqual(widths.page);
   await expect(page.locator('#ofStore')).toHaveCount(0);await page.locator('#storeSel').selectOption('ofTestStore');await expect(page.locator('#storeSel')).toHaveValue('ofTestStore');await expect(page.locator('#ofRecentCards [data-date="2026-10-11"] .sc-delivery-row input').first()).toHaveValue('42');await expect(page.locator('#ofRecentCards [data-date="2026-10-11"] .sc-history-icon')).toHaveText('🌤️');
+  const singleAction=page.locator('#ofRecentCards [data-date="2026-10-15"] .of-event-actions');
+  await expect(singleAction.locator('.of-event-trigger')).toHaveCount(1);
+  const singleFit=await singleAction.evaluate(action=>({container:action.getBoundingClientRect().width,button:action.querySelector('button').getBoundingClientRect().width}));
+  expect(Math.abs(singleFit.container-singleFit.button)).toBeLessThanOrEqual(1);
   await page.locator('#ofRecentCards [data-date="2026-10-11"] .of-event-trigger').filter({hasText:'イベント'}).click();
   await expect(page.locator('#ofEventDialog .of-event-dialog-list li')).toHaveText(['テスト店舗限定のお祭り']);
   await page.locator('.of-event-dialog-close').click();
