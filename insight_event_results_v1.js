@@ -403,7 +403,7 @@
       var wrap=el('div',undefined,'er-day-tabs');
       occurrence.days.forEach(function(day){
         var button=el('button',undefined,'er-day-tab'+(day.date===state.selectedDate?' active':''));button.type='button';button.dataset.date=day.date;
-        button.append(el('strong',dateLabel(day.date,false)),el('span','売上 '+salesYen(day.metrics.salesYen)),el('span','客数 '+people(day.metrics.customers)));
+        button.append(el('strong',dateLabel(day.date,false)),root.InsightSalesCount.createHistoricalWeatherRow(day.date,currentStoreId()),el('span','売上 '+salesYen(day.metrics.salesYen)),el('span','客数 '+people(day.metrics.customers)));
         var hourly=root.InsightHourlyCustomers.status(allStores,currentStoreId(),day.date);
         if(hourly.complete)button.append(el('small','時間帯データあり'));
         button.onclick=function(){state.selectedDate=day.date;render();};
