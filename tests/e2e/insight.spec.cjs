@@ -1432,7 +1432,8 @@ test('セール実績は内容別に表示し開催回ごとに行を分けて7�
   expect(layout.secondOccurrenceTop).toBeGreaterThan(layout.eighthTop+20);
   expect(layout.seventhRight).toBeLessThanOrEqual(layout.gridRight+1);
   expect(layout.gridScrollWidth).toBeLessThanOrEqual(layout.gridClientWidth+1);
-  expect(layout.saleChildren).toEqual(layout.inputChildren);
+  expect(layout.saleChildren.filter(name=>name!=='sc-history-weather')).toEqual(layout.inputChildren);
+  await expect(page.locator('.sr-group .sc-history-weather')).toHaveCount(11);
   expect(layout.allReadOnly).toBe(true);
 
   const order=await page.evaluate(()=>({
@@ -1960,6 +1961,8 @@ test('イベント実績は過去開催→複数日→カテゴリー便別実�
         ]
       };
     });
+    const historicRows=store.data&&store.data['2026']&&store.data['2026']['9月'];
+    if(Array.isArray(historicRows))historicRows[11]=Object.assign({},historicRows[11],{d:'12',weather:'雨',tempMaxC:26.9,tempMinC:18.6});
     window.InsightEventResults.render();
   });
 
@@ -2007,6 +2010,9 @@ test('イベント実績は過去開催→複数日→カテゴリー便別実�
   const periodGrids=periodSection.locator('.er-period-day-grid');
   await expect(periodGrids).toHaveCount(2);
   await expect(periodGrids.first().locator('.sc-day')).toHaveCount(2);
+  await expect(periodGrids.first().locator('.sc-history-weather')).toHaveCount(2);
+  await expect(page.locator('.er-day-tabs .sc-history-weather')).toHaveCount(2);
+  await expect(page.locator('.er-day-tabs .sc-history-weather').first()).toContainText('26°');
   await expect(periodGrids.first().locator('.sc-day-num')).toHaveText(['9/12（土）','9/13（日）']);
   await expect(periodGrids.first().getByLabel('2026-09-12 1便 納品数')).toHaveValue('40');
   await expect(periodGrids.first().getByLabel('2026-09-12 1便 販売数')).toHaveValue('36');
@@ -2064,7 +2070,7 @@ test('イベント実績は過去開催→複数日→カテゴリー便別実�
     width:getComputedStyle(card).width,
     padding:getComputedStyle(card).padding,
     dateFont:getComputedStyle(card.querySelector('strong')).fontSize,
-    metricFont:getComputedStyle(card.querySelector('span')).fontSize
+    metricFont:getComputedStyle(card.querySelector(':scope > span')).fontSize
   }));
   expect(dayCardStyle).toEqual({width:'210px',padding:'13px 15px',dateFont:'15px',metricFont:'13.5px'});
   await expect(page.locator('.er-hourly-section')).toBeVisible();
