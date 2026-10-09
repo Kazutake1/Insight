@@ -134,3 +134,34 @@ test('WebKitで販売数を保存し再読込後も保持する',async({page})=>
   await expect(restored).toHaveValue('321');
   expect(errors).toEqual([]);
 });
+
+test('WebKitで分析AIの左側をスクロールして末尾まで確認できる',async({page})=>{
+  const errors=await openInsight(page);
+  await page.setViewportSize({width:1194,height:834});
+  await page.locator('#aiAnalysisToggle').click();
+  await expect(page.locator('body')).toHaveClass(/ai-analysis-open/);
+  const result=await page.evaluate(()=>{
+    const host=document.getElementById('aiAnalysisSummary');
+    host.replaceChildren();
+    for(let i=0;i<70;i++){
+      const p=document.createElement('p');
+      p.textContent='スクロール確認用の長い分析コメント '+i;
+      p.className='ai-analysis-comment';
+      host.appendChild(p);
+    }
+    const scroller=document.querySelector('.ai-workspace-main-scroll');
+    const question=document.querySelector('.ai-workspace-question-dock');
+    const questionBefore=question.getBoundingClientRect().top;
+    scroller.scrollTop=scroller.scrollHeight;
+    const bounds=scroller.getBoundingClientRect();
+    const last=host.lastElementChild.getBoundingClientRect();
+    return {
+      scrollable:scroller.scrollHeight>scroller.clientHeight,
+      scrolled:scroller.scrollTop>0,
+      endVisible:last.bottom<=bounds.bottom+1&&last.top>=bounds.top-1,
+      dockFixed:Math.abs(questionBefore-question.getBoundingClientRect().top)<=1
+    };
+  });
+  expect(result).toEqual({scrollable:true,scrolled:true,endVisible:true,dockFixed:true});
+  expect(errors).toEqual([]);
+});
