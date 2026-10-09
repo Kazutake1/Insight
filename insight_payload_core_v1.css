@@ -1459,3 +1459,5 @@ body.ai-analysis-open #main{margin-right:0!important}
 .sc-history-weather{display:flex;align-items:center;justify-content:center;gap:2px;white-space:nowrap;min-width:0;margin:3px 0 5px;font-size:11px;font-weight:700;line-height:1.35}
 .sc-history-icon{font-size:13px;line-height:1;flex:0 0 auto}.sc-history-high{color:#dc2626}.sc-history-low{color:#2563eb}.sc-history-divider{color:var(--text3)}
 .er-day-tab .sc-history-weather{margin:1px 0 3px;font-size:11px;font-weight:700}.er-day-tab .sc-history-weather span{font-size:11px;font-weight:700}.er-day-tab .sc-history-weather .sc-history-icon{font-size:13px}
+
+.er-detail-title>.sc-history-weather{justify-content:flex-start;margin-top:5px}
