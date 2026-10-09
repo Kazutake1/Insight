@@ -403,7 +403,7 @@
       var wrap=el('div',undefined,'er-day-tabs');
       occurrence.days.forEach(function(day){
         var button=el('button',undefined,'er-day-tab'+(day.date===state.selectedDate?' active':''));button.type='button';button.dataset.date=day.date;
-        button.append(el('strong',dateLabel(day.date,false)),el('span','売上 '+salesYen(day.metrics.salesYen)),el('span','客数 '+people(day.metrics.customers)));
+        button.append(el('strong',dateLabel(day.date,false)),root.InsightSalesCount.createHistoricalWeatherRow(day.date,currentStoreId()),el('span','売上 '+salesYen(day.metrics.salesYen)),el('span','客数 '+people(day.metrics.customers)));
         var hourly=root.InsightHourlyCustomers.status(allStores,currentStoreId(),day.date);
         if(hourly.complete)button.append(el('small','時間帯データあり'));
         button.onclick=function(){state.selectedDate=day.date;render();};
@@ -416,6 +416,7 @@
       var back=el('button','← 過去開催一覧へ','er-back');back.type='button';back.onclick=function(){state.occurrenceId='';state.selectedDate='';render();};summary.append(back);
       var head=el('section',undefined,'er-section er-detail-head'),heading=el('div',undefined,'er-detail-title');
       heading.append(el('h2',data.title),el('p',periodLabel(occurrence)+(occurrence.days.length>1?'　'+occurrence.days.length+'日間':'　1日開催')));
+      if(occurrence.days.length===1)heading.append(root.InsightSalesCount.createHistoricalWeatherRow(occurrence.days[0].date,currentStoreId()));
       head.append(heading);
       var singleDay=occurrence.startDate===occurrence.endDate;
       var cards=el('div',undefined,'er-overview-grid');
