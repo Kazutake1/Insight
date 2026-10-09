@@ -62,6 +62,7 @@ var orderedFeatureLoads=[
   './insight_ai_context_v1.js?v=20261003-ai-pipeline-1',
   './insight_ai_page_comments_v1.js?v=20261001-decision-analysis',
   './insight_settings_v1.js?v=20261007-step3-settings-hidden-class-1',
+  './insight_weather_bulk_v1.js?v=20261009-weather-bulk-1',
   './insight_year_controls_layout_v1.js?v=20261006-csp-style-year-controls-1',
   './insight_dark_theme_v1.js?v=20261007-csp-style-dark-theme-1',
   './insight_readability_v1.js?v=20261007-csp-style-readability-global-containers-1',
