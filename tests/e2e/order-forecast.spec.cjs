@@ -29,7 +29,7 @@ test('発注予測は閲覧専用・実績と平均・店舗カテゴリー切�
   const result=await open(page);await page.setViewportSize({width:1194,height:834});
   await page.locator('#navOrderForecast').click();await expect(page.locator('#pageOrderForecast')).toHaveClass(/show/);
   const initial=await page.evaluate(()=>InsightOrderForecast.addDays(InsightOrderForecast.today(),2));await expect(page.locator('#ofDelivery')).toHaveValue(initial);
-  await page.locator('#ofDelivery').fill('2026-10-11');await page.locator('#ofDelivery').dispatchEvent('change');await expect(page.locator('#ofSchedule')).toContainText('発注入力 10/9（金） 午後');await expect(page.locator('#ofSchedule')).toContainText('締切 10/10（土） 11:00');await expect(page.locator('#ofSchedule')).toContainText('納品 10/11（日） 1便 3:00・2便 10:00・3便 15:00');
+  await page.locator('#ofDelivery').fill('2026-10-11');await page.locator('#ofDelivery').dispatchEvent('change');await expect(page.locator('#ofSchedule')).toHaveCount(0);
   await expect(page.locator('#ofWeather .sc-day')).toHaveCount(7);await expect(page.locator('#ofWeather .of-selected')).toHaveCount(1);const height=await page.locator('#ofWeather .of-weather-card').first().evaluate(n=>n.getBoundingClientRect().height);expect(height).toBeLessThan(140);await expect(page.locator('#ofWeather .of-temp-max')).toHaveCount(7);await expect(page.locator('#ofWeather .of-temp-min')).toHaveCount(7);
   await page.locator('#ofDelivery').fill('2026-10-18');await page.locator('#ofDelivery').dispatchEvent('change');
   await expect(page.locator('#ofYearCards .sc-day')).toHaveCount(7);await expect(page.locator('#ofWeekCards .sc-day')).toHaveCount(5);await expect(page.locator('#ofRecentCards .sc-day')).toHaveCount(2);
