@@ -280,10 +280,10 @@ test('トップページは外部shellと機能manifestの最新版確認をno-s
     fetch('/insight_payload_source_v1.html?e2e-shell-check=1',{cache:'no-store'}).then(r=>r.text())
   ]));
   const [source,boot,loader,payload]=sources;
-  expect(source).toContain('name="insight-shell-version" content="20261009-ai-left-scroll-build-1"');
-  expect(source).toContain('insight_shell_boot_v1.js?v=20261009-ai-left-scroll-build-1');
-  expect(source).toContain('insight_shell_loader_v1.js?v=20261009-ai-left-scroll-build-1');
-  expect(source).toContain('insight_shell_v1.css?v=20261009-ai-left-scroll-build-1');
+  expect(source).toContain('name="insight-shell-version" content="20261009-weather-bulk-build-1"');
+  expect(source).toContain('insight_shell_boot_v1.js?v=20261009-weather-bulk-build-1');
+  expect(source).toContain('insight_shell_loader_v1.js?v=20261009-weather-bulk-build-1');
+  expect(source).toContain('insight_shell_v1.css?v=20261009-weather-bulk-build-1');
   expect(source).not.toMatch(/<script(?![^>]*\bsrc=)[^>]*>/i);
   expect(source).not.toMatch(/<style\b/i);
   expect(source).not.toMatch(/script-src[^;]*'unsafe-inline'/);
@@ -1182,6 +1182,39 @@ test('販売数ページはデータ本体の置換後に古いdraftを残さな
   });
 
   expect(result).toEqual({first:6,second:60});
+  expect(errors).toEqual([]);
+});
+
+test('設定ページの過去天気一括補完は未入力欄だけ保存し入力済みを保持する',async({page})=>{
+  const errors=await openInsight(page);
+  await page.route('https://historical-forecast-api.open-meteo.com/**',route=>route.fulfill({
+    status:200,contentType:'application/json',body:JSON.stringify({
+      daily:{time:['2023-01-01','2023-01-02'],weather_code:[61,0],
+        temperature_2m_max:[25.8,22.2],temperature_2m_min:[0.4,10.8]}
+    })
+  }));
+  await page.evaluate(()=>{
+    const s=allStores.stores[allStores.current];
+    s.years=['2023'];s.data={'2023':{'1月':[
+      {d:'1',weather:'',tempMaxC:'',tempMinC:0,売上:987,客数:42},
+      {d:'2',weather:'晴',tempMaxC:30,tempMinC:null,売上:150,客数:60}
+    ]}};
+    s.weatherLocation={latitude:35.25,longitude:136.78,timezone:'Asia/Tokyo',label:'テスト地点'};
+  });
+  await page.locator('#navSettings').click();
+  const button=page.locator('#insightWeatherBulkStart');
+  await expect(button).toBeVisible();
+  page.once('dialog',dialog=>dialog.accept());
+  await button.click();
+  await expect(page.locator('#insightWeatherBulkStatus')).toContainText('取得が終了しました');
+  const data=await page.evaluate(()=>{
+    const s=allStores.stores[allStores.current];
+    const saved=JSON.parse(localStorage.getItem('insight_v11'));
+    return {rows:s.data['2023']['1月'],stored:saved.stores[allStores.current].data['2023']['1月']};
+  });
+  expect(data.rows[0]).toMatchObject({weather:'小雨',tempMaxC:25,tempMinC:0,売上:987,客数:42});
+  expect(data.rows[1]).toMatchObject({weather:'晴',tempMaxC:30,tempMinC:10,売上:150,客数:60});
+  expect(data.stored).toEqual(data.rows);
   expect(errors).toEqual([]);
 });
 
