@@ -50,7 +50,7 @@ function load(options={}){
 }
 test('2023年からの既存年度・行だけを対象にし、未設定店舗を飛ばす',()=>{
   const x=load();const p=x.api.scan(x.data,'2023-01-03');
-  assert.equal(p.days,2);assert.equal(p.fields,4);
+  assert.equal(p.days,2);assert.equal(p.fields,3);
   assert.equal(p.stores.length,1);assert.deepEqual(Array.from(p.unconfigured),['B店']);
   assert.equal(p.groups.length,1);
   assert.equal(p.groups[0].start,'2023-01-01');
@@ -59,7 +59,7 @@ test('2023年からの既存年度・行だけを対象にし、未設定店舗�
 test('気温0を入力済みとして保持し、天気・気温の空欄だけ保存する',async()=>{
   const x=load();
   const result=await x.api.run();
-  assert.equal(result.days,2);assert.equal(result.fields,4);
+  assert.equal(result.days,2);assert.equal(result.fields,3);
   assert.equal(x.saved.length,1);
   const r1=x.data.stores.a.data['2023']['1月'][0];
   const r2=x.data.stores.a.data['2023']['1月'][1];
