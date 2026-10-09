@@ -1026,6 +1026,15 @@ body.ai-analysis-open #main{margin-right:0!important}
 .insight-settings-section h2{margin:0 0 5px;font-size:15px;color:var(--text)}
 .insight-settings-section>p{margin:0 0 12px;color:var(--text4);font-size:11px;line-height:1.55}
 .insight-settings-actions{display:grid;gap:8px}
+.insight-weather-bulk-section{display:grid;gap:10px}
+#pageSettings .insight-weather-bulk-section>p{margin:0;color:var(--text3);font-size:13px;line-height:1.55}
+#pageSettings .insight-weather-bulk-section .insight-weather-bulk-note{color:var(--text4);font-size:12px}
+.insight-weather-bulk-actions{display:flex;gap:8px;flex-wrap:wrap}
+.insight-weather-bulk-button{min-height:42px;padding:9px 14px;border:1px solid var(--border);border-radius:10px;background:var(--surface2);color:var(--text);font:700 13px/1.35 inherit;cursor:pointer}
+.insight-weather-bulk-button:disabled{opacity:.45;cursor:default}
+#insightWeatherBulkStart{background:var(--text);color:var(--surface)}
+#insightWeatherBulkStatus{font-size:12px;color:var(--text3);line-height:1.6;overflow-wrap:anywhere;white-space:normal}
+
 .insight-settings-actions .sidebar-btn,#pageSettings #insightDataHealthButton{display:flex;width:100%;box-sizing:border-box;align-items:center;gap:9px;margin:0;padding:11px 12px;border:1px solid var(--border);border-radius:11px;background:var(--surface2);color:var(--text3);font:600 12px/1.35 -apple-system,BlinkMacSystemFont,"Noto Sans JP",sans-serif;text-align:left;cursor:pointer}
 .insight-settings-actions .sidebar-btn:hover,#pageSettings #insightDataHealthButton:hover{background:var(--surface3)}
 #pageSettings #insightDataHealthButton{color:#15803d}
