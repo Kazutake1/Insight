@@ -20,7 +20,7 @@ async function open(page,failed=false){
     const cat=allStores.salesCountManagement.categories[0];cat.activeTrips=[true,false,true];
     const make=(value)=>({trips:[{delivery:value,sales:value},{delivery:100,sales:100},{delivery:null,sales:null}]});
     base.salesCounts={};for(const date of ['2026-10-11','2026-10-12','2026-10-15','2026-10-16','2026-10-17','2026-09-20','2026-09-27','2026-10-04'])base.salesCounts[date]={[cat.id]:make(date==='2026-10-11'?0:date==='2026-10-12'?null:12)};
-    allStores.stores.ofTestStore=JSON.parse(JSON.stringify(base));allStores.stores.ofTestStore.name='テスト店舗';allStores.stores.ofTestStore.salesCounts['2026-10-11'][cat.id].trips[0].delivery=42;
+    allStores.stores.ofTestStore=JSON.parse(JSON.stringify(base));allStores.stores.ofTestStore.name='テスト店舗';allStores.stores.ofTestStore.salesCounts['2026-10-11'][cat.id].trips[0].delivery=42;renderStoreSel();
     window.__ofBefore=JSON.stringify(allStores);window.__ofStored=localStorage.getItem('insight_v11');
   });
   return {errors,calls:()=>calls};
