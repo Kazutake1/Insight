@@ -4,6 +4,21 @@ const sales=require('../insight_sales_count_v1.js');
 const fs=require('node:fs');
 const path=require('node:path');
 
+
+test('過去の日付・店舗別の天気は保存済みの行から参照し、欠損は推測せず表示する',()=>{
+  const all={current:'a',stores:{a:{data:{'2026':{'10月':[]}}},b:{data:{'2026':{'10月':[]}}}}};
+  all.stores.a.data['2026']['10月'][10]={d:'11',weather:'雨',tempMaxC:26.9,tempMinC:0};
+  all.stores.b.data['2026']['10月'][10]={d:'11',weather:'晴',tempMaxC:21.2,tempMinC:12.7};
+  all.stores.a.data['2026']['10月'][11]={d:'99',weather:'雪',tempMaxC:-2};
+  const original=JSON.stringify(all);
+  assert.deepEqual(sales.historicalWeather(all,'a','2026-10-11'),{weather:'雨',icon:'🌧️',max:'26',min:'0'});
+  assert.deepEqual(sales.historicalWeather(all,'b','2026-10-11'),{weather:'晴',icon:'🌤️',max:'21',min:'12'});
+  assert.deepEqual(sales.historicalWeather(all,'a','2026-10-12'),{weather:'—',icon:'—',max:'—',min:'—'});
+  assert.deepEqual(sales.historicalWeather(all,'a','2026-09-11'),{weather:'—',icon:'—',max:'—',min:'—'});
+  assert.deepEqual(sales.historicalWeather(all,'a','2026-10-XX'),{weather:'—',icon:'—',max:'—',min:'—'});
+  assert.equal(JSON.stringify(all),original);
+});
+
 function base(){return {current:'a',stores:{a:{name:'A',years:['2026'],data:{},salesCounts:{}}}};}
 
 test('old data receives safe defaults without changing existing store fields',()=>{
