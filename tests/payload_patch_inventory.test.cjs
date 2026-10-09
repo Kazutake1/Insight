@@ -48,7 +48,7 @@ test('canonical payloadはinline script/styleを持たず外部assetを順序固
   const aiPresentation=read('insight_ai_presentation_v1.js');
   const readability=read('insight_readability_v1.js');
   const css=read('insight_payload_core_v1.css');
-  assert.match(payload,/insight_payload_core_v1\.css\?v=20261007-step3-donut-mode-css-1/);
+  assert.match(payload,/insight_payload_core_v1\.css\?v=20261009-ai-bottom-height-align-1/);
   assert.match(payload,/insight_payload_core_v1\.js\?v=20261007-step4-ai-position-css-1/);
   assert.doesNotMatch(core,/label\.style\.color/);
   assert.doesNotMatch(core,/msg\.style\.display/);
@@ -1155,7 +1155,7 @@ test('分析AIの位置は外部CSSだけで決まりruntime inline styleを使�
   const presentation=read('insight_ai_presentation_v1.js');
   const css=read('insight_payload_core_v1.css');
   assert.doesNotMatch(presentation,/sidebarRect|getBoundingClientRect|\.style\.setProperty|--ai-workspace-(?:left|top)/);
-  assert.match(css,/left:202px!important;right:12px!important;top:calc\(env\(safe-area-inset-top\) \+ 12px\)!important;bottom:calc\(env\(safe-area-inset-bottom\) \+ 12px\)!important/);
+  assert.match(css,/left:202px!important;right:12px!important;top:calc\(env\(safe-area-inset-top\) \+ 12px\)!important;bottom:auto!important;[^}]*height:calc\(100vh - env\(safe-area-inset-top\) - env\(safe-area-inset-bottom\) - 24px\)!important/);
   assert.match(css,/left:8px!important;right:8px!important}/);
 });
 
