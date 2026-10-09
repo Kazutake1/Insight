@@ -54,6 +54,7 @@ jobs:
           - security_storage_regression.test.cjs
           - storage_layer.test.cjs
           - weather_future_guard.test.cjs
+          - weather_bulk.test.cjs
           - weekly_review.test.cjs
           - year_manager.test.cjs
     steps:
