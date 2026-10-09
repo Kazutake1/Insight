@@ -280,10 +280,10 @@ test('トップページは外部shellと機能manifestの最新版確認をno-s
     fetch('/insight_payload_source_v1.html?e2e-shell-check=1',{cache:'no-store'}).then(r=>r.text())
   ]));
   const [source,boot,loader,payload]=sources;
-  expect(source).toContain('name="insight-shell-version" content="20261009-weather-bulk-today-build-1"');
-  expect(source).toContain('insight_shell_boot_v1.js?v=20261009-weather-bulk-today-build-1');
-  expect(source).toContain('insight_shell_loader_v1.js?v=20261009-weather-bulk-today-build-1');
-  expect(source).toContain('insight_shell_v1.css?v=20261009-weather-bulk-today-build-1');
+  expect(source).toContain('name="insight-shell-version" content="20261009-order-forecast-build-1"');
+  expect(source).toContain('insight_shell_boot_v1.js?v=20261009-order-forecast-build-1');
+  expect(source).toContain('insight_shell_loader_v1.js?v=20261009-order-forecast-build-1');
+  expect(source).toContain('insight_shell_v1.css?v=20261009-order-forecast-build-1');
   expect(source).not.toMatch(/<script(?![^>]*\bsrc=)[^>]*>/i);
   expect(source).not.toMatch(/<style\b/i);
   expect(source).not.toMatch(/script-src[^;]*'unsafe-inline'/);
@@ -3026,3 +3026,4 @@ test('販売数入力の平日・日祝平均は保存済み通常日を分類�
   await expect(holiday.locator('tbody tr').nth(1).locator('td')).toHaveText(['—','—','—','—']);
   expect(errors).toEqual([]);
 });
+

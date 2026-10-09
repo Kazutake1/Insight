@@ -68,7 +68,8 @@ var orderedFeatureLoads=[
   './insight_readability_v1.js?v=20261007-csp-style-readability-global-containers-1',
   './insight_input_chart_cleanup_v1.js?v=20261006-remove-chart-copy-1',
   './insight_weekday_chart_fix_v1.js?v=20261006-waste-zero-past-1',
-  './insight_weekday_chart_spacing_v1.js?v=20261006-csp-style-weekday-1'
+  './insight_weekday_chart_spacing_v1.js?v=20261006-csp-style-weekday-1',
+  './insight_order_forecast_v1.js?v=20261009-1'
 ];
 function featureSignature(entries){
   var text=entries.join('\n'),hash=2166136261;
@@ -98,3 +99,4 @@ html=html.replace('</body>',orderedFeatureHtml+'</body>');
 document.open();document.write(html);document.close();
 }).catch(fail);
 })();
+
