@@ -280,10 +280,10 @@ test('トップページは外部shellと機能manifestの最新版確認をno-s
     fetch('/insight_payload_source_v1.html?e2e-shell-check=1',{cache:'no-store'}).then(r=>r.text())
   ]));
   const [source,boot,loader,payload]=sources;
-  expect(source).toContain('name="insight-shell-version" content="20261009-order-forecast-delivery-date-build-3"');
-  expect(source).toContain('insight_shell_boot_v1.js?v=20261009-order-forecast-delivery-date-build-3');
-  expect(source).toContain('insight_shell_loader_v1.js?v=20261009-order-forecast-delivery-date-build-3');
-  expect(source).toContain('insight_shell_v1.css?v=20261009-order-forecast-delivery-date-build-3');
+  expect(source).toContain('name="insight-shell-version" content="20261009-order-forecast-sidebar-divider-build-4"');
+  expect(source).toContain('insight_shell_boot_v1.js?v=20261009-order-forecast-sidebar-divider-build-4');
+  expect(source).toContain('insight_shell_loader_v1.js?v=20261009-order-forecast-sidebar-divider-build-4');
+  expect(source).toContain('insight_shell_v1.css?v=20261009-order-forecast-sidebar-divider-build-4');
   expect(source).not.toMatch(/<script(?![^>]*\bsrc=)[^>]*>/i);
   expect(source).not.toMatch(/<style\b/i);
   expect(source).not.toMatch(/script-src[^;]*'unsafe-inline'/);
@@ -1438,13 +1438,23 @@ test('セール実績は内容別に表示し開催回ごとに行を分けて7�
   const order=await page.evaluate(()=>({
     afterSales:document.getElementById('navSalesCount').nextElementSibling&&document.getElementById('navSalesCount').nextElementSibling.id,
     afterResults:document.getElementById('navSaleResults').nextElementSibling&&document.getElementById('navSaleResults').nextElementSibling.id,
-    afterOrder:document.getElementById('navOrderForecast').nextElementSibling&&document.getElementById('navOrderForecast').nextElementSibling.id,
-    afterEventResults:document.getElementById('navEventResults').nextElementSibling&&document.getElementById('navEventResults').nextElementSibling.id
+    afterEventResults:document.getElementById('navEventResults').nextElementSibling&&document.getElementById('navEventResults').nextElementSibling.id,
+    afterAI:document.getElementById('aiAnalysisToggle').nextElementSibling&&document.getElementById('aiAnalysisToggle').nextElementSibling.className,
+    beforeOrder:document.getElementById('navOrderForecast').previousElementSibling&&document.getElementById('navOrderForecast').previousElementSibling.className,
+    lastNav:document.querySelector('#sidebar .nav-list').lastElementChild&&document.querySelector('#sidebar .nav-list').lastElementChild.id,
+    dividerRole:document.querySelector('.of-nav-divider')&&document.querySelector('.of-nav-divider').getAttribute('role'),
+    dividerHeight:document.querySelector('.of-nav-divider')&&document.querySelector('.of-nav-divider').getBoundingClientRect().height,
+    visibleGroupHeading:document.querySelector('.of-nav-section-title')
   }));
   expect(order.afterSales).toBe('navSaleResults');
-  expect(order.afterResults).toBe('navOrderForecast');
-  expect(order.afterOrder).toBe('navEventResults');
+  expect(order.afterResults).toBe('navEventResults');
   expect(order.afterEventResults).toBe('aiAnalysisToggle');
+  expect(order.afterAI).toBe('of-nav-divider');
+  expect(order.beforeOrder).toBe('of-nav-divider');
+  expect(order.lastNav).toBe('navOrderForecast');
+  expect(order.dividerRole).toBe('separator');
+  expect(order.dividerHeight).toBeGreaterThan(0);
+  expect(order.visibleGroupHeading).toBeNull();
   expect(errors).toEqual([]);
 });
 
