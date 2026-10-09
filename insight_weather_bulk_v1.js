@@ -161,7 +161,11 @@ async function fetchSeries(loc,group){
       }
       var map=dailyMap(await response.json());
       // A partial response is not accepted; never silently mark unavailable days as completed.
-      if(group.dates.some(function(date){return !map.has(date);}))throw new Error('対象日が応答に含まれていません');
+      if(group.dates.some(function(date){
+        var item=map.get(date);
+        return !item||codeToWeather(item.code)===null||
+          finiteTemperature(item.max)===null||finiteTemperature(item.min)===null;
+      }))throw new Error('対象日の天気・最高気温・最低気温に欠損があります');
       return {map:map,source:modes[i]};
     }catch(error){
       if(String(error&&error.message||'').includes('429'))throw error;
@@ -277,6 +281,8 @@ function install(){
       status.textContent=(result.cancelled?'中止しました。':'取得が終了しました。')+
         ' 補完 '+result.days+'日／'+result.fields+'項目。'+
         (result.plan.unconfigured.length?' 地点未設定：'+result.plan.unconfigured.join('、')+'。':'')+
+        (result.plan.unavailableYears.length?' 未登録年度：'+result.plan.unavailableYears.join('、')+'。':'')+
+        (result.sourceCounts.archive?' 再解析データ使用区間：'+result.sourceCounts.archive+'。':'')+
         ' 既存の表示を更新するには画面を再読み込みしてください。';
     }catch(error){
       status.textContent='取得を中断しました：'+String(error&&error.message||error)+
