@@ -41,6 +41,7 @@ function load(options={}){
       urls.push(url);
       if(options.failNetwork)return {ok:false,status:500};
       if(options.failHistorical&&url.includes('historical-forecast-api'))return {ok:false,status:500};
+      if(options.partialHistorical&&url.includes('historical-forecast-api'))return {ok:true,status:200,json:async()=>({daily:{time:['2023-01-01','2023-01-02'],weather_code:[61,61],temperature_2m_max:[null,null],temperature_2m_min:[10,10]}})};
       return mockWeather(url);
     }
   };
@@ -100,4 +101,23 @@ test('天気ラベルは既存コードに合わせ、未定義WMOコードを�
   assert.equal(api.codeToWeather(63),'雨');
   assert.equal(api.codeToWeather(95),'雷雨');
   assert.equal(api.codeToWeather(999),null);
+});
+
+test('過去の気象モデルに日付はあっても気温が欠ける場合は再解析へ切り替える',async()=>{
+  const x=load({partialHistorical:true});
+  const result=await x.api.run();
+  assert.equal(result.days,2);
+  assert.equal(x.urls.length,2);
+  assert.match(x.urls[1],/archive-api\.open-meteo\.com/);
+  assert.equal(x.data.stores.a.data['2023']['1月'][0].tempMaxC,24);
+});
+test('両店舗の地点が登録されている場合は店舗ごとに補完する',async()=>{
+  const data=snapshot();
+  data.stores.b.weatherLocation={latitude:35.3,longitude:136.8,timezone:'Asia/Tokyo'};
+  const x=load({data});
+  const result=await x.api.run();
+  assert.equal(result.days,3);
+  assert.equal(x.saved.length,2);
+  assert.equal(x.data.stores.b.data['2023']['1月'][0].weather,'雨');
+  assert.equal(x.data.stores.b.data['2023']['1月'][0].tempMaxC,24);
 });
