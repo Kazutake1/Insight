@@ -110,7 +110,7 @@
     var sales=root.InsightSalesCount,doc=root.document;if(!sales||!sales.createReadOnlyDayCard||!doc.getElementById('navSaleResults')){setTimeout(init,20);return;}root.__insightOrderForecastV1=true;
     var state={storeId:allStores.current,delivery:addDays(today(),2),categoryId:null},forecast=null,error='',loading=false,request=0,client=createClient(root.fetch.bind(root));
     function el(tag,text,cls){var node=doc.createElement(tag);if(text!==undefined)node.textContent=text;if(cls)node.className=cls;return node;}
-    var link=el('link');link.rel='stylesheet';link.href='./insight_order_forecast_v1.css?v=20261010-event-dialog-center-11';doc.head.append(link);
+    var link=el('link');link.rel='stylesheet';link.href='./insight_order_forecast_v1.css?v=20261010-order-forecast-layout-12';doc.head.append(link);
     var nav=el('button',undefined,'nav-btn');nav.id='navOrderForecast';nav.type='button';nav.innerHTML='<svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M3 4h18v16H3zM3 9h18M8 4v16"/></svg><span>発注予測</span>';nav.onclick=function(){root.gotoNav('orderForecast');};var navList=doc.querySelector('#sidebar .nav-list'),divider=el('div',undefined,'of-nav-divider');divider.setAttribute('role','separator');navList.append(divider,nav);
     var page=el('div',undefined,'page of-page');page.id='pageOrderForecast';page.innerHTML='<div class="page-header"><div class="page-title">発注予測</div></div><div class="of-toolbar"><label>納品日 <input id="ofDelivery" type="date" min="1900-01-01" max="9998-12-31"></label><label>カテゴリー <select id="ofCategory"></select></label></div><section class="of-section"><div class="of-heading"><h2>天気予報 <details class="of-source-info"><summary aria-label="天気予報の出典を確認" title="出典を確認">ⓘ</summary><div class="of-source-description"><a href="https://www.jma.go.jp/bosai/forecast/" target="_blank" rel="noopener noreferrer">出典：気象庁ホームページ（天気予報データを加工して表示）</a></div></details></h2><button id="ofRefresh" type="button">更新</button></div><div id="ofWeatherStatus" role="status" class="of-meta"></div><div id="ofWeather" class="of-grid"></div></section><section class="of-section"><h2>前年同時期7日間</h2><div id="ofPreviousYear" class="of-meta"></div><div id="ofYearCards" class="of-grid"></div></section><section class="of-section"><h2>過去4週間の同曜日実績</h2><div id="ofWeekCards" class="of-grid"></div></section><section class="of-section"><h2>納品日前7日間の実績</h2><div id="ofRecentCards" class="of-grid"></div><div id="ofRecentEmpty" class="of-meta"></div></section>';doc.getElementById('main').append(page);
     var eventDialog=el('dialog',undefined,'of-event-dialog');eventDialog.id='ofEventDialog';
@@ -148,6 +148,7 @@
           button.onclick=function(){showEventDetails(item.date,kind,items);};
           actions.append(button);
         });
+        if(actions.children.length===2)actions.classList.add('of-event-actions-paired');
         card.append(actions);
       }
       return card;
