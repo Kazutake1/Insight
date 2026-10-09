@@ -9,7 +9,7 @@ async function open(page,failed=false){
     let json;
     if(url.endsWith('/area.json'))json={class20s:{'23220':{name:'稲沢市',parent:'230011'}},class15s:{'230011':{parent:'230010'}},class10s:{'230010':{name:'西部',parent:'230000'}},offices:{'230000':{name:'愛知県'}}};
     else if(url.endsWith('/amedastable.json'))json={'51106':{lat:[35,10],lon:[136,58]}};
-    else {calls++;const start=await page.evaluate(()=>InsightOrderForecast.today());const times=Array.from({length:7},(_,i)=>new Date(Date.parse(start+'T00:00:00Z')+i*86400000).toISOString().slice(0,10)+'T00:00:00+09:00');json=[{reportDatetime:start+'T17:00:00+09:00',timeSeries:[{timeDefines:times,areas:[{area:{code:'230010',name:'西部'},weatherCodes:times.map(()=> '101'),pops:times.map(()=> '20')}]},{timeDefines:times,areas:[{area:{code:'51106',name:'名古屋'},tempsMin:times.map(()=> '18'),tempsMax:times.map(()=> '28')}]}]}];}
+    else {calls++;const start=new Intl.DateTimeFormat('en-CA',{timeZone:'Asia/Tokyo',year:'numeric',month:'2-digit',day:'2-digit'}).format(new Date());const times=Array.from({length:7},(_,i)=>new Date(Date.parse(start+'T00:00:00Z')+i*86400000).toISOString().slice(0,10)+'T00:00:00+09:00');json=[{reportDatetime:start+'T17:00:00+09:00',timeSeries:[{timeDefines:times,areas:[{area:{code:'230010',name:'西部'},weatherCodes:times.map(()=> '101'),pops:times.map(()=> '20')}]},{timeDefines:times,areas:[{area:{code:'51106',name:'名古屋'},tempsMin:times.map(()=> '18'),tempsMax:times.map(()=> '28')}]}]}];}
     await route.fulfill({json});
   });
   await page.goto('/Index.html');await page.waitForFunction(()=>document.getElementById('navOrderForecast'));
@@ -41,7 +41,7 @@ test('発注予測は閲覧専用・実績と平均・店舗カテゴリー切�
   const cats=await page.locator('#ofCategory option').evaluateAll(nodes=>nodes.map(n=>n.value));await page.locator('#ofCategory').selectOption(cats[1]);await expect(page.locator('#ofRecentCards .sc-day')).toHaveCount(0);
   await page.locator('#nav1').click();await expect(page.locator('#pageOrderForecast')).not.toHaveClass(/show/);await expect(page.locator('#pageDash')).toHaveClass(/show/);
   await page.locator('#navOrderForecast').click();await expect(page.locator('#ofDelivery')).toHaveValue('2026-10-18');await expect(page.locator('#ofCategory')).toHaveValue(cats[1]);await expect(page.locator('#ofStore')).toHaveValue('ofTestStore');
-  const protection=await page.evaluate(()=>({memory:JSON.stringify(allStores)===window.__ofBefore,storage:localStorage.getItem('insight_v11')===window.__ofStored}));expect(protection).toEqual({memory:true,storage:true});expect(result.errors).toEqual([]);
+  const protection=await page.evaluate(()=>({memory:JSON.stringify(allStores)===window.__ofBefore,differences:(function diff(a,b,path){if(JSON.stringify(a)===JSON.stringify(b))return [];if(a&&b&&typeof a==='object'&&typeof b==='object')return [...new Set([...Object.keys(a),...Object.keys(b)])].flatMap(k=>diff(a[k],b[k],path+'.'+k));return [path];})(JSON.parse(window.__ofBefore),allStores,'allStores'),storage:localStorage.getItem('insight_v11')===window.__ofStored}));expect(protection).toEqual({memory:true,differences:[],storage:true});expect(result.errors).toEqual([]);
 });
 test('予報の更新連打を抑えライト/ダーク双方で選択日を強調する',async({page})=>{
   const result=await open(page);await page.locator('#navOrderForecast').click();await expect(page.locator('#ofWeather .sc-day')).toHaveCount(7);
