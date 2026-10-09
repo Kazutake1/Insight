@@ -122,7 +122,7 @@ test('Index.htmlは必要先だけを許可するCSPを定義する',()=>{
     "default-src 'self'",
     "script-src 'self' https://unpkg.com https://cdnjs.cloudflare.com",
     "style-src 'self'",
-    "connect-src 'self' https://geocoding-api.open-meteo.com https://api.open-meteo.com https://historical-forecast-api.open-meteo.com https://www.jma.go.jp",
+    "connect-src 'self' https://geocoding-api.open-meteo.com https://api.open-meteo.com https://historical-forecast-api.open-meteo.com https://archive-api.open-meteo.com https://www.jma.go.jp",
     "img-src 'self' data: blob:",
     "object-src 'none'",
     "base-uri 'self'",
