@@ -2,6 +2,29 @@ const test=require('node:test');
 const assert=require('node:assert/strict');
 const fs=require('node:fs');
 const model=require('../insight_order_forecast_v1.js');
+test('セール・イベントのタップ表示は登録時のsnapshot.titleを正しく参照し複数件を保つ',()=>{
+  const data=[
+    {type:'sale',title:'旧名',snapshot:{title:'おにぎりセール'}},
+    {type:'sale',snapshot:{title:'サンドイッチ2個割引'}},
+    {type:'nearby',snapshot:{title:'地域の秋祭り'}},
+    {type:'special',snapshot:{title:'地域の秋祭り'}},
+    {type:'staff',name:'応援イベント',snapshot:{}},
+    {type:'sale',snapshot:{title:'<b>文字列のまま</b>'}},
+    {type:'sale',snapshot:{}}
+  ];
+  const before=JSON.stringify(data);
+  assert.deepEqual(model.eventItems(data),[
+    {kind:'sale',name:'おにぎりセール'},
+    {kind:'sale',name:'サンドイッチ2個割引'},
+    {kind:'event',name:'地域の秋祭り'},
+    {kind:'event',name:'地域の秋祭り'},
+    {kind:'event',name:'応援イベント'},
+    {kind:'sale',name:'<b>文字列のまま</b>'},
+    {kind:'sale',name:'名称未登録'}
+  ]);
+  assert.equal(JSON.stringify(data),before);
+  assert.deepEqual(model.eventItems(null),[]);
+});
 test('気象庁の天気コードに応じて晴・曇・雨・雪と複合予報のアイコン種別を返す',()=>{const cases={100:'sun',101:'partly',112:'sunRain',115:'sunSnow',200:'cloud',201:'partly',202:'cloudRain',204:'cloudSnow',300:'rain',301:'sunRain',303:'rainSnow',311:'sunRain',400:'snow',401:'sunSnow',403:'rainSnow',413:'cloudSnow'};Object.entries(cases).forEach(([code,kind])=>assert.equal(model.weatherIconKind(code),kind,code));for(const code of [null,'','999','__proto__'])assert.equal(model.weatherIconKind(code),null);});
 test('発注10/9午後なら締切10/10 11時、納品10/11である',()=>{const orderDate='2026-10-09',delivery=model.addDays(orderDate,2);assert.equal(model.addDays(orderDate,1),'2026-10-10');assert.equal(delivery,'2026-10-11');assert.equal(model.addDays(delivery,-2),orderDate);assert.equal(model.addDays(delivery,-1),'2026-10-10');});
 test('天気予報の日付は日曜・祝日が赤、土曜が青（祝日優先）',()=>{const holiday=(y,m,d)=>y===2026&&m===10&&(d===12||d===10);assert.equal(model.weatherDayTone('2026-10-11',holiday),'sun');assert.equal(model.weatherDayTone('2026-10-10',()=>false),'sat');assert.equal(model.weatherDayTone('2026-10-12',holiday),'sun');assert.equal(model.weatherDayTone('2026-10-10',holiday),'sun');assert.equal(model.weatherDayTone('2026-10-13',holiday),'');});

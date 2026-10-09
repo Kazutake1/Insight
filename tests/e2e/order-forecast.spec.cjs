@@ -21,7 +21,19 @@ async function open(page,failed=false){
     const make=(value)=>({trips:[{delivery:value,sales:value},{delivery:100,sales:100},{delivery:null,sales:null}]});
     base.data=base.data||{};base.data['2026']=base.data['2026']||{};base.data['2026']['10月']=base.data['2026']['10月']||[];base.data['2026']['10月'][10]=Object.assign({},base.data['2026']['10月'][10],{d:'11',weather:'雨',tempMaxC:25.9,tempMinC:15.2});
     base.salesCounts={};for(const date of ['2026-10-11','2026-10-12','2026-10-15','2026-10-16','2026-10-17','2026-09-20','2026-09-27','2026-10-04'])base.salesCounts[date]={[cat.id]:make(date==='2026-10-11'?0:date==='2026-10-12'?null:12)};
-    allStores.stores.ofTestStore=JSON.parse(JSON.stringify(base));allStores.stores.ofTestStore.name='テスト店舗';allStores.stores.ofTestStore.salesCounts['2026-10-11'][cat.id].trips[0].delivery=42;allStores.stores.ofTestStore.data['2026']['10月'][10]=Object.assign({},allStores.stores.ofTestStore.data['2026']['10月'][10],{weather:'晴',tempMaxC:23.3,tempMinC:14.8});renderStoreSel();
+    const date='2026-10-11';
+    allStores.eventManagement=allStores.eventManagement||{version:1,presets:[],events:[]};
+    allStores.eventManagement.events=(allStores.eventManagement.events||[]).filter(e=>!String(e.id||'').startsWith('of_e2e_'));
+    allStores.eventManagement.events.push(
+      {id:'of_e2e_sale1',type:'sale',scope:'global',startDate:date,endDate:date,snapshot:{title:'おにぎりセール',sale:{method:'amount',params:{amount:20}}}},
+      {id:'of_e2e_sale2',type:'sale',scope:'global',startDate:date,endDate:date,snapshot:{title:'サンドイッチ2個割引'}}
+    );
+    base.events=(base.events||[]).filter(e=>!String(e.id||'').startsWith('of_e2e_'));
+    base.events.push(
+      {id:'of_e2e_nearby',type:'nearby',scope:'store',startDate:date,endDate:date,snapshot:{title:'秋まつり'}},
+      {id:'of_e2e_special',type:'special',scope:'store',startDate:date,endDate:date,snapshot:{title:'創業記念日'}}
+    );
+    allStores.stores.ofTestStore=JSON.parse(JSON.stringify(base));allStores.stores.ofTestStore.name='テスト店舗';allStores.stores.ofTestStore.events=[{id:'of_e2e_second_only',type:'nearby',scope:'store',startDate:'2026-10-11',endDate:'2026-10-11',snapshot:{title:'テスト店舗限定のお祭り'}}];allStores.stores.ofTestStore.salesCounts['2026-10-11'][cat.id].trips[0].delivery=42;allStores.stores.ofTestStore.data['2026']['10月'][10]=Object.assign({},allStores.stores.ofTestStore.data['2026']['10月'][10],{weather:'晴',tempMaxC:23.3,tempMinC:14.8});renderStoreSel();
     window.__ofBefore=JSON.stringify(allStores);window.__ofStored=localStorage.getItem('insight_v11');
   });
   return {errors,calls:()=>calls};
@@ -35,12 +47,33 @@ test('発注予測は閲覧専用・実績と平均・店舗カテゴリー切�
   await page.locator('#ofDelivery').fill('2026-10-18');await page.locator('#ofDelivery').dispatchEvent('change');
   await expect(page.locator('#ofYearCards .sc-day')).toHaveCount(7);await expect(page.locator('#ofWeekCards .sc-day')).toHaveCount(5);await expect(page.locator('#ofRecentCards .sc-day')).toHaveCount(2);
   await expect(page.locator('#ofRecentCards [data-date="2026-10-11"] .sc-delivery-row input').first()).toHaveValue('0');await expect(page.locator('#ofRecentCards [data-date="2026-10-11"] .sc-history-weather')).toContainText('25°');await expect(page.locator('#ofRecentCards [data-date="2026-10-11"] .sc-history-icon')).toHaveText('🌧️');
+  const historic=page.locator('#ofRecentCards [data-date="2026-10-11"]');
+  await expect(historic.locator('.of-event-trigger')).toHaveText(['セール','イベント']);
+  const eventFit=await historic.evaluate(card=>{
+    const bounds=card.getBoundingClientRect(),buttons=Array.from(card.querySelectorAll('.of-event-trigger'));
+    return {overflow:card.scrollHeight-card.clientHeight,buttons:buttons.map(button=>{const rect=button.getBoundingClientRect();return {left:rect.left-bounds.left,right:bounds.right-rect.right,bottom:bounds.bottom-rect.bottom};})};
+  });
+  expect(eventFit.overflow).toBeLessThanOrEqual(1);
+  for(const bounds of eventFit.buttons){expect(bounds.left).toBeGreaterThanOrEqual(0);expect(bounds.right).toBeGreaterThanOrEqual(0);expect(bounds.bottom).toBeGreaterThanOrEqual(5);}
+  await historic.locator('.of-event-trigger').filter({hasText:'セール'}).click();
+  await expect(page.locator('#ofEventDialog')).toBeVisible();
+  await expect(page.locator('#ofEventDialogTitle')).toContainText('セール');
+  await expect(page.locator('#ofEventDialog .of-event-dialog-list li')).toHaveText(['おにぎりセール','サンドイッチ2個割引']);
+  await page.locator('.of-event-dialog-close').click();
+  await expect(page.locator('#ofEventDialog')).toBeHidden();
+  await historic.locator('.of-event-trigger').filter({hasText:'イベント'}).click();
+  await expect(page.locator('#ofEventDialog .of-event-dialog-list li')).toHaveText(['秋まつり','創業記念日']);
+  await page.keyboard.press('Escape');
+  await expect(page.locator('#ofEventDialog')).toBeHidden();
   await expect(page.locator('#ofRecentCards [data-date="2026-10-16"]')).toHaveCount(0);await expect(page.locator('#ofRecentCards [data-date="2026-10-17"]')).toHaveCount(0);
   await expect(page.locator('#ofWeekCards .sc-average-card .sc-delivery-row input').first()).toHaveValue('9');await expect(page.locator('#ofWeekCards .sc-average-card .sc-delivery-row input').nth(1)).toHaveValue('ー');
   expect(await page.locator('#pageOrderForecast .sc-trip input').evaluateAll(inputs=>inputs.every(i=>i.readOnly))).toBe(true);
   const widths=await page.evaluate(()=>({year:document.querySelector('#ofYearCards .sc-day').getBoundingClientRect().width,week:document.querySelector('#ofWeekCards .sc-day').getBoundingClientRect().width,recent:document.querySelector('#ofRecentCards .sc-day').getBoundingClientRect().width,right:document.querySelector('#ofYearCards .sc-day:last-child').getBoundingClientRect().right,page:document.querySelector('#pageOrderForecast').getBoundingClientRect().right}));
   expect(Math.abs(widths.year-widths.week)).toBeLessThan(1);expect(Math.abs(widths.year-widths.recent)).toBeLessThan(1);expect(widths.right).toBeLessThanOrEqual(widths.page);
   await expect(page.locator('#ofStore')).toHaveCount(0);await page.locator('#storeSel').selectOption('ofTestStore');await expect(page.locator('#storeSel')).toHaveValue('ofTestStore');await expect(page.locator('#ofRecentCards [data-date="2026-10-11"] .sc-delivery-row input').first()).toHaveValue('42');await expect(page.locator('#ofRecentCards [data-date="2026-10-11"] .sc-history-icon')).toHaveText('🌤️');
+  await page.locator('#ofRecentCards [data-date="2026-10-11"] .of-event-trigger').filter({hasText:'イベント'}).click();
+  await expect(page.locator('#ofEventDialog .of-event-dialog-list li')).toHaveText(['テスト店舗限定のお祭り']);
+  await page.locator('.of-event-dialog-close').click();
   const cats=await page.locator('#ofCategory option').evaluateAll(nodes=>nodes.map(n=>n.value));await page.locator('#ofCategory').selectOption(cats[1]);await expect(page.locator('#ofRecentCards .sc-day')).toHaveCount(0);
   await page.locator('#nav1').click();await expect(page.locator('#pageOrderForecast')).not.toHaveClass(/show/);await expect(page.locator('#pageDash')).toHaveClass(/show/);
   await page.locator('#navOrderForecast').click();await expect(page.locator('#ofDelivery')).toHaveValue('2026-10-18');await expect(page.locator('#ofCategory')).toHaveValue(cats[1]);await expect(page.locator('#storeSel')).toHaveValue('ofTestStore');
