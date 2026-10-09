@@ -33,7 +33,7 @@ async function open(page,failed=false){
       {id:'of_e2e_nearby',type:'nearby',scope:'store',startDate:date,endDate:date,snapshot:{title:'秋まつり'}},
       {id:'of_e2e_special',type:'special',scope:'store',startDate:date,endDate:date,snapshot:{title:'創業記念日'}}
     );
-    allStores.stores.ofTestStore=JSON.parse(JSON.stringify(base));allStores.stores.ofTestStore.name='テスト店舗';allStores.stores.ofTestStore.events=[{id:'of_e2e_second_only',type:'nearby',scope:'store',startDate:'2026-10-11',endDate:'2026-10-11',snapshot:{title:'テスト店舗限定のお祭り'}}];allStores.stores.ofTestStore.salesCounts['2026-10-11'][cat.id].trips[0].delivery=42;allStores.stores.ofTestStore.data['2026']['10月'][10]=Object.assign({},allStores.stores.ofTestStore.data['2026']['10月'][10],{weather:'晴',tempMaxC:23.3,tempMinC:14.8});renderStoreSel();
+    allStores.stores.ofTestStore=JSON.parse(JSON.stringify(base));allStores.stores.ofTestStore.name='テスト店舗';allStores.stores.ofTestStore.events=[{id:'of_e2e_second_only',type:'nearby',scope:'store',startDate:'2026-10-11',endDate:'2026-10-11',snapshot:{title:'テスト店舗限定のお祭り'}},{id:'of_e2e_single_only',type:'nearby',scope:'store',startDate:'2026-10-12',endDate:'2026-10-12',snapshot:{title:'単独イベント'}}];allStores.stores.ofTestStore.salesCounts['2026-10-11'][cat.id].trips[0].delivery=42;allStores.stores.ofTestStore.data['2026']['10月'][10]=Object.assign({},allStores.stores.ofTestStore.data['2026']['10月'][10],{weather:'晴',tempMaxC:23.3,tempMinC:14.8});renderStoreSel();
     window.__ofBefore=JSON.stringify(allStores);window.__ofStored=localStorage.getItem('insight_v11');
   });
   return {errors,calls:()=>calls};
@@ -101,7 +101,7 @@ test('発注予測は閲覧専用・実績と平均・店舗カテゴリー切�
   const widths=await page.evaluate(()=>({year:document.querySelector('#ofYearCards .sc-day').getBoundingClientRect().width,week:document.querySelector('#ofWeekCards .sc-day').getBoundingClientRect().width,recent:document.querySelector('#ofRecentCards .sc-day').getBoundingClientRect().width,right:document.querySelector('#ofYearCards .sc-day:last-child').getBoundingClientRect().right,page:document.querySelector('#pageOrderForecast').getBoundingClientRect().right}));
   expect(Math.abs(widths.year-widths.week)).toBeLessThan(1);expect(Math.abs(widths.year-widths.recent)).toBeLessThan(1);expect(widths.right).toBeLessThanOrEqual(widths.page);
   await expect(page.locator('#ofStore')).toHaveCount(0);await page.locator('#storeSel').selectOption('ofTestStore');await expect(page.locator('#storeSel')).toHaveValue('ofTestStore');await expect(page.locator('#ofRecentCards [data-date="2026-10-11"] .sc-delivery-row input').first()).toHaveValue('42');await expect(page.locator('#ofRecentCards [data-date="2026-10-11"] .sc-history-icon')).toHaveText('🌤️');
-  const singleAction=page.locator('#ofRecentCards [data-date="2026-10-11"] .of-event-actions');
+  const singleAction=page.locator('#ofRecentCards [data-date="2026-10-12"] .of-event-actions');
   await expect(singleAction.locator('.of-event-trigger')).toHaveCount(1);
   const singleFit=await singleAction.evaluate(action=>({container:action.getBoundingClientRect().width,button:action.querySelector('button').getBoundingClientRect().width}));
   expect(Math.abs(singleFit.container-singleFit.button)).toBeLessThanOrEqual(1);
