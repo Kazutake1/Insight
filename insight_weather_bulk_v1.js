@@ -9,11 +9,8 @@ var cancelRequested=false;
 
 function pad(n){return String(n).padStart(2,'0');}
 function localDate(d){return d.getFullYear()+'-'+pad(d.getMonth()+1)+'-'+pad(d.getDate());}
-function yesterday(){
-  var d=new Date();
-  d.setHours(12,0,0,0);
-  d.setDate(d.getDate()-1);
-  return localDate(d);
+function today(){
+  return localDate(new Date());
 }
 function recentStart(){
   var d=new Date();
@@ -46,7 +43,7 @@ function monthAndRow(target,dateKey){
   return index<0?null:rows[index];
 }
 function scan(snapshot,lastDate){
-  var end=lastDate||yesterday(),recent=recentStart();
+  var end=lastDate||today(),recent=recentStart();
   var result={start:START,end:end,stores:[],groups:[],days:0,fields:0,unconfigured:[],unavailableYears:[]};
   var stores=snapshot&&snapshot.stores||{};
   Object.keys(stores).forEach(function(storeId){
@@ -251,9 +248,9 @@ function install(){
   section.className='insight-settings-section insight-weather-bulk-section';
   var h=root.document.createElement('h2');h.textContent='過去の天気を一括補完';
   var p=root.document.createElement('p');
-  p.textContent='2023年1月1日〜昨日。登録済み年度・日付の未入力欄だけ補完し、既存の天気・最高／最低気温、売上、客数は変更しません。';
+  p.textContent='2023年1月1日〜本日。登録済み年度・日付の未入力欄だけ補完し、既存の天気・最高／最低気温、売上、客数は変更しません。';
   var note=root.document.createElement('p');note.className='insight-weather-bulk-note';
-  note.textContent='全店舗が対象です。各店舗の「天気地点」が未設定の場合はスキップします。開始前にデータをバックアップしてください。';
+  note.textContent='全店舗が対象です。各店舗の「天気地点」が未設定の場合はスキップします。当日分は予報値となる場合があります。開始前にデータをバックアップしてください。';
   var row=root.document.createElement('div');row.className='insight-weather-bulk-actions';
   var start=button('insightWeatherBulkStart','未取得の天気を一括取得');
   var cancel=button('insightWeatherBulkCancel','中止');cancel.disabled=true;
