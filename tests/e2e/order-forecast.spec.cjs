@@ -96,6 +96,38 @@ test('発注予測は閲覧専用・実績と平均・店舗カテゴリー切�
     normal:getComputedStyle(card.parentElement.querySelector('.sc-day:not(.sc-average-card)')).backgroundColor
   }));
   expect(averageTone.average).not.toBe(averageTone.normal);
+  // Each of the three input rows must line up with the weather-bearing cards.
+  // The average has an invisible weather row; no forecast/weather is synthesized.
+  for(const size of [{width:1194,height:834},{width:768,height:1024}]){
+    await page.setViewportSize(size);
+    const alignment=await page.locator('#ofWeekCards').evaluate(grid=>{
+      const normal=grid.querySelector('.sc-day:not(.sc-average-card)');
+      const average=grid.querySelector('.sc-average-card');
+      const top=selector=>[normal,average].map(card=>card.querySelector(selector).getBoundingClientRect().top);
+      const spacer=average.querySelector('.of-average-weather-spacer');
+      const weather=normal.querySelector('.sc-history-weather');
+      return {header:top('.sc-col-head'),delivery:top('.sc-delivery-row'),
+        sales:top('.sc-sales-row'),totals:top('.sc-totals'),
+        height:[weather.getBoundingClientRect().height,spacer.getBoundingClientRect().height],
+        hasSpacer:spacer.getAttribute('aria-hidden')==='true'};
+    });
+    expect(alignment.hasSpacer).toBe(true);
+    for(const positions of [alignment.header,alignment.delivery,alignment.sales,alignment.totals,alignment.height])
+      expect(Math.abs(positions[0]-positions[1])).toBeLessThanOrEqual(1.5);
+    for(const dark of [false,true]){
+      await page.evaluate(value=>{document.documentElement.classList.toggle('dark',value);document.body.classList.toggle('dark',value);},dark);
+      const style=await page.locator('#ofWeekCards .sc-average-card').evaluate(card=>{
+        const s=getComputedStyle(card);
+        return {topColor:s.borderTopColor,topWidth:s.borderTopWidth,
+          bg:s.backgroundColor,other:getComputedStyle(card.parentElement.querySelector('.sc-day:not(.sc-average-card)')).backgroundColor};
+      });
+      expect(style.topColor).toBe('rgb(0, 0, 0)');
+      expect(style.topWidth).toBe('2px');
+      expect(style.bg).not.toBe(style.other);
+    }
+  }
+  await page.evaluate(()=>{document.documentElement.classList.remove('dark');document.body.classList.remove('dark');});
+  await page.setViewportSize({width:1194,height:834});
   await expect(page.locator('#ofWeekCards .sc-average-card .sc-delivery-row input').first()).toHaveValue('9');await expect(page.locator('#ofWeekCards .sc-average-card .sc-delivery-row input').nth(1)).toHaveValue('ー');
   expect(await page.locator('#pageOrderForecast .sc-trip input').evaluateAll(inputs=>inputs.every(i=>i.readOnly))).toBe(true);
   const widths=await page.evaluate(()=>({year:document.querySelector('#ofYearCards .sc-day').getBoundingClientRect().width,week:document.querySelector('#ofWeekCards .sc-day').getBoundingClientRect().width,recent:document.querySelector('#ofRecentCards .sc-day').getBoundingClientRect().width,right:document.querySelector('#ofYearCards .sc-day:last-child').getBoundingClientRect().right,page:document.querySelector('#pageOrderForecast').getBoundingClientRect().right}));
