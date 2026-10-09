@@ -2,6 +2,7 @@ const test=require('node:test');
 const assert=require('node:assert/strict');
 const fs=require('node:fs');
 const model=require('../insight_order_forecast_v1.js');
+test('気象庁の天気コードに応じて晴・曇・雨・雪と複合予報のアイコン種別を返す',()=>{const cases={100:'sun',101:'partly',112:'sunRain',115:'sunSnow',200:'cloud',201:'partly',202:'cloudRain',204:'cloudSnow',300:'rain',301:'sunRain',303:'rainSnow',311:'sunRain',400:'snow',401:'sunSnow',403:'rainSnow',413:'cloudSnow'};Object.entries(cases).forEach(([code,kind])=>assert.equal(model.weatherIconKind(code),kind,code));for(const code of [null,'','999','__proto__'])assert.equal(model.weatherIconKind(code),null);});
 test('発注10/9午後なら締切10/10 11時、納品10/11である',()=>{const orderDate='2026-10-09',delivery=model.addDays(orderDate,2);assert.equal(model.addDays(orderDate,1),'2026-10-10');assert.equal(delivery,'2026-10-11');assert.equal(model.addDays(delivery,-2),orderDate);assert.equal(model.addDays(delivery,-1),'2026-10-10');});
 test('天気予報の日付は日曜・祝日が赤、土曜が青（祝日優先）',()=>{const holiday=(y,m,d)=>y===2026&&m===10&&(d===12||d===10);assert.equal(model.weatherDayTone('2026-10-11',holiday),'sun');assert.equal(model.weatherDayTone('2026-10-10',()=>false),'sat');assert.equal(model.weatherDayTone('2026-10-12',holiday),'sun');assert.equal(model.weatherDayTone('2026-10-10',holiday),'sun');assert.equal(model.weatherDayTone('2026-10-13',holiday),'');});
 const sales=require('../insight_sales_count_v1.js');
@@ -43,7 +44,7 @@ test('7日分を作り短期と週間を結合、未発表の気温は0にしな
   const data=model.parseForecast(forecast(),target,areas,points,'2026-10-09');
   assert.equal(data.days.length,7);assert.equal(data.days[0].min,null);assert.equal(data.days[0].max,null);assert.equal(data.days[0].pop,0);
   assert.equal(data.days[1].min,18);assert.equal(data.days[1].max,28);assert.equal(data.days[1].pop,20);
-  assert.equal(data.days[2].weather,'くもり一時雨');assert.equal(data.days[2].pop,50);assert.equal(data.days[6].weather,'—');
+  assert.equal(data.days[0].weatherCode,'111');assert.equal(data.days[1].weatherCode,'101');assert.equal(data.days[2].weatherCode,'202');assert.equal(data.days[2].weather,'くもり一時雨');assert.equal(data.days[6].weatherCode,null);assert.equal(data.days[2].pop,50);assert.equal(data.days[6].weather,'—');
   assert.throws(()=>model.parseForecast({},target,areas,points,'2026-10-09'));
 });
 test('取得はメモリのみ、同時取得集約・30分キャッシュ・手動更新は60秒制限',async()=>{
