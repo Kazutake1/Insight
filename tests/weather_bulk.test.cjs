@@ -121,3 +121,16 @@ test('両店舗の地点が登録されている場合は店舗ごとに補完�
   assert.equal(x.data.stores.b.data['2023']['1月'][0].weather,'雨');
   assert.equal(x.data.stores.b.data['2023']['1月'][0].tempMaxC,24);
 });
+
+test('一括取得の期間は2023年1月1日から実行日の今日までを含む',()=>{
+  const x=load();
+  const plan=x.api.scan(x.data);
+  const now=new Date();
+  const ymd=now.getFullYear()+'-'+String(now.getMonth()+1).padStart(2,'0')+'-'+String(now.getDate()).padStart(2,'0');
+  assert.equal(plan.start,'2023-01-01');
+  assert.equal(plan.end,ymd);
+  const todayGroup={start:ymd,end:ymd};
+  const url=x.api.urlFor(coord,todayGroup,'recent');
+  assert.match(url,/past_days=3/);
+  assert.match(url,/forecast_days=1/);
+});
