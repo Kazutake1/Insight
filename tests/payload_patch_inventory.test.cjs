@@ -25,9 +25,9 @@ test('Index shellはinline script/styleを持たず外部assetへ分離する',(
   const boot=read('insight_shell_boot_v1.js');
   const loader=read('insight_shell_loader_v1.js');
   const css=read('insight_shell_v1.css');
-  assert.match(index,/insight_shell_boot_v1\.js\?v=20261006-csp-style-shell-1/);
-  assert.match(index,/insight_shell_loader_v1\.js\?v=20261006-csp-style-shell-1/);
-  assert.match(index,/insight_shell_v1\.css\?v=20261006-csp-style-shell-1/);
+  assert.match(index,/insight_shell_boot_v1\.js\?v=20261009-ai-left-scroll-build-1/);
+  assert.match(index,/insight_shell_loader_v1\.js\?v=20261009-ai-left-scroll-build-1/);
+  assert.match(index,/insight_shell_v1\.css\?v=20261009-ai-left-scroll-build-1/);
   assert.doesNotMatch(index,/<script(?![^>]*\bsrc=)[^>]*>/i);
   assert.doesNotMatch(index,/<style\b/i);
   assert.doesNotMatch(index,/script-src[^;]*'unsafe-inline'/);
@@ -48,7 +48,7 @@ test('canonical payloadはinline script/styleを持たず外部assetを順序固
   const aiPresentation=read('insight_ai_presentation_v1.js');
   const readability=read('insight_readability_v1.js');
   const css=read('insight_payload_core_v1.css');
-  assert.match(payload,/insight_payload_core_v1\.css\?v=20261009-ai-bottom-height-align-1/);
+  assert.match(payload,/insight_payload_core_v1\.css\?v=20261009-ai-left-scroll-css-1/);
   assert.match(payload,/insight_payload_core_v1\.js\?v=20261007-step4-ai-position-css-1/);
   assert.doesNotMatch(core,/label\.style\.color/);
   assert.doesNotMatch(core,/msg\.style\.display/);
@@ -185,8 +185,8 @@ test('canonical payloadはinline script/styleを持たず外部assetを順序固
 
 test('トップページはキャッシュ抑止とシェル・機能manifestの自己更新を持つ',()=>{
   const index=readShell();
-  assert.match(index,/insight-shell-version" content="20261006-csp-style-shell-1/);
-  assert.match(index,/var BUILD="20261006-csp-style-shell-1"/);
+  assert.match(index,/insight-shell-version" content="20261009-ai-left-scroll-build-1/);
+  assert.match(index,/var BUILD="20261009-ai-left-scroll-build-1"/);
   assert.match(index,/Shell rule: bump BUILD whenever the loader/);
   assert.match(index,/Cache-Control" content="no-cache, no-store, must-revalidate/);
   assert.match(index,/insight_probe=/);
@@ -309,12 +309,15 @@ test('AI表示CSSはIndexの文字列置換ではなくpresentation moduleが所
     '  .ai-analysis-panel{width:92vw;}',
     '.ai-analysis-empty{font-size:12px;line-height:1.7;color:var(--text4);}'
   ]) assert.ok(!index.includes("html=html.replace('"+marker),marker+' がIndexのreplaceに残っています');
-  assert.match(index,/insight_ai_presentation_v1\.js\?v=20261006-header-compact-1/);
+  assert.match(index,/insight_ai_presentation_v1\.js\?v=20261009-ai-left-scroll-js-1/);
   assert.doesNotMatch(presentation,/insightAiPresentationStyle|createElement\(['\"]style/);
   assert.doesNotMatch(presentation,/数値と要点を優先して表示/);
   assert.match(css,/body\.ai-analysis-open #main\{margin-right:0!important\}/);
   assert.match(css,/\.ai-analysis-panel\.ai-analysis-workspace/);
   assert.match(css,/\.ai-workspace-grid/);
+  assert.match(css,/\.ai-workspace-main-scroll\{[^}]*overflow-y:auto/);
+  assert.match(presentation,/scrollRegion\.append\(mainHead,historyToolbar,summaryCard\)/);
+  assert.match(css,/\.ai-workspace-question-dock\{position:relative;flex:0 0 auto/);
   assert.match(css,/\.ai-analysis-question-row/);
   assert.match(css,/@media\(max-width:920px\)/);
   assert.doesNotThrow(()=>new vm.Script(presentation), 'presentation module must be valid JavaScript');
@@ -1086,7 +1089,7 @@ test('分析AIはダッシュボード再掲ではなく4ブロックの意思�
   const presentation=read('insight_ai_presentation_v1.js');
   assert.match(index,/insight_ai_interpretation_v1\.js\?v=20261001-decision-analysis/);
   assert.match(index,/insight_ai_page_comments_v1\.js\?v=20261001-decision-analysis/);
-  assert.match(index,/insight_ai_presentation_v1\.js\?v=20261006-header-compact-1/);
+  assert.match(index,/insight_ai_presentation_v1\.js\?v=20261009-ai-left-scroll-js-1/);
   assert.match(index,/insight_ai_visual_v1\.js\?v=20261006-balanced-layout-1/);
   assert.ok(index.indexOf('insight_analysis_history_v1.js')<index.indexOf('insight_ai_interpretation_v1.js'));
   assert.ok(index.indexOf('insight_ai_interpretation_v1.js')<index.indexOf('insight_ai_page_comments_v1.js'));
@@ -1147,7 +1150,7 @@ test('STEP5完了: bootstrap文字列patch依存は0件',()=>{
 
 test('分析AI workspace assetはcache bustされている',()=>{
   const index=readShell();
-  assert.match(index,/insight_ai_presentation_v1\.js\?v=20261006-header-compact-1/);
+  assert.match(index,/insight_ai_presentation_v1\.js\?v=20261009-ai-left-scroll-js-1/);
   assert.match(index,/insight_ops_v1\.js\?v=20260930-step5-2/);
 });
 
