@@ -14,6 +14,7 @@ async function open(page,failed=false){
   });
   await page.goto('/Index.html');await page.waitForFunction(()=>document.getElementById('navOrderForecast'));
   await page.evaluate(()=>{
+    gotoNav(1); // Initialize existing dashboard defaults before the protection baseline.
     const id=allStores.current,base=allStores.stores[id];
     base.weatherLocation={name:'稲沢市',admin1:'愛知県',latitude:35.25,longitude:136.8};
     const cat=allStores.salesCountManagement.categories[0];cat.activeTrips=[true,false,true];

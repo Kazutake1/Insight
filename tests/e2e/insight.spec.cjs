@@ -1438,10 +1438,12 @@ test('セール実績は内容別に表示し開催回ごとに行を分けて7�
   const order=await page.evaluate(()=>({
     afterSales:document.getElementById('navSalesCount').nextElementSibling&&document.getElementById('navSalesCount').nextElementSibling.id,
     afterResults:document.getElementById('navSaleResults').nextElementSibling&&document.getElementById('navSaleResults').nextElementSibling.id,
+    afterOrder:document.getElementById('navOrderForecast').nextElementSibling&&document.getElementById('navOrderForecast').nextElementSibling.id,
     afterEventResults:document.getElementById('navEventResults').nextElementSibling&&document.getElementById('navEventResults').nextElementSibling.id
   }));
   expect(order.afterSales).toBe('navSaleResults');
-  expect(order.afterResults).toBe('navEventResults');
+  expect(order.afterResults).toBe('navOrderForecast');
+  expect(order.afterOrder).toBe('navEventResults');
   expect(order.afterEventResults).toBe('aiAnalysisToggle');
   expect(errors).toEqual([]);
 });
