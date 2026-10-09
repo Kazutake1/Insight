@@ -380,22 +380,34 @@
         if(!groups.has(label))groups.set(label,[]);
         groups.get(label).push(entry);
       });
+      var scroll=el('div',undefined,'er-demand-scroll');
+      scroll.tabIndex=0;scroll.setAttribute('role','region');scroll.setAttribute('aria-label','特需商品一覧');
+      var table=el('table',undefined,'er-demand-table'),thead=el('thead'),header=el('tr');
+      ['商品名','用意数','販売数','消化率'].forEach(function(label){
+        var column=el('th',label);column.scope='col';header.append(column);
+      });
+      thead.append(header);table.append(thead);
       groups.forEach(function(entries,category){
-        var group=el('div',undefined,'er-demand-category');group.append(el('h3',category));
-        var grid=el('div',undefined,'er-demand-grid');
+        var body=el('tbody',undefined,'er-demand-category'),groupRow=el('tr',undefined,'er-demand-group');
+        var categoryName=el('th',category);categoryName.colSpan=4;categoryName.scope='rowgroup';groupRow.append(categoryName);body.append(groupRow);
         entries.forEach(function(entry){
-          var item=entry.current,card=el('article',undefined,'er-demand-card');card.append(el('h3',item.name));
-          var metrics=el('div',undefined,'er-demand-metrics');
-          metrics.append(summaryMetric('用意数',item.prepared===null?'—':numberText(item.prepared,0)),summaryMetric('販売数',item.sold===null?'—':numberText(item.sold,0)),summaryMetric('消化率',item.sellThrough===null?'—':numberText(item.sellThrough,1)+'%'));
-          card.append(metrics);
+          var item=entry.current,row=el('tr',undefined,'er-demand-row'),product=el('th',undefined,'er-demand-product');
+          product.scope='row';product.append(el('span',item.name,'er-demand-name'));
           if(entry.previous){
             var old=entry.previous,previous='前回：用意 '+(old.prepared===null?'—':numberText(old.prepared,0))+'　販売 '+(old.sold===null?'—':numberText(old.sold,0))+'　消化率 '+(old.sellThrough===null?'—':numberText(old.sellThrough,1)+'%');
-            card.append(el('p',previous,'er-demand-previous'));
+            product.append(el('span',previous,'er-demand-previous'));
           }
-          grid.append(card);
+          row.append(product);
+          [item.prepared===null?'—':numberText(item.prepared,0),
+           item.sold===null?'—':numberText(item.sold,0),
+           item.sellThrough===null?'—':numberText(item.sellThrough,1)+'%'].forEach(function(value){
+            row.append(el('td',value,'er-demand-value'));
+          });
+          body.append(row);
         });
-        group.append(grid);section.append(group);
+        table.append(body);
       });
+      scroll.append(table);section.append(scroll);
       return section;
     }
     function renderDayTabs(occurrence){
