@@ -286,10 +286,15 @@ function install(){
   return true;
 }
 if(root.document){
-  if(root.document.readyState==='loading')root.document.addEventListener('DOMContentLoaded',function(){
-    if(!install())root.setTimeout(install,200);
-  },{once:true});
-  else if(!install())root.setTimeout(install,200);
+  function startInstall(){
+    if(install())return;
+    var attempts=0,timer=root.setInterval(function(){
+      attempts++;
+      if(install()||attempts>=50)root.clearInterval(timer);
+    },100);
+  }
+  if(root.document.readyState==='loading')root.document.addEventListener('DOMContentLoaded',startInstall,{once:true});
+  else startInstall();
 }
 root.InsightWeatherBulk={scan:scan,run:run,applyGroup:applyGroup,urlFor:urlFor,
   fetchSeries:fetchSeries,isValidLocation:isValidLocation,codeToWeather:codeToWeather,
