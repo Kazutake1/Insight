@@ -111,3 +111,20 @@ test('特需商品のカテゴリーを正規化しても過去の未分類商�
   assert.equal(prior.category,undefined);
   assert.equal(prior.sold,45);
 });
+
+
+for(const count of [1,2,4])test(`特需表示の${count}カテゴリーでも全商品・順序・前回値を保持し元データを変更しない`,()=>{
+  const all=data(),products=all.stores.a.events[0].snapshot.specialDemand;
+  products[0].category='カテゴリー1';
+  for(let i=1;i<count;i++)products.push({id:'cat'+i,name:'商品'+i,category:i===3?'':'カテゴリー'+(i+1),prepared:null,sold:null});
+  products.push({id:'last',name:'同じカテゴリーの最後の商品',category:'カテゴリー1',prepared:0,sold:0});
+  const before=JSON.stringify(all);
+  const value=results.collect(all,'a','文化フォーラム','秋まつり',analysis);
+  const comparison=results.demandComparison(value.occurrences,value.occurrences[0]);
+  assert.deepEqual(comparison.map(e=>e.current.id),products.map(e=>e.id));
+  assert.equal(comparison[0].previous.sold,45);
+  assert.equal(comparison.at(-1).current.prepared,0);
+  assert.equal(comparison.at(-1).current.sold,0);
+  assert.equal(comparison.at(-1).current.sellThrough,null);
+  assert.equal(JSON.stringify(all),before);
+});
