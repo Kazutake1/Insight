@@ -382,14 +382,17 @@
       });
       var scroll=el('div',undefined,'er-demand-scroll');
       scroll.tabIndex=0;scroll.setAttribute('role','region');scroll.setAttribute('aria-label','特需商品一覧');
-      var table=el('table',undefined,'er-demand-table'),thead=el('thead'),header=el('tr');
-      ['商品名','用意数','販売数','消化率'].forEach(function(label){
-        var column=el('th',label);column.scope='col';header.append(column);
-      });
-      thead.append(header);table.append(thead);
       groups.forEach(function(entries,category){
-        var body=el('tbody',undefined,'er-demand-category'),groupRow=el('tr',undefined,'er-demand-group');
-        var categoryName=el('th',category);categoryName.colSpan=4;categoryName.scope='rowgroup';groupRow.append(categoryName);body.append(groupRow);
+        var group=el('section',undefined,'er-demand-category');group.append(el('h3',category));
+        var list=el('div',undefined,'er-demand-category-scroll');
+        list.tabIndex=0;list.setAttribute('role','region');list.setAttribute('aria-label',category+'の特需商品');
+        var table=el('table',undefined,'er-demand-table'),thead=el('thead'),header=el('tr');
+        table.setAttribute('aria-label',category+'の特需商品一覧');
+        ['商品名','用意数','販売数','消化率'].forEach(function(label){
+          var column=el('th',label);column.scope='col';header.append(column);
+        });
+        thead.append(header);table.append(thead);
+        var body=el('tbody');
         entries.forEach(function(entry){
           var item=entry.current,row=el('tr',undefined,'er-demand-row'),product=el('th',undefined,'er-demand-product');
           product.scope='row';product.append(el('span',item.name,'er-demand-name'));
@@ -405,9 +408,9 @@
           });
           body.append(row);
         });
-        table.append(body);
+        table.append(body);list.append(table);group.append(list);scroll.append(group);
       });
-      scroll.append(table);section.append(scroll);
+      section.append(scroll);
       return section;
     }
     function renderDayTabs(occurrence){

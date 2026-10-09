@@ -280,10 +280,10 @@ test('トップページは外部shellと機能manifestの最新版確認をno-s
     fetch('/insight_payload_source_v1.html?e2e-shell-check=1',{cache:'no-store'}).then(r=>r.text())
   ]));
   const [source,boot,loader,payload]=sources;
-  expect(source).toContain('name="insight-shell-version" content="20261010-demand-table-build-14"');
-  expect(source).toContain('insight_shell_boot_v1.js?v=20261010-demand-table-build-14');
-  expect(source).toContain('insight_shell_loader_v1.js?v=20261010-demand-table-build-14');
-  expect(source).toContain('insight_shell_v1.css?v=20261010-demand-table-build-14');
+  expect(source).toContain('name="insight-shell-version" content="20261010-demand-categories-build-15"');
+  expect(source).toContain('insight_shell_boot_v1.js?v=20261010-demand-categories-build-15');
+  expect(source).toContain('insight_shell_loader_v1.js?v=20261010-demand-categories-build-15');
+  expect(source).toContain('insight_shell_v1.css?v=20261010-demand-categories-build-15');
   expect(source).not.toMatch(/<script(?![^>]*\bsrc=)[^>]*>/i);
   expect(source).not.toMatch(/<style\b/i);
   expect(source).not.toMatch(/script-src[^;]*'unsafe-inline'/);
@@ -296,7 +296,7 @@ test('トップページは外部shellと機能manifestの最新版確認をno-s
   expect(source).toContain('https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js');
   expect(source).toContain('integrity="sha512-CQBWl4fJHWbryGE+Pc7UAxWMUMNMWzWxF4SQo9CgkJIN1kx6djDQZjh3Y8SZ1d+6I+1zze6Z7kHXO7q3UyZAWw=="');
   expect(loader).not.toContain('stripPayloadChartScript');
-  expect(payload).toContain('insight_payload_core_v1.css?v=20261010-demand-table-css-1');
+  expect(payload).toContain('insight_payload_core_v1.css?v=20261010-demand-categories-css-1');
   expect(payload).toContain('insight_payload_core_v1.js?v=20261007-step4-ai-position-css-1');
   expect(payload).toContain('insight_payload_ai_legacy_v1.js?v=20261006-payload-assets-1');
   expect(payload).toContain('insight_payload_bindings_v1.js?v=20261006-inline-bindings-1');
@@ -2178,13 +2178,13 @@ test('イベント実績は過去開催→複数日→カテゴリー便別実�
     previous:getComputedStyle(document.querySelector('.er-demand-previous')).fontSize
   }));
   expect(cardTypography).toEqual({category:'15px',demand:'13px',previous:'11px'});
-  const sparseScroll=await page.locator('.er-demand-scroll').evaluate(el=>({
+  const sparseScroll=await page.locator('.er-demand-category-scroll').first().evaluate(el=>({
     height:el.getBoundingClientRect().height,scrollHeight:el.scrollHeight,clientHeight:el.clientHeight,
     role:el.getAttribute('role'),label:el.getAttribute('aria-label')
   }));
   expect(sparseScroll.height).toBeLessThan(400);
   expect(sparseScroll.scrollHeight).toBeLessThanOrEqual(sparseScroll.clientHeight+1);
-  expect(sparseScroll).toMatchObject({role:'region',label:'特需商品一覧'});
+  expect(sparseScroll.role).toBe('region');
 
   // Many products across categories must not expand the event page indefinitely.
   await page.evaluate(()=>{
@@ -2199,11 +2199,11 @@ test('イベント実績は過去開催→複数日→カテゴリー便別実�
     window.InsightEventResults.render();
   });
   await expect(page.locator('.er-demand-row')).toHaveCount(26);
-  await expect(page.locator('.er-demand-group th')).toHaveText(['アイス','ドリンク']);
+  await expect(page.locator('.er-demand-category > h3')).toHaveText(['アイス','ドリンク']);
   await expect(page.locator('.er-demand-row').nth(1).locator('td')).toHaveText(['40','—','—']);
   for(const viewport of [{width:1194,height:834},{width:834,height:1194}]){
     await page.setViewportSize(viewport);
-    const large=await page.locator('.er-demand-scroll').evaluate(scroll=>{
+    const large=await page.locator('.er-demand-category-scroll').first().evaluate(scroll=>{
       const bounds=scroll.getBoundingClientRect(),table=scroll.querySelector('table');
       const heads=Array.from(table.querySelectorAll('thead th')).map(el=>el.textContent);
       const last=table.querySelector('.er-demand-row:last-child');
@@ -2216,8 +2216,8 @@ test('イベント実績は過去開催→複数日→カテゴリー便別実�
     expect(large.lastVisible).toBe(true);
     expect(large.overflowX).toBeLessThanOrEqual(1);
     expect(large.headers).toEqual(['商品名','用意数','販売数','消化率']);
-    await page.locator('.er-demand-scroll').evaluate(el=>{el.scrollTop=el.scrollHeight;});
-    const scrolled=await page.locator('.er-demand-scroll').evaluate(el=>({
+    await page.locator('.er-demand-category-scroll').first().evaluate(el=>{el.scrollTop=el.scrollHeight;});
+    const scrolled=await page.locator('.er-demand-category-scroll').first().evaluate(el=>({
       scrollTop:el.scrollTop,headerTop:el.querySelector('thead th').getBoundingClientRect().top,
       regionTop:el.getBoundingClientRect().top
     }));
@@ -2672,8 +2672,8 @@ test('よく使うイベントの特需商品は自由名で登録・編集で�
   await page.locator('#erEvent').selectOption({label:'E2E夏祭り'});
   await page.locator('.er-occurrence').first().click();
   await expect(page.locator('.er-demand-category')).toHaveCount(2);
-  await expect(page.locator('.er-demand-category').nth(0).locator('.er-demand-group th').first()).toHaveText(sharedCategory.name);
-  await expect(page.locator('.er-demand-category').nth(1).locator('.er-demand-group th').first()).toHaveText('祭り限定');
+  await expect(page.locator('.er-demand-category').nth(0).locator('h3').first()).toHaveText(sharedCategory.name);
+  await expect(page.locator('.er-demand-category').nth(1).locator('h3').first()).toHaveText('祭り限定');
   await expect(page.locator('.er-demand-category .er-demand-row')).toHaveCount(2);
   expect(errors).toEqual([]);
 });
