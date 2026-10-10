@@ -8,6 +8,8 @@ test('予測用データ品質チェックは設定画面から開け、デー�
   });
   await page.goto('/Index.html');
   await expect(page.locator('#insightPredictionDataButton')).toHaveCount(1);
+  await page.locator('#navSettings').click();
+  await expect(page.locator('#pageSettings')).toHaveClass(/show/);
   const before=await page.evaluate(()=>JSON.stringify(allStores));
   await page.locator('#insightPredictionDataButton').click();
   await expect(page.locator('#insightPredictionDataOverlay')).toBeVisible();
