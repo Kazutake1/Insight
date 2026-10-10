@@ -39,6 +39,7 @@ test('WebKitで起動し主要入力ページを移動できる',async({page})=>
 
   await page.locator('#navSalesCount').click();
   await expect(page.locator('#pageSalesCount')).toHaveClass(/show/);
+  await expect(page.locator('#scCalendar .sc-day:not(.empty)').first().locator('.sc-trip')).toHaveCount(3);
 
   expect(errors).toEqual([]);
 });
