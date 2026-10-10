@@ -129,3 +129,43 @@ test('保存後の廃棄入力編集履歴を消し、販売数だけの再保�
   expect(await page.evaluate(({date,storeId,categoryId})=>
     allStores.stores[storeId].wasteCounts[date][categoryId].trips,key)).toEqual([0,5,null]);
 });
+
+
+test('セール・イベント・発注予測が共有する読み取りカードは廃棄0と未入力を区別する',async({page})=>{
+  await page.route('**/Index.html*',async route=>{
+    const response=await route.fetch();
+    await route.fulfill({response,body:(await response.text()).replace(/;?\\s*upgrade-insecure-requests/g,'')});
+  });
+  await page.goto('/Index.html');
+  await expect(page.locator('#navSalesCount')).toBeVisible();
+  await page.locator('#navSalesCount').click();
+  const before=await page.evaluate(()=>{
+    const id=allStores.current,store=allStores.stores[id];
+    return JSON.stringify(store.wasteCounts||{});
+  });
+  await page.evaluate(()=>{
+    const category=allStores.salesCountManagement.categories.find(c=>!c.hidden);
+    const date='2026-10-11',id=allStores.current,store=allStores.stores[id];
+    store.wasteCounts=store.wasteCounts||{};
+    store.wasteCounts[date]=store.wasteCounts[date]||{};
+    store.wasteCounts[date][category.id]={trips:[null,0,3]};
+    const raw=store.salesCounts&&store.salesCounts[date]&&store.salesCounts[date][category.id];
+    const card=InsightSalesCount.createReadOnlyDayCard(date,raw,category,InsightSalesCount.wasteRecordAt(allStores,id,date,category.id));
+    card.id='wasteReadOnlyE2E';document.body.append(card);
+  });
+  const card=page.locator('#wasteReadOnlyE2E');
+  await expect(card.locator('.sc-waste-row input')).toHaveCount(3);
+  await expect(card.locator('.sc-waste-row input').nth(0)).toHaveValue('—');
+  await expect(card.locator('.sc-waste-row input').nth(1)).toHaveValue('0');
+  await expect(card.locator('.sc-waste-row input').nth(2)).toHaveValue('3');
+  await expect(card.locator('.sc-total-waste')).toHaveText('3※');
+  await expect(card.locator('.sc-total-waste')).toHaveAttribute('aria-label',/一部未入力/);
+  await expect(page.locator('.sc-average-card .sc-waste-row')).toHaveCount(0);
+  const original=await page.evaluate(()=>JSON.stringify(allStores.stores[allStores.current].wasteCounts||{}));
+  await page.locator('#navSaleResults').click();
+  await expect(page.locator('#pageSaleResults')).toHaveClass(/show/);
+  await page.locator('#navOrderForecast').click();
+  await expect(page.locator('#pageOrderForecast')).toHaveClass(/show/);
+  expect(await page.evaluate(()=>JSON.stringify(allStores.stores[allStores.current].wasteCounts||{}))).toBe(original);
+  expect(before).not.toBe(original);
+});
