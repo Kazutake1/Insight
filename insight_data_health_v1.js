@@ -49,6 +49,24 @@
     if(shape)issue(issues,'error',kind+'_invalid_shape',storeId,storeName,null,(kind==='sales'?'販売数':kind==='waste'?'廃棄数':'時間帯別客数')+'のデータ形式が不正な日付が'+shape+'件あります。');
   }
 
+  function checkWasteCountRecords(container,categories,issues,storeId,storeName){
+    if(container===undefined||!object(container))return;
+    var ids=Array.isArray(categories)?new Set(categories.filter(function(c){return object(c)&&typeof c.id==='string';}).map(function(c){return c.id;})):null;
+    var unknownCategories=0,invalidRecords=0,recordCount=0;
+    Object.keys(container).forEach(function(date){
+      if(!validDate(date)||!object(container[date]))return;
+      Object.keys(container[date]).forEach(function(categoryId){
+        recordCount++;
+        if(ids&&!ids.has(categoryId))unknownCategories++;
+        var record=container[date][categoryId];
+        if(!object(record)||!Array.isArray(record.trips)||record.trips.length!==3||
+          record.trips.some(function(v){return v!==null&&(!Number.isSafeInteger(v)||v<0);}))invalidRecords++;
+      });
+    });
+    if(!ids&&recordCount)issue(issues,'error','waste_missing_categories',storeId,storeName,null,'廃棄数のカテゴリー定義を確認できません。');
+    if(unknownCategories)issue(issues,'error','waste_unknown_category',storeId,storeName,null,'登録されていないカテゴリーIDの廃棄数が'+unknownCategories+'件あります。');
+    if(invalidRecords)issue(issues,'error','waste_invalid_record',storeId,storeName,null,'廃棄数の便数・数量が不正な記録が'+invalidRecords+'件あります。');
+  }
   function check(snapshot){
     var issues=[];
     if(!object(snapshot)){issue(issues,'error','root','', '',null,'保存データ全体の形式が不正です。');return finish(issues,0);}
@@ -103,6 +121,7 @@
 
       dateYearCounts(store.salesCounts,registered,'sales',issues,storeId,name);
       dateYearCounts(store.wasteCounts,registered,'waste',issues,storeId,name);
+      checkWasteCountRecords(store.wasteCounts,snapshot.salesCountManagement&&snapshot.salesCountManagement.categories,issues,storeId,name);
       dateYearCounts(store.hourlyCustomers,registered,'hourly',issues,storeId,name);
     });
     return finish(issues,storeCount);
