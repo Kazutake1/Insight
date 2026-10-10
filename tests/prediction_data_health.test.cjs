@@ -64,5 +64,7 @@ test('未入力と0、対象外便、非表示カテゴリー、起点日、未�
   assert.throws(()=>model.examine(data,{start:'2025-10-05',end:'2025-09-05'}));
   const today=model.examine(data);
   assert.equal(today.start,'2025-09-01');
-  assert.ok(today.end<new Intl.DateTimeFormat('en-CA',{timeZone:'Asia/Tokyo',year:'numeric',month:'2-digit',day:'2-digit'}).format(new Date()),'当日の未確定数値を集計しない');
+  const formatted=new Intl.DateTimeFormat('en-CA',{timeZone:'Asia/Tokyo',year:'numeric',month:'2-digit',day:'2-digit'}).formatToParts(new Date());
+  const todayParts=Object.fromEntries(formatted.map(p=>[p.type,p.value]));
+  assert.ok(today.end<[todayParts.year,todayParts.month,todayParts.day].join('-'),'当日の未確定数値を集計しない');
 });
