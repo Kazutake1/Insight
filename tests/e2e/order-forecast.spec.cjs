@@ -158,3 +158,38 @@ test('予報通信エラーでも実績は表示し未保存入力の離脱確�
   page.once('dialog',dialog=>dialog.dismiss());await page.locator('#navOrderForecast').click();await expect(page.locator('#pageSalesCount')).toHaveClass(/show/);await expect(page.locator('#pageOrderForecast')).not.toHaveClass(/show/);
   page.once('dialog',dialog=>dialog.accept());await page.locator('#navOrderForecast').click();await expect(page.locator('#ofWeatherStatus')).toContainText('取得できません');await expect(page.locator('#ofWeatherStatus')).toBeVisible();await expect(page.locator('#ofYearCards .sc-day')).toHaveCount(7);await expect(page.locator('#ofRefresh')).toBeEnabled();expect(result.errors).toEqual([]);
 });
+
+
+test('サイドバーは分析AIだけを発注予測の直下へ移動しiPadで両機能を維持する',async({page})=>{
+  const {errors}=await open(page);
+  const snapshot=()=>page.evaluate(()=>({memory:JSON.stringify(allStores),saved:localStorage.getItem('insight_v11')}));
+  const original=['nav0','nav1','nav2','nav3','nav4','navSalesCount','navSaleResults','navEventResults','aiAnalysisToggle','navOrderForecast'];
+  const expected=original.filter(id=>id!=='aiAnalysisToggle');expected.splice(expected.indexOf('navOrderForecast')+1,0,'aiAnalysisToggle');
+  const ids=()=>page.locator('#sidebar .nav-list .nav-btn').evaluateAll(nodes=>nodes.map(n=>n.id));
+  expect(await ids()).toEqual(expected);
+  expect((await ids()).filter(id=>id!=='aiAnalysisToggle')).toEqual(original.filter(id=>id!=='aiAnalysisToggle'));
+  await expect(page.locator('#navOrderForecast')).toHaveText('発注予測');
+  await expect(page.locator('#aiAnalysisToggle')).toHaveText('分析AI');
+  for(const viewport of [{width:1194,height:834},{width:834,height:1194}])for(const dark of [false,true]){
+    await page.setViewportSize(viewport);
+    await page.evaluate(dark=>{document.documentElement.classList.toggle('dark',dark);document.body.classList.toggle('dark',dark);},dark);
+    const before=await snapshot(page);
+    await page.locator('#navOrderForecast').click();
+    await expect(page.locator('#pageOrderForecast')).toHaveClass(/show/);
+    await expect(page.locator('#navOrderForecast')).toHaveClass(/active/);
+    await page.locator('#aiAnalysisToggle').click();
+    await expect(page.locator('body')).toHaveClass(/ai-analysis-open/);
+    await expect(page.locator('#aiAnalysisPanel')).toHaveAttribute('aria-hidden','false');
+    await page.locator('#aiAnalysisToggle').click();
+    await expect(page.locator('body')).not.toHaveClass(/ai-analysis-open/);
+    await expect(page.locator('#pageOrderForecast')).toHaveClass(/show/);
+    expect(await ids()).toEqual(expected);
+    const fit=await page.locator('#sidebar .nav-list').evaluate(list=>{
+      const forecast=document.getElementById('navOrderForecast').getBoundingClientRect(),ai=document.getElementById('aiAnalysisToggle').getBoundingClientRect();
+      return {overflow:list.scrollWidth-list.clientWidth,forecastBottom:forecast.bottom,aiTop:ai.top,aiWidth:ai.width,forecastWidth:forecast.width,adjacent:document.getElementById('navOrderForecast').nextElementSibling.id};
+    });
+    expect(fit.overflow).toBeLessThanOrEqual(1);expect(fit.aiTop).toBeGreaterThanOrEqual(fit.forecastBottom);expect(fit.aiWidth).toBe(fit.forecastWidth);expect(fit.adjacent).toBe('aiAnalysisToggle');
+    expect(await snapshot(page)).toEqual(before);
+  }
+  expect(errors).toEqual([]);
+});
