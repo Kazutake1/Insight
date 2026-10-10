@@ -23,6 +23,7 @@ var orderedFeatureLoads=[
   './insight_ai_ops_v1.js?v=20260930-hooks2',
   './insight_backup_guard_v1.js?v=20261003-post-restore-verify',
   './insight_data_health_v1.js?v=20261007-step3-data-health-status-1',
+  './insight_prediction_data_health_v1.js?v=20261010-prediction-quality-1',
   './insight_waste_insights_v1.js?v=20260930-hooks2',
   './insight_dashboard_year_fix_v1.js?v=20261006-legacy-year-cleanup-1',
   './insight_kyaku_insights_v1.js?v=20260930-hooks2',
