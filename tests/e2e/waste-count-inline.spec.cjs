@@ -134,7 +134,7 @@ test('保存後の廃棄入力編集履歴を消し、販売数だけの再保�
 test('セール・イベント・発注予測が共有する読み取りカードは廃棄0と未入力を区別する',async({page})=>{
   await page.route('**/Index.html*',async route=>{
     const response=await route.fetch();
-    await route.fulfill({response,body:(await response.text()).replace(/;?\\s*upgrade-insecure-requests/g,'')});
+    await route.fulfill({response,body:(await response.text()).replace(/;?\s*upgrade-insecure-requests/g,'')});
   });
   await page.goto('/Index.html');
   await expect(page.locator('#navSalesCount')).toBeVisible();
