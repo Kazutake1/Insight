@@ -1501,3 +1501,15 @@ body.ai-analysis-open #main{margin-right:0!important}
 .ipdh-table tbody th{font-weight:700;text-align:left;vertical-align:top;min-width:100px}
 .ipdh-table .ipdh-inactive{color:var(--text4,#777);text-align:center}
 @media(max-width:520px){.ipdh-overlay{padding:8px}.ipdh-dialog{padding:13px}.ipdh-metrics{grid-template-columns:repeat(2,minmax(0,1fr))}}
+
+/* Waste count inline three-row calendar: do not resize average or sale result cards. */
+#pageSalesCount .sc-calendar>.sc-day:not(.empty){height:auto;min-height:246px}
+#pageSalesCount .sc-calendar .sc-waste-row input{background:#fff1f2;border-color:#fda4af}
+#pageSalesCount .sc-calendar .sc-waste-row input:focus{background:#fff1f2;border-color:#e11d48}
+#pageSalesCount .sc-calendar .sc-waste-row input.has-val{background:#ffe4e6;border-color:#fb7185}
+#pageSalesCount .sc-calendar .sc-waste-row input.sc-not-applicable{background:var(--surface2)!important;border-color:var(--border)!important;color:var(--text4)!important}
+#pageSalesCount .sc-calendar .sc-totals{grid-template-columns:repeat(3,minmax(0,1fr))}
+#pageSalesCount .sc-calendar .sc-totals b{font-size:13px;min-width:0}
+#pageSalesCount .sc-calendar .sc-total-waste{color:#be123c}
+#pageSalesCount .sc-legend-waste{background:#ffe4e6;border-color:#fb7185!important}
+#pageSalesCount .sc-legend{flex-wrap:wrap}
