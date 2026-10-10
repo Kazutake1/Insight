@@ -66,6 +66,10 @@ test('年度削除は年度直結データを削除しイベント履歴と他�
     '2024-12-31':{old2:true},
     '2025-01-01':{keep:true}
   };
+  store.wasteCounts={
+    '2024-08-03':{cat_onigiri:{trips:[1,2,3]}},
+    '2025-01-01':{cat_onigiri:{trips:[0,null,2]}}
+  };
   store.hourlyCustomers={
     '2024-08-03':Array(24).fill(1),
     '2025-01-01':Array(24).fill(2)
@@ -81,6 +85,9 @@ test('年度削除は年度直結データを削除しイベント履歴と他�
   assert.equal(result.removed.dataYear,true);
   assert.equal(result.removed.monthlyOpsYear,true);
   assert.equal(result.removed.salesCountDates,2);
+  assert.equal(result.removed.wasteCountDates,1);
+  assert.equal(store.wasteCounts['2024-08-03'],undefined);
+  assert.deepEqual(store.wasteCounts['2025-01-01'].cat_onigiri.trips,[0,null,2]);
   assert.equal(result.removed.hourlyCustomerDates,1);
   assert.equal(store.data['2024'],undefined);
   assert.equal(store.monthlyOps['2024'],undefined);
