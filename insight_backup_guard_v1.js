@@ -78,6 +78,7 @@ function restoreSummary(fileName,info,snapshot,report){
     var warnings=(report.issues||[]).filter(function(item){return item.severity==="warning";}).slice(0,3).map(function(item){return "・"+item.message;}).join("\n");
     if(warnings)message+="\n\n注意事項\n"+warnings;
   }
+  if(countWasteRecords(allStores)>0){message+=countWasteRecords(snapshot)===0?"\n\n注意：このバックアップに廃棄数データはありません。復元すると現在の廃棄数は失われます。":"\n\n注意：現在の廃棄数もバックアップの値に置き換わります。";}
   return message+"\n\n現在の全データは上書きされます。復元しますか？";
 }
 
@@ -114,6 +115,32 @@ function normalizeSalesCount(next){
   if(!isPlainObject(next.salesCountManagement)||next.salesCountManagement.version!==1||!Array.isArray(next.salesCountManagement.categories)||!next.salesCountManagement.categories.length||!next.salesCountManagement.categories.some(function(c){return isPlainObject(c)&&c.hidden===false;}))throw new Error("販売数カテゴリーマスターが不正です");
   var ids=new Set(),names=new Set(),labels=new Set();next.salesCountManagement.categories.forEach(function(c){if(!isPlainObject(c)||typeof c.id!=="string"||!c.id||ids.has(c.id)||typeof c.name!=="string"||!c.name.trim()||names.has(c.name)||typeof c.hidden!=="boolean"||!Array.isArray(c.aliases)||c.aliases.some(function(a){return typeof a!=="string"||!a.trim();}))throw new Error("販売数カテゴリーが不正です");var values=[c.name].concat(c.aliases);if(values.some(function(v){return labels.has(v);}))throw new Error("販売数カテゴリーの名称履歴が重複しています");values.forEach(function(v){labels.add(v);});ids.add(c.id);names.add(c.name);});
   Object.keys(next.stores).forEach(function(storeId){var st=next.stores[storeId];if(st.salesCounts===undefined)st.salesCounts={};if(!isPlainObject(st.salesCounts))throw new Error("販売数データが不正です");Object.keys(st.salesCounts).forEach(function(date){if(!validSalesCountDate(date)||!isPlainObject(st.salesCounts[date]))throw new Error("販売数の日付データが不正です");Object.keys(st.salesCounts[date]).forEach(function(categoryId){if(!ids.has(categoryId))throw new Error("販売数カテゴリーの識別番号が不正です");var r=st.salesCounts[date][categoryId];if(!isPlainObject(r)||!Array.isArray(r.trips)||r.trips.length!==3)throw new Error("販売数の便データが不正です");r.trips.forEach(function(t){if(!isPlainObject(t))throw new Error("販売数の便データが不正です");["delivery","sales"].forEach(function(k){var v=t[k];if(v!==null&&(!Number.isSafeInteger(v)||v<0))throw new Error("販売数の入力値が不正です");});});});});});
+}
+function validateWasteCountBackup(next){
+  var ids=new Set(next.salesCountManagement.categories.map(function(category){return category.id;}));
+  Object.keys(next.stores).forEach(function(storeId){
+    var waste=next.stores[storeId].wasteCounts;
+    if(waste===undefined)return;
+    if(!isPlainObject(waste))throw new Error("廃棄数データの保存形式が不正です");
+    Object.keys(waste).forEach(function(date){
+      if(!validSalesCountDate(date)||!isPlainObject(waste[date]))throw new Error("廃棄数の日付データが不正です");
+      Object.keys(waste[date]).forEach(function(categoryId){
+        if(!ids.has(categoryId))throw new Error("廃棄数カテゴリーの識別番号が不正です");
+        var record=waste[date][categoryId];
+        if(!isPlainObject(record)||!Array.isArray(record.trips)||record.trips.length!==3||
+          record.trips.some(function(value){return value!==null&&(!Number.isSafeInteger(value)||value<0);}))
+          throw new Error("廃棄数の便データが不正です");
+      });
+    });
+  });
+}
+function countWasteRecords(snapshot){
+  var count=0;
+  Object.keys(snapshot&&snapshot.stores||{}).forEach(function(storeId){
+    var waste=snapshot.stores[storeId].wasteCounts||{};
+    Object.keys(waste).forEach(function(date){count+=Object.keys(waste[date]||{}).length;});
+  });
+  return count;
 }
 function normalizeBackup(raw){
   var next;if(isPlainObject(raw)&&isPlainObject(raw.stores)&&typeof raw.current==="string"){next=raw;}else if(isPlainObject(raw)&&Array.isArray(raw.years)&&isPlainObject(raw.data)){next=migrateOldData(raw);}else{throw new Error("バックアップ形式が正しくありません");}
@@ -161,6 +188,7 @@ function normalizeBackup(raw){
   });
   if(next.sharedWeather!==undefined){if(!isPlainObject(next.sharedWeather))throw new Error("共有天気データが不正です");Object.keys(next.sharedWeather).forEach(function(k){if(typeof next.sharedWeather[k]!=="string")throw new Error("共有天気データが不正です");});}
   normalizeSalesCount(next);
+  validateWasteCountBackup(next);
   if(window.InsightEvents)window.InsightEvents.validate(next);
   else if(next.eventManagement!==undefined||Object.keys(next.stores).some(function(id){return next.stores[id].events!==undefined;}))throw new Error("店舗イベント機能の読み込み後に復元してください");
   return next;
