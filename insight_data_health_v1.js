@@ -31,7 +31,7 @@
   }
   function dateYearCounts(container,registered,kind,issues,storeId,storeName){
     if(container===undefined)return;
-    if(!object(container)){issue(issues,'error',kind+'_container',storeId,storeName,null,kind==='sales'?'販売数データの保存形式が不正です。':'時間帯別客数データの保存形式が不正です。');return;}
+    if(!object(container)){issue(issues,'error',kind+'_container',storeId,storeName,null,kind==='sales'?'販売数データの保存形式が不正です。':kind==='waste'?'廃棄数データの保存形式が不正です。':'時間帯別客数データの保存形式が不正です。');return;}
     var orphan={},invalid=0,shape=0;
     Object.keys(container).forEach(function(key){
       var parsed=validDate(key);
@@ -42,11 +42,11 @@
         if(!Array.isArray(hours)||hours.length!==24||hours.some(function(v){return v!==null&&(!Number.isSafeInteger(v)||v<0);}))shape++;
       }else if(!object(container[key]))shape++;
     });
-    if(invalid)issue(issues,'error',kind+'_invalid_date',storeId,storeName,null,(kind==='sales'?'販売数':'時間帯別客数')+'に不正な日付キーが'+invalid+'件あります。');
+    if(invalid)issue(issues,'error',kind+'_invalid_date',storeId,storeName,null,(kind==='sales'?'販売数':kind==='waste'?'廃棄数':'時間帯別客数')+'に不正な日付キーが'+invalid+'件あります。');
     Object.keys(orphan).sort().forEach(function(year){
-      issue(issues,'warning',kind+'_unregistered_year',storeId,storeName,year,(kind==='sales'?'販売数':'時間帯別客数')+'に、正式登録されていない'+year+'年度のデータが'+orphan[year]+'日分あります。');
+      issue(issues,'warning',kind+'_unregistered_year',storeId,storeName,year,(kind==='sales'?'販売数':kind==='waste'?'廃棄数':'時間帯別客数')+'に、正式登録されていない'+year+'年度のデータが'+orphan[year]+'日分あります。');
     });
-    if(shape)issue(issues,'error',kind+'_invalid_shape',storeId,storeName,null,(kind==='sales'?'販売数':'時間帯別客数')+'のデータ形式が不正な日付が'+shape+'件あります。');
+    if(shape)issue(issues,'error',kind+'_invalid_shape',storeId,storeName,null,(kind==='sales'?'販売数':kind==='waste'?'廃棄数':'時間帯別客数')+'のデータ形式が不正な日付が'+shape+'件あります。');
   }
 
   function check(snapshot){
@@ -102,6 +102,7 @@
       }
 
       dateYearCounts(store.salesCounts,registered,'sales',issues,storeId,name);
+      dateYearCounts(store.wasteCounts,registered,'waste',issues,storeId,name);
       dateYearCounts(store.hourlyCustomers,registered,'hourly',issues,storeId,name);
     });
     return finish(issues,storeCount);
