@@ -1508,6 +1508,7 @@ body.ai-analysis-open #main{margin-right:0!important}
 #pageSalesCount .sc-calendar .sc-waste-row input:focus{background:#fff1f2;border-color:#e11d48}
 #pageSalesCount .sc-calendar .sc-waste-row input.has-val{background:#ffe4e6;border-color:#fb7185}
 #pageSalesCount .sc-calendar .sc-waste-row input.sc-not-applicable{background:var(--surface2)!important;border-color:var(--border)!important;color:var(--text4)!important}
+#pageSalesCount .sc-calendar .sc-waste-row input.sc-waste-unverified{background:var(--surface2);border:1px dashed var(--border);color:var(--text)}
 #pageSalesCount .sc-calendar .sc-totals{grid-template-columns:repeat(3,minmax(0,1fr))}
 #pageSalesCount .sc-calendar .sc-totals b{font-size:13px;min-width:0}
 #pageSalesCount .sc-calendar .sc-total-waste{color:#be123c}
