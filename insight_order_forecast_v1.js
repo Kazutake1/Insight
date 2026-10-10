@@ -135,7 +135,7 @@
       eventDialog.showModal();closeEvent.focus();
     }
     function dayCard(item,category){
-      var card=sales.createReadOnlyDayCard(item.date,item.record,category);card.dataset.date=item.date;
+      var card=sales.createReadOnlyDayCard(item.date,item.record,category,sales.wasteRecordAt(allStores,state.storeId,item.date,category.id));card.dataset.date=item.date;
       var events=root.InsightEvents&&root.InsightEvents.list(allStores,state.storeId,item.date,item.date)||[];
       var items=eventItems(events);
       if(items.length){
