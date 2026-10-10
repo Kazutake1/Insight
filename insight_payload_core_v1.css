@@ -1516,8 +1516,10 @@ body.ai-analysis-open #main{margin-right:0!important}
 /* Saved waste counts in read-only sale, event and order-history cards only. */
 .sc-day.sc-readonly-waste{height:auto;min-height:268px}
 .sc-day.sc-readonly-waste .sc-totals{grid-template-columns:repeat(3,minmax(0,1fr))}
-.sc-day.sc-readonly-waste .sc-totals b{font-size:13px;min-width:0}
+.sc-day.sc-readonly-waste .sc-totals b{font-size:14px;min-width:0}
 .sc-day.sc-readonly-waste .sc-total-waste{color:var(--text)}
+/* Keep the existing 4-week average card aligned without showing a waste average. */
+#ofWeekCards .sc-average-card .sc-totals{margin-top:42px}
 .sc-day.sc-readonly-waste .sc-waste-row input{background:var(--surface2);border-color:var(--border);color:var(--text)}
 .sc-day.sc-readonly-waste .sc-waste-row input.has-val{background:#ffe4e6;border-color:#fb7185;color:var(--text)}
 .dark .sc-day.sc-readonly-waste .sc-waste-row input.has-val{background:var(--surface2);border-color:#fb7185;color:var(--text)}
