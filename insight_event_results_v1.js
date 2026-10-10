@@ -334,7 +334,7 @@
       var grid=el('div',undefined,'er-category-grid');
       categories.forEach(function(category){
         var wrap=el('article',undefined,'er-category-card');wrap.append(el('h3',category.name));
-        var card=root.InsightSalesCount.createReadOnlyDayCard(date,saved[category.id],category);card.classList.add('er-readonly-sales-card');
+        var card=root.InsightSalesCount.createReadOnlyDayCard(date,saved[category.id],category,root.InsightSalesCount.wasteRecordAt(allStores,currentStoreId(),date,category.id));card.classList.add('er-readonly-sales-card');
         wrap.append(card);grid.append(wrap);
       });
       section.append(grid);return section;
@@ -363,7 +363,7 @@
         var grid=el('div',undefined,'er-period-day-grid');
         occurrence.days.forEach(function(day){
           var saved=records[day.date]&&records[day.date][category.id];
-          var card=root.InsightSalesCount.createReadOnlyDayCard(day.date,saved,category);
+          var card=root.InsightSalesCount.createReadOnlyDayCard(day.date,saved,category,root.InsightSalesCount.wasteRecordAt(allStores,currentStoreId(),day.date,category.id));
           grid.append(card);
         });
         group.append(grid);list.append(group);
