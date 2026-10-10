@@ -800,7 +800,7 @@ test('保存データ健全性チェックは読み取り専用で不整合を�
   const index=readShell();
   const health=read('insight_data_health_v1.js');
   const css=read('insight_payload_core_v1.css');
-  assert.match(index,/insight_data_health_v1\.js\?v=20261007-step3-data-health-status-1/);
+  assert.match(index,/insight_data_health_v1\.js\?v=20261011-waste-inline-1/);
   assert.ok(index.indexOf('insight_backup_guard_v1.js')<index.indexOf('insight_data_health_v1.js'));
   assert.match(health,/function check\(snapshot\)/);
   assert.match(health,/orphan_data_year/);
@@ -827,7 +827,7 @@ test('過年度は既存の疎データを保持して正式年度へ昇格し�
   const index=readShell();
   const manager=read('insight_year_manager_v1.js');
   const salesCount=read('insight_sales_count_v1.js');
-  assert.match(index,/insight_year_manager_v1\.js\?v=20261002-year-delete-consistency/);
+  assert.match(index,/insight_year_manager_v1\.js\?v=20261011-waste-inline-1/);
   assert.ok(index.indexOf('insight_storage_v1.js')<index.indexOf('insight_year_manager_v1.js'));
   assert.ok(index.indexOf('insight_year_manager_v1.js')<index.indexOf('insight_sales_count_v1.js'));
   assert.match(manager,/function normalizeYearData\(/);
@@ -844,7 +844,7 @@ test('年度削除は年度直結データをトランザクションで削除�
   const index=readShell();
   const manager=read('insight_year_manager_v1.js');
   const yearFix=read('insight_dashboard_year_fix_v1.js');
-  assert.match(index,/insight_year_manager_v1\.js\?v=20261002-year-delete-consistency/);
+  assert.match(index,/insight_year_manager_v1\.js\?v=20261011-waste-inline-1/);
   assert.match(index,/insight_dashboard_year_fix_v1\.js\?v=20261006-legacy-year-cleanup-1/);
   assert.match(manager,/function removeYear\(/);
   assert.match(manager,/removeDateYear\(target\.salesCounts,y\)/);
