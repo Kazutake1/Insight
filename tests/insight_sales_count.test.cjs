@@ -258,3 +258,36 @@ test('廃棄数の保存成功時のみ編集済みフラグを初期化する',
   assert.match(save,/persistTransaction\(next\);state\.wasteTouched=\{\};setDirty\(false\)/);
   assert.match(save,/catch\(e\)\{alert\('販売数を保存できませんでした/);
 });
+
+
+test('表示専用の廃棄数参照は店舗・日付・カテゴリーを区別し保存内容を変更しない',()=>{
+  const all=base();sales.ensure(all);
+  const id=all.salesCountManagement.categories[0].id;
+  all.stores.a.wasteCounts={'2026-10-11':{[id]:{trips:[null,0,3]}}};
+  all.stores.b={salesCounts:{},wasteCounts:{'2026-10-11':{[id]:{trips:[8,0,0]}}}};
+  const before=JSON.stringify(all);
+  assert.deepEqual(sales.wasteRecordAt(all,'a','2026-10-11',id),{trips:[null,0,3]});
+  assert.deepEqual(sales.wasteRecordAt(all,'b','2026-10-11',id),{trips:[8,0,0]});
+  assert.equal(sales.wasteRecordAt(all,'a','2026-10-12',id),null);
+  assert.equal(sales.wasteRecordAt(all,'a','2026-10-11','other'),null);
+  assert.equal(JSON.stringify(all),before);
+});
+
+test('セール・イベント・発注予測の実績カードだけ廃棄数を読み取り表示する',()=>{
+  const read=name=>fs.readFileSync(path.join(__dirname,'..',name),'utf8');
+  const salesSource=read('insight_sales_count_v1.js');
+  const saleSource=read('insight_sale_results_v1.js');
+  const eventSource=read('insight_event_results_v1.js');
+  const forecastSource=read('insight_order_forecast_v1.js');
+  const css=read('insight_payload_core_v1.css');
+  assert.match(salesSource,/withWaste=arguments\.length>=4/);
+  assert.match(salesSource,/buildReadOnlyWasteInput/);
+  assert.match(salesSource,/wasteSummary\(wasteRecord,mask,date\)/);
+  assert.match(saleSource,/createReadOnlyDayCard\(day\.date,day\.record,category,root\.InsightSalesCount\.wasteRecordAt/);
+  assert.equal((eventSource.match(/createReadOnlyDayCard\([^\n]*wasteRecordAt/g)||[]).length,2);
+  assert.match(forecastSource,/createReadOnlyDayCard\(item\.date,item\.record,category,sales\.wasteRecordAt/);
+  assert.match(forecastSource,/sales\.createAverageCard\('4週平均',data\.deliveryAverage,data\.salesAverage,null,category\)/);
+  assert.match(css,/#pageSalesCount \.sc-calendar \.sc-total-waste\{color:#111\}/);
+  assert.match(css,/\.sc-day\.sc-readonly-waste\{height:auto;min-height:268px\}/);
+  assert.match(css,/\.sc-day\.sc-readonly-waste \.sc-totals\{grid-template-columns:repeat\(3,minmax\(0,1fr\)\)\}/);
+});
