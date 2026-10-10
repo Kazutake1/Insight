@@ -236,7 +236,7 @@ test('廃棄数3行目は販売数入力ページだけに追加し既存平均�
   const css=fs.readFileSync(path.join(__dirname,'..','insight_payload_core_v1.css'),'utf8');
   assert.match(source,/wasteRow\.append\(buildWasteInput/);
   assert.match(source,/nextStore\.wasteCounts=savedWaste/);
-  assert.match(source,/persistTransaction\(next\);setDirty\(false\)/);
+  assert.match(source,/persistTransaction\(next\);state\.wasteTouched=\{\};setDirty\(false\)/);
   assert.match(css,/#pageSalesCount \.sc-calendar>\.sc-day:not\(\.empty\)/);
   assert.doesNotMatch(source,/function createAverageCard[^\n]*sc-total-waste/);
 });
