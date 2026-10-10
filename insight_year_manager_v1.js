@@ -84,6 +84,7 @@
       dataYear:!!(object(target.data)&&hasOwn(target.data,y)),
       monthlyOpsYear:!!(object(target.monthlyOps)&&hasOwn(target.monthlyOps,y)),
       salesCountDates:removeDateYear(target.salesCounts,y),
+      wasteCountDates:removeDateYear(target.wasteCounts,y),
       hourlyCustomerDates:removeDateYear(target.hourlyCustomers,y)
     };
     if(object(target.data))delete target.data[y];

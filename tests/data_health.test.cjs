@@ -64,3 +64,38 @@ test('時間帯別客数の24時間形式と日付キーを検査する',()=>{
   assert.ok(report.issues.some(x=>x.code==='hourly_invalid_date'));
   assert.ok(report.issues.some(x=>x.code==='hourly_invalid_shape'));
 });
+
+
+test('廃棄数が未導入の旧データは正常として扱う',()=>{
+  const data=clean(),before=JSON.stringify(data);
+  assert.equal(health.check(data).status,'ok');
+  assert.equal(JSON.stringify(data),before);
+});
+test('廃棄数の正常な数量・日付・カテゴリーを読取専用で検証する',()=>{
+  const data=clean();
+  data.salesCountManagement={version:1,categories:[{id:'cat_onigiri',name:'おにぎり',hidden:false,aliases:[],activeTrips:[true,true,true]}]};
+  data.stores.s1.wasteCounts={'2026-10-11':{cat_onigiri:{trips:[null,0,3]}}};
+  const before=JSON.stringify(data),report=health.check(data);
+  assert.equal(report.status,'ok');assert.equal(JSON.stringify(data),before);
+});
+test('廃棄数の不正便数・数量・カテゴリー・日付を検出し保存データを変更しない',()=>{
+  const data=clean();
+  data.salesCountManagement={version:1,categories:[{id:'cat_onigiri'}]};
+  data.stores.s1.wasteCounts={
+    '2026-10-11':{
+      cat_onigiri:{trips:[null,-1,1.5]},
+      unknown:{trips:[0,1,2]}
+    },
+    '2026-10-12':{cat_onigiri:{trips:['0',null,3]}},
+    '2026-02-30':{cat_onigiri:{trips:[0,0,0]}}
+  };
+  const before=JSON.stringify(data),report=health.check(data);
+  const codes=new Set(report.issues.map(i=>i.code));
+  for(const code of ['waste_invalid_record','waste_unknown_category','waste_invalid_date'])assert.ok(codes.has(code),code);
+  assert.equal(report.status,'error');assert.equal(JSON.stringify(data),before);
+});
+test('廃棄数のレコードがあるのに共通カテゴリーが存在しない場合はエラー',()=>{
+  const data=clean();
+  data.stores.s1.wasteCounts={'2026-10-11':{cat_onigiri:{trips:[0,1,2]}}};
+  assert.ok(health.check(data).issues.some(x=>x.code==='waste_missing_categories'));
+});

@@ -187,3 +187,74 @@ test('日種別平均は選択月・カテゴリーの保存実績から全イ�
   assert.equal(sales.average(groups.sundayHoliday,'sales').total,105);
   assert.equal(sales.average([],'sales').total,null);
 });
+
+test('廃棄数のない既存スナップショットは変更せず検証できる',()=>{
+  const all=base();sales.ensure(all);
+  assert.equal(all.stores.a.wasteCounts,undefined);
+  assert.doesNotThrow(()=>sales.validate(all));
+  assert.equal(all.stores.a.wasteCounts,undefined);
+});
+
+test('廃棄数は未入力null・入力済み0・正の整数を区別する',()=>{
+  const all=base();sales.ensure(all);
+  const id=all.salesCountManagement.categories[0].id;
+  all.stores.a.wasteCounts={'2026-10-11':{[id]:{trips:[null,0,3]}}};
+  assert.doesNotThrow(()=>sales.validate(all));
+  assert.deepEqual(sales.normalizeWasteRecord(undefined),{trips:[null,null,null]});
+  assert.deepEqual(sales.normalizeWasteRecord(all.stores.a.wasteCounts['2026-10-11'][id]),{trips:[null,0,3]});
+  assert.deepEqual(sales.wasteSummary({trips:[null,0,3]},[true,true,true]),{total:3,complete:false});
+  assert.deepEqual(sales.wasteSummary({trips:[0,0,3]},[true,true,true]),{total:3,complete:true});
+});
+
+test('非対象便を合計しないが過去に保存された非対象便の値は捨てない',()=>{
+  assert.deepEqual(sales.wasteSummary({trips:[0,null,3]},[true,false,true]),{total:3,complete:true});
+  assert.deepEqual(sales.wasteSummary({trips:[0,2,3]},[true,false,true]),{total:5,complete:true});
+});
+
+test('廃棄数の店舗・日付・カテゴリー・便の不正値を拒否する',()=>{
+  const make=()=>{const all=base();sales.ensure(all);const id=all.salesCountManagement.categories[0].id;all.stores.a.wasteCounts={'2026-10-11':{[id]:{trips:[0,null,2]}}};return {all,id};};
+  for(const bad of [-1,1.5,'3',NaN,Infinity]){
+    const {all,id}=make();all.stores.a.wasteCounts['2026-10-11'][id].trips[0]=bad;
+    assert.throws(()=>sales.validate(all),/廃棄数/);
+  }
+  {
+    const {all,id}=make();all.stores.a.wasteCounts['2026-10-11'][id].trips=[1,2];
+    assert.throws(()=>sales.validate(all),/廃棄数/);
+  }
+  {
+    const {all}=make();all.stores.a.wasteCounts={'2026-09-31':{cat_onigiri:{trips:[1,2,3]}}};
+    assert.throws(()=>sales.validate(all),/廃棄数/);
+  }
+  {
+    const {all}=make();all.stores.a.wasteCounts={'2026-10-11':{unknown_category:{trips:[1,2,3]}}};
+    assert.throws(()=>sales.validate(all),/廃棄数/);
+  }
+});
+
+test('廃棄数3行目は販売数入力ページだけに追加し既存平均カードを変更しない',()=>{
+  const source=fs.readFileSync(path.join(__dirname,'..','insight_sales_count_v1.js'),'utf8');
+  const css=fs.readFileSync(path.join(__dirname,'..','insight_payload_core_v1.css'),'utf8');
+  assert.match(source,/wasteRow\.append\(buildWasteInput/);
+  assert.match(source,/nextStore\.wasteCounts=savedWaste/);
+  assert.match(source,/persistTransaction\(next\);state\.wasteTouched=\{\};setDirty\(false\)/);
+  assert.match(css,/#pageSalesCount \.sc-calendar>\.sc-day:not\(\.empty\)/);
+  assert.doesNotMatch(source,/function createAverageCard[^\n]*sc-total-waste/);
+});
+
+
+test('過去の対象便設定を推測で対象外と確定せず入力可能にする',()=>{
+  assert.equal(sales.wasteTripStatus([true,false,true],'2025-09-11',1,'2026-10-11'),'unverified');
+  assert.equal(sales.wasteTripStatus([true,false,true],'2026-10-11',1,'2026-10-11'),'inactive');
+  assert.equal(sales.wasteTripStatus([true,false,true],'2026-10-12',1,'2026-10-11'),'inactive');
+  assert.equal(sales.wasteTripStatus([true,true,true],'2025-09-11',1,'2026-10-11'),'active');
+  assert.deepEqual(sales.wasteSummary({trips:[0,null,3]},[true,false,true],'2025-09-11','2026-10-11'),{total:3,complete:false});
+  assert.deepEqual(sales.wasteSummary({trips:[0,null,3]},[true,false,true],'2026-10-11','2026-10-11'),{total:3,complete:true});
+  assert.deepEqual(sales.wasteSummary({trips:[0,2,3]},[true,false,true],'2025-09-11','2026-10-11'),{total:5,complete:true});
+});
+
+test('廃棄数の保存成功時のみ編集済みフラグを初期化する',()=>{
+  const source=fs.readFileSync(path.join(__dirname,'..','insight_sales_count_v1.js'),'utf8');
+  const save=source.slice(source.indexOf('function save(){'),source.indexOf('function notifyPeriodChange()'));
+  assert.match(save,/persistTransaction\(next\);state\.wasteTouched=\{\};setDirty\(false\)/);
+  assert.match(save,/catch\(e\)\{alert\('販売数を保存できませんでした/);
+});

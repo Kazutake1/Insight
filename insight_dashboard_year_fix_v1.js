@@ -21,7 +21,7 @@
   function ensureDialog(){
     if(overlay)return;
     overlay=document.createElement('div');overlay.id='insightYearDeleteOverlay';overlay.hidden=true;
-    overlay.innerHTML='<div id="insightYearDeleteDialog" role="dialog" aria-modal="true" aria-labelledby="insightYearDeleteHeading" aria-describedby="insightYearDeleteWarning"><h2 id="insightYearDeleteHeading">年度の削除</h2><label for="insightYearDeleteSelect">削除する年度</label><select id="insightYearDeleteSelect"></select><p id="insightYearDeleteQuestion"></p><p id="insightYearDeleteWarning">この年度の売上・客数・買上点数・廃棄・店舗メモ・天気/気温・人件費/粗利率・販売数/納品数・時間帯別客数を削除します。イベント・催事の開催記録と店舗設定は削除しません。元に戻せません。</p><div id="insightYearDeleteActions"><button type="button" id="insightYearDeleteCancel">キャンセル</button><button type="button" id="insightYearDeleteConfirm">削除する</button></div></div>';
+    overlay.innerHTML='<div id="insightYearDeleteDialog" role="dialog" aria-modal="true" aria-labelledby="insightYearDeleteHeading" aria-describedby="insightYearDeleteWarning"><h2 id="insightYearDeleteHeading">年度の削除</h2><label for="insightYearDeleteSelect">削除する年度</label><select id="insightYearDeleteSelect"></select><p id="insightYearDeleteQuestion"></p><p id="insightYearDeleteWarning">この年度の売上・客数・買上点数・廃棄金額・廃棄数・店舗メモ・天気/気温・人件費/粗利率・販売数/納品数・時間帯別客数を削除します。イベント・催事の開催記録と店舗設定は削除しません。元に戻せません。</p><div id="insightYearDeleteActions"><button type="button" id="insightYearDeleteCancel">キャンセル</button><button type="button" id="insightYearDeleteConfirm">削除する</button></div></div>';
     document.body.appendChild(overlay);
     select=overlay.querySelector('#insightYearDeleteSelect');
     question=overlay.querySelector('#insightYearDeleteQuestion');
