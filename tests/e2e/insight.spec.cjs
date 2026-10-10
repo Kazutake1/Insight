@@ -1439,8 +1439,8 @@ test('セール実績は内容別に表示し開催回ごとに行を分けて7�
   const order=await page.evaluate(()=>({
     afterSales:document.getElementById('navSalesCount').nextElementSibling&&document.getElementById('navSalesCount').nextElementSibling.id,
     afterResults:document.getElementById('navSaleResults').nextElementSibling&&document.getElementById('navSaleResults').nextElementSibling.id,
-    afterEventResults:document.getElementById('navEventResults').nextElementSibling&&document.getElementById('navEventResults').nextElementSibling.id,
-    afterAI:document.getElementById('aiAnalysisToggle').nextElementSibling&&document.getElementById('aiAnalysisToggle').nextElementSibling.className,
+    afterEventResults:document.getElementById('navEventResults').nextElementSibling&&document.getElementById('navEventResults').nextElementSibling.className,
+    afterOrder:document.getElementById('navOrderForecast').nextElementSibling&&document.getElementById('navOrderForecast').nextElementSibling.id,
     beforeOrder:document.getElementById('navOrderForecast').previousElementSibling&&document.getElementById('navOrderForecast').previousElementSibling.className,
     lastNav:document.querySelector('#sidebar .nav-list').lastElementChild&&document.querySelector('#sidebar .nav-list').lastElementChild.id,
     dividerRole:document.querySelector('.of-nav-divider')&&document.querySelector('.of-nav-divider').getAttribute('role'),
@@ -1449,10 +1449,10 @@ test('セール実績は内容別に表示し開催回ごとに行を分けて7�
   }));
   expect(order.afterSales).toBe('navSaleResults');
   expect(order.afterResults).toBe('navEventResults');
-  expect(order.afterEventResults).toBe('aiAnalysisToggle');
-  expect(order.afterAI).toBe('of-nav-divider');
+  expect(order.afterEventResults).toBe('of-nav-divider');
+  expect(order.afterOrder).toBe('aiAnalysisToggle');
   expect(order.beforeOrder).toBe('of-nav-divider');
-  expect(order.lastNav).toBe('navOrderForecast');
+  expect(order.lastNav).toBe('aiAnalysisToggle');
   expect(order.dividerRole).toBe('separator');
   expect(order.dividerHeight).toBeGreaterThan(0);
   expect(order.visibleGroupHeading).toBeNull();
