@@ -1475,3 +1475,29 @@ body.ai-analysis-open #main{margin-right:0!important}
 .er-day-tab .sc-history-weather{margin:1px 0 3px;font-size:11px;font-weight:700}.er-day-tab .sc-history-weather span{font-size:11px;font-weight:700}.er-day-tab .sc-history-weather .sc-history-icon{font-size:13px}
 
 .er-detail-title>.sc-history-weather{justify-content:flex-start;margin-top:5px}
+
+/* Read-only prediction input coverage diagnostics; local data never leaves the browser. */
+#insightPredictionDataButton{display:block;width:100%;box-sizing:border-box;margin:2px 0 0;padding:8px 10px;border:0;border-radius:8px;background:transparent;color:var(--text,#222);text-align:left;font:700 12px/1.35 -apple-system,BlinkMacSystemFont,"Noto Sans JP",sans-serif;cursor:pointer}
+#insightPredictionDataButton:hover{background:var(--surface2,rgba(0,0,0,.05))}
+.ipdh-overlay{position:fixed;inset:0;z-index:26002;background:rgba(0,0,0,.46);display:flex;align-items:center;justify-content:center;box-sizing:border-box;padding:16px}
+.ipdh-overlay[hidden]{display:none!important}
+.ipdh-dialog{width:min(860px,100%);max-height:85vh;max-height:85dvh;overflow:auto;box-sizing:border-box;padding:20px;border-radius:16px;background:var(--surface,#fff);color:var(--text,#222);box-shadow:0 18px 60px rgba(0,0,0,.25);font:13px/1.5 -apple-system,BlinkMacSystemFont,"Noto Sans JP",sans-serif}
+.ipdh-header{display:flex;justify-content:space-between;align-items:center;gap:16px;margin-bottom:10px}
+.ipdh-header h2{margin:0;font-size:18px}
+.ipdh-close{flex:0 0 auto;border:1px solid var(--border,#ccc);border-radius:8px;padding:8px 14px;background:var(--surface2,#f4f4f4);color:var(--text,#222);cursor:pointer;font-weight:700;min-height:40px}
+.ipdh-period{font-weight:800;margin:0 0 10px}
+.ipdh-note{color:var(--text4,#777);font-size:11px;line-height:1.5;margin:8px 0 14px}
+.ipdh-store{margin-top:14px;border-top:1px solid var(--border,#ddd);padding-top:12px}
+.ipdh-store h3{font-size:15px;margin:0 0 10px}
+.ipdh-metrics{display:grid;grid-template-columns:repeat(auto-fit,minmax(120px,1fr));gap:8px;margin-bottom:12px}
+.ipdh-metric{border:1px solid var(--border,#ddd);border-radius:9px;background:var(--surface2,#f7f7f7);padding:8px}
+.ipdh-metric span{display:block;font-size:11px;color:var(--text4,#777)}
+.ipdh-metric strong{display:block;font-size:17px;margin-top:2px}
+.ipdh-table-scroll{max-width:100%;overflow-x:auto;overscroll-behavior-inline:contain;border:1px solid var(--border,#ddd);border-radius:8px}
+.ipdh-table{border-collapse:collapse;min-width:650px;width:100%;font-variant-numeric:tabular-nums}
+.ipdh-table th,.ipdh-table td{border-bottom:1px solid var(--border,#ddd);padding:7px 9px;text-align:right;white-space:nowrap}
+.ipdh-table th:first-child,.ipdh-table td:first-child{text-align:left}
+.ipdh-table thead th{background:var(--surface2,#f7f7f7);color:var(--text3,#777);font-size:11px;position:sticky;top:0}
+.ipdh-table tbody th{font-weight:700;text-align:left;vertical-align:top;min-width:100px}
+.ipdh-table .ipdh-inactive{color:var(--text4,#777);text-align:center}
+@media(max-width:520px){.ipdh-overlay{padding:8px}.ipdh-dialog{padding:13px}.ipdh-metrics{grid-template-columns:repeat(2,minmax(0,1fr))}}
