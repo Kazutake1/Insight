@@ -240,3 +240,21 @@ test('廃棄数3行目は販売数入力ページだけに追加し既存平均�
   assert.match(css,/#pageSalesCount \.sc-calendar>\.sc-day:not\(\.empty\)/);
   assert.doesNotMatch(source,/function createAverageCard[^\n]*sc-total-waste/);
 });
+
+
+test('過去の対象便設定を推測で対象外と確定せず入力可能にする',()=>{
+  assert.equal(sales.wasteTripStatus([true,false,true],'2025-09-11',1,'2026-10-11'),'unverified');
+  assert.equal(sales.wasteTripStatus([true,false,true],'2026-10-11',1,'2026-10-11'),'inactive');
+  assert.equal(sales.wasteTripStatus([true,false,true],'2026-10-12',1,'2026-10-11'),'inactive');
+  assert.equal(sales.wasteTripStatus([true,true,true],'2025-09-11',1,'2026-10-11'),'active');
+  assert.deepEqual(sales.wasteSummary({trips:[0,null,3]},[true,false,true],'2025-09-11','2026-10-11'),{total:3,complete:false});
+  assert.deepEqual(sales.wasteSummary({trips:[0,null,3]},[true,false,true],'2026-10-11','2026-10-11'),{total:3,complete:true});
+  assert.deepEqual(sales.wasteSummary({trips:[0,2,3]},[true,false,true],'2025-09-11','2026-10-11'),{total:5,complete:true});
+});
+
+test('廃棄数の保存成功時のみ編集済みフラグを初期化する',()=>{
+  const source=fs.readFileSync(path.join(__dirname,'..','insight_sales_count_v1.js'),'utf8');
+  const save=source.slice(source.indexOf('function save(){'),source.indexOf('function notifyPeriodChange()'));
+  assert.match(save,/persistTransaction\(next\);state\.wasteTouched=\{\};setDirty\(false\)/);
+  assert.match(save,/catch\(e\)\{alert\('販売数を保存できませんでした/);
+});
