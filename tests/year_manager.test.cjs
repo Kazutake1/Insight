@@ -113,3 +113,9 @@ test('最後の1年度と未登録年度は削除できない',()=>{
   all.stores.a.years=['2026'];
   assert.throws(()=>manager.removeYear(all,'a','2026'),/最後の1年度/);
 });
+
+
+test('年度削除画面は廃棄金額と廃棄数の両方を明示する',()=>{
+  const source=require('node:fs').readFileSync(require('node:path').join(__dirname,'..','insight_dashboard_year_fix_v1.js'),'utf8');
+  assert.match(source,/廃棄金額・廃棄数/);
+});
