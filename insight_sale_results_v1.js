@@ -229,7 +229,7 @@
         var rows=el('div',undefined,'sr-occurrence-grids'),category=selectedCategory();
         group.occurrences.forEach(function(occurrence){
           var grid=el('div',undefined,'sr-day-grid');
-          occurrence.days.forEach(function(day){grid.append(root.InsightSalesCount.createReadOnlyDayCard(day.date,day.record,category));});
+          occurrence.days.forEach(function(day){grid.append(root.InsightSalesCount.createReadOnlyDayCard(day.date,day.record,category,root.InsightSalesCount.wasteRecordAt(allStores,allStores.current,day.date,category.id)));});
           rows.append(grid);
         });
         section.append(head,rows);area.append(section);
