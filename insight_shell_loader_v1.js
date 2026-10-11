@@ -42,6 +42,7 @@ var orderedFeatureLoads=[
   './insight_input_weather_temp_v1.js?v=20261006-csp-style-input-weather-1',
   './insight_sales_count_v1.js?v=20261011-readonly-waste-1',
   './insight_trip_inference_v1.js?v=20261011-month-infer-1',
+  './insight_trip_overrides_v1.js?v=20261011-manual-trips-1',
   './insight_sale_results_v1.js?v=20261011-readonly-waste-1',
   './insight_page_title_layout_v1.js?v=20261002-title-align',
   './insight_page_period_sync_v1.js?v=20261001-route-order',
