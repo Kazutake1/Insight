@@ -48,7 +48,7 @@ test('canonical payloadはinline script/styleを持たず外部assetを順序固
   const aiPresentation=read('insight_ai_presentation_v1.js');
   const readability=read('insight_readability_v1.js');
   const css=read('insight_payload_core_v1.css');
-  assert.match(payload,/insight_payload_core_v1\.css\?v=20261011-trip-review-ui-1/);
+  assert.match(payload,/insight_payload_core_v1\.css\?v=20261011-manual-trip-style-1/);
   assert.match(payload,/insight_payload_core_v1\.js\?v=20261007-step4-ai-position-css-1/);
   assert.doesNotMatch(core,/label\.style\.color/);
   assert.doesNotMatch(core,/msg\.style\.display/);
@@ -565,7 +565,7 @@ test('設定ページはサイドバー下部の管理項目を集約する',()=
   const index=readShell();
   const settings=fs.readFileSync(path.join(root,'insight_settings_v1.js'),'utf8');
   const css=read('insight_payload_core_v1.css');
-  assert.match(index,/insight_settings_v1\.js\?v=20261007-step3-settings-hidden-class-1/);
+  assert.match(index,/insight_settings_v1\.js\?v=20261011-trip-manual-settings-1/);
   assert.ok(index.indexOf('insight_data_health_v1.js')<index.indexOf('insight_settings_v1.js'));
   assert.match(settings,/nav\.id='navSettings'/);
   assert.match(settings,/page\.id='pageSettings'/);
@@ -818,7 +818,7 @@ test('保存データ健全性チェックは読み取り専用で不整合を�
   const index=readShell();
   const health=read('insight_data_health_v1.js');
   const css=read('insight_payload_core_v1.css');
-  assert.match(index,/insight_data_health_v1\.js\?v=20261011-event-health-1/);
+  assert.match(index,/insight_data_health_v1\.js\?v=20261011-manual-trips-health-1/);
   assert.ok(index.indexOf('insight_backup_guard_v1.js')<index.indexOf('insight_data_health_v1.js'));
   assert.match(health,/function check\(snapshot,eventValidator\)/);
   assert.match(health,/function checkEventRecords\(snapshot,issues,eventValidator\)/);
