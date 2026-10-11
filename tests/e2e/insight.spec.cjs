@@ -280,10 +280,10 @@ test('トップページは外部shellと機能manifestの最新版確認をno-s
     fetch('/insight_payload_source_v1.html?e2e-shell-check=1',{cache:'no-store'}).then(r=>r.text())
   ]));
   const [source,boot,loader,payload]=sources;
-  expect(source).toContain('name="insight-shell-version" content="20261011-trip-infer-build-23"');
-  expect(source).toContain('insight_shell_boot_v1.js?v=20261011-trip-infer-build-23');
-  expect(source).toContain('insight_shell_loader_v1.js?v=20261011-trip-infer-build-23');
-  expect(source).toContain('insight_shell_v1.css?v=20261011-trip-infer-build-23');
+  expect(source).toContain('name="insight-shell-version" content="20261011-trip-review-build-24"');
+  expect(source).toContain('insight_shell_boot_v1.js?v=20261011-trip-review-build-24');
+  expect(source).toContain('insight_shell_loader_v1.js?v=20261011-trip-review-build-24');
+  expect(source).toContain('insight_shell_v1.css?v=20261011-trip-review-build-24');
   expect(source).not.toMatch(/<script(?![^>]*\bsrc=)[^>]*>/i);
   expect(source).not.toMatch(/<style\b/i);
   expect(source).not.toMatch(/script-src[^;]*'unsafe-inline'/);
@@ -296,7 +296,7 @@ test('トップページは外部shellと機能manifestの最新版確認をno-s
   expect(source).toContain('https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js');
   expect(source).toContain('integrity="sha512-CQBWl4fJHWbryGE+Pc7UAxWMUMNMWzWxF4SQo9CgkJIN1kx6djDQZjh3Y8SZ1d+6I+1zze6Z7kHXO7q3UyZAWw=="');
   expect(loader).not.toContain('stripPayloadChartScript');
-  expect(payload).toContain('insight_payload_core_v1.css?v=20261011-readonly-waste-1');
+  expect(payload).toContain('insight_payload_core_v1.css?v=20261011-trip-review-ui-1');
   expect(payload).toContain('insight_payload_core_v1.js?v=20261007-step4-ai-position-css-1');
   expect(payload).toContain('insight_payload_ai_legacy_v1.js?v=20261006-payload-assets-1');
   expect(payload).toContain('insight_payload_bindings_v1.js?v=20261006-inline-bindings-1');
@@ -1076,6 +1076,98 @@ test('年度一覧にない古い疎データは起動を妨げず正式年度�
   expect(restored.years).not.toContain('1999');
   expect(restored.orphan[0]).toBeNull();
   expect(restored.orphan[1]).toBeNull();
+  expect(errors).toEqual([]);
+});
+
+test('設定ページで月別・店舗別・カテゴリー別の対象便判定を確認でき、保存領域は変化しない',async({page})=>{
+  const errors=await openInsight(page);
+  await page.waitForFunction(()=>window.InsightTripInferenceView&&document.getElementById('insightTripHistorySection'));
+  const before=await page.evaluate(()=>localStorage.getItem('insight_v11'));
+  const fixture=await page.evaluate(()=>{
+    const a=allStores.current,b='__trip_history_demo_store__';
+    const category='__trip_history_demo_category__',other='__trip_history_second_category__';
+    allStores.stores[b]={name:'対象便確認B店',years:['2026'],salesCounts:{}};
+    allStores.salesCountManagement.categories.push(
+      {id:category,name:'対象便確認カテゴリー',hidden:false,aliases:[],activeTrips:[true,true,true]},
+      {id:other,name:'対象便確認別カテゴリー',hidden:false,aliases:[],activeTrips:[true,true,true]}
+    );
+    if(!allStores.stores[a].salesCounts)allStores.stores[a].salesCounts={};
+    for(let i=1;i<=8;i++){
+      const date='2026-09-'+String(i).padStart(2,'0');
+      if(!allStores.stores[a].salesCounts[date])allStores.stores[a].salesCounts[date]={};
+      allStores.stores[a].salesCounts[date][category]={trips:[
+        {delivery:i,sales:0},{delivery:null,sales:i},{delivery:null,sales:null}
+      ]};
+      allStores.stores[b].salesCounts[date]={[category]:{trips:[
+        {delivery:null,sales:null},{delivery:null,sales:null},{delivery:0,sales:i}
+      ]}};
+    }
+    window.InsightTripInferenceView.refresh(true);
+    return {a,b,category,other};
+  });
+  await page.locator('#navSettings').click();
+  const panel=page.locator('#insightTripHistorySection');
+  await expect(panel).toBeVisible();
+  await expect(panel.locator('h2')).toHaveText('過去の対象便判定');
+  await panel.locator('#insightTripHistoryStore').selectOption(fixture.a);
+  await panel.locator('#insightTripHistoryCategory').selectOption(fixture.category);
+  await panel.locator('#insightTripHistoryMonth').selectOption('2026-09');
+  await expect(panel.locator('.insight-trip-history-card')).toHaveCount(3);
+  await expect(panel.locator('.insight-trip-history-status')).toHaveText([
+    '入力実績あり','入力実績あり','対象外と推定'
+  ]);
+  await expect(panel.locator('#insightTripHistorySummary')).toContainText('記録がある日：8日');
+  await expect(panel.locator('.insight-trip-history-reason').first()).toContainText('販売 8日');
+  await panel.locator('#insightTripHistoryMonth').selectOption('2026-08');
+  await expect(panel.locator('.insight-trip-history-status')).toHaveText([
+    '判定不能','判定不能','判定不能'
+  ]);
+  await panel.locator('#insightTripHistoryMonth').selectOption('2026-09');
+  await panel.locator('#insightTripHistoryStore').selectOption(fixture.b);
+  await panel.locator('#insightTripHistoryCategory').selectOption(fixture.category);
+  await panel.locator('#insightTripHistoryMonth').selectOption('2026-09');
+  await expect(panel.locator('.insight-trip-history-status')).toHaveText([
+    '対象外と推定','対象外と推定','入力実績あり'
+  ]);
+  await panel.locator('#insightTripHistoryCategory').selectOption(fixture.other);
+  await panel.locator('#insightTripHistoryMonth').selectOption('2026-09');
+  await expect(panel.locator('.insight-trip-history-status')).toHaveText([
+    '判定不能','判定不能','判定不能'
+  ]);
+  expect(await page.evaluate(()=>localStorage.getItem('insight_v11'))).toBe(before);
+  expect(errors).toEqual([]);
+});
+
+test('過去の対象便確認カードはiPad横向き幅で見切れずダークモードにも適応する',async({page})=>{
+  const errors=await openInsight(page);
+  await page.setViewportSize({width:1024,height:768});
+  await page.locator('#navSettings').click();
+  const panel=page.locator('#insightTripHistorySection');
+  await expect(panel).toBeVisible();
+  await panel.scrollIntoViewIfNeeded();
+  await expect(panel.locator('#insightTripHistoryStore')).toBeVisible();
+  const layout=await panel.evaluate(node=>{
+    const cards=[...node.querySelectorAll('.insight-trip-history-card')];
+    const area=node.querySelector('.insight-trip-history-results').getBoundingClientRect();
+    return {panelWidth:node.getBoundingClientRect().width,
+      cardCount:cards.length,areaLeft:area.left,areaRight:area.right,
+      cards:cards.map(card=>({left:card.getBoundingClientRect().left,right:card.getBoundingClientRect().right})),
+      darkColor:getComputedStyle(node).color};
+  });
+  expect(layout.panelWidth).toBeGreaterThan(250);
+  expect(layout.cardCount).toBe(3);
+  for(const card of layout.cards){
+    expect(card.left).toBeGreaterThanOrEqual(layout.areaLeft-1);
+    expect(card.right).toBeLessThanOrEqual(layout.areaRight+1);
+  }
+  await page.locator('#insightThemeToggle').check({force:true});
+  await expect(page.locator('html')).toHaveClass(/dark/);
+  const dark=await panel.evaluate(node=>({
+    select:getComputedStyle(node.querySelector('#insightTripHistoryStore')).backgroundColor,
+    card:getComputedStyle(node.querySelector('.insight-trip-history-card')).backgroundColor
+  }));
+  expect(dark.select).not.toBe('rgba(0, 0, 0, 0)');
+  expect(dark.card).not.toBe('rgba(0, 0, 0, 0)');
   expect(errors).toEqual([]);
 });
 

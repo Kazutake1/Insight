@@ -1528,3 +1528,20 @@ body.ai-analysis-open #main{margin-right:0!important}
 
 #pageSalesCount .sc-legend-waste{background:#ffe4e6;border-color:#fb7185!important}
 #pageSalesCount .sc-legend{flex-wrap:wrap}
+
+
+/* Settings: read-only historical trip inference. Respect shared theme variables. */
+#insightTripHistorySection .insight-trip-history-controls{display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px;margin:12px 0}
+#insightTripHistorySection .insight-trip-history-controls label{display:grid;gap:6px;min-width:0;font-size:12px;font-weight:600;color:var(--text3)}
+#insightTripHistorySection .insight-trip-history-controls select{appearance:auto;min-height:42px;width:100%;min-width:0;padding:8px;border:1px solid var(--border);border-radius:9px;background:var(--surface2);color:var(--text);font:inherit}
+#insightTripHistorySection .insight-trip-history-controls select:focus-visible{outline:2px solid var(--text3);outline-offset:2px}
+#insightTripHistorySection .insight-trip-history-summary{font-size:12px;color:var(--text3);margin:7px 0 10px}
+#insightTripHistorySection .insight-trip-history-results{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:9px}
+#insightTripHistorySection .insight-trip-history-card{min-width:0;border:1px solid var(--border);border-radius:11px;background:var(--surface2);padding:12px;overflow-wrap:anywhere}
+#insightTripHistorySection .insight-trip-history-trip{font-size:13px;color:var(--text3);font-weight:600}
+#insightTripHistorySection .insight-trip-history-status{font-size:15px;color:var(--text);font-weight:700;margin:7px 0}
+#insightTripHistorySection .insight-trip-history-reason{font-size:12px;color:var(--text3);line-height:1.55}
+#insightTripHistorySection .insight-trip-history-review{font-size:12px;color:var(--text3);margin-top:7px;font-weight:600}
+#insightTripHistorySection .insight-trip-history-note{font-size:12px;color:var(--text4);line-height:1.5;margin:11px 0 0}
+@media(max-width:720px){#insightTripHistorySection .insight-trip-history-controls{grid-template-columns:1fr 1fr}#insightTripHistorySection .insight-trip-history-controls label:last-child{grid-column:span 2}}
+@media(max-width:520px){#insightTripHistorySection .insight-trip-history-results{grid-template-columns:1fr}}

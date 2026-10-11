@@ -36,6 +36,7 @@ jobs:
           - event_results.test.cjs
           - insight_sales_count.test.cjs
           - trip_inference.test.cjs
+          - trip_inference_view.test.cjs
           - insight_yoy_policy.test.cjs
           - monthly_review.test.cjs
           - multiyear_analysis.test.cjs
