@@ -58,7 +58,7 @@
   }
   function put(snapshot,storeId,categoryId,month,trip,mode,options){
     if(!object(snapshot)||!object(snapshot.stores)||!object(snapshot.stores[storeId]))throw new Error('店舗がありません');
-    if(typeof categoryId!=='string'||!categoryId||!hasCategory(snapshot,categoryId))throw new Error('カテゴリーがありません');
+    if(typeof categoryId!=='string'||!categoryId||['__proto__','prototype','constructor'].indexOf(categoryId)>=0||!hasCategory(snapshot,categoryId))throw new Error('カテゴリーがありません');
     if(!validMonth(month))throw new Error('年月が不正です');
     if(!Number.isInteger(trip)||trip<1||trip>3)throw new Error('便の指定が不正です');
     if([null,'active','inactive'].indexOf(mode)<0)throw new Error('手動判定が不正です');
