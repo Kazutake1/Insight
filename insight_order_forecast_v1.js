@@ -68,7 +68,7 @@
     var monthCache=historical?new Map():null;
     function at(date){
       var raw=saved&&saved[date]&&saved[date][category.id],item={date:date,record:sales.normalizeRecord(raw)};
-      if(historical)item.mask=history.resolver.resolveDate(history.snapshot,history.storeId,category.id,date,{monthCache:monthCache}).mask;
+      if(historical)item.mask=history.resolver.resolveDate(history.snapshot,history.storeId,category.id,date,{monthCache:monthCache,today:history.today}).mask;
       return item;
     }
     var weeks=ranges.weeks.map(at),prior=ranges.previousYear.map(at);
@@ -77,8 +77,8 @@
       deliveryAverage:sales.average(weeks.map(function(item){return item.record;}),'delivery',mask),
       salesAverage:sales.average(weeks.map(function(item){return item.record;}),'sales',mask)};
     // Week-specific eligibility takes priority over the category's present settings.
-    var deliveryAverage=history.resolver.averageByDate(history.snapshot,history.storeId,category.id,weeks,'delivery');
-    var salesAverage=history.resolver.averageByDate(history.snapshot,history.storeId,category.id,weeks,'sales');
+    var deliveryAverage=history.resolver.averageByDate(history.snapshot,history.storeId,category.id,weeks,'delivery',{today:history.today});
+    var salesAverage=history.resolver.averageByDate(history.snapshot,history.storeId,category.id,weeks,'sales',{today:history.today});
     var averageMask=[0,1,2].map(function(i){
       var statuses=weeks.map(function(item){return item.mask[i];});
       return statuses.some(function(value){return value===true;})?true:
@@ -131,7 +131,7 @@
   root.InsightOrderForecast=model;if(!root.document)return;
   function init(){
     if(root.__insightOrderForecastV1)return;
-    var sales=root.InsightSalesCount,doc=root.document;if(!sales||!sales.createReadOnlyDayCard||!doc.getElementById('navSaleResults')){setTimeout(init,20);return;}root.__insightOrderForecastV1=true;
+    var sales=root.InsightSalesCount,doc=root.document;if(!sales||!sales.createReadOnlyDayCard||!root.InsightTripHistoryResolver||!doc.getElementById('navSaleResults')){setTimeout(init,20);return;}root.__insightOrderForecastV1=true;
     var state={storeId:allStores.current,delivery:addDays(today(),2),categoryId:null},forecast=null,error='',loading=false,request=0,client=createClient(root.fetch.bind(root));
     function el(tag,text,cls){var node=doc.createElement(tag);if(text!==undefined)node.textContent=text;if(cls)node.className=cls;return node;}
     var link=el('link');link.rel='stylesheet';link.href='./insight_order_forecast_v1.css?v=20261010-average-alignment-13';doc.head.append(link);
