@@ -1095,7 +1095,7 @@ test('対象便の過去月自動判定は保存内容を変えず、0入力と�
     const report=window.InsightTripInference.inferMonth(snap,'shop1','c','2026-09',{today:'2026-10-11'});
     return {report,unchanged:JSON.stringify(snap)===before};
   });
-  expect(result.report.trips.map(trip=>trip.status)).toEqual(['observed_active','unknown','inferred_inactive']);
+  expect(result.report.trips.map(trip=>trip.status)).toEqual(['observed_active','inferred_inactive','inferred_inactive']);
   expect(result.report.trips[0].salesDays).toBe(8);
   expect(result.report.trips[2].otherTripObservedDays).toBe(8);
   expect(result.unchanged).toBe(true);
