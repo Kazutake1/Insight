@@ -1181,7 +1181,7 @@ test('手動判定は月・カテゴリー・便ごとに保存され再読込�
   const ids=await page.evaluate(()=>({
     store:document.getElementById('insightTripHistoryStore').value,
     category:document.getElementById('insightTripHistoryCategory').value,
-    all:JSON.parse(localStorage.getItem('insight_v11'))
+    all:JSON.parse(localStorage.getItem('insight_v11')||JSON.stringify(allStores))
   }));
   const third=panel.locator('.insight-trip-history-card').nth(2);
   await third.locator('.insight-trip-history-choice').selectOption('active');
