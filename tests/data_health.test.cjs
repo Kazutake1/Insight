@@ -1,6 +1,7 @@
 const test=require('node:test');
 const assert=require('node:assert/strict');
 const health=require('../insight_data_health_v1.js');
+const events=require('../insight_events_v1.js');
 
 function day(d){return {d:String(d),売上:0,客数:0,買上点数:0,廃棄金額:0,haiki:{},weather:''};}
 function yearData(year){
@@ -98,4 +99,79 @@ test('廃棄数のレコードがあるのに共通カテゴリーが存在し�
   const data=clean();
   data.stores.s1.wasteCounts={'2026-10-11':{cat_onigiri:{trips:[0,1,2]}}};
   assert.ok(health.check(data).issues.some(x=>x.code==='waste_missing_categories'));
+});
+
+function eventRecord(id,scope,type){
+  return {id,type:type||'special',scope,startDate:'2026-10-11',endDate:'2026-10-12',
+    snapshot:{version:1,title:'実績確認用イベント',note:''}};
+}
+
+test('イベント・催事が登録されていない旧データは正常なまま',()=>{
+  const data=clean(),before=JSON.stringify(data);
+  const report=health.check(data,events);
+  assert.equal(report.status,'ok');
+  assert.equal(JSON.stringify(data),before);
+});
+
+test('正常な全店共通イベント・店舗イベント・よく使う設定は変更せず正常判定',()=>{
+  const data=clean();
+  data.eventManagement={version:1,presets:[],events:[eventRecord('global1','global','campaign')]};
+  data.stores.s1.events=[eventRecord('store1','store')];
+  const before=JSON.stringify(data),report=health.check(data,events);
+  assert.equal(report.status,'ok');
+  assert.equal(report.counts.errors,0);
+  assert.equal(JSON.stringify(data),before);
+});
+
+test('店舗イベントの不正な開催期間を店舗名付きで報告し書き換えない',()=>{
+  const data=clean(),bad=eventRecord('store-bad','store');
+  bad.endDate='2026-10-10';
+  data.stores.s1.events=[bad];
+  const before=JSON.stringify(data),report=health.check(data,events);
+  const issue=report.issues.find(item=>item.code==='event_store_invalid');
+  assert.equal(report.status,'error');
+  assert.equal(issue.storeId,'s1');
+  assert.equal(issue.storeName,'店舗A');
+  assert.match(issue.message,/開催期間/);
+  assert.equal(JSON.stringify(data),before);
+});
+
+test('全店共通のプリセット不正は店舗イベントとは分けて報告',()=>{
+  const data=clean();
+  data.eventManagement={version:1,presets:[{id:'preset-bad',snapshot:{version:1,title:'',note:''}}],events:[]};
+  const before=JSON.stringify(data),report=health.check(data,events);
+  assert.ok(report.issues.some(item=>item.code==='event_global_invalid'&&/名称/.test(item.message)));
+  assert.ok(!report.issues.some(item=>item.code==='event_store_invalid'));
+  assert.equal(JSON.stringify(data),before);
+});
+
+test('店舗間・共通をまたぐイベント識別番号の重複を検出',()=>{
+  const data=clean();
+  data.eventManagement={version:1,presets:[],events:[eventRecord('duplicate','global','campaign')]};
+  data.stores.s1.events=[eventRecord('duplicate','store')];
+  const before=JSON.stringify(data),report=health.check(data,events);
+  assert.equal(report.status,'error');
+  assert.ok(report.issues.some(item=>item.code==='event_cross_scope_invalid'&&/重複/.test(item.message)));
+  assert.equal(JSON.stringify(data),before);
+});
+
+test('異常のある店舗だけを特定し他店舗のイベントを誤判定しない',()=>{
+  const data=clean(),other=JSON.parse(JSON.stringify(data.stores.s1));
+  other.name='店舗B';
+  other.events=[eventRecord('store-b','store')];
+  data.stores.s2=other;
+  data.stores.s1.events=[eventRecord('store-a','store')];
+  data.stores.s1.events[0].scope='global';
+  const report=health.check(data,events);
+  const items=report.issues.filter(item=>item.code==='event_store_invalid');
+  assert.equal(items.length,1);
+  assert.equal(items[0].storeName,'店舗A');
+});
+
+test('イベント検証処理が利用できないときは正常扱いにせず検査不能を報告',()=>{
+  const data=clean();
+  data.stores.s1.events=[eventRecord('store1','store')];
+  const report=health.check(data);
+  assert.equal(report.status,'error');
+  assert.ok(report.issues.some(item=>item.code==='event_validator_missing'));
 });
