@@ -81,15 +81,17 @@
     return {trips:trips,total:totals.length?totals.reduce(function(s,v){return s+v;},0)/totals.length:null};
   }
   // Saved records only; use the same all-event exclusion as impact analyses.
-  function dayTypeRecords(records,categoryId,prefix,eventsForDate,holidayForDate){
+  function dayTypeRecords(records,categoryId,prefix,eventsForDate,holidayForDate,withDates){
     var groups={weekday:[],sundayHoliday:[]};
     Object.keys(records||{}).sort().forEach(function(date){
       if(!validDateKey(date)||date.slice(0,7)!==prefix||!records[date][categoryId])return;
       if(eventsForDate(date).length)return;
       var parts=date.split('-').map(Number),wd=new Date(parts[0],parts[1]-1,parts[2]).getDay();
       var holiday=holidayForDate(parts[0],parts[1],parts[2]);
-      if(wd===0||holiday)groups.sundayHoliday.push(normalizeRecord(records[date][categoryId]));
-      else if(wd>=1&&wd<=5)groups.weekday.push(normalizeRecord(records[date][categoryId]));
+      var record=normalizeRecord(records[date][categoryId]);
+      var value=withDates?{date:date,record:record}:record;
+      if(wd===0||holiday)groups.sundayHoliday.push(value);
+      else if(wd>=1&&wd<=5)groups.weekday.push(value);
     });
     return groups;
   }
@@ -255,7 +257,28 @@
       target.setAttribute('aria-label',summary.total===null?'廃棄数未入力':summary.complete?'廃棄合計 '+summary.total+'個':'廃棄入力済み合計 '+summary.total+'個。一部未入力');
     }
     function renderCalendar(){var grid=doc.getElementById('scCalendar');grid.replaceChildren();WEEKDAYS.forEach(function(w,i){var h=el('div',w,'sc-weekhead '+(i===0?'sun':i===6?'sat':''));grid.append(h);});var first=new Date(Number(state.year),state.month-1,1).getDay(),col=first;for(var b=0;b<first;b++)grid.append(el('div',undefined,'sc-day empty'));var days=daysInMonth();for(var day=1;day<=days;day++){var date=monthPrefix()+'-'+pad(day),r=state.draft[date]||emptyRecord(),wd=new Date(Number(state.year),state.month-1,day).getDay(),holiday=typeof isHoliday==='function'&&isHoliday(Number(state.year),state.month,day),red=wd===0||holiday,card=el('div',undefined,'sc-day '+(wd===6?'sat-card':red?'sun-card':''));var head=el('div',undefined,'sc-day-title'),num=el('strong',String(day),'sc-day-num '+(wd===6?'sat':red?'sun':''));head.append(num,holiday?el('small','祝日'):el('span'));card.append(head);var labels=el('div',undefined,'sc-col-head');labels.innerHTML='<span>1便</span><span>2便</span><span>3便</span>';card.append(labels);var delivery=el('div',undefined,'sc-trip sc-delivery-row'),salesRow=el('div',undefined,'sc-trip sc-sales-row'),wasteRow=el('div',undefined,'sc-trip sc-waste-row');delivery.append(buildInput(date,r,0,'delivery'),buildInput(date,r,1,'delivery'),buildInput(date,r,2,'delivery'));salesRow.append(buildInput(date,r,0,'sales'),buildInput(date,r,1,'sales'),buildInput(date,r,2,'sales'));wasteRow.append(buildWasteInput(date,0),buildWasteInput(date,1),buildWasteInput(date,2));card.append(delivery,salesRow,wasteRow);var totals=el('div',undefined,'sc-totals');totals.innerHTML='<b class="sc-total-delivery" data-total="delivery"></b><b class="sc-total-sales" data-total="sales"></b><b class="sc-total-waste"></b>';card.append(totals);updateTotals(card,r);updateWasteTotal(card,date);grid.append(card);col=(col+1)%7;if(wd===6&&day<days){grid.append(el('div',undefined,'sc-week-sep'));col=0;}}if(col>0){for(var x=col;x<7;x++)grid.append(el('div',undefined,'sc-day empty'));}}
-    function weekdayRecords(key){var groups=[[],[],[],[],[],[],[]],mask=activeTrips(selectedCategory());Object.keys(state.draft).forEach(function(date){groups[new Date(date+'T12:00:00').getDay()].push(state.draft[date]);});return groups.map(function(g){return average(g,key,mask);});}
+    // Only historical averages use month-specific trip evidence; editing and current settings are unchanged.
+    function datedAverage(rows,key){
+      var month=monthPrefix(),mask=activeTrips(selectedCategory());
+      if(month>=localTodayKey().slice(0,7)){
+        var ordinary=average(rows.map(function(row){return row.record;}),key,mask);
+        return {trips:ordinary.trips,total:ordinary.total,mask:mask,recordDays:rows.length};
+      }
+      var resolver=root.InsightTripHistoryResolver;
+      if(!resolver||typeof resolver.monthly!=='function'||typeof resolver.averageByDate!=='function')
+        throw new Error('過去の対象便集計機能を読み込めませんでした。');
+      var report=resolver.monthly(allStores,allStores.current,state.categoryId,month);
+      var calculated=resolver.averageByDate(allStores,allStores.current,state.categoryId,rows,key);
+      return {trips:calculated.trips,total:calculated.total,recordDays:rows.length,
+        mask:report.trips.map(function(item){return item.status==='active'?true:item.status==='inactive'?false:null;})};
+    }
+    function weekdayRecords(key){
+      var groups=[[],[],[],[],[],[],[]];
+      Object.keys(state.draft).forEach(function(date){
+        groups[new Date(date+'T12:00:00').getDay()].push({date:date,record:state.draft[date]});
+      });
+      return groups.map(function(group){return datedAverage(group,key);});
+    }
     function averageTable(title,key){var box=el('section',undefined,'sc-card'),h=el('h3',title),table=el('table'),mask=activeTrips(selectedCategory());table.innerHTML='<thead><tr><th>曜日</th><th>1便平均</th><th>2便平均</th><th>3便平均</th><th>1日合計平均</th></tr></thead>';var body=el('tbody'),values=weekdayRecords(key);values.forEach(function(a,i){var tr=el('tr');tr.innerHTML='<th>'+WEEKDAYS[i]+'</th><td>'+(mask[0]===false?'ー':fmt(a.trips[0]))+'</td><td>'+(mask[1]===false?'ー':fmt(a.trips[1]))+'</td><td>'+(mask[2]===false?'ー':fmt(a.trips[2]))+'</td><td>'+fmt(a.total)+'</td>';body.append(tr);});table.append(body);box.append(h,table);return box;}
     function eventMatches(e){if(!e||e.type!=='sale'||!e.snapshot||!e.snapshot.sale)return false;return categoriesForSale(allStores,e.snapshot.sale).some(function(c){return c.id===state.categoryId;});}
     function eventsFor(storeId,date){try{return root.InsightEvents?root.InsightEvents.list(allStores,storeId,date).filter(eventMatches):[];}catch(_){return [];}}
@@ -300,11 +323,22 @@
       });
     };
 
-    function comparisonTable(records,title){var mask=activeTrips(selectedCategory()),d=average(records,'delivery',mask),s=average(records,'sales',mask),box=el('section',undefined,'sc-card'),table=el('table');box.append(el('h3',title));function v(value,index){return mask[index]===false?'ー':fmt(value);}table.innerHTML='<thead><tr><th></th><th>1便</th><th>2便</th><th>3便</th><th>1日</th></tr></thead><tbody><tr><th>平均納品</th><td>'+v(d.trips[0],0)+'</td><td>'+v(d.trips[1],1)+'</td><td>'+v(d.trips[2],2)+'</td><td>'+fmt(d.total)+'</td></tr><tr><th>平均販売</th><td>'+v(s.trips[0],0)+'</td><td>'+v(s.trips[1],1)+'</td><td>'+v(s.trips[2],2)+'</td><td>'+fmt(s.total)+'</td></tr></tbody>';box.append(table);return box;}
+    function comparisonTable(records,title){
+      var d=datedAverage(records,'delivery'),s=datedAverage(records,'sales'),
+        box=el('section',undefined,'sc-card'),table=el('table'),mask=d.mask;
+      box.append(el('h3',title));
+      function v(value,index){
+        return mask[index]===false?'ー':mask[index]===null&&value===null&&records.length?'?':fmt(value);
+      }
+      table.innerHTML='<thead><tr><th></th><th>1便</th><th>2便</th><th>3便</th><th>1日</th></tr></thead>'+
+        '<tbody><tr><th>平均納品</th><td>'+v(d.trips[0],0)+'</td><td>'+v(d.trips[1],1)+'</td><td>'+v(d.trips[2],2)+'</td><td>'+fmt(d.total)+'</td></tr>'+
+        '<tr><th>平均販売</th><td>'+v(s.trips[0],0)+'</td><td>'+v(s.trips[1],1)+'</td><td>'+v(s.trips[2],2)+'</td><td>'+fmt(s.total)+'</td></tr></tbody>';
+      box.append(table);return box;
+    }
     function appendDayTypeComparisons(comps){
       var groups=dayTypeRecords(store.salesCounts,state.categoryId,monthPrefix(),function(date){
         return root.InsightEvents.list(allStores,allStores.current,date);
-      },function(year,month,day){return typeof isHoliday==='function'&&isHoliday(year,month,day);});
+      },function(year,month,day){return typeof isHoliday==='function'&&isHoliday(year,month,day);},true);
       [
         {records:groups.weekday,title:'平日平均'},
         {records:groups.sundayHoliday,title:'日曜日・祝日平均'}
@@ -319,7 +353,29 @@
     function disp(t,index){return tripActive(selectedCategory(),index)?dispValue(t.delivery)+' / '+dispValue(t.sales):'対象外';}function dispValue(v){return v===null?'—':String(v);}
     function buildAverageInput(value,label,enabled){var i=el('input');if(enabled===false){i.type='text';i.value='ー';i.readOnly=true;i.tabIndex=-1;i.className='sc-not-applicable';i.setAttribute('aria-readonly','true');i.setAttribute('aria-label',label+' 対象外');return i;}i.type='number';i.value=value===null?'':fmt(value);i.readOnly=true;i.tabIndex=-1;i.setAttribute('aria-readonly','true');i.setAttribute('aria-label',label);i.classList.toggle('has-val',value!==null);return i;}
     function createAverageCard(label,deliveryAverage,salesAverage,tone,category){var mask=activeTrips(category||selectedCategory());deliveryAverage=deliveryAverage||{trips:[null,null,null],total:null};salesAverage=salesAverage||{trips:[null,null,null],total:null};var card=el('section',undefined,'sc-day sc-average-card '+(tone==='sun'?'sun-card':tone==='sat'?'sat-card':'')),title=el('div',undefined,'sc-day-title'),num=el('strong',label,'sc-day-num '+(tone==='sun'?'sun':tone==='sat'?'sat':'')),head=el('div',undefined,'sc-col-head'),delivery=el('div',undefined,'sc-trip sc-delivery-row'),salesRow=el('div',undefined,'sc-trip sc-sales-row'),totals=el('div',undefined,'sc-totals');title.append(num,el('span'));head.innerHTML='<span>1便</span><span>2便</span><span>3便</span>';delivery.append(buildAverageInput(deliveryAverage.trips[0],label+' 1便 平均納品',mask[0]),buildAverageInput(deliveryAverage.trips[1],label+' 2便 平均納品',mask[1]),buildAverageInput(deliveryAverage.trips[2],label+' 3便 平均納品',mask[2]));salesRow.append(buildAverageInput(salesAverage.trips[0],label+' 1便 平均販売',mask[0]),buildAverageInput(salesAverage.trips[1],label+' 2便 平均販売',mask[1]),buildAverageInput(salesAverage.trips[2],label+' 3便 平均販売',mask[2]));totals.innerHTML='<b class="sc-total-delivery">'+fmt(deliveryAverage.total)+'</b><b class="sc-total-sales">'+fmt(salesAverage.total)+'</b>';card.append(title,head,delivery,salesRow,totals);return card;}
-    function renderAverages(){var a=doc.getElementById('scAverages');a.replaceChildren();a.append(el('h3','曜日別平均','sc-average-title'));var grid=el('div',undefined,'sc-average-grid'),deliveries=weekdayRecords('delivery'),salesValues=weekdayRecords('sales'),mask=activeTrips(selectedCategory());function v(value,index){return '<b'+(mask[index]===false?' class="sc-not-applicable"':'')+'>'+(mask[index]===false?'ー':fmt(value))+'</b>';}WEEKDAYS.forEach(function(day,i){var card=el('section',undefined,'sc-average-day '+(i===0?'sun-card':i===6?'sat-card':'')),title=el('div',day+'曜日','sc-average-day-title '+(i===0?'sun':i===6?'sat':'')),head=el('div',undefined,'sc-average-head'),delivery=el('div',undefined,'sc-average-row sc-average-delivery'),salesRow=el('div',undefined,'sc-average-row sc-average-sales'),totals=el('div',undefined,'sc-average-totals');head.innerHTML='<span>1便</span><span>2便</span><span>3便</span>';delivery.innerHTML=v(deliveries[i].trips[0],0)+v(deliveries[i].trips[1],1)+v(deliveries[i].trips[2],2);salesRow.innerHTML=v(salesValues[i].trips[0],0)+v(salesValues[i].trips[1],1)+v(salesValues[i].trips[2],2);totals.innerHTML='<b class="sc-total-delivery">'+fmt(deliveries[i].total)+'</b><b class="sc-total-sales">'+fmt(salesValues[i].total)+'</b>';card.append(title,head,delivery,salesRow,totals);grid.append(card);});a.append(grid);}
+    function renderAverages(){
+      var a=doc.getElementById('scAverages');a.replaceChildren();
+      a.append(el('h3','曜日別平均','sc-average-title'));
+      var grid=el('div',undefined,'sc-average-grid'),
+        deliveries=weekdayRecords('delivery'),salesValues=weekdayRecords('sales');
+      function v(value,index,mask,recordDays){
+        return '<b'+(mask[index]===false?' class="sc-not-applicable"':'')+'>'+
+          (mask[index]===null&&value===null&&recordDays?'?':mask[index]===false?'ー':fmt(value))+'</b>';
+      }
+      WEEKDAYS.forEach(function(day,i){
+        var card=el('section',undefined,'sc-average-day '+(i===0?'sun-card':i===6?'sat-card':'')),
+          title=el('div',day+'曜日','sc-average-day-title '+(i===0?'sun':i===6?'sat':'')),
+          head=el('div',undefined,'sc-average-head'),delivery=el('div',undefined,'sc-average-row sc-average-delivery'),
+          salesRow=el('div',undefined,'sc-average-row sc-average-sales'),totals=el('div',undefined,'sc-average-totals'),
+          d=deliveries[i],s=salesValues[i],mask=d.mask;
+        head.innerHTML='<span>1便</span><span>2便</span><span>3便</span>';
+        delivery.innerHTML=v(d.trips[0],0,mask,d.recordDays)+v(d.trips[1],1,mask,d.recordDays)+v(d.trips[2],2,mask,d.recordDays);
+        salesRow.innerHTML=v(s.trips[0],0,mask,s.recordDays)+v(s.trips[1],1,mask,s.recordDays)+v(s.trips[2],2,mask,s.recordDays);
+        totals.innerHTML='<b class="sc-total-delivery">'+fmt(d.total)+'</b><b class="sc-total-sales">'+fmt(s.total)+'</b>';
+        card.append(title,head,delivery,salesRow,totals);grid.append(card);
+      });
+      a.append(grid);
+    }
     function render(){var title=doc.getElementById('scPeriod');title.textContent=state.year+'年 '+state.month+'月';var sel=doc.getElementById('scCategory');sel.replaceChildren();activeCategories().forEach(function(c){var o=el('option',c.name);o.value=c.id;sel.append(o);});if(!selectedCategory()||selectedCategory().hidden)state.categoryId=activeCategories()[0]&&activeCategories()[0].id;sel.value=state.categoryId||'';renderCalendar();renderAverages();renderAnalysis();}
     function manageCategories(){var d=el('dialog',undefined,'sc-dialog'),draft=copy(categories());draft.forEach(function(c){c.activeTrips=activeTrips(c);});d.innerHTML='<header><h2>カテゴリー管理</h2><button type="button">閉じる</button></header><div class="sc-category-list"></div><div class="sc-dialog-actions"><button type="button" data-add>＋ カテゴリーを追加</button><button type="button" class="primary" data-save>保存する</button></div>';doc.body.append(d);var list=d.querySelector('.sc-category-list');d.querySelector('header button').onclick=function(){d.close();};function moveWithinGroup(items,position,delta){var target=items[position+delta];if(!target)return;var currentIndex=items[position].index,targetIndex=target.index,x=draft[currentIndex];draft[currentIndex]=draft[targetIndex];draft[targetIndex]=x;draw();}function drawGroup(hidden){var items=draft.map(function(c,index){return {category:c,index:index};}).filter(function(item){return item.category.hidden===hidden;}),group=el('section',undefined,'sc-category-group '+(hidden?'is-hidden':'is-visible')),heading=el('h3',(hidden?'非表示':'表示中')+'（'+items.length+'件）');group.append(heading);items.forEach(function(item,position){var c=item.category,row=el('div',undefined,'sc-category-row '+(hidden?'is-hidden':'is-visible')),input=el('input');input.value=c.name;input.setAttribute('aria-label','カテゴリー名');input.oninput=function(){c.name=input.value.trim();};var trips=el('div',undefined,'sc-category-trips');trips.append(el('span','対象便','sc-category-trips-label'));[0,1,2].forEach(function(trip){var label=el('label'),check=el('input');check.type='checkbox';check.checked=c.activeTrips[trip]!==false;check.setAttribute('aria-label',c.name+' '+(trip+1)+'便を対象にする');check.onchange=function(){c.activeTrips[trip]=check.checked;};label.append(check,el('span',(trip+1)+'便'));trips.append(label);});var stateText=el('span',(hidden?'○ ':'● ')+(hidden?'非表示':'表示中'),'sc-category-state '+(hidden?'is-hidden':'is-visible'));var toggle=el('button',hidden?'再表示する':'非表示にする','sc-category-toggle');toggle.type='button';toggle.onclick=function(){c.hidden=!c.hidden;draw();};var up=el('button','↑','sc-category-move'),down=el('button','↓','sc-category-move');up.type=down.type='button';up.setAttribute('aria-label',c.name+'を上へ移動');down.setAttribute('aria-label',c.name+'を下へ移動');up.disabled=position===0;down.disabled=position===items.length-1;up.onclick=function(){moveWithinGroup(items,position,-1);};down.onclick=function(){moveWithinGroup(items,position,1);};row.append(input,trips,stateText,toggle,up,down);group.append(row);});list.append(group);}function draw(){list.replaceChildren();drawGroup(false);drawGroup(true);}d.querySelector('[data-add]').onclick=function(){draft.push({id:'cat_'+Date.now().toString(36)+'_'+Math.random().toString(36).slice(2,7),name:'新しいカテゴリー',hidden:false,aliases:[],activeTrips:[true,true,true]});draw();};d.querySelector('[data-save]').onclick=function(){try{if(!draft.length||!draft.some(function(c){return !c.hidden;}))throw new Error('表示するカテゴリーを1件以上残してください');var names=new Set();draft.forEach(function(c){if(!c.name)throw new Error('カテゴリー名を入力してください');if(!Array.isArray(c.activeTrips)||!c.activeTrips.some(Boolean))throw new Error(c.name+'は対象便を1つ以上選択してください');if(names.has(c.name))throw new Error('同じカテゴリー名は使用できません');names.add(c.name);var old=categories().find(function(x){return x.id===c.id;});if(old&&old.name!==c.name){c.aliases=Array.from(new Set((c.aliases||[]).filter(function(name){return name!==c.name;}).concat([old.name])));}});var labels=new Set();draft.forEach(function(c){[c.name].concat(c.aliases||[]).forEach(function(name){if(labels.has(name))throw new Error('現在名または過去名と重複するカテゴリー名は使用できません');labels.add(name);});});var previousCategoryId=state.categoryId,previousDraft=state.draft,previousWasteDraft=state.wasteDraft,previousWasteTouched=state.wasteTouched,wasDirty=state.dirty,nextCategory=draft.find(function(c){return c.id===previousCategoryId&&!c.hidden;});var nextCategoryId=nextCategory?previousCategoryId:draft.find(function(c){return !c.hidden;}).id;if(wasDirty&&nextCategoryId!==previousCategoryId&&!confirm('販売数入力に未保存の変更があります。\n保存せずにカテゴリーを切り替えますか？'))return;var next=copy(allStores);ensure(next);next.salesCountManagement.categories=draft;persistTransaction(next);state.categoryId=nextCategoryId;if(nextCategoryId===previousCategoryId){state.draft=previousDraft;state.wasteDraft=previousWasteDraft;state.wasteTouched=previousWasteTouched;render();setDirty(wasDirty);}else{readMonth();render();}d.close();showToast('✓ カテゴリーを保存しました','#15803d','#f0fdf4');}catch(e){alert(e.message);}};d.addEventListener('close',function(){d.remove();});draw();d.showModal();}
     function buildPage(){var nav4=doc.getElementById('nav4'),nav=el('button',undefined,'nav-btn');nav.id='navSalesCount';nav.type='button';nav.innerHTML='<svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 4h18v16H3z"/><path d="M3 9h18M8 4v16M13 4v16M18 4v16"/></svg>販売数入力';nav.onclick=function(){root.gotoNav('salesCounts');};nav4.insertAdjacentElement('afterend',nav);var page=el('div',undefined,'page sc-page');page.id='pageSalesCount';page.innerHTML='<div class="page-header"><div class="page-title">販売数入力</div><div class="header-right"><span id="scDirty" class="sc-status saved">保存済み</span><button id="scSave" class="save-btn" disabled>保存する</button></div></div><div class="sc-toolbar"><button id="scPrev" type="button">‹ 前月</button><strong id="scPeriod"></strong><button id="scNext" type="button">翌月 ›</button><label>カテゴリー <select id="scCategory"></select></label><button id="scManage" type="button">カテゴリー管理</button></div><div class="sc-legend" aria-label="色分けの案内"><span><i class="sc-legend-delivery"></i>納品＝緑</span><span><i class="sc-legend-sales"></i>販売＝オレンジ</span><span><i class="sc-legend-waste"></i>廃棄＝赤</span><span>※一部未入力</span><span>?＝過去の対象便未確認</span></div><div id="scCalendar" class="sc-calendar"></div><div id="scAverages" class="sc-averages"></div><div id="scAnalysis"></div>';doc.getElementById('main').append(page);doc.getElementById('scSave').onclick=save;doc.getElementById('scPrev').onclick=function(){changePeriod(-1);};doc.getElementById('scNext').onclick=function(){changePeriod(1);};doc.getElementById('scCategory').onchange=function(e){changeCategory(e.target.value);};doc.getElementById('scManage').onclick=manageCategories;}
