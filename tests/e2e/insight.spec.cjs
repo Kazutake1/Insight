@@ -884,6 +884,76 @@ test('復元確定時は上書き前のデータを自動ダウンロードし�
   expect(errors).toEqual([]);
 });
 
+
+test('復元保存・整合性検証の完了後に画面更新が失敗しても保存済みと案内する',async({page})=>{
+  const errors=await openInsight(page);
+  await page.locator('#navSettings').click();
+  const downloadPromise=page.waitForEvent('download');
+  await page.locator('#backupBtn').click();
+  const backup=await downloadPromise,restorePath=await backup.path();
+  const snapshot=JSON.parse(fs.readFileSync(restorePath,'utf8')).data;
+
+  await page.evaluate(()=>{
+    const st=allStores.stores[allStores.current],year=String(st.years[0]);
+    st.data[year]['1月'][0].storeMemo='E2E復元前の書き込み';
+    persist();
+    window.renderStoreSel=function(){throw new Error('E2E再描画失敗');};
+  });
+
+  const dialogs=[];
+  page.on('dialog',async d=>{dialogs.push({type:d.type(),message:d.message()});await d.accept();});
+  const safetyPromise=page.waitForEvent('download');
+  await page.locator('#restoreFile').setInputFiles(restorePath);
+  const safety=await safetyPromise;
+  expect(safety.suggestedFilename()).toMatch(/^Insight_pre_restore_/);
+  await expect.poll(()=>dialogs.some(d=>d.type==='alert')).toBe(true);
+  const warning=dialogs.find(d=>d.type==='alert').message;
+  expect(warning).toContain('バックアップの保存と整合性確認は完了しました');
+  expect(warning).toContain('Insightを再読み込み');
+  expect(warning).not.toContain('現在のデータは変更されていません');
+
+  const persisted=await page.evaluate(()=>JSON.parse(localStorage.getItem('insight_v11')));
+  expect(persisted.stores).toEqual(snapshot.stores);
+  await page.reload();
+  await expect(page.locator('#nav1')).toBeVisible();
+  const current=await page.evaluate(()=>JSON.parse(localStorage.getItem('insight_v11')));
+  expect(current.stores).toEqual(snapshot.stores);
+  expect(errors).toEqual([]);
+});
+
+test('復元前の保存競合では容量不足と誤表示せず元データを保持する',async({page})=>{
+  const errors=await openInsight(page);
+  await page.locator('#navSettings').click();
+  const downloadPromise=page.waitForEvent('download');
+  await page.locator('#backupBtn').click();
+  const backup=await downloadPromise,restorePath=await backup.path();
+  await page.evaluate(()=>{
+    const st=allStores.stores[allStores.current],year=String(st.years[0]);
+    st.data[year]['1月'][0].storeMemo='E2E競合前のデータ';
+    persist();
+    window.InsightStorage.writeSnapshot=function(){
+      const error=new Error('別のタブでデータが更新されています。');
+      error.name='InsightStorageConflictError';
+      throw error;
+    };
+  });
+  const rawBefore=await page.evaluate(()=>localStorage.getItem('insight_v11'));
+  const dialogs=[];
+  page.on('dialog',async d=>{dialogs.push({type:d.type(),message:d.message()});await d.accept();});
+  const safetyPromise=page.waitForEvent('download');
+  await page.locator('#restoreFile').setInputFiles(restorePath);
+  const safety=await safetyPromise;
+  expect(safety.suggestedFilename()).toMatch(/^Insight_pre_restore_/);
+  await expect.poll(()=>dialogs.some(d=>d.type==='alert')).toBe(true);
+  const warning=dialogs.find(d=>d.type==='alert').message;
+  expect(warning).toContain('バックアップを復元できませんでした');
+  expect(warning).toContain('別のタブでデータが更新されています');
+  expect(warning).not.toContain('保存容量が不足');
+  expect(warning).toContain('現在のデータは変更されていません');
+  expect(await page.evaluate(()=>localStorage.getItem('insight_v11'))).toBe(rawBefore);
+  expect(errors).toEqual([]);
+});
+
 test('復元後検査で異常を検出した場合は復元前データへ自動で戻す',async({page})=>{
   const errors=await openInsight(page);
   await page.locator('#navSettings').click();
