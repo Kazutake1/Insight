@@ -1138,6 +1138,100 @@ test('設定ページで月別・店舗別・カテゴリー別の対象便判�
   expect(errors).toEqual([]);
 });
 
+
+test('過去月の便別手動設定を保存・再読込・自動判定へ戻すまで実績を変更しない',async({page})=>{
+  const errors=await openInsight(page);
+  await page.locator('#navSettings').click();
+  const panel=page.locator('#insightTripHistorySection');
+  await expect(panel).toBeVisible();
+  const context=await page.evaluate(()=>({
+    storeId:allStores.current,categoryId:allStores.salesCountManagement.categories[0].id,
+    currentYears:allStores.stores[allStores.current].years.slice(),
+    beforeStores:JSON.stringify(allStores.stores),
+    beforeMaster:JSON.stringify(allStores.salesCountManagement)
+  }));
+  await panel.locator('#insightTripHistoryStore').selectOption(context.storeId);
+  await panel.locator('#insightTripHistoryCategory').selectOption(context.categoryId);
+  await panel.locator('#insightTripHistoryMonth').selectOption('2025-08');
+  const card=panel.locator('.insight-trip-history-card').nth(2);
+  await expect(card.locator('.insight-trip-history-status')).toHaveText('判定不能');
+  await card.locator('select[aria-label="3便の手動判定"]').selectOption('active');
+  await expect(card.getByRole('button',{name:'3便の手動判定を保存'})).toBeEnabled();
+  await card.getByRole('button',{name:'3便の手動判定を保存'}).click();
+  await expect(card.locator('.insight-trip-history-status')).toHaveText('対象便（手動設定）');
+  await expect(card.getByRole('button',{name:'3便の手動判定を保存'})).toBeDisabled();
+  const persisted=await page.evaluate(()=>({
+    stored:JSON.parse(localStorage.getItem('insight_v11')),
+    inMemory:window.InsightTripOverrides.find(allStores,allStores.current,allStores.salesCountManagement.categories[0].id,'2025-08',3)
+  }));
+  expect(persisted.inMemory).toBe('active');
+  expect(persisted.stored.tripInferenceOverrides).toEqual([
+    {storeId:context.storeId,categoryId:context.categoryId,month:'2025-08',trip:3,status:'active'}
+  ]);
+  expect(JSON.stringify(persisted.stored.stores)).toBe(context.beforeStores);
+  expect(JSON.stringify(persisted.stored.salesCountManagement)).toBe(context.beforeMaster);
+  await page.reload();
+  await expect(page.locator('#navSettings')).toBeVisible();
+  await page.locator('#navSettings').click();
+  const after=page.locator('#insightTripHistorySection');
+  await after.locator('#insightTripHistoryStore').selectOption(context.storeId);
+  await after.locator('#insightTripHistoryCategory').selectOption(context.categoryId);
+  await after.locator('#insightTripHistoryMonth').selectOption('2025-08');
+  const restoredCard=after.locator('.insight-trip-history-card').nth(2);
+  await expect(restoredCard.locator('.insight-trip-history-status')).toHaveText('対象便（手動設定）');
+  await restoredCard.locator('select[aria-label="3便の手動判定"]').selectOption('auto');
+  await restoredCard.getByRole('button',{name:'3便の手動判定を保存'}).click();
+  await expect(restoredCard.locator('.insight-trip-history-status')).toHaveText('判定不能');
+  expect(await page.evaluate(()=>JSON.parse(localStorage.getItem('insight_v11')).tripInferenceOverrides)).toBeUndefined();
+  expect(errors).toEqual([]);
+});
+
+test('実績0のある便の対象外指定を禁止し、競合失敗時にも保存と表示を変えない',async({page})=>{
+  const errors=await openInsight(page);
+  const fixture=await page.evaluate(()=>{
+    const category=allStores.salesCountManagement.categories[0].id;
+    const storeId=allStores.current;
+    allStores.stores[storeId].salesCounts=allStores.stores[storeId].salesCounts||{};
+    allStores.stores[storeId].salesCounts['2025-08-03']={
+      [category]:{trips:[
+        {delivery:null,sales:null},{delivery:null,sales:null},{delivery:0,sales:null}
+      ]}
+    };
+    persist();
+    return {storeId,category};
+  });
+  const rawBefore=await page.evaluate(()=>localStorage.getItem('insight_v11'));
+  await page.locator('#navSettings').click();
+  const panel=page.locator('#insightTripHistorySection');
+  await panel.locator('#insightTripHistoryStore').selectOption(fixture.storeId);
+  await panel.locator('#insightTripHistoryCategory').selectOption(fixture.category);
+  await panel.locator('#insightTripHistoryMonth').selectOption('2025-08');
+  const card=panel.locator('.insight-trip-history-card').nth(2);
+  await expect(card.locator('.insight-trip-history-status')).toHaveText('入力実績あり');
+  await expect(card.locator('option[value="inactive"]')).toBeDisabled();
+  const attempt=await page.evaluate(({storeId,category})=>{
+    try{
+      window.InsightTripOverrides.save(allStores,storeId,category,'2025-08',3,'inactive',window.InsightStorage);
+      return 'unexpected success';
+    }catch(error){return error.message;}
+  },fixture);
+  expect(attempt).toContain('入力済み');
+  expect(await page.evaluate(()=>localStorage.getItem('insight_v11'))).toBe(rawBefore);
+  await card.locator('select[aria-label="3便の手動判定"]').selectOption('active');
+  await page.evaluate(()=>{
+    window.InsightStorage.transaction=function(){throw new Error('E2E書き込み競合');};
+  });
+  const dialogPromise=page.waitForEvent('dialog');
+  const action=card.getByRole('button',{name:'3便の手動判定を保存'}).click();
+  const dialog=await dialogPromise;
+  expect(dialog.message()).toContain('E2E書き込み競合');
+  await dialog.accept();await action;
+  await expect(card.locator('.insight-trip-history-status')).toHaveText('入力実績あり');
+  await expect(card.locator('select[aria-label="3便の手動判定"]')).toHaveValue('auto');
+  expect(await page.evaluate(()=>localStorage.getItem('insight_v11'))).toBe(rawBefore);
+  expect(errors).toEqual([]);
+});
+
 test('過去の対象便確認カードはiPad横向き幅で見切れずダークモードにも適応する',async({page})=>{
   const errors=await openInsight(page);
   await page.setViewportSize({width:1024,height:768});
