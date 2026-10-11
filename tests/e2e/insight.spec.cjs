@@ -3396,7 +3396,8 @@ test('販売数入力の平日・日祝平均は保存済み通常日を分類�
     category.activeTrips=[false,true,true];
     InsightSalesCount.reloadFromStore();
   });
-  await expect(weekday.locator('tbody tr').nth(1).locator('td')).toHaveText(['ー','10','5','20']);
+  // Past-month evidence takes priority over today's category activeTrips.
+  await expect(weekday.locator('tbody tr').nth(1).locator('td')).toHaveText(['50','10','5','120']);
   await page.setViewportSize({width:768,height:1024});
   await holiday.scrollIntoViewIfNeeded();
   expect(await page.locator('#scAnalysis .sc-comparisons').evaluate(n=>getComputedStyle(n).gridTemplateColumns.split(' ').length)).toBe(1);
