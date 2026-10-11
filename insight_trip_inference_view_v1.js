@@ -103,7 +103,7 @@
       try{
         overrides.save(snapshot(),root.InsightStorage,storeId,categoryId,month,trip.trip,mode);
         render();
-        summary.textContent='手動判定を保存しました。';
+        summary.textContent='手動判定を保存しました。 '+summary.textContent;
       }catch(error){
         root.alert('対象便判定を保存できませんでした。\\n'+String(error&&error.message?error.message:error));
         render();
