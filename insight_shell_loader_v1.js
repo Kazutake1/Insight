@@ -40,8 +40,8 @@ var orderedFeatureLoads=[
   './insight_weather_temperature_auto_v1.js?v=20260930-hooks1',
   './insight_weather_location_v1.js?v=20260930-security1',
   './insight_input_weather_temp_v1.js?v=20261006-csp-style-input-weather-1',
-  './insight_sales_count_v1.js?v=20261011-waste-inline-1',
-  './insight_sale_results_v1.js?v=20261006-sale-note-1',
+  './insight_sales_count_v1.js?v=20261011-readonly-waste-1',
+  './insight_sale_results_v1.js?v=20261011-readonly-waste-1',
   './insight_page_title_layout_v1.js?v=20261002-title-align',
   './insight_page_period_sync_v1.js?v=20261001-route-order',
   './insight_sales_period_selector_v1.js?v=20261006-input-period-runtime-2',
@@ -53,7 +53,7 @@ var orderedFeatureLoads=[
   './insight_event_impact_v1.js?v=20261003-event-impact-1',
   './insight_seasonality_analysis_v1.js?v=20261003-seasonality-1',
   './insight_anomaly_explanation_v1.js?v=20261003-anomaly-context-1',
-  './insight_event_results_v1.js?v=20261010-demand-categories-js-1',
+  './insight_event_results_v1.js?v=20261011-readonly-waste-1',
   './insight_daily_anomaly_v1.js?v=20261003-anomaly-context-1',
   './insight_weekly_review_v1.js?v=20261001-step4',
   './insight_monthly_review_v1.js?v=20261001-step5',
@@ -70,7 +70,7 @@ var orderedFeatureLoads=[
   './insight_input_chart_cleanup_v1.js?v=20261006-remove-chart-copy-1',
   './insight_weekday_chart_fix_v1.js?v=20261006-waste-zero-past-1',
   './insight_weekday_chart_spacing_v1.js?v=20261006-csp-style-weekday-1',
-  './insight_order_forecast_v1.js?v=20261010-sidebar-ai-order-14'
+  './insight_order_forecast_v1.js?v=20261011-readonly-waste-1'
 ];
 function featureSignature(entries){
   var text=entries.join('\n'),hash=2166136261;

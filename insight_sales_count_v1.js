@@ -28,6 +28,10 @@
   function categoryForSale(all,sale){return categoriesForSale(all,sale)[0]||null;}
   function emptyRecord(){return {trips:[{delivery:null,sales:null},{delivery:null,sales:null},{delivery:null,sales:null}]};}
   function normalizeRecord(value){var out=emptyRecord(),src=value&&Array.isArray(value.trips)?value.trips:[];for(var i=0;i<3;i++){var t=src[i]||{};out.trips[i].delivery=t.delivery===null||t.delivery===undefined?null:Number(t.delivery);out.trips[i].sales=t.sales===null||t.sales===undefined?null:Number(t.sales);}return out;}
+  function wasteRecordAt(all,storeId,date,categoryId){
+    var store=all&&all.stores&&all.stores[storeId];
+    return store&&store.wasteCounts&&store.wasteCounts[date]&&store.wasteCounts[date][categoryId]||null;
+  }
   function emptyWasteRecord(){return {trips:[null,null,null]};}
   function normalizeWasteRecord(value){
     var raw=value&&Array.isArray(value.trips)?value.trips:[];
@@ -110,7 +114,7 @@
     function temp(value){if(value===null||value===undefined||value===''||!Number.isFinite(Number(value)))return '—';return String(Math.trunc(Number(value)));}
     return {weather:wx||'—',icon:Object.prototype.hasOwnProperty.call(symbols,wx)?symbols[wx]:'—',max:temp(entry.tempMaxC),min:temp(entry.tempMinC)};
   }
-  var model={ensure:ensure,validate:validate,categoryForSale:categoryForSale,categoriesForSale:categoriesForSale,emptyRecord:emptyRecord,normalizeRecord:normalizeRecord,emptyWasteRecord:emptyWasteRecord,normalizeWasteRecord:normalizeWasteRecord,validateWasteCounts:validateWasteCounts,wasteSummary:wasteSummary,wasteTripStatus:wasteTripStatus,average:average,activeTrips:activeTrips,tripActive:tripActive,validDateKey:validDateKey,uniqueSaleRecords:uniqueSaleRecords,dayTypeRecords:dayTypeRecords,historicalWeather:historicalWeather};
+  var model={ensure:ensure,validate:validate,categoryForSale:categoryForSale,categoriesForSale:categoriesForSale,emptyRecord:emptyRecord,normalizeRecord:normalizeRecord,emptyWasteRecord:emptyWasteRecord,normalizeWasteRecord:normalizeWasteRecord,validateWasteCounts:validateWasteCounts,wasteSummary:wasteSummary,wasteRecordAt:wasteRecordAt,wasteTripStatus:wasteTripStatus,average:average,activeTrips:activeTrips,tripActive:tripActive,validDateKey:validDateKey,uniqueSaleRecords:uniqueSaleRecords,dayTypeRecords:dayTypeRecords,historicalWeather:historicalWeather};
   if(typeof module!=='undefined'&&module.exports)module.exports=model;
   if(!root.document)return;
   root.InsightSalesCount=model;
@@ -158,6 +162,20 @@
     function updateTotals(card,r,mask){var vals=card.querySelectorAll('[data-total]');vals.forEach(function(n){var v=total(r,n.dataset.total,mask);n.textContent=v===null?'—':String(v);});}
     function buildReadOnlyInput(date,r,trip,key,category){var i=el('input');if(!tripActive(category||selectedCategory(),trip)){i.type='text';i.value='ー';i.readOnly=true;i.tabIndex=-1;i.className='sc-not-applicable';i.setAttribute('aria-readonly','true');i.setAttribute('aria-label',date+' '+(trip+1)+'便 対象外');return i;}i.type='number';i.min='0';i.step='1';i.inputMode='numeric';i.value=r.trips[trip][key]===null?'':String(r.trips[trip][key]);i.classList.toggle('has-val',i.value!=='');i.readOnly=true;i.tabIndex=-1;i.setAttribute('aria-readonly','true');i.setAttribute('aria-label',date+' '+(trip+1)+'便 '+(key==='delivery'?'納品数':'販売数'));return i;}
 
+    function buildReadOnlyWasteInput(date,record,index,category){
+      var input=el('input'),value=record.trips[index];
+      var status=wasteTripStatus(activeTrips(category||selectedCategory()),date,index);
+      input.type='text';
+      input.value=value===null?(status==='inactive'?'ー':status==='unverified'?'?':'—'):String(value);
+      input.readOnly=true;input.tabIndex=-1;
+      input.setAttribute('aria-readonly','true');
+      input.setAttribute('aria-label',date+' '+(index+1)+'便 廃棄数'+(status==='unverified'?'（過去の対象便は未確認）':''));
+      if(status==='inactive'&&value===null)input.classList.add('sc-not-applicable');
+      else if(status==='unverified'&&value===null)input.classList.add('sc-waste-unverified');
+      else input.classList.toggle('has-val',value!==null);
+      return input;
+    }
+
     function createHistoricalWeatherRow(date,storeId){
       var info=historicalWeather(allStores,storeId||allStores.current,date);
       var line=el('div',undefined,'sc-history-weather');
@@ -166,7 +184,42 @@
         el('span',' / ','sc-history-divider'),el('span',info.min+'°','sc-history-low'));
       return line;
     }
-    function createReadOnlyDayCard(date,value,category){var r=normalizeRecord(value),mask=activeTrips(category||selectedCategory()),parts=date.split('-'),year=Number(parts[0]),month=Number(parts[1]),day=Number(parts[2]),wd=new Date(year,month-1,day).getDay(),holiday=typeof isHoliday==='function'&&isHoliday(year,month,day),red=wd===0||holiday,card=el('div',undefined,'sc-day '+(wd===6?'sat-card':red?'sun-card':''));var head=el('div',undefined,'sc-day-title'),num=el('strong',month+'/'+day+'（'+WEEKDAYS[wd]+'）','sc-day-num '+(wd===6?'sat':red?'sun':''));head.append(num,holiday?el('small','祝日'):el('span'));card.append(head,createHistoricalWeatherRow(date,allStores.current));var labels=el('div',undefined,'sc-col-head');labels.innerHTML='<span>1便</span><span>2便</span><span>3便</span>';card.append(labels);var delivery=el('div',undefined,'sc-trip sc-delivery-row'),salesRow=el('div',undefined,'sc-trip sc-sales-row');delivery.append(buildReadOnlyInput(date,r,0,'delivery',category),buildReadOnlyInput(date,r,1,'delivery',category),buildReadOnlyInput(date,r,2,'delivery',category));salesRow.append(buildReadOnlyInput(date,r,0,'sales',category),buildReadOnlyInput(date,r,1,'sales',category),buildReadOnlyInput(date,r,2,'sales',category));card.append(delivery,salesRow);var totals=el('div',undefined,'sc-totals');totals.innerHTML='<b class="sc-total-delivery" data-total="delivery"></b><b class="sc-total-sales" data-total="sales"></b>';card.append(totals);updateTotals(card,r,mask);return card;}
+    function createReadOnlyDayCard(date,value,category,waste){
+      var r=normalizeRecord(value),mask=activeTrips(category||selectedCategory()),parts=date.split('-'),
+        year=Number(parts[0]),month=Number(parts[1]),day=Number(parts[2]),
+        wd=new Date(year,month-1,day).getDay(),
+        holiday=typeof isHoliday==='function'&&isHoliday(year,month,day),red=wd===0||holiday,
+        withWaste=arguments.length>=4,
+        card=el('div',undefined,'sc-day '+(wd===6?'sat-card':red?'sun-card':'')+(withWaste?' sc-readonly-waste':''));
+      var head=el('div',undefined,'sc-day-title'),
+        num=el('strong',month+'/'+day+'（'+WEEKDAYS[wd]+'）','sc-day-num '+(wd===6?'sat':red?'sun':''));
+      head.append(num,holiday?el('small','祝日'):el('span'));
+      card.append(head,createHistoricalWeatherRow(date,allStores.current));
+      var labels=el('div',undefined,'sc-col-head');
+      labels.innerHTML='<span>1便</span><span>2便</span><span>3便</span>';
+      card.append(labels);
+      var delivery=el('div',undefined,'sc-trip sc-delivery-row'),
+        salesRow=el('div',undefined,'sc-trip sc-sales-row');
+      delivery.append(buildReadOnlyInput(date,r,0,'delivery',category),buildReadOnlyInput(date,r,1,'delivery',category),buildReadOnlyInput(date,r,2,'delivery',category));
+      salesRow.append(buildReadOnlyInput(date,r,0,'sales',category),buildReadOnlyInput(date,r,1,'sales',category),buildReadOnlyInput(date,r,2,'sales',category));
+      card.append(delivery,salesRow);
+      var wasteRecord;
+      if(withWaste){
+        wasteRecord=normalizeWasteRecord(waste);
+        var wasteRow=el('div',undefined,'sc-trip sc-waste-row');
+        wasteRow.append(buildReadOnlyWasteInput(date,wasteRecord,0,category),buildReadOnlyWasteInput(date,wasteRecord,1,category),buildReadOnlyWasteInput(date,wasteRecord,2,category));
+        card.append(wasteRow);
+      }
+      var totals=el('div',undefined,'sc-totals');
+      totals.innerHTML='<b class="sc-total-delivery" data-total="delivery"></b><b class="sc-total-sales" data-total="sales"></b>'+(withWaste?'<b class="sc-total-waste"></b>':'');
+      card.append(totals);updateTotals(card,r,mask);
+      if(withWaste){
+        var summary=wasteSummary(wasteRecord,mask,date),target=totals.querySelector('.sc-total-waste');
+        target.textContent=summary.total===null?'—':String(summary.total)+(summary.complete?'':'※');
+        target.setAttribute('aria-label',summary.total===null?'廃棄数未入力':summary.complete?'廃棄合計 '+summary.total+'個':'廃棄入力済み合計 '+summary.total+'個。一部未入力');
+      }
+      return card;
+    }
     function buildWasteInput(date,index){
       var rec=state.wasteDraft[date]||emptyWasteRecord(),value=rec.trips[index],input=el('input');
       var status=wasteTripStatus(activeTrips(selectedCategory()),date,index);
