@@ -1152,7 +1152,7 @@ test('過去月の便別手動設定を保存・再読込・自動判定へ戻�
   }));
   await panel.locator('#insightTripHistoryStore').selectOption(context.storeId);
   await panel.locator('#insightTripHistoryCategory').selectOption(context.categoryId);
-  await panel.locator('#insightTripHistoryMonth').selectOption('2025-08');
+  await panel.locator('#insightTripHistoryMonth').selectOption('2026-09');
   const card=panel.locator('.insight-trip-history-card').nth(2);
   await expect(card.locator('.insight-trip-history-status')).toHaveText('判定不能');
   await card.locator('select[aria-label="3便の手動判定"]').selectOption('active');
@@ -1162,11 +1162,11 @@ test('過去月の便別手動設定を保存・再読込・自動判定へ戻�
   await expect(card.getByRole('button',{name:'3便の手動判定を保存'})).toBeDisabled();
   const persisted=await page.evaluate(()=>({
     stored:JSON.parse(localStorage.getItem('insight_v11')),
-    inMemory:window.InsightTripOverrides.find(allStores,allStores.current,allStores.salesCountManagement.categories[0].id,'2025-08',3)
+    inMemory:window.InsightTripOverrides.find(allStores,allStores.current,allStores.salesCountManagement.categories[0].id,'2026-09',3)
   }));
   expect(persisted.inMemory).toBe('active');
   expect(persisted.stored.tripInferenceOverrides).toEqual([
-    {storeId:context.storeId,categoryId:context.categoryId,month:'2025-08',trip:3,status:'active'}
+    {storeId:context.storeId,categoryId:context.categoryId,month:'2026-09',trip:3,status:'active'}
   ]);
   expect(JSON.stringify(persisted.stored.stores)).toBe(context.beforeStores);
   expect(JSON.stringify(persisted.stored.salesCountManagement)).toBe(context.beforeMaster);
@@ -1176,7 +1176,7 @@ test('過去月の便別手動設定を保存・再読込・自動判定へ戻�
   const after=page.locator('#insightTripHistorySection');
   await after.locator('#insightTripHistoryStore').selectOption(context.storeId);
   await after.locator('#insightTripHistoryCategory').selectOption(context.categoryId);
-  await after.locator('#insightTripHistoryMonth').selectOption('2025-08');
+  await after.locator('#insightTripHistoryMonth').selectOption('2026-09');
   const restoredCard=after.locator('.insight-trip-history-card').nth(2);
   await expect(restoredCard.locator('.insight-trip-history-status')).toHaveText('対象便（手動設定）');
   await restoredCard.locator('select[aria-label="3便の手動判定"]').selectOption('auto');
@@ -1192,7 +1192,7 @@ test('実績0のある便の対象外指定を禁止し、競合失敗時にも�
     const category=allStores.salesCountManagement.categories[0].id;
     const storeId=allStores.current;
     allStores.stores[storeId].salesCounts=allStores.stores[storeId].salesCounts||{};
-    allStores.stores[storeId].salesCounts['2025-08-03']={
+    allStores.stores[storeId].salesCounts['2026-09-03']={
       [category]:{trips:[
         {delivery:null,sales:null},{delivery:null,sales:null},{delivery:0,sales:null}
       ]}
@@ -1205,13 +1205,13 @@ test('実績0のある便の対象外指定を禁止し、競合失敗時にも�
   const panel=page.locator('#insightTripHistorySection');
   await panel.locator('#insightTripHistoryStore').selectOption(fixture.storeId);
   await panel.locator('#insightTripHistoryCategory').selectOption(fixture.category);
-  await panel.locator('#insightTripHistoryMonth').selectOption('2025-08');
+  await panel.locator('#insightTripHistoryMonth').selectOption('2026-09');
   const card=panel.locator('.insight-trip-history-card').nth(2);
   await expect(card.locator('.insight-trip-history-status')).toHaveText('入力実績あり');
   await expect(card.locator('option[value="inactive"]')).toBeDisabled();
   const attempt=await page.evaluate(({storeId,category})=>{
     try{
-      window.InsightTripOverrides.save(allStores,storeId,category,'2025-08',3,'inactive',window.InsightStorage);
+      window.InsightTripOverrides.save(allStores,storeId,category,'2026-09',3,'inactive',window.InsightStorage);
       return 'unexpected success';
     }catch(error){return error.message;}
   },fixture);
