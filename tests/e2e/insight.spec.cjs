@@ -280,10 +280,10 @@ test('トップページは外部shellと機能manifestの最新版確認をno-s
     fetch('/insight_payload_source_v1.html?e2e-shell-check=1',{cache:'no-store'}).then(r=>r.text())
   ]));
   const [source,boot,loader,payload]=sources;
-  expect(source).toContain('name="insight-shell-version" content="20261011-restore-state-build-22"');
-  expect(source).toContain('insight_shell_boot_v1.js?v=20261011-restore-state-build-22');
-  expect(source).toContain('insight_shell_loader_v1.js?v=20261011-restore-state-build-22');
-  expect(source).toContain('insight_shell_v1.css?v=20261011-restore-state-build-22');
+  expect(source).toContain('name="insight-shell-version" content="20261011-trip-infer-build-23"');
+  expect(source).toContain('insight_shell_boot_v1.js?v=20261011-trip-infer-build-23');
+  expect(source).toContain('insight_shell_loader_v1.js?v=20261011-trip-infer-build-23');
+  expect(source).toContain('insight_shell_v1.css?v=20261011-trip-infer-build-23');
   expect(source).not.toMatch(/<script(?![^>]*\bsrc=)[^>]*>/i);
   expect(source).not.toMatch(/<style\b/i);
   expect(source).not.toMatch(/script-src[^;]*'unsafe-inline'/);
@@ -1076,6 +1076,30 @@ test('年度一覧にない古い疎データは起動を妨げず正式年度�
   expect(restored.years).not.toContain('1999');
   expect(restored.orphan[0]).toBeNull();
   expect(restored.orphan[1]).toBeNull();
+  expect(errors).toEqual([]);
+});
+
+test('対象便の過去月自動判定は保存内容を変えず、0入力と未入力を識別する',async({page})=>{
+  const errors=await openInsight(page);
+  await page.waitForFunction(()=>window.InsightTripInference&&window.InsightTripInference.inferMonth);
+  const rawBefore=await page.evaluate(()=>localStorage.getItem('insight_v11'));
+  const result=await page.evaluate(()=>{
+    const snap={current:'shop1',stores:{shop1:{salesCounts:{}}}};
+    for(let day=1;day<=8;day++){
+      const key='2026-09-'+String(day).padStart(2,'0');
+      snap.stores.shop1.salesCounts[key]={c:{trips:[
+        {delivery:day,sales:0},{delivery:null,sales:null},{delivery:null,sales:null}
+      ]}};
+    }
+    const before=JSON.stringify(snap);
+    const report=window.InsightTripInference.inferMonth(snap,'shop1','c','2026-09',{today:'2026-10-11'});
+    return {report,unchanged:JSON.stringify(snap)===before};
+  });
+  expect(result.report.trips.map(trip=>trip.status)).toEqual(['observed_active','inferred_inactive','inferred_inactive']);
+  expect(result.report.trips[0].salesDays).toBe(8);
+  expect(result.report.trips[2].otherTripObservedDays).toBe(8);
+  expect(result.unchanged).toBe(true);
+  expect(await page.evaluate(()=>localStorage.getItem('insight_v11'))).toBe(rawBefore);
   expect(errors).toEqual([]);
 });
 

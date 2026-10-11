@@ -25,9 +25,9 @@ test('Index shellはinline script/styleを持たず外部assetへ分離する',(
   const boot=read('insight_shell_boot_v1.js');
   const loader=read('insight_shell_loader_v1.js');
   const css=read('insight_shell_v1.css');
-  assert.match(index,/insight_shell_boot_v1\.js\?v=20261011-restore-state-build-22/);
-  assert.match(index,/insight_shell_loader_v1\.js\?v=20261011-restore-state-build-22/);
-  assert.match(index,/insight_shell_v1\.css\?v=20261011-restore-state-build-22/);
+  assert.match(index,/insight_shell_boot_v1\.js\?v=20261011-trip-infer-build-23/);
+  assert.match(index,/insight_shell_loader_v1\.js\?v=20261011-trip-infer-build-23/);
+  assert.match(index,/insight_shell_v1\.css\?v=20261011-trip-infer-build-23/);
   assert.doesNotMatch(index,/<script(?![^>]*\bsrc=)[^>]*>/i);
   assert.doesNotMatch(index,/<style\b/i);
   assert.doesNotMatch(index,/script-src[^;]*'unsafe-inline'/);
@@ -185,8 +185,8 @@ test('canonical payloadはinline script/styleを持たず外部assetを順序固
 
 test('トップページはキャッシュ抑止とシェル・機能manifestの自己更新を持つ',()=>{
   const index=readShell();
-  assert.match(index,/insight-shell-version" content="20261011-restore-state-build-22/);
-  assert.match(index,/var BUILD="20261011-restore-state-build-22"/);
+  assert.match(index,/insight-shell-version" content="20261011-trip-infer-build-23/);
+  assert.match(index,/var BUILD="20261011-trip-infer-build-23"/);
   assert.match(index,/Shell rule: bump BUILD whenever the loader/);
   assert.match(index,/Cache-Control" content="no-cache, no-store, must-revalidate/);
   assert.match(index,/insight_probe=/);
@@ -505,6 +505,12 @@ test('分析AIの対象年月をサイドバー切替後も固定し各ページ
   const pageAI=read('insight_ai_page_comments_v1.js');
   const lock=read('insight_analysis_period_lock_v1.js');
   const salesCount=read('insight_sales_count_v1.js');
+  const tripInference=read('insight_trip_inference_v1.js');
+  assert.ok(index.includes('insight_trip_inference_v1.js?v=20261011-month-infer-1'));
+  assert.ok(index.indexOf('insight_sales_count_v1.js')<index.indexOf('insight_trip_inference_v1.js'));
+  assert.ok(tripInference.includes('function inferMonth(snapshot,storeId,categoryId,month,options)'));
+  assert.ok(!tripInference.includes('localStorage.setItem')&&!tripInference.includes('InsightStorage.writeSnapshot')&&!tripInference.includes('persist('));
+  assert.doesNotThrow(()=>new vm.Script(tripInference),'trip inference module should parse as JavaScript');
   assert.match(index,/insight_analysis_period_lock_v1\.js\?v=20261001-sync-owner/);
   assert.match(index,/insight_sales_count_v1\.js\?v=20261011-readonly-waste-1/);
   assert.match(presentation,/aiAnalysisTarget/);
