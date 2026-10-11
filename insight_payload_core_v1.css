@@ -1545,3 +1545,11 @@ body.ai-analysis-open #main{margin-right:0!important}
 #insightTripHistorySection .insight-trip-history-note{font-size:12px;color:var(--text4);line-height:1.5;margin:11px 0 0}
 @media(max-width:720px){#insightTripHistorySection .insight-trip-history-controls{grid-template-columns:1fr 1fr}#insightTripHistorySection .insight-trip-history-controls label:last-child{grid-column:span 2}}
 @media(max-width:520px){#insightTripHistorySection .insight-trip-history-results{grid-template-columns:1fr}}
+
+/* Monthly trip override controls: neutral theme, 11-inch iPad touch targets. */
+#insightTripHistorySection .insight-trip-history-edit{display:flex;align-items:center;gap:7px;margin-top:10px;min-width:0}
+#insightTripHistorySection .insight-trip-history-choice{min-width:0;flex:1 1 auto;width:100%;min-height:42px;padding:8px 7px;border:1px solid var(--border);border-radius:8px;background:var(--surface);color:var(--text);font:600 12px/1.3 -apple-system,BlinkMacSystemFont,"Noto Sans JP",sans-serif}
+#insightTripHistorySection .insight-trip-history-save{flex:0 0 auto;min-height:42px;padding:8px 11px;border:1px solid var(--border);border-radius:8px;background:var(--text);color:var(--surface);font:600 12px/1.3 -apple-system,BlinkMacSystemFont,"Noto Sans JP",sans-serif;cursor:pointer}
+#insightTripHistorySection .insight-trip-history-save:disabled{opacity:.45;cursor:default}
+#insightTripHistorySection .insight-trip-history-choice:focus-visible,#insightTripHistorySection .insight-trip-history-save:focus-visible{outline:2px solid var(--text3);outline-offset:2px}
+@media(max-width:960px){#insightTripHistorySection .insight-trip-history-edit{flex-wrap:wrap}#insightTripHistorySection .insight-trip-history-save{width:100%}}
