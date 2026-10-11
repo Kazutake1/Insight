@@ -291,3 +291,41 @@ test('セール・イベント・発注予測の実績カードだけ廃棄数�
   assert.match(css,/\.sc-day\.sc-readonly-waste\{height:auto;min-height:268px\}/);
   assert.match(css,/\.sc-day\.sc-readonly-waste \.sc-totals\{grid-template-columns:repeat\(3,minmax\(0,1fr\)\)\}/);
 });
+
+test('過去の日種別平均は既存の通常日判定を維持したまま日付情報を返せる',()=>{
+  const rec=value=>({trips:[{delivery:value,sales:value},{delivery:value,sales:value},{delivery:null,sales:null}]});
+  const records={
+    '2026-09-01':{cat:rec(10)},
+    '2026-09-05':{cat:rec(99)},
+    '2026-09-06':{cat:rec(30)},
+    '2026-09-21':{cat:rec(40)},
+    '2026-09-22':{cat:rec(50)},
+    '2026-09-23':{cat:rec(60)}
+  };
+  const original=JSON.stringify(records);
+  const excluded=date=>date==='2026-09-22'?[{type:'sale'}]:[];
+  const holiday=(y,m,d)=>d===21||d===23;
+  const plain=sales.dayTypeRecords(records,'cat','2026-09',excluded,holiday);
+  const dated=sales.dayTypeRecords(records,'cat','2026-09',excluded,holiday,true);
+  assert.deepEqual(dated.weekday.map(item=>item.date),['2026-09-01']);
+  assert.deepEqual(dated.sundayHoliday.map(item=>item.date),['2026-09-06','2026-09-21','2026-09-23']);
+  assert.deepEqual(dated.weekday.map(item=>item.record),plain.weekday);
+  assert.deepEqual(dated.sundayHoliday.map(item=>item.record),plain.sundayHoliday);
+  assert.equal(JSON.stringify(records),original);
+});
+
+test('曜日別・平日・日祝平均の実装だけを月別の読み取り専用判定につなぐ',()=>{
+  const source=fs.readFileSync(path.join(__dirname,'..','insight_sales_count_v1.js'),'utf8');
+  const resolver=fs.readFileSync(path.join(__dirname,'..','insight_trip_history_resolver_v1.js'),'utf8');
+  const loader=fs.readFileSync(path.join(__dirname,'..','insight_shell_loader_v1.js'),'utf8');
+  assert.match(source,/function datedAverage\(rows,key\)/);
+  assert.match(source,/resolver\.averageByDate\(allStores,allStores\.current,state\.categoryId,rows,key\)/);
+  assert.match(source,/var ordinary=average\(rows\.map/);
+  assert.match(source,/month>=localTodayKey\(\)\.slice\(0,7\)/);
+  assert.match(source,/function weekdayRecords\(key\)/);
+  assert.match(source,/function comparisonTable\(records,title\)/);
+  assert.match(source,/var value=withDates\?/);
+  assert.match(resolver,/function resolveDate\(/);
+  assert.ok(loader.indexOf('insight_trip_history_resolver_v1.js')>loader.indexOf('insight_trip_overrides_v1.js'));
+  assert.ok(loader.indexOf('insight_trip_history_resolver_v1.js')<loader.indexOf('insight_sale_results_v1.js'));
+});
