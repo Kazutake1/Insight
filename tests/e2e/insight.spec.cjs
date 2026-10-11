@@ -3438,3 +3438,89 @@ test('別タブからの古い保存を拒否し先に保存された店舗デ�
   expect(secondErrors).toEqual([]);
   await second.close();
 });
+
+
+test('過去の対象便推定と手動確定が曜日別・平日・日祝平均に反映され、保存値を変更しない',async({page})=>{
+  const errors=await openInsight(page);
+  await page.locator('#navSalesCount').click();
+  const baseline=await page.evaluate(()=>{
+    const id=allStores.current,st=allStores.stores[id];
+    st.years=Array.from(new Set(st.years.concat(['2026'])));
+    const category=allStores.salesCountManagement.categories.find(c=>!c.hidden);
+    category.activeTrips=[true,true,true];
+    st.salesCounts={};st.events=[];
+    delete st.tripHistoryOverrides;
+    if(allStores.eventManagement&&Array.isArray(allStores.eventManagement.events))
+      allStores.eventManagement.events=[];
+    for(let day=1;day<=8;day++){
+      const date='2026-09-'+String(day).padStart(2,'0');
+      st.salesCounts[date]={[category.id]:{trips:[
+        {delivery:10,sales:10},{delivery:20,sales:20},{delivery:null,sales:null}
+      ]}};
+    }
+    InsightSalesCount.setPeriod(2026,9);
+    InsightSalesCount.reloadFromStore();
+    return {storeId:id,categoryId:category.id,activeTrips:category.activeTrips.slice()};
+  });
+  const original=await page.evaluate(()=>localStorage.getItem('insight_v11'));
+  const tuesday=page.locator('#scAverages .sc-average-day').nth(2);
+  const weekday=page.locator('#scAnalysis .sc-day-type-card').first();
+  const sundayHoliday=page.locator('#scAnalysis .sc-day-type-card').nth(1);
+  await expect(tuesday.locator('.sc-average-sales b')).toHaveText(['10','20','ー']);
+  await expect(tuesday.locator('.sc-average-totals .sc-total-sales')).toHaveText('30');
+  await expect(weekday.locator('tbody tr').nth(1).locator('td')).toHaveText(['10','20','ー','30']);
+  await expect(sundayHoliday.locator('tbody tr').nth(1).locator('td')).toHaveText(['10','20','ー','30']);
+
+  await page.evaluate(({storeId,categoryId})=>{
+    const st=allStores.stores[storeId];
+    st.tripHistoryOverrides={version:1,categories:{[categoryId]:{'2026-09':{'3':'active'}}}};
+    InsightSalesCount.reloadFromStore();
+  },baseline);
+  await expect(tuesday.locator('.sc-average-sales b')).toHaveText(['10','20','—']);
+  await expect(tuesday.locator('.sc-average-totals .sc-total-sales')).toHaveText('—');
+  await expect(weekday.locator('tbody tr').nth(1).locator('td')).toHaveText(['10','20','—','—']);
+  await expect(sundayHoliday.locator('tbody tr').nth(1).locator('td')).toHaveText(['10','20','—','—']);
+
+  await page.evaluate(({storeId,categoryId})=>{
+    allStores.stores[storeId].tripHistoryOverrides.categories[categoryId]['2026-09']['3']='inactive';
+    InsightSalesCount.reloadFromStore();
+  },baseline);
+  await expect(tuesday.locator('.sc-average-sales b')).toHaveText(['10','20','ー']);
+  await expect(tuesday.locator('.sc-average-totals .sc-total-sales')).toHaveText('30');
+
+  await page.evaluate(({storeId})=>{
+    delete allStores.stores[storeId].tripHistoryOverrides;
+    InsightSalesCount.reloadFromStore();
+  },baseline);
+  await expect(tuesday.locator('.sc-average-totals .sc-total-sales')).toHaveText('30');
+  expect(await page.evaluate(()=>localStorage.getItem('insight_v11'))).toBe(original);
+  const currentMask=await page.evaluate(categoryId=>allStores.salesCountManagement.categories.find(c=>c.id===categoryId).activeTrips,baseline.categoryId);
+  expect(currentMask).toEqual([true,true,true]);
+  expect(errors).toEqual([]);
+});
+
+test('過去月で証拠不足なら3便を対象外にせず、合計平均を未確定として表示する',async({page})=>{
+  const errors=await openInsight(page);
+  await page.locator('#navSalesCount').click();
+  await page.evaluate(()=>{
+    const st=allStores.stores[allStores.current];
+    st.years=Array.from(new Set(st.years.concat(['2026'])));
+    const category=allStores.salesCountManagement.categories.find(c=>!c.hidden);
+    category.activeTrips=[true,true,true];st.salesCounts={};st.events=[];
+    delete st.tripHistoryOverrides;
+    if(allStores.eventManagement&&Array.isArray(allStores.eventManagement.events))
+      allStores.eventManagement.events=[];
+    for(let day=1;day<=6;day++){
+      st.salesCounts['2026-09-'+String(day).padStart(2,'0')]={[category.id]:{trips:[
+        {delivery:0,sales:0},{delivery:10,sales:10},{delivery:null,sales:null}
+      ]}};
+    }
+    InsightSalesCount.setPeriod(2026,9);
+    InsightSalesCount.reloadFromStore();
+  });
+  const tuesday=page.locator('#scAverages .sc-average-day').nth(2);
+  await expect(tuesday.locator('.sc-average-sales b')).toHaveText(['0','10','?']);
+  await expect(tuesday.locator('.sc-average-totals .sc-total-sales')).toHaveText('—');
+  await expect(page.locator('#scAnalysis .sc-day-type-card').first().locator('tbody tr').nth(1).locator('td')).toHaveText(['0','10','?','—']);
+  expect(errors).toEqual([]);
+});
