@@ -4,6 +4,7 @@
 
   var PERIODS={3:3,6:6,12:12,all:null};
   var WEEKDAYS=['日','月','火','水','木','金','土'];
+  var historyResolver=(typeof module!=='undefined'&&module.exports)?require('./insight_trip_history_resolver_v1.js'):root.InsightTripHistoryResolver;
 
   function copy(value){return JSON.parse(JSON.stringify(value));}
   function pad(value){return String(value).padStart(2,'0');}
@@ -64,15 +65,20 @@
   function hasRecord(record){
     return !!(record&&record.trips&&record.trips.some(function(t){return t.delivery!==null||t.sales!==null;}));
   }
-  function stats(records,salesApi,category){
+  function stats(records,salesApi,category,history){
     records=records||[];
-    var mask=salesApi.activeTrips?salesApi.activeTrips(category):[true,true,true];
-    var delivery=salesApi.average(records,'delivery',mask).total,sales=salesApi.average(records,'sales',mask).total;
-    return {
-      averageDelivery:delivery,
-      averageSales:sales,
-      sellThrough:delivery!==null&&delivery>0&&sales!==null?sales/delivery*100:null
-    };
+    var delivery,sales;
+    if(history){
+      // Each row carries its own date; category settings must not rewrite history.
+      delivery=history.resolver.averageByDate(history.all,history.storeId,history.categoryId,records,'delivery').total;
+      sales=history.resolver.averageByDate(history.all,history.storeId,history.categoryId,records,'sales').total;
+    }else{
+      var mask=salesApi.activeTrips?salesApi.activeTrips(category):[true,true,true];
+      delivery=salesApi.average(records,'delivery',mask).total;
+      sales=salesApi.average(records,'sales',mask).total;
+    }
+    return {averageDelivery:delivery,averageSales:sales,
+      sellThrough:delivery!==null&&delivery>0&&sales!==null?sales/delivery*100:null};
   }
   function monthKeysForDays(days){
     var seen=new Set();
@@ -80,7 +86,7 @@
     return Array.from(seen);
   }
   function normalComparison(all,storeId,categoryId,occurrence,range,deps,category){
-    var eventsApi=deps.events,salesApi=deps.sales,mask=salesApi.activeTrips?salesApi.activeTrips(category):[true,true,true];
+    var eventsApi=deps.events,salesApi=deps.sales,history=deps.history;
     var weekdays=new Set(occurrence.days.map(function(day){return parseIso(day.date).getDay();}));
     var records=[],seen=new Set(),months=monthKeysForDays(occurrence.days);
     months.forEach(function(monthKey){
@@ -92,14 +98,17 @@
         var sale=eventsApi.list(all,storeId,date,date).some(function(event){return categoryMatches(all,event,categoryId,salesApi);});
         if(sale||seen.has(date))continue;
         var record=recordAt(all,storeId,date,categoryId,salesApi);
-        if(!hasRecord(record)||!complete(record,'sales',mask))continue;
-        seen.add(date);records.push(record);
+        if(!hasRecord(record))continue;
+        // Count only ordinary days with a complete dated sales total.
+        var decision=history.resolver.resolveDate(all,storeId,categoryId,date,{monthCache:history.cache});
+        if(decision.mask.some(function(value){return value===null;})||!complete(record,'sales',decision.mask))continue;
+        seen.add(date);records.push({date:date,record:record});
       }
     });
-    var saleStats=stats(occurrence.days.filter(function(day){return hasRecord(day.record);}).map(function(day){return day.record;}),salesApi,category);
-    var normalStats=stats(records,salesApi,category);
+    var saleStats=stats(occurrence.days.filter(function(day){return hasRecord(day.record);}),salesApi,category,history);
+    var normalStats=stats(records,salesApi,category,history);
     return {
-      normalCount:records.length,
+      normalCount:history.resolver.averageByDate(all,storeId,categoryId,records,'sales').totalDays,
       normalAverageSales:normalStats.averageSales,
       normalRatio:saleStats.averageSales!==null&&normalStats.averageSales!==null&&normalStats.averageSales!==0?
         (saleStats.averageSales-normalStats.averageSales)/normalStats.averageSales*100:null
@@ -107,10 +116,11 @@
   }
   function collect(all,storeId,categoryId,period,referenceIso,deps){
     deps=deps||{};
-    var eventsApi=deps.events,salesApi=deps.sales;
-    if(!eventsApi||!salesApi)throw new Error('セール実績の分析機能を利用できません。');
+    var eventsApi=deps.events,salesApi=deps.sales,resolver=deps.resolver||historyResolver;
+    if(!eventsApi||!salesApi||!resolver)throw new Error('セール実績の分析機能を利用できません。');
     salesApi.ensure(all);
-    var range=rangeFor(period,referenceIso),store=all.stores&&all.stores[storeId],category=(all.salesCountManagement.categories||[]).find(function(c){return c.id===categoryId;})||null;
+    var range=rangeFor(period,referenceIso),store=all.stores&&all.stores[storeId],category=(all.salesCountManagement.categories||[]).find(function(c){return c.id===categoryId;})||null,
+      history={all:all,storeId:storeId,categoryId:categoryId,resolver:resolver,cache:new Map()};
     if(!store)return {range:range,groups:[],occurrences:[]};
     var events=eventsApi.list(all,storeId,range.start,range.end).filter(function(event){
       return categoryMatches(all,event,categoryId,salesApi);
@@ -135,8 +145,9 @@
         originalEndDate:event.endDate,
         days:days
       };
-      var saleStats=stats(days.filter(function(day){return day.hasRecord;}).map(function(day){return day.record;}),salesApi,category);
-      Object.assign(occurrence,saleStats,normalComparison(all,storeId,categoryId,occurrence,range,deps,category));
+      var saleStats=stats(days.filter(function(day){return day.hasRecord;}),salesApi,category,history);
+      Object.assign(occurrence,saleStats,normalComparison(all,storeId,categoryId,occurrence,range,
+        {events:eventsApi,sales:salesApi,history:history},category));
       occurrences.push(occurrence);
 
       if(!groupsBySummary[summary])groupsBySummary[summary]={summary:summary,occurrences:[],daysByDate:{}};
@@ -155,7 +166,7 @@
         });
       });
       group.days=ordered;
-      var groupStats=stats(group.days.filter(function(day){return day.hasRecord;}).map(function(day){return day.record;}),salesApi,category);
+      var groupStats=stats(group.days.filter(function(day){return day.hasRecord;}),salesApi,category,history);
       group.averageDelivery=groupStats.averageDelivery;
       group.averageSales=groupStats.averageSales;
       group.sellThrough=groupStats.sellThrough;
@@ -197,7 +208,7 @@
       return start[0]+'/'+Number(start[1])+'/'+Number(start[2])+'〜'+end[0]+'/'+Number(end[1])+'/'+Number(end[2]);
     }
     function currentData(){
-      return collect(allStores,allStores.current,state.categoryId,state.period,referenceIso(),{events:root.InsightEvents,sales:root.InsightSalesCount});
+      return collect(allStores,allStores.current,state.categoryId,state.period,referenceIso(),{events:root.InsightEvents,sales:root.InsightSalesCount,resolver:root.InsightTripHistoryResolver});
     }
     function renderFilters(){
       doc.querySelectorAll('#srPeriodTabs button').forEach(function(button){button.classList.toggle('active',button.dataset.period===state.period);});
@@ -229,7 +240,12 @@
         var rows=el('div',undefined,'sr-occurrence-grids'),category=selectedCategory();
         group.occurrences.forEach(function(occurrence){
           var grid=el('div',undefined,'sr-day-grid');
-          occurrence.days.forEach(function(day){grid.append(root.InsightSalesCount.createReadOnlyDayCard(day.date,day.record,category,root.InsightSalesCount.wasteRecordAt(allStores,allStores.current,day.date,category.id)));});
+          var resolver=root.InsightTripHistoryResolver,cache=new Map();
+          occurrence.days.forEach(function(day){
+            var decision=resolver.resolveDate(allStores,allStores.current,category.id,day.date,{monthCache:cache});
+            grid.append(root.InsightSalesCount.createReadOnlyDayCard(day.date,day.record,category,
+              root.InsightSalesCount.wasteRecordAt(allStores,allStores.current,day.date,category.id),decision.mask));
+          });
           rows.append(grid);
         });
         section.append(head,rows);area.append(section);
