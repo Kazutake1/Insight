@@ -251,3 +251,21 @@ test('バックアップ復元後も共有年月を復元先店舗の年度構�
   const source=fs.readFileSync(path.join(root,'insight_backup_guard_v1.js'),'utf8');
   assert.match(source,/InsightPagePeriodSync\.reconcileCurrentStore/);
 });
+
+test('復元の保存前エラーは容量不足と決めつけず元の原因を通知する',()=>{
+  const source=fs.readFileSync(path.join(root,'insight_backup_guard_v1.js'),'utf8');
+  assert.match(source,/if\(!writeCompleted\)\{/);
+  assert.match(source,/postErr\.name==="QuotaExceededError"/);
+  assert.match(source,/throw postErr;/);
+  assert.doesNotMatch(source,/if\(!writeCompleted\)throw new Error\("保存容量が不足しているため復元できません"\)/);
+});
+
+test('復元確定後の画面更新エラーは保存成功を伝えて再読込を促す',()=>{
+  const source=fs.readFileSync(path.join(root,'insight_backup_guard_v1.js'),'utf8');
+  assert.match(source,/reader\.onload=function\(ev\)\{var restoreCommitted=false;try\{/);
+  assert.ok(source.indexOf('verifiedRestore=verifyRestoredSnapshot(newAll)')<source.indexOf('restoreCommitted=true'));
+  assert.ok(source.indexOf('restoreCommitted=true')<source.indexOf('allStores=newAll'));
+  assert.match(source,/復元したデータは保存されています。Insightを再読み込み/);
+  assert.match(source,/もう一度復元する必要はありません/);
+  assert.match(source,/現在のデータは変更されていません/);
+});

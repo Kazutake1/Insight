@@ -280,10 +280,10 @@ test('トップページは外部shellと機能manifestの最新版確認をno-s
     fetch('/insight_payload_source_v1.html?e2e-shell-check=1',{cache:'no-store'}).then(r=>r.text())
   ]));
   const [source,boot,loader,payload]=sources;
-  expect(source).toContain('name="insight-shell-version" content="20261011-event-health-build-21"');
-  expect(source).toContain('insight_shell_boot_v1.js?v=20261011-event-health-build-21');
-  expect(source).toContain('insight_shell_loader_v1.js?v=20261011-event-health-build-21');
-  expect(source).toContain('insight_shell_v1.css?v=20261011-event-health-build-21');
+  expect(source).toContain('name="insight-shell-version" content="20261011-restore-state-build-22"');
+  expect(source).toContain('insight_shell_boot_v1.js?v=20261011-restore-state-build-22');
+  expect(source).toContain('insight_shell_loader_v1.js?v=20261011-restore-state-build-22');
+  expect(source).toContain('insight_shell_v1.css?v=20261011-restore-state-build-22');
   expect(source).not.toMatch(/<script(?![^>]*\bsrc=)[^>]*>/i);
   expect(source).not.toMatch(/<style\b/i);
   expect(source).not.toMatch(/script-src[^;]*'unsafe-inline'/);
@@ -881,6 +881,78 @@ test('復元確定時は上書き前のデータを自動ダウンロードし�
   await expect(page.locator('#pageSettings')).toHaveClass(/show/);
   await expect(page.locator('#navSettings')).toHaveClass(/active/);
   await expect(page.getByText('データを復元しました（整合性確認済み）')).toBeVisible();
+  expect(errors).toEqual([]);
+});
+
+
+test('復元保存・整合性検証の完了後に画面更新が失敗しても保存済みと案内する',async({page})=>{
+  const errors=await openInsight(page);
+  await page.locator('#navSettings').click();
+  const downloadPromise=page.waitForEvent('download');
+  await page.locator('#backupBtn').click();
+  const backup=await downloadPromise,restorePath=await backup.path();
+  const snapshot=JSON.parse(fs.readFileSync(restorePath,'utf8')).data;
+
+  await page.evaluate(()=>{
+    const st=allStores.stores[allStores.current],year=String(st.years[0]);
+    st.data[year]['1月'][0].storeMemo='E2E復元前の書き込み';
+    persist();
+    window.renderStoreSel=function(){throw new Error('E2E再描画失敗');};
+  });
+
+  const dialogs=[];
+  page.on('dialog',async d=>{dialogs.push({type:d.type(),message:d.message()});await d.accept();});
+  const safetyPromise=page.waitForEvent('download');
+  await page.locator('#restoreFile').setInputFiles(restorePath);
+  const safety=await safetyPromise;
+  expect(safety.suggestedFilename()).toMatch(/^Insight_pre_restore_/);
+  await expect.poll(()=>dialogs.some(d=>d.type==='alert')).toBe(true);
+  const warning=dialogs.find(d=>d.type==='alert').message;
+  expect(warning).toContain('バックアップの保存と整合性確認は完了しました');
+  expect(warning).toContain('Insightを再読み込み');
+  expect(warning).not.toContain('現在のデータは変更されていません');
+
+  const persisted=await page.evaluate(()=>JSON.parse(localStorage.getItem('insight_v11')));
+  const target=snapshot.stores[snapshot.current],year=String(target.years[0]);
+  expect(persisted.stores[snapshot.current].data[year]['1月'][0].storeMemo).toBe(target.data[year]['1月'][0].storeMemo);
+  expect(persisted.stores[snapshot.current].data[year]['1月'][0].storeMemo).not.toBe('E2E復元前の書き込み');
+  await page.reload();
+  await expect(page.locator('#nav1')).toBeVisible();
+  const current=await page.evaluate(()=>JSON.parse(localStorage.getItem('insight_v11')));
+  expect(current.stores[snapshot.current].data[year]['1月'][0].storeMemo).toBe(target.data[year]['1月'][0].storeMemo);
+  expect(errors).toEqual([]);
+});
+
+test('復元前の保存競合では容量不足と誤表示せず元データを保持する',async({page})=>{
+  const errors=await openInsight(page);
+  await page.locator('#navSettings').click();
+  const downloadPromise=page.waitForEvent('download');
+  await page.locator('#backupBtn').click();
+  const backup=await downloadPromise,restorePath=await backup.path();
+  await page.evaluate(()=>{
+    const st=allStores.stores[allStores.current],year=String(st.years[0]);
+    st.data[year]['1月'][0].storeMemo='E2E競合前のデータ';
+    persist();
+    window.InsightStorage.writeSnapshot=function(){
+      const error=new Error('別のタブでデータが更新されています。');
+      error.name='InsightStorageConflictError';
+      throw error;
+    };
+  });
+  const rawBefore=await page.evaluate(()=>localStorage.getItem('insight_v11'));
+  const dialogs=[];
+  page.on('dialog',async d=>{dialogs.push({type:d.type(),message:d.message()});await d.accept();});
+  const safetyPromise=page.waitForEvent('download');
+  await page.locator('#restoreFile').setInputFiles(restorePath);
+  const safety=await safetyPromise;
+  expect(safety.suggestedFilename()).toMatch(/^Insight_pre_restore_/);
+  await expect.poll(()=>dialogs.some(d=>d.type==='alert')).toBe(true);
+  const warning=dialogs.find(d=>d.type==='alert').message;
+  expect(warning).toContain('バックアップを復元できませんでした');
+  expect(warning).toContain('別のタブでデータが更新されています');
+  expect(warning).not.toContain('保存容量が不足');
+  expect(warning).toContain('現在のデータは変更されていません');
+  expect(await page.evaluate(()=>localStorage.getItem('insight_v11'))).toBe(rawBefore);
   expect(errors).toEqual([]);
 });
 
