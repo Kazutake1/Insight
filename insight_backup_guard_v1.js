@@ -240,7 +240,7 @@ backupData=function(){
 };
 restoreData=function(e){
   var file=e.target.files[0];if(!file)return;if(file.size>20*1024*1024){alert("バックアップファイルが大きすぎます。\n20MB以下のファイルを選択してください。");e.target.value="";return;}
-  var reader=new FileReader();reader.onload=function(ev){try{
+  var reader=new FileReader();reader.onload=function(ev){var restoreCommitted=false;try{
     var parsed=JSON.parse(ev.target.result),envelope=parseBackupEnvelope(parsed),newAll=normalizeBackup(envelope.data);
     if(envelope.info)validateBackupInfo(envelope.info,newAll);
     var preflight=runRestorePreflight(newAll);
@@ -252,7 +252,10 @@ restoreData=function(e){
       window.InsightStorage.writeSnapshot(newAll);writeCompleted=true;
       verifiedRestore=verifyRestoredSnapshot(newAll);
     }catch(postErr){
-      if(!writeCompleted)throw new Error("保存容量が不足しているため復元できません");
+      if(!writeCompleted){
+        if(postErr&&postErr.name==="QuotaExceededError")throw new Error("保存容量が不足しているため復元できません");
+        throw postErr;
+      }
       try{
         rollbackPreRestoreSnapshot();
         preRestoreMemorySnapshot=null;
@@ -263,11 +266,15 @@ restoreData=function(e){
       e.target.value="";return;
     }
     newAll=verifiedRestore.snapshot;preRestoreMemorySnapshot=null;
+    // Persisted data has passed readback and health checks. UI failures cannot undo it.
+    restoreCommitted=true;
     allStores=newAll;store=allStores.stores[allStores.current];baseYear=store.years[store.years.length-1];cmpYear=store.years.length>1?store.years[store.years.length-2]:null;editYear={sales:baseYear,kyaku:baseYear,haiki:baseYear};editMonth={sales:todayFY().month,kyaku:todayFY().month,haiki:todayFY().month};renderStoreSel();if(currentNav==='salesCounts'){if(window.InsightSalesCount&&typeof window.InsightSalesCount.reloadFromStore==="function")window.InsightSalesCount.reloadFromStore();else gotoNav('salesCounts');}else if(currentNav==='settings'){if(window.InsightSettings&&typeof window.InsightSettings.open==="function")window.InsightSettings.open();}else if(currentNav===1)refreshDash();else if(currentNav>1)initInputPage(["","","sales","kyaku","haiki"][currentNav]);else initQuickPage();if(window.InsightPagePeriodSync&&typeof window.InsightPagePeriodSync.reconcileCurrentStore==="function")window.InsightPagePeriodSync.reconcileCurrentStore();if(window.InsightDataHealth&&typeof window.InsightDataHealth.refresh==="function")window.InsightDataHealth.refresh();updateMissingBadge();showToast("📤 データを復元しました（整合性確認済み）","#1d4ed8","#eff6ff");
   }catch(err){
     console.warn("Insight restore rejected:",err);
     var detail=String(err&&err.message?err.message:err);
-    alert("バックアップを復元できませんでした。\n"+detail+"\n\n現在のデータは変更されていません。");
+    alert(restoreCommitted
+      ?"バックアップの保存と整合性確認は完了しましたが、画面の更新に失敗しました。\n"+detail+"\n\n復元したデータは保存されています。Insightを再読み込みして表示を更新してください。もう一度復元する必要はありません。"
+      :"バックアップを復元できませんでした。\n"+detail+"\n\n現在のデータは変更されていません。");
   }e.target.value="";};reader.onerror=function(){alert("ファイルを読み込めませんでした。\n現在のデータは変更されていません。");e.target.value="";};reader.readAsText(file);
 };
 })();
