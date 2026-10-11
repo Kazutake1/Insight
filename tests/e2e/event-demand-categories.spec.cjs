@@ -138,7 +138,7 @@ test('過去便の推定・手動確定はセール実績と単日／複数日�
     }};
     InsightSaleResults.render();
   },setup);
-  await expect.poll(()=>saleCard.locator('.sc-sales-row input').evaluateAll(inputs=>inputs.map(i=>i.value))).toEqual(['0','18','?']);
+  await expect.poll(()=>saleCard.locator('.sc-sales-row input').evaluateAll(inputs=>inputs.map(i=>i.value))).toEqual(['0','18','']);
   await expect(saleCard.locator('.sc-total-sales')).toHaveText('—');
   await expect(page.locator('#srGroups .sr-stat').nth(1).locator('strong')).toHaveText('—');
 
