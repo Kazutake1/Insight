@@ -283,8 +283,11 @@ test('セール・イベント・発注予測の実績カードだけ廃棄数�
   assert.match(salesSource,/withWaste=arguments\.length>=4/);
   assert.match(salesSource,/buildReadOnlyWasteInput/);
   assert.match(salesSource,/wasteSummary\(wasteRecord,mask,date\)/);
-  assert.match(saleSource,/createReadOnlyDayCard\(day\.date,day\.record,category,root\.InsightSalesCount\.wasteRecordAt/);
-  assert.equal((eventSource.match(/createReadOnlyDayCard\([^\n]*wasteRecordAt/g)||[]).length,2);
+  assert.match(saleSource,/createReadOnlyDayCard\(day\.date,day\.record,category,/);
+  assert.match(saleSource,/decision\.mask/);
+  assert.match(eventSource,/function historicalSalesCard\(/);
+  assert.match(eventSource,/createReadOnlyDayCard\(date,record,category,/);
+  assert.match(eventSource,/resolver\.resolveDate\(allStores,currentStoreId\(\),category\.id,date\)/);
   assert.match(forecastSource,/createReadOnlyDayCard\(item\.date,item\.record,category,sales\.wasteRecordAt/);
   assert.match(forecastSource,/sales\.createAverageCard\('6週平均',data\.deliveryAverage,data\.salesAverage,null,category\)/);
   assert.match(css,/#pageSalesCount \.sc-calendar \.sc-total-waste\{color:#111\}/);
