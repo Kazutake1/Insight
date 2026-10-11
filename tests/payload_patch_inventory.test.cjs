@@ -549,6 +549,19 @@ test('STEP7で将来AI接続用の共通analysisContext境界を追加する',()
   assert.doesNotThrow(()=>new vm.Script(aiContext),'AI context module must be valid JavaScript');
 });
 
+test('過去の対象便の手動設定は読み込み順・保存・復元整合性を保つ',()=>{
+  const index=readShell();
+  const module=read('insight_trip_overrides_v1.js');
+  const view=read('insight_trip_inference_view_v1.js');
+  const health=read('insight_data_health_v1.js');
+  assert.ok(index.includes('insight_trip_overrides_v1.js?v=20261011-manual-trips-1'));
+  assert.ok(index.indexOf('insight_trip_inference_v1.js')<index.indexOf('insight_trip_overrides_v1.js'));
+  assert.ok(index.indexOf('insight_trip_overrides_v1.js')<index.indexOf('insight_trip_inference_view_v1.js'));
+  assert.ok(module.includes('storage.transaction(snapshot,'));
+  assert.ok(view.includes('overrides.save(all,'));
+  assert.ok(health.includes('trip_overrides_invalid'));
+  assert.doesNotThrow(()=>new vm.Script(module));
+});
 test('過去の対象便判定UIは設定ページだけに追加される',()=>{
   const manifest=readShell();
   const view=read('insight_trip_inference_view_v1.js');
