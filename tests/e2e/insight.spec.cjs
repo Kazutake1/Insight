@@ -3093,3 +3093,33 @@ test('販売数入力の平日・日祝平均は保存済み通常日を分類�
   expect(errors).toEqual([]);
 });
 
+
+test('別タブからの古い保存を拒否し先に保存された店舗データを維持する',async({page,context})=>{
+  const firstErrors=await openInsight(page);
+  const second=await context.newPage();
+  const secondErrors=await openInsight(second);
+  const warnings=[];
+  second.on('dialog',async dialog=>{warnings.push(dialog.message());await dialog.accept();});
+
+  await page.evaluate(()=>{
+    allStores.stores[allStores.current].name='タブAで変更した店舗名';
+    persist();
+  });
+  const rejected=await second.evaluate(()=>{
+    allStores.stores[allStores.current].name='古いタブBの店舗名';
+    try{persist();return null;}catch(error){
+      return {name:error.name,cause:error.cause&&error.cause.name};
+    }
+  });
+  expect(rejected).toEqual({name:'InsightPersistError',cause:'InsightStorageConflictError'});
+  expect(warnings.length).toBe(1);
+  expect(warnings[0]).toContain('別のタブでデータが更新されています');
+  const saved=await page.evaluate(()=>{
+    const raw=localStorage.getItem('insight_v11'),data=JSON.parse(raw);
+    return data.stores[data.current].name;
+  });
+  expect(saved).toBe('タブAで変更した店舗名');
+  expect(firstErrors).toEqual([]);
+  expect(secondErrors).toEqual([]);
+  await second.close();
+});
