@@ -2,6 +2,7 @@ const test=require('node:test');
 const assert=require('node:assert/strict');
 const health=require('../insight_data_health_v1.js');
 const events=require('../insight_events_v1.js');
+const tripOverrides=require('../insight_trip_overrides_v1.js');
 
 function day(d){return {d:String(d),売上:0,客数:0,買上点数:0,廃棄金額:0,haiki:{},weather:''};}
 function yearData(year){
@@ -174,4 +175,16 @@ test('イベント検証処理が利用できないときは正常扱いにせ�
   const report=health.check(data);
   assert.equal(report.status,'error');
   assert.ok(report.issues.some(item=>item.code==='event_validator_missing'));
+});
+
+test('対象便の追加手動設定はバックアップ互換の任意領域として検証',()=>{
+  const data=clean(),before=JSON.stringify(data);
+  data.tripInferenceOverrides=[{storeId:'s1',categoryId:'cat1',month:'2025-09',trip:3,status:'inactive'}];
+  const ok=health.check(data,events);
+  assert.equal(ok.status,'ok');
+  data.tripInferenceOverrides[0].trip=4;
+  const err=health.check(data,events);
+  assert.equal(err.status,'error');
+  assert.ok(err.issues.some(x=>x.code==='trip_overrides_invalid'));
+  assert.notEqual(JSON.stringify(data),before);
 });
