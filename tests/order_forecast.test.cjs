@@ -90,3 +90,42 @@ test('通信エラーを伝え再試行の連打を抑える',async()=>{
 test('新機能は永続保存・実績保存・外部記憶更新を持たない',()=>{
   const text=fs.readFileSync(require.resolve('../insight_order_forecast_v1.js'),'utf8');assert.doesNotMatch(text,/localStorage|sessionStorage|indexedDB|writeSnapshot|\bpersist\s*\(|INSIGHT_MEMORY/);
 });
+
+
+test('前年7日間は上段天気の表示開始日に52週間前を対応させ、曜日と列を一致させる',()=>{
+  const weatherStart='2026-10-11',delivery='2026-10-13',range=model.dates(delivery,weatherStart);
+  assert.deepEqual(range.previousYear,[
+    '2025-10-12','2025-10-13','2025-10-14','2025-10-15',
+    '2025-10-16','2025-10-17','2025-10-18'
+  ]);
+  for(let i=0;i<7;i++){
+    const weatherDay=model.addDays(weatherStart,i);
+    assert.equal(new Date(weatherDay).getUTCDay(),new Date(range.previousYear[i]).getUTCDay());
+    assert.equal(range.previousYear[i],model.addDays(weatherDay,-364));
+  }
+  assert.equal(range.previousYear[2],model.addDays(delivery,-364),'納品日の52週前は同じ列');
+  assert.equal(range.weeks[0],model.addDays(delivery,-28),'4週実績には影響しない');
+  assert.equal(range.recent[0],model.addDays(delivery,-7),'直近実績には影響しない');
+});
+
+test('納品日が予報開始日から離れても天気の先頭と前年の先頭を優先して合わせる',()=>{
+  const start='2026-10-11',earlier=model.dates('2026-10-12',start),later=model.dates('2026-10-20',start);
+  assert.deepEqual(later.previousYear,earlier.previousYear);
+  assert.equal(later.previousYear[0],'2025-10-12');
+  assert.equal(later.weeks[0],model.addDays('2026-10-20',-28));
+  assert.equal(earlier.weeks[0],model.addDays('2026-10-12',-28));
+});
+
+test('閏年を跨いでも表示7列が52週前の同じ曜日になり保存データを変更しない',()=>{
+  for(const start of ['2024-02-27','2025-12-29','2026-10-11']){
+    const delivery=model.addDays(start,2),saved={};
+    const dataBefore=JSON.stringify(saved),data=model.collect(saved,category,delivery,sales,start);
+    assert.deepEqual(data.previousYear.map(row=>row.date),model.dates(delivery,start).previousYear);
+    data.previousYear.forEach((row,i)=>{
+      const weather=model.addDays(start,i);
+      assert.equal(new Date(weather).getUTCDay(),new Date(row.date).getUTCDay());
+    });
+    assert.equal(data.weeks.length,4);
+    assert.equal(JSON.stringify(saved),dataBefore);
+  }
+});
