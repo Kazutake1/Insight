@@ -45,7 +45,7 @@ test('発注予測は閲覧専用・実績と平均・店舗カテゴリー切�
   await page.locator('#ofDelivery').fill('2026-10-11');await page.locator('#ofDelivery').dispatchEvent('change');await expect(page.locator('#ofSchedule')).toHaveCount(0);
   await expect(page.locator('#ofWeather .sc-day')).toHaveCount(7);await expect(page.locator('#ofWeather .of-selected')).toHaveCount(1);const dimensions=await page.locator('#ofWeather .of-weather-card').first().evaluate(card=>{const cardRect=card.getBoundingClientRect(),iconRect=card.querySelector('.of-weather-symbol').getBoundingClientRect();return {height:cardRect.height,iconWidth:iconRect.width,iconHeight:iconRect.height,iconInside:iconRect.bottom<=cardRect.bottom&&iconRect.top>=cardRect.top};});expect(dimensions.height).toBeGreaterThanOrEqual(145);expect(dimensions.height).toBeLessThanOrEqual(160);expect(dimensions.iconWidth).toBeGreaterThanOrEqual(34);expect(dimensions.iconHeight).toBeGreaterThanOrEqual(34);expect(dimensions.iconInside).toBe(true);await expect(page.locator('#ofWeather .of-temp-max')).toHaveCount(7);await expect(page.locator('#ofWeather .of-temp-min')).toHaveCount(7);await expect(page.locator('#ofWeather .of-weather-symbol')).toHaveCount(7);await expect(page.locator('#ofWeather .of-weather-symbol[aria-hidden="true"]')).toHaveCount(7);await expect(page.locator('#ofWeatherStatus')).toBeHidden();await expect(page.locator('#ofWeather .of-weather-card small').first()).toContainText('降水');await expect(page.locator('#ofWeather a.of-source')).toHaveCount(0);await expect(page.locator('.of-source-description')).toBeHidden();await page.locator('.of-source-info summary').click();await expect(page.locator('.of-source-description')).toBeVisible();await expect(page.locator('.of-source-description')).toContainText('気象庁ホームページ');await page.locator('.of-source-info summary').click();await expect(page.locator('.of-source-description')).toBeHidden();
   await page.locator('#ofDelivery').fill('2026-10-18');await page.locator('#ofDelivery').dispatchEvent('change');
-  await expect(page.locator('#ofYearCards .sc-day')).toHaveCount(7);await expect(page.locator('#ofWeekCards .sc-day')).toHaveCount(7);await expect(page.locator('#ofRecentCards .sc-day')).toHaveCount(2);
+  await expect(page.locator('#ofYearCards .sc-day')).toHaveCount(7);await expect(page.locator('#ofWeekCards .sc-day')).toHaveCount(7);await expect(page.locator('#ofRecentCards .sc-day')).toHaveCount(3);
   await expect(page.locator('#ofRecentCards [data-date="2026-10-11"] .sc-delivery-row input').first()).toHaveValue('0');await expect(page.locator('#ofRecentCards [data-date="2026-10-11"] .sc-history-weather')).toContainText('25°');await expect(page.locator('#ofRecentCards [data-date="2026-10-11"] .sc-history-icon')).toHaveText('🌧️');
   const historic=page.locator('#ofRecentCards [data-date="2026-10-11"]');
   await expect(historic.locator('.of-event-trigger')).toHaveText(['セール','イベント']);
@@ -128,7 +128,7 @@ test('発注予測は閲覧専用・実績と平均・店舗カテゴリー切�
   }
   await page.evaluate(()=>{document.documentElement.classList.remove('dark');document.body.classList.remove('dark');});
   await page.setViewportSize({width:1194,height:834});
-  await expect(page.locator('#ofWeekCards .sc-average-card .sc-delivery-row input').first()).toHaveValue('9');await expect(page.locator('#ofWeekCards .sc-average-card .sc-delivery-row input').nth(1)).toHaveValue('ー');
+  await expect(page.locator('#ofWeekCards .sc-average-card .sc-delivery-row input').first()).toHaveValue('9');await expect(page.locator('#ofWeekCards .sc-average-card .sc-delivery-row input').nth(1)).toHaveValue('100');
   expect(await page.locator('#pageOrderForecast .sc-trip input').evaluateAll(inputs=>inputs.every(i=>i.readOnly))).toBe(true);
   const widths=await page.evaluate(()=>({year:document.querySelector('#ofYearCards .sc-day').getBoundingClientRect().width,week:document.querySelector('#ofWeekCards .sc-day').getBoundingClientRect().width,recent:document.querySelector('#ofRecentCards .sc-day').getBoundingClientRect().width,right:document.querySelector('#ofYearCards .sc-day:last-child').getBoundingClientRect().right,page:document.querySelector('#pageOrderForecast').getBoundingClientRect().right}));
   expect(Math.abs(widths.year-widths.week)).toBeLessThan(1);expect(Math.abs(widths.year-widths.recent)).toBeLessThan(1);expect(widths.right).toBeLessThanOrEqual(widths.page);
@@ -192,4 +192,65 @@ test('サイドバーは分析AIだけを発注予測の直下へ移動しiPad�
     expect(await snapshot(page)).toEqual(before);
   }
   expect(errors).toEqual([]);
+});
+
+
+test('発注予測は過去の対象便を前年・6週・直近カードと平均へ反映し、手動確定で再計算する',async({page})=>{
+  const state=await open(page);
+  const seeded=await page.evaluate(()=>{
+    const storeId=allStores.current,store=allStores.stores[storeId];
+    const cat=allStores.salesCountManagement.categories[0],delivery='2026-07-19';
+    cat.activeTrips=[false,false,true]; // Present settings are intentionally different.
+    const dates=InsightOrderForecast.dates(delivery);
+    const previous=InsightOrderForecast.addDays(InsightOrderForecast.today(),-364);
+    store.salesCounts={};
+    dates.weeks.forEach((date,index)=>{
+      store.salesCounts[date]={[cat.id]:{trips:index<4?
+        [{delivery:10,sales:index===1?0:10},{delivery:20,sales:20},{delivery:null,sales:null}]:
+        [{delivery:10,sales:10},{delivery:null,sales:null},{delivery:30,sales:30}]}};
+    });
+    store.salesCounts[previous]={[cat.id]:{trips:[
+      {delivery:0,sales:0},{delivery:null,sales:null},{delivery:null,sales:null}
+    ]}};
+    store.tripHistoryOverrides={version:1,categories:{[cat.id]:{
+      '2026-06':{'1':'active','2':'active','3':'inactive'},
+      '2026-07':{'1':'active','2':'inactive','3':'active'}
+    }}};
+    return {storeId,categoryId:cat.id,delivery,prior:previous,storage:localStorage.getItem('insight_v11')};
+  });
+  await page.locator('#navOrderForecast').click();
+  await page.locator('#ofDelivery').fill(seeded.delivery);
+  await page.locator('#ofDelivery').dispatchEvent('change');
+  await expect(page.locator('#ofWeekCards .sc-day')).toHaveCount(7);
+  const june=page.locator('#ofWeekCards .sc-day').first();
+  const july=page.locator('#ofWeekCards .sc-day').nth(4);
+  await expect.poll(()=>june.locator('.sc-sales-row input').evaluateAll(items=>items.map(x=>x.value))).toEqual(['10','20','ー']);
+  await expect.poll(()=>july.locator('.sc-sales-row input').evaluateAll(items=>items.map(x=>x.value))).toEqual(['10','ー','30']);
+  await expect(june.locator('.sc-total-sales')).toHaveText('30');
+  await expect(july.locator('.sc-total-sales')).toHaveText('40');
+  const average=page.locator('#ofWeekCards .sc-average-card');
+  await expect.poll(()=>average.locator('.sc-sales-row input').evaluateAll(items=>items.map(x=>x.value))).toEqual(['8.3','20','30']);
+  await expect(average.locator('.sc-total-sales')).toHaveText('31.7');
+  await expect(page.locator('#ofRecentCards [data-date="2026-07-12"] .sc-sales-row input').nth(2)).toHaveValue('30');
+  const prior=page.locator('#ofYearCards [data-date="'+seeded.prior+'"]');
+  await expect(prior.locator('.sc-sales-row input').first()).toHaveValue('0');
+  await expect(prior.locator('.sc-sales-row input').nth(1)).toHaveValue('?');
+  await expect(prior.locator('.sc-total-sales')).toHaveText('—');
+
+  await page.evaluate(({storeId,categoryId})=>{
+    allStores.stores[storeId].tripHistoryOverrides.categories[categoryId]['2026-06']['3']='active';
+    InsightOrderForecast.render();
+  },seeded);
+  await expect(june.locator('.sc-sales-row input').nth(2)).toHaveValue('');
+  await expect(june.locator('.sc-total-sales')).toHaveText('—');
+  await expect(average.locator('.sc-total-sales')).toHaveText('40');
+  await page.evaluate(({storeId,categoryId})=>{
+    allStores.stores[storeId].tripHistoryOverrides.categories[categoryId]['2026-06']['3']='inactive';
+    InsightOrderForecast.render();
+  },seeded);
+  await expect(june.locator('.sc-sales-row input').nth(2)).toHaveValue('ー');
+  await expect(average.locator('.sc-total-sales')).toHaveText('31.7');
+  expect(await page.evaluate(()=>localStorage.getItem('insight_v11'))).toBe(seeded.storage);
+  expect(await page.evaluate(id=>allStores.salesCountManagement.categories.find(c=>c.id===id).activeTrips,seeded.categoryId)).toEqual([false,false,true]);
+  expect(state.errors).toEqual([]);
 });

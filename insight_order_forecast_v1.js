@@ -62,7 +62,31 @@
   }
   function dates(delivery,weatherStart){var previousStart=weatherStart?addDays(weatherStart,-364):addDays(delivery,-367);return {previousYear:[0,1,2,3,4,5,6].map(function(n){return addDays(previousStart,n);}),weeks:[-42,-35,-28,-21,-14,-7].map(function(n){return addDays(delivery,n);}),recent:[-7,-6,-5,-4,-3].map(function(n){return addDays(delivery,n);})};}
   function hasRecord(record,mask){return !!(record&&Array.isArray(record.trips)&&record.trips.some(function(t,i){return mask[i]!==false&&t&&['delivery','sales'].some(function(k){return t[k]!==null&&t[k]!==undefined&&Number.isFinite(t[k]);});}));}
-  function collect(saved,category,delivery,sales,weatherStart){var ranges=dates(delivery,weatherStart),mask=sales.activeTrips(category);function at(date){var raw=saved&&saved[date]&&saved[date][category.id];return {date:date,record:sales.normalizeRecord(raw)};}var weeks=ranges.weeks.map(at);return {previousYear:ranges.previousYear.map(at),weeks:weeks,recent:ranges.recent.map(at).filter(function(x){return hasRecord(x.record,mask);}),deliveryAverage:sales.average(weeks.map(function(x){return x.record;}),'delivery',mask),salesAverage:sales.average(weeks.map(function(x){return x.record;}),'sales',mask)};}
+  function collect(saved,category,delivery,sales,weatherStart,history){
+    var ranges=dates(delivery,weatherStart),mask=sales.activeTrips(category);
+    var historical=history&&history.snapshot&&history.storeId&&history.resolver;
+    var monthCache=historical?new Map():null;
+    function at(date){
+      var raw=saved&&saved[date]&&saved[date][category.id],item={date:date,record:sales.normalizeRecord(raw)};
+      if(historical)item.mask=history.resolver.resolveDate(history.snapshot,history.storeId,category.id,date,{monthCache:monthCache,today:history.today}).mask;
+      return item;
+    }
+    var weeks=ranges.weeks.map(at),prior=ranges.previousYear.map(at);
+    var recent=ranges.recent.map(at).filter(function(item){return hasRecord(item.record,item.mask||mask);});
+    if(!historical)return {previousYear:prior,weeks:weeks,recent:recent,
+      deliveryAverage:sales.average(weeks.map(function(item){return item.record;}),'delivery',mask),
+      salesAverage:sales.average(weeks.map(function(item){return item.record;}),'sales',mask)};
+    // Week-specific eligibility takes priority over the category's present settings.
+    var deliveryAverage=history.resolver.averageByDate(history.snapshot,history.storeId,category.id,weeks,'delivery',{today:history.today});
+    var salesAverage=history.resolver.averageByDate(history.snapshot,history.storeId,category.id,weeks,'sales',{today:history.today});
+    var averageMask=[0,1,2].map(function(i){
+      var statuses=weeks.map(function(item){return item.mask[i];});
+      return statuses.some(function(value){return value===true;})?true:
+        statuses.every(function(value){return value===false;})?false:null;
+    });
+    return {previousYear:prior,weeks:weeks,recent:recent,
+      deliveryAverage:deliveryAverage,salesAverage:salesAverage,averageMask:averageMask};
+  }
   function number(v){return v===null||v===undefined||v===''||!Number.isFinite(Number(v))?null:Number(v);}
   function resolveLocation(location,areas){
     if(!location)return {office:'230000',area:'230010',latitude:35.17,longitude:136.97,label:'愛知県西部'};
@@ -107,7 +131,7 @@
   root.InsightOrderForecast=model;if(!root.document)return;
   function init(){
     if(root.__insightOrderForecastV1)return;
-    var sales=root.InsightSalesCount,doc=root.document;if(!sales||!sales.createReadOnlyDayCard||!doc.getElementById('navSaleResults')){setTimeout(init,20);return;}root.__insightOrderForecastV1=true;
+    var sales=root.InsightSalesCount,doc=root.document;if(!sales||!sales.createReadOnlyDayCard||!root.InsightTripHistoryResolver||!doc.getElementById('navSaleResults')){setTimeout(init,20);return;}root.__insightOrderForecastV1=true;
     var state={storeId:allStores.current,delivery:addDays(today(),2),categoryId:null},forecast=null,error='',loading=false,request=0,client=createClient(root.fetch.bind(root));
     function el(tag,text,cls){var node=doc.createElement(tag);if(text!==undefined)node.textContent=text;if(cls)node.className=cls;return node;}
     var link=el('link');link.rel='stylesheet';link.href='./insight_order_forecast_v1.css?v=20261010-average-alignment-13';doc.head.append(link);
@@ -135,7 +159,8 @@
       eventDialog.showModal();closeEvent.focus();
     }
     function dayCard(item,category){
-      var card=sales.createReadOnlyDayCard(item.date,item.record,category,sales.wasteRecordAt(allStores,state.storeId,item.date,category.id));card.dataset.date=item.date;
+      var card=sales.createReadOnlyDayCard(item.date,item.record,category,
+        sales.wasteRecordAt(allStores,state.storeId,item.date,category.id),item.mask);card.dataset.date=item.date;
       var events=root.InsightEvents&&root.InsightEvents.list(allStores,state.storeId,item.date,item.date)||[];
       var items=eventItems(events);
       if(items.length){
@@ -155,7 +180,8 @@
       return card;
     }
     function weatherStartDate(){return forecast&&Array.isArray(forecast.days)&&forecast.days.length&&isoDate(forecast.days[0].date)?forecast.days[0].date:today();}
-    function render(){if(!dataStore())state.storeId=allStores.current;var available=categories(),category=available.find(function(c){return c.id===state.categoryId;})||available[0];state.categoryId=category&&category.id||null;var catSelect=doc.getElementById('ofCategory');catSelect.replaceChildren();available.forEach(function(c){var option=el('option',c.name);option.value=c.id;catSelect.append(option);});catSelect.value=state.categoryId||'';doc.getElementById('ofDelivery').value=state.delivery;doc.getElementById('ofPreviousYear').textContent='基準日 '+addDays(state.delivery,-364)+'（52週間前）';['ofYearCards','ofWeekCards','ofRecentCards'].forEach(function(id){doc.getElementById(id).replaceChildren();});if(category){var data=collect(dataStore().salesCounts,category,state.delivery,sales,weatherStartDate());data.previousYear.forEach(function(item){doc.getElementById('ofYearCards').append(dayCard(item,category));});data.weeks.forEach(function(item){doc.getElementById('ofWeekCards').append(dayCard(item,category));});var averageCard=sales.createAverageCard('6週平均',data.deliveryAverage,data.salesAverage,null,category),spacer=el('div',undefined,'sc-history-weather of-average-weather-spacer');spacer.setAttribute('aria-hidden','true');spacer.append(el('span','—'));averageCard.querySelector('.sc-day-title').after(spacer);doc.getElementById('ofWeekCards').append(averageCard);data.recent.forEach(function(item){doc.getElementById('ofRecentCards').append(dayCard(item,category));});doc.getElementById('ofRecentEmpty').textContent=data.recent.length?'':'対象期間の実績はありません。';}else doc.getElementById('ofRecentEmpty').textContent='表示するカテゴリーがありません。';weather();}
+    function render(){if(!dataStore())state.storeId=allStores.current;var available=categories(),category=available.find(function(c){return c.id===state.categoryId;})||available[0];state.categoryId=category&&category.id||null;var catSelect=doc.getElementById('ofCategory');catSelect.replaceChildren();available.forEach(function(c){var option=el('option',c.name);option.value=c.id;catSelect.append(option);});catSelect.value=state.categoryId||'';doc.getElementById('ofDelivery').value=state.delivery;doc.getElementById('ofPreviousYear').textContent='基準日 '+addDays(state.delivery,-364)+'（52週間前）';['ofYearCards','ofWeekCards','ofRecentCards'].forEach(function(id){doc.getElementById(id).replaceChildren();});if(category){var data=collect(dataStore().salesCounts,category,state.delivery,sales,weatherStartDate(),
+        {snapshot:allStores,storeId:state.storeId,resolver:root.InsightTripHistoryResolver});data.previousYear.forEach(function(item){doc.getElementById('ofYearCards').append(dayCard(item,category));});data.weeks.forEach(function(item){doc.getElementById('ofWeekCards').append(dayCard(item,category));});var averageCard=sales.createAverageCard('6週平均',data.deliveryAverage,data.salesAverage,null,category,data.averageMask),spacer=el('div',undefined,'sc-history-weather of-average-weather-spacer');spacer.setAttribute('aria-hidden','true');spacer.append(el('span','—'));averageCard.querySelector('.sc-day-title').after(spacer);doc.getElementById('ofWeekCards').append(averageCard);data.recent.forEach(function(item){doc.getElementById('ofRecentCards').append(dayCard(item,category));});doc.getElementById('ofRecentEmpty').textContent=data.recent.length?'':'対象期間の実績はありません。';}else doc.getElementById('ofRecentEmpty').textContent='表示するカテゴリーがありません。';weather();}
     async function load(force){var token=++request;loading=true;error='';weather();try{var result=await client.load(dataStore().weatherLocation,force);if(token!==request)return;forecast=result;}catch(e){if(token!==request)return;error=(e&&e.message||'天気予報を取得できませんでした。')+(forecast?'（前回取得分を表示）':'');}finally{if(token===request){loading=false;render();}}}
 doc.getElementById('ofCategory').onchange=function(e){state.categoryId=e.target.value;render();};doc.getElementById('ofDelivery').onchange=function(e){if(!isoDate(e.target.value)||e.target.value<'1900-01-01'||e.target.value>'9998-12-31'){e.target.value=state.delivery;return;}state.delivery=e.target.value;render();};doc.getElementById('ofRefresh').onclick=function(){load(true);};
     var originalGoto=root.gotoNav;root.gotoNav=function(target){if(target==='orderForecast'){originalGoto.apply(this,arguments);if(currentNav!==target)return;state.storeId=allStores.current;doc.querySelectorAll('.nav-btn').forEach(function(n){n.classList.remove('active');});doc.querySelectorAll('.page').forEach(function(n){n.classList.remove('show');});nav.classList.add('active');page.classList.add('show');render();load(false);return;}var result=originalGoto.apply(this,arguments);if(currentNav!=='orderForecast'){nav.classList.remove('active');page.classList.remove('show');}return result;};
