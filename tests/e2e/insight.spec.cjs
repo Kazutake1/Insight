@@ -1049,6 +1049,41 @@ test('データ状態チェックは未登録年度を要確認表示し保存�
 });
 
 
+
+test('データ状態チェックは店舗イベントの異常を店舗名付きで表示し保存領域を変更しない',async({page})=>{
+  const errors=await openInsight(page);
+  await page.waitForFunction(()=>window.InsightEvents&&window.InsightDataHealth&&document.getElementById('insightDataHealthButton'));
+  await page.locator('#navSettings').click();
+  await expect(page.locator('#insightDataHealthButton')).toBeVisible();
+  const rawBefore=await page.evaluate(()=>localStorage.getItem('insight_v11'));
+  await page.evaluate(()=>{
+    const store=allStores.stores[allStores.current];
+    window.__eventHealthOriginal={store:store,events:store.events,hadEvents:Object.prototype.hasOwnProperty.call(store,'events')};
+    store.events=[{id:'event-health-e2e',scope:'store',type:'special',startDate:'2026-10-12',endDate:'2026-10-11',
+      snapshot:{version:1,title:'検証用の催事',note:''}}];
+    window.InsightDataHealth.refresh();
+  });
+  await expect(page.locator('#insightDataHealthButton')).toContainText('データ状態：要確認');
+  await page.locator('#insightDataHealthButton').click();
+  await expect(page.locator('#insightDataHealthOverlay')).toBeVisible();
+  await expect(page.locator('#insightDataHealthIssues')).toContainText('開催期間を確認してください');
+  const result=await page.evaluate(()=>{
+    const report=window.InsightDataHealth.getLastReport();
+    const matched=report.issues.filter(x=>x.code==='event_store_invalid');
+    const original=window.__eventHealthOriginal;
+    if(original.hadEvents)original.store.events=original.events;
+    else delete original.store.events;
+    delete window.__eventHealthOriginal;
+    window.InsightDataHealth.refresh();
+    return {status:report.status,matched};
+  });
+  expect(result.status).toBe('error');
+  expect(result.matched).toHaveLength(1);
+  expect(result.matched[0].storeName).toBeTruthy();
+  expect(await page.evaluate(()=>localStorage.getItem('insight_v11'))).toBe(rawBefore);
+  expect(errors).toEqual([]);
+});
+
 test('保存済みデータが壊れている場合は空データで起動せず保存データを保持する',async({page})=>{
   await page.addInitScript(()=>localStorage.setItem('insight_v11','{"current":"broken","stores":'));
   await page.goto('/Index.html',{waitUntil:'domcontentloaded'});
