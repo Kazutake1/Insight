@@ -95,8 +95,9 @@
         var date=year+'-'+pad(month)+'-'+pad(day);
         if(date<range.start||date>range.end)continue;
         if(!weekdays.has(parseIso(date).getDay()))continue;
-        var sale=eventsApi.list(all,storeId,date,date).some(function(event){return categoryMatches(all,event,categoryId,salesApi);});
-        if(sale||seen.has(date))continue;
+        // Ordinary comparison days must contain no sale, campaign or event of any
+        // category (including store-specific nearby/special events).
+        if(eventsApi.list(all,storeId,date,date).length||seen.has(date))continue;
         var record=recordAt(all,storeId,date,categoryId,salesApi);
         if(!hasRecord(record))continue;
         // Count only ordinary days with a complete dated sales total.
