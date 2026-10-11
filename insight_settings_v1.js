@@ -90,6 +90,7 @@
         page.classList.add('show');
         currentNav='settings';
         if(root.InsightDataHealth&&typeof root.InsightDataHealth.refresh==='function')root.InsightDataHealth.refresh();
+      if(root.InsightTripInferenceView&&typeof root.InsightTripInferenceView.refresh==='function')root.InsightTripInferenceView.refresh(true);
         return;
       }
       if(typeof currentNav!=='undefined'&&currentNav==='settings'){
@@ -111,6 +112,7 @@
       nav.classList.add('active');
       page.classList.add('show');
       if(root.InsightDataHealth&&typeof root.InsightDataHealth.refresh==='function')root.InsightDataHealth.refresh();
+      if(root.InsightTripInferenceView&&typeof root.InsightTripInferenceView.refresh==='function')root.InsightTripInferenceView.refresh(true);
       return result;
     };
 
