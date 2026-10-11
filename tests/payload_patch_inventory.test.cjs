@@ -25,9 +25,9 @@ test('Index shellはinline script/styleを持たず外部assetへ分離する',(
   const boot=read('insight_shell_boot_v1.js');
   const loader=read('insight_shell_loader_v1.js');
   const css=read('insight_shell_v1.css');
-  assert.match(index,/insight_shell_boot_v1\.js\?v=20261011-forecast-6weeks-build-28/);
-  assert.match(index,/insight_shell_loader_v1\.js\?v=20261011-forecast-6weeks-build-28/);
-  assert.match(index,/insight_shell_v1\.css\?v=20261011-forecast-6weeks-build-28/);
+  assert.match(index,/insight_shell_boot_v1\.js\?v=20261011-historical-results-build-29/);
+  assert.match(index,/insight_shell_loader_v1\.js\?v=20261011-historical-results-build-29/);
+  assert.match(index,/insight_shell_v1\.css\?v=20261011-historical-results-build-29/);
   assert.doesNotMatch(index,/<script(?![^>]*\bsrc=)[^>]*>/i);
   assert.doesNotMatch(index,/<style\b/i);
   assert.doesNotMatch(index,/script-src[^;]*'unsafe-inline'/);
@@ -185,8 +185,8 @@ test('canonical payloadはinline script/styleを持たず外部assetを順序固
 
 test('トップページはキャッシュ抑止とシェル・機能manifestの自己更新を持つ',()=>{
   const index=readShell();
-  assert.match(index,/insight-shell-version" content="20261011-forecast-6weeks-build-28/);
-  assert.match(index,/var BUILD="20261011-forecast-6weeks-build-28"/);
+  assert.match(index,/insight-shell-version" content="20261011-historical-results-build-29/);
+  assert.match(index,/var BUILD="20261011-historical-results-build-29"/);
   assert.match(index,/Shell rule: bump BUILD whenever the loader/);
   assert.match(index,/Cache-Control" content="no-cache, no-store, must-revalidate/);
   assert.match(index,/insight_probe=/);
@@ -512,7 +512,7 @@ test('分析AIの対象年月をサイドバー切替後も固定し各ページ
   assert.ok(!tripInference.includes('localStorage.setItem')&&!tripInference.includes('InsightStorage.writeSnapshot')&&!tripInference.includes('persist('));
   assert.doesNotThrow(()=>new vm.Script(tripInference),'trip inference module should parse as JavaScript');
   assert.match(index,/insight_analysis_period_lock_v1\.js\?v=20261001-sync-owner/);
-  assert.match(index,/insight_sales_count_v1\.js\?v=20261011-trip-averages-1/);
+  assert.match(index,/insight_sales_count_v1\.js\?v=20261011-historical-results-1/);
   assert.match(presentation,/aiAnalysisTarget/);
   assert.match(css,/\.ai-workspace-period-label\{display:none!important\}/);
   assert.match(css,/\.ai-workspace-brand\{min-width:0;display:grid;align-content:center;gap:2px\}/);
@@ -937,7 +937,7 @@ test('イベント実績は過去開催・日付カード・時間帯グラフ�
   const eventResults=read('insight_event_results_v1.js');
   const events=read('insight_events_v1.js');
   assert.match(index,/insight_events_v1\.js\?v=20261007-step3-event-target-visibility-1/);
-  assert.match(index,/insight_event_results_v1\.js\?v=20261011-readonly-waste-1/);
+  assert.match(index,/insight_event_results_v1\.js\?v=20261011-historical-results-1/);
   assert.ok(index.indexOf('insight_analysis_context_v1.js')<index.indexOf('insight_event_results_v1.js'));
   assert.ok(index.indexOf('insight_event_results_v1.js')<index.indexOf('insight_daily_anomaly_v1.js'));
   assert.match(css,/\.ie-dialog\.ie-event-add \.ie-presets\{margin-top:10px\}/);
@@ -1047,8 +1047,8 @@ test('セール実績ページは販売数入力直後に読み込み同一日�
   const index=readShell();
   const saleResults=read('insight_sale_results_v1.js');
   const sales=read('insight_sales_count_v1.js');
-  assert.match(index,/insight_sales_count_v1\.js\?v=20261011-trip-averages-1/);
-  assert.match(index,/insight_sale_results_v1\.js\?v=20261011-readonly-waste-1/);
+  assert.match(index,/insight_sales_count_v1\.js\?v=20261011-historical-results-1/);
+  assert.match(index,/insight_sale_results_v1\.js\?v=20261011-historical-results-1/);
   assert.ok(index.indexOf('insight_sales_count_v1.js')<index.indexOf('insight_sale_results_v1.js'));
   assert.ok(index.indexOf('insight_sale_results_v1.js')<index.indexOf('insight_page_period_sync_v1.js'));
   assert.match(saleResults,/id='navSaleResults'|nav\.id='navSaleResults'/);
@@ -1239,8 +1239,8 @@ test('販売数カテゴリーの対象便設定を全関連層で共有する',
   const analysis=read('insight_analysis_context_v1.js');
   const saleResults=read('insight_sale_results_v1.js');
   const pageAI=read('insight_ai_page_comments_v1.js');
-  assert.match(index,/insight_sales_count_v1\.js\?v=20261011-trip-averages-1/);
-  assert.match(index,/insight_sale_results_v1\.js\?v=20261011-readonly-waste-1/);
+  assert.match(index,/insight_sales_count_v1\.js\?v=20261011-historical-results-1/);
+  assert.match(index,/insight_sale_results_v1\.js\?v=20261011-historical-results-1/);
   assert.match(index,/insight_analysis_context_v1\.js\?v=20261004-special-demand/);
   assert.match(index,/insight_ai_page_comments_v1\.js\?v=20261001-decision-analysis/);
   assert.match(sales,/activeTrips:\[true,true,true\]/);

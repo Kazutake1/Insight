@@ -162,7 +162,23 @@
     function changeCategory(id){if(id===state.categoryId)return;if(!confirmLeave()){doc.getElementById('scCategory').value=state.categoryId;return;}state.categoryId=id;readMonth();render();}
     function buildInput(date,r,trip,key){var i=el('input');if(!tripActive(selectedCategory(),trip)){i.type='text';i.value='ー';i.readOnly=true;i.tabIndex=-1;i.className='sc-not-applicable';i.setAttribute('aria-readonly','true');i.setAttribute('aria-label',date+' '+(trip+1)+'便 対象外');return i;}i.type='number';i.min='0';i.step='1';i.inputMode='numeric';i.value=r.trips[trip][key]===null?'':String(r.trips[trip][key]);i.classList.toggle('has-val',i.value!=='');i.setAttribute('aria-label',date+' '+(trip+1)+'便 '+(key==='delivery'?'納品数':'販売数'));i.oninput=function(){if(!state.draft[date])state.draft[date]=r;i.setCustomValidity('');if(i.value===''){r.trips[trip][key]=null;}else{var n=Number(i.value);if(!Number.isSafeInteger(n)||n<0){i.setCustomValidity('0以上の整数を入力してください');setDirty(true);return;}r.trips[trip][key]=n;}i.classList.toggle('has-val',i.value!=='');setDirty(true);updateTotals(i.closest('.sc-day'),r);renderAverages();};return i;}
     function updateTotals(card,r,mask){var vals=card.querySelectorAll('[data-total]');vals.forEach(function(n){var v=total(r,n.dataset.total,mask);n.textContent=v===null?'—':String(v);});}
-    function buildReadOnlyInput(date,r,trip,key,category){var i=el('input');if(!tripActive(category||selectedCategory(),trip)){i.type='text';i.value='ー';i.readOnly=true;i.tabIndex=-1;i.className='sc-not-applicable';i.setAttribute('aria-readonly','true');i.setAttribute('aria-label',date+' '+(trip+1)+'便 対象外');return i;}i.type='number';i.min='0';i.step='1';i.inputMode='numeric';i.value=r.trips[trip][key]===null?'':String(r.trips[trip][key]);i.classList.toggle('has-val',i.value!=='');i.readOnly=true;i.tabIndex=-1;i.setAttribute('aria-readonly','true');i.setAttribute('aria-label',date+' '+(trip+1)+'便 '+(key==='delivery'?'納品数':'販売数'));return i;}
+    function buildReadOnlyInput(date,r,trip,key,category,historyMask){
+      var i=el('input'),hasHistory=Array.isArray(historyMask)&&historyMask.length===3,
+        status=hasHistory?historyMask[trip]:activeTrips(category||selectedCategory())[trip],
+        saved=r.trips[trip][key],recorded=r.trips[trip].delivery!==null||r.trips[trip].sales!==null;
+      // Historical read-only cards must never hide a saved count (including zero).
+      if(status===false&&(!hasHistory||!recorded)){
+        i.type='text';i.value='ー';i.readOnly=true;i.tabIndex=-1;i.className='sc-not-applicable';
+        i.setAttribute('aria-readonly','true');i.setAttribute('aria-label',date+' '+(trip+1)+'便 対象外');return i;
+      }
+      if(status===null&&saved===null){
+        i.type='text';i.value='?';i.readOnly=true;i.tabIndex=-1;i.className='sc-waste-unverified';
+        i.setAttribute('aria-readonly','true');i.setAttribute('aria-label',date+' '+(trip+1)+'便 '+(key==='delivery'?'納品数':'販売数')+'（対象便未確認）');return i;
+      }
+      i.type='number';i.min='0';i.step='1';i.inputMode='numeric';i.value=saved===null?'':String(saved);
+      i.classList.toggle('has-val',i.value!=='');i.readOnly=true;i.tabIndex=-1;
+      i.setAttribute('aria-readonly','true');i.setAttribute('aria-label',date+' '+(trip+1)+'便 '+(key==='delivery'?'納品数':'販売数'));return i;
+    }
 
     function buildReadOnlyWasteInput(date,record,index,category){
       var input=el('input'),value=record.trips[index];
@@ -186,8 +202,8 @@
         el('span',' / ','sc-history-divider'),el('span',info.min+'°','sc-history-low'));
       return line;
     }
-    function createReadOnlyDayCard(date,value,category,waste){
-      var r=normalizeRecord(value),mask=activeTrips(category||selectedCategory()),parts=date.split('-'),
+    function createReadOnlyDayCard(date,value,category,waste,historyMask){
+      var r=normalizeRecord(value),mask=Array.isArray(historyMask)&&historyMask.length===3?historyMask:activeTrips(category||selectedCategory()),parts=date.split('-'),
         year=Number(parts[0]),month=Number(parts[1]),day=Number(parts[2]),
         wd=new Date(year,month-1,day).getDay(),
         holiday=typeof isHoliday==='function'&&isHoliday(year,month,day),red=wd===0||holiday,
@@ -202,8 +218,8 @@
       card.append(labels);
       var delivery=el('div',undefined,'sc-trip sc-delivery-row'),
         salesRow=el('div',undefined,'sc-trip sc-sales-row');
-      delivery.append(buildReadOnlyInput(date,r,0,'delivery',category),buildReadOnlyInput(date,r,1,'delivery',category),buildReadOnlyInput(date,r,2,'delivery',category));
-      salesRow.append(buildReadOnlyInput(date,r,0,'sales',category),buildReadOnlyInput(date,r,1,'sales',category),buildReadOnlyInput(date,r,2,'sales',category));
+      delivery.append(buildReadOnlyInput(date,r,0,'delivery',category,historyMask),buildReadOnlyInput(date,r,1,'delivery',category,historyMask),buildReadOnlyInput(date,r,2,'delivery',category,historyMask));
+      salesRow.append(buildReadOnlyInput(date,r,0,'sales',category,historyMask),buildReadOnlyInput(date,r,1,'sales',category,historyMask),buildReadOnlyInput(date,r,2,'sales',category,historyMask));
       card.append(delivery,salesRow);
       var wasteRecord;
       if(withWaste){
@@ -215,6 +231,17 @@
       var totals=el('div',undefined,'sc-totals');
       totals.innerHTML='<b class="sc-total-delivery" data-total="delivery"></b><b class="sc-total-sales" data-total="sales"></b>'+(withWaste?'<b class="sc-total-waste"></b>':'');
       card.append(totals);updateTotals(card,r,mask);
+      if(Array.isArray(historyMask)&&historyMask.length===3){
+        // Read-only historical totals require all confirmed active trips to have values.
+        // An unknown trip or a missing active value must never become a partial total.
+        totals.querySelectorAll('[data-total]').forEach(function(node){
+          var key=node.dataset.total;
+          var complete=mask.every(function(active,index){
+            return active===false||(active===true&&r.trips[index][key]!==null);
+          });
+          if(!complete){node.textContent='—';node.title='過去の対象便が未確認、または対象便の実績が未入力です';}
+        });
+      }
       if(withWaste){
         var summary=wasteSummary(wasteRecord,mask,date),target=totals.querySelector('.sc-total-waste');
         target.textContent=summary.total===null?'—':String(summary.total)+(summary.complete?'':'※');

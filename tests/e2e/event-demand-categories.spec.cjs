@@ -86,3 +86,84 @@ for(const count of [1,2,3,4])for(const theme of ['light','dark'])for(const viewp
     expect(errors).toEqual([]);
   });
 }
+
+
+test('過去便の推定・手動確定はセール実績と単日／複数日イベント実績に同じように反映する',async({page,browserName})=>{
+  await page.setViewportSize({width:1194,height:834});
+  const errors=[];page.on('pageerror',e=>errors.push(e.message));
+  if(browserName==='webkit')await page.route('**/Index.html*',async route=>{
+    const response=await route.fetch();
+    await route.fulfill({response,body:(await response.text()).replace(/;?\s*upgrade-insecure-requests/g,'')});
+  });
+  await page.goto('/Index.html',{waitUntil:'domcontentloaded'});
+  await page.waitForFunction(()=>window.InsightSaleResults&&window.InsightEventResults&&window.InsightTripHistoryResolver);
+  const setup=await page.evaluate(()=>{
+    const storeId=allStores.current,store=allStores.stores[storeId];
+    const category=allStores.salesCountManagement.categories.find(item=>!item.hidden);
+    category.activeTrips=[false,false,true]; // Current settings are deliberately opposite historical evidence.
+    store.salesCounts={};
+    for(let d=1;d<=20;d++){
+      const date='2026-09-'+String(d).padStart(2,'0');
+      store.salesCounts[date]={[category.id]:{trips:[
+        {delivery:d===15?0:10,sales:d===15?0:8},
+        {delivery:20,sales:18},
+        {delivery:null,sales:null}
+      ]}};
+    }
+    delete store.tripHistoryOverrides;
+    store.events=[
+      {id:'historical_trip_event_period',type:'special',scope:'store',startDate:'2026-09-15',endDate:'2026-09-16',
+        snapshot:{version:1,title:'歴史便・複数日催事'}},
+      {id:'historical_trip_event_single',type:'special',scope:'store',startDate:'2026-09-20',endDate:'2026-09-20',
+        snapshot:{version:1,title:'歴史便・単日催事'}}
+    ];
+    allStores.eventManagement=allStores.eventManagement||{version:1,presets:[],events:[]};
+    allStores.eventManagement.events=[
+      {id:'historical_trip_sale',type:'sale',scope:'global',startDate:'2026-09-15',endDate:'2026-09-16',
+        snapshot:{title:'歴史便検証セール',sale:{categoryId:category.id,category:category.name,
+          method:'amount',params:{amount:20}}}}
+    ];
+    return {storeId,categoryId:category.id,saved:localStorage.getItem('insight_v11')};
+  });
+  await page.locator('#navSaleResults').click();
+  const saleCard=page.locator('#srGroups .sc-day').filter({has:page.locator('.sc-day-num')}).first();
+  await expect.poll(()=>saleCard.locator('.sc-delivery-row input').evaluateAll(inputs=>inputs.map(i=>i.value))).toEqual(['0','20','ー']);
+  await expect.poll(()=>saleCard.locator('.sc-sales-row input').evaluateAll(inputs=>inputs.map(i=>i.value))).toEqual(['0','18','ー']);
+  await expect(saleCard.locator('.sc-total-sales')).toHaveText('18');
+  await expect(page.locator('#srGroups .sr-stat').nth(1)).toContainText('平均販売');
+
+  await page.evaluate(({storeId,categoryId})=>{
+    allStores.stores[storeId].tripHistoryOverrides={version:1,categories:{
+      [categoryId]:{'2026-09':{'3':'active'}}
+    }};
+    InsightSaleResults.render();
+  },setup);
+  await expect.poll(()=>saleCard.locator('.sc-sales-row input').evaluateAll(inputs=>inputs.map(i=>i.value))).toEqual(['0','18','']);
+  await expect(saleCard.locator('.sc-total-sales')).toHaveText('—');
+  await expect(page.locator('#srGroups .sr-stat').nth(1).locator('strong')).toHaveText('—');
+
+  await page.evaluate(({storeId,categoryId})=>{
+    allStores.stores[storeId].tripHistoryOverrides.categories[categoryId]['2026-09']['3']='inactive';
+    InsightSaleResults.render();
+  },setup);
+  await expect.poll(()=>saleCard.locator('.sc-sales-row input').evaluateAll(inputs=>inputs.map(i=>i.value))).toEqual(['0','18','ー']);
+  await expect(saleCard.locator('.sc-total-sales')).toHaveText('18');
+
+  await page.locator('#navEventResults').click();
+  await page.locator('.er-kind-btn[data-kind="special"]').click();
+  await page.locator('#erEvent').selectOption({label:'歴史便・複数日催事'});
+  await page.locator('.er-occurrence').first().click();
+  const periodCard=page.locator('.er-period-day-grid .sc-day').first();
+  await expect.poll(()=>periodCard.locator('.sc-sales-row input').evaluateAll(inputs=>inputs.map(i=>i.value))).toEqual(['0','18','ー']);
+  await expect(periodCard.locator('.sc-total-sales')).toHaveText('18');
+  await expect(page.locator('.er-overview-grid .er-overview-title')).toHaveText(['売上','客数']);
+
+  await page.locator('.er-back').click();
+  await page.locator('#erEvent').selectOption({label:'歴史便・単日催事'});
+  await page.locator('.er-occurrence').first().click();
+  const singleCard=page.locator('.er-category-grid .sc-day').first();
+  await expect.poll(()=>singleCard.locator('.sc-sales-row input').evaluateAll(inputs=>inputs.map(i=>i.value))).toEqual(['8','18','ー']);
+  await expect(singleCard.locator('.sc-total-sales')).toHaveText('26');
+  expect(await page.evaluate(()=>localStorage.getItem('insight_v11'))).toBe(setup.saved);
+  expect(errors).toEqual([]);
+});

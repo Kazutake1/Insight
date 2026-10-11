@@ -101,6 +101,14 @@ test('セール実績は対象外便を日合計・通常日比較から除外�
       day.cat_onigiri.trips[0].sales=null;
     }
   });
+  // Completed months use their own manually confirmed history, not activeTrips today.
+  all.stores.storeA.tripHistoryOverrides={version:1,categories:{
+    cat_onigiri:{
+      '2026-04':{'1':'inactive'},
+      '2026-07':{'1':'inactive'},
+      '2026-09':{'1':'inactive'}
+    }
+  }};
   const data=saleResults.collect(all,'storeA','cat_onigiri','12','2026-10-01',{events,sales});
   const sep=data.occurrences.find(o=>o.id==='sale_sep');
   assert.ok(sep);
@@ -150,4 +158,70 @@ test('同一カテゴリー内の複数値引き条件は1つのセール実績�
   assert.match(data.groups[0].summary,/180〜239円→150円均一/);
   assert.match(data.groups[0].summary,/240〜359円→250円均一/);
   assert.equal(data.groups[0].averageSales,(129+134+140)/3);
+});
+
+
+test('過去セールは月別の対象便判定で集計し、推定対象外・手動対象の違いを反映する',()=>{
+  const all=fixture();
+  sales.ensure(all);
+  all.eventManagement.events=all.eventManagement.events.filter(item=>item.id==='sale_sep');
+  all.stores.storeA.salesCounts={};
+  const category=all.salesCountManagement.categories[0];
+  category.activeTrips=[false,false,true]; // Today's configuration must not rewrite September.
+  for(let d=1;d<=15;d++){
+    const date='2026-09-'+String(d).padStart(2,'0');
+    all.stores.storeA.salesCounts[date]={cat_onigiri:{trips:[
+      {delivery:d===1?0:10,sales:d===1?0:8},
+      {delivery:20,sales:18},
+      {delivery:null,sales:null}
+    ]}};
+  }
+  const input=JSON.stringify(all);
+  const get=()=>saleResults.collect(all,'storeA','cat_onigiri','12','2026-10-01',{events,sales});
+  const occurrence=get().occurrences[0];
+  assert.equal(occurrence.averageDelivery,30);
+  assert.equal(occurrence.averageSales,26);
+  assert.notEqual(occurrence.normalRatio,null);
+  assert.equal(JSON.stringify(all),input,'read-only collection must not alter saved sales');
+  all.stores.storeA.tripHistoryOverrides={version:1,categories:{
+    cat_onigiri:{'2026-09':{'3':'active'}}
+  }};
+  const confirmedActive=get().occurrences[0];
+  assert.equal(confirmedActive.averageSales,null,'unknown third trip must not be silently treated as zero');
+  assert.equal(confirmedActive.averageDelivery,null);
+  assert.equal(confirmedActive.normalRatio,null);
+  all.stores.storeA.tripHistoryOverrides.categories.cat_onigiri['2026-09']['3']='inactive';
+  assert.equal(get().occurrences[0].averageSales,26);
+});
+
+test('同じセールの月跨ぎ集計に年月別の対象便を適用し入力0を実績に含める',()=>{
+  const all=fixture();sales.ensure(all);
+  all.eventManagement.events=[
+    {id:'aug',type:'sale',scope:'global',startDate:'2026-08-28',endDate:'2026-08-28',snapshot:{title:'夏の共通セール',sale:{categoryId:'cat_onigiri',category:'おにぎり',method:'amount',params:{amount:20}}}},
+    {id:'sep',type:'sale',scope:'global',startDate:'2026-09-15',endDate:'2026-09-15',snapshot:{title:'夏の共通セール',sale:{categoryId:'cat_onigiri',category:'おにぎり',method:'amount',params:{amount:20}}}}
+  ];
+  all.stores.storeA.salesCounts={
+    '2026-08-28':{cat_onigiri:{trips:[{delivery:10,sales:0},{delivery:20,sales:8},{delivery:null,sales:null}]}},
+    '2026-09-15':{cat_onigiri:{trips:[{delivery:10,sales:10},{delivery:20,sales:20},{delivery:30,sales:30}]}}
+  };
+  all.stores.storeA.tripHistoryOverrides={version:1,categories:{
+    cat_onigiri:{'2026-08':{'3':'inactive'},'2026-09':{'3':'active'}}
+  }};
+  const before=JSON.stringify(all),data=saleResults.collect(all,'storeA','cat_onigiri','12','2026-10-01',{events,sales});
+  assert.equal(data.groups.length,1);
+  assert.equal(data.groups[0].averageSales,(8+60)/2);
+  assert.equal(data.groups[0].averageDelivery,(30+60)/2);
+  assert.equal(JSON.stringify(all),before);
+});
+
+test('証拠不足で対象便が不明な過去セールは部分合計を平均値として表示しない',()=>{
+  const all=fixture();sales.ensure(all);
+  all.eventManagement.events=all.eventManagement.events.filter(item=>item.id==='sale_apr');
+  all.stores.storeA.salesCounts={
+    '2026-04-10':{cat_onigiri:{trips:[{delivery:10,sales:0},{delivery:20,sales:15},{delivery:null,sales:null}]}}
+  };
+  const result=saleResults.collect(all,'storeA','cat_onigiri','12','2026-10-01',{events,sales});
+  assert.equal(result.groups[0].averageSales,null);
+  assert.equal(result.groups[0].averageDelivery,null);
+  assert.equal(result.occurrences[0].normalCount,0);
 });

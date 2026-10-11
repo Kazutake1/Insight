@@ -321,6 +321,14 @@
       scroll.append(chart);section.append(scroll);
       return section;
     }
+    function historicalSalesCard(date,record,category){
+      var resolver=root.InsightTripHistoryResolver;
+      if(!resolver||typeof resolver.resolveDate!=='function')
+        throw new Error('過去の対象便判定を読み込めませんでした。');
+      var mask=resolver.resolveDate(allStores,currentStoreId(),category.id,date).mask;
+      return root.InsightSalesCount.createReadOnlyDayCard(date,record,category,
+        root.InsightSalesCount.wasteRecordAt(allStores,currentStoreId(),date,category.id),mask);
+    }
     function salesCategoriesSection(date){
       root.InsightSalesCount.ensure(allStores);
       var store=allStores.stores[currentStoreId()],saved=store&&store.salesCounts&&store.salesCounts[date]||{};
@@ -334,7 +342,7 @@
       var grid=el('div',undefined,'er-category-grid');
       categories.forEach(function(category){
         var wrap=el('article',undefined,'er-category-card');wrap.append(el('h3',category.name));
-        var card=root.InsightSalesCount.createReadOnlyDayCard(date,saved[category.id],category,root.InsightSalesCount.wasteRecordAt(allStores,currentStoreId(),date,category.id));card.classList.add('er-readonly-sales-card');
+        var card=historicalSalesCard(date,saved[category.id],category);card.classList.add('er-readonly-sales-card');
         wrap.append(card);grid.append(wrap);
       });
       section.append(grid);return section;
@@ -363,7 +371,7 @@
         var grid=el('div',undefined,'er-period-day-grid');
         occurrence.days.forEach(function(day){
           var saved=records[day.date]&&records[day.date][category.id];
-          var card=root.InsightSalesCount.createReadOnlyDayCard(day.date,saved,category,root.InsightSalesCount.wasteRecordAt(allStores,currentStoreId(),day.date,category.id));
+          var card=historicalSalesCard(day.date,saved,category);
           grid.append(card);
         });
         group.append(grid);list.append(group);
