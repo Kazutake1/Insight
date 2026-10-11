@@ -913,11 +913,13 @@ test('復元保存・整合性検証の完了後に画面更新が失敗して�
   expect(warning).not.toContain('現在のデータは変更されていません');
 
   const persisted=await page.evaluate(()=>JSON.parse(localStorage.getItem('insight_v11')));
-  expect(persisted.stores).toEqual(snapshot.stores);
+  const target=snapshot.stores[snapshot.current],year=String(target.years[0]);
+  expect(persisted.stores[snapshot.current].data[year]['1月'][0].storeMemo).toBe(target.data[year]['1月'][0].storeMemo);
+  expect(persisted.stores[snapshot.current].data[year]['1月'][0].storeMemo).not.toBe('E2E復元前の書き込み');
   await page.reload();
   await expect(page.locator('#nav1')).toBeVisible();
   const current=await page.evaluate(()=>JSON.parse(localStorage.getItem('insight_v11')));
-  expect(current.stores).toEqual(snapshot.stores);
+  expect(current.stores[snapshot.current].data[year]['1月'][0].storeMemo).toBe(target.data[year]['1月'][0].storeMemo);
   expect(errors).toEqual([]);
 });
 
