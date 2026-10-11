@@ -11,6 +11,28 @@
     return key;
   }
 
+  // Local snapshot identity is tracked outside insight_v11: no persisted schema changes.
+  // Read once after the payload has loaded allStores. A later readSnapshot() must not
+  // silently acknowledge another tab's changes while the live UI still holds old data.
+  var lastSavedRaw=root.localStorage.getItem(storageKey());
+  var externalChangeSeen=false;
+  if(typeof root.addEventListener==='function'){
+    root.addEventListener('storage',function(event){
+      if(event&&(event.key===null||event.key===storageKey())&&event.newValue!==lastSavedRaw)
+        externalChangeSeen=true;
+    });
+  }
+
+  function assertNotStale(){
+    // Compare raw bytes, not a normalized snapshot: legacy data may lack
+    // schemaVersion before its first normal save.
+    if(externalChangeSeen||root.localStorage.getItem(storageKey())!==lastSavedRaw){
+      var error=new Error('別のタブでデータが更新されています。古いデータで上書きしないため保存を停止しました。未保存の入力内容を控えてから、Insightを再読み込みしてください。');
+      error.name='InsightStorageConflictError';
+      throw error;
+    }
+  }
+
   function clone(value){
     return JSON.parse(JSON.stringify(value));
   }
@@ -43,7 +65,10 @@
 
   function writeSnapshot(snapshot){
     var serialized=serialize(snapshot);
+    assertNotStale();
     root.localStorage.setItem(storageKey(),serialized);
+    // Update the observed baseline only after a successful write.
+    lastSavedRaw=serialized;
     return serialized;
   }
 
