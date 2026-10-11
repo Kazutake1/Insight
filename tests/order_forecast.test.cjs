@@ -156,3 +156,77 @@ test('過去6週間の集計で実績の未入力と0を区別し保存データ
   assert.equal(actual.deliveryAverage.total,null,'対象便に未入力がある場合1日合計は平均対象外');
   assert.equal(JSON.stringify(saved),before);
 });
+
+
+test('発注予測の6週平均は各月の対象便を用い、現行設定と異なる便や入力済み0を正しく集計する',()=>{
+  const cat={id:'food',activeTrips:[false,true,false]};
+  const snapshot={current:'A',salesCountManagement:{categories:[cat]},stores:{
+    A:{salesCounts:{},tripHistoryOverrides:{version:1,categories:{food:{
+      '2026-06':{'1':'active','2':'active','3':'inactive'},
+      '2026-07':{'1':'active','2':'inactive','3':'active'}
+    }}}},
+    B:{salesCounts:{}}
+  }};
+  const dates=model.dates('2026-07-19','2026-07-17');
+  const trip=(delivery,sales)=>({delivery,sales});
+  dates.weeks.forEach((date,i)=>{
+    snapshot.stores.A.salesCounts[date]={food:{trips:i<4?
+      [trip(10,i===1?0:10),trip(20,20),trip(null,null)]:
+      [trip(10,10),trip(null,null),trip(30,30)]}};
+  });
+  const firstPrior=dates.previousYear[0];
+  snapshot.stores.A.salesCounts[firstPrior]={food:{trips:[
+    trip(0,0),trip(5,5),trip(null,null)
+  ]}};
+  const saved=JSON.stringify(snapshot);
+  const opts={snapshot,storeId:'A',resolver:require('../insight_trip_history_resolver_v1.js'),today:'2026-10-11'};
+  const result=model.collect(snapshot.stores.A.salesCounts,cat,'2026-07-19',sales,'2026-07-17',opts);
+  assert.deepEqual(result.weeks.map(x=>x.mask),[
+    [true,true,false],[true,true,false],[true,true,false],[true,true,false],
+    [true,false,true],[true,false,true]
+  ]);
+  assert.deepEqual(result.averageMask,[true,true,true]);
+  assert.equal(result.deliveryAverage.total,200/6);
+  assert.equal(result.salesAverage.total,190/6);
+  assert.equal(result.salesAverage.totalDays,6);
+  assert.equal(result.salesAverage.trips[0],50/6);
+  assert.equal(result.salesAverage.trips[1],20);
+  assert.equal(result.salesAverage.trips[2],30);
+  assert.equal(result.previousYear[0].mask[0],true,'前年の保存済み0を保持');
+  assert.equal(result.previousYear[0].record.trips[0].sales,0);
+  assert.deepEqual(result.recent.map(x=>x.date),['2026-07-12'],'現行対象外の便だけの実績を表示');
+  assert.equal(JSON.stringify(snapshot),saved,'read-only operation must never mutate the snapshot');
+});
+
+test('過去の対象便が不明なときも0個の入力は保持し、6週合計平均は未確定にする',()=>{
+  const cat={id:'food',activeTrips:[false,true,false]};
+  const store={salesCounts:{'2026-06-14':{food:{trips:[
+    {delivery:0,sales:0},{delivery:null,sales:null},{delivery:null,sales:null}
+  ]}}}};
+  const snapshot={salesCountManagement:{categories:[cat]},stores:{A:store}};
+  const before=JSON.stringify(snapshot),history={
+    snapshot,storeId:'A',resolver:require('../insight_trip_history_resolver_v1.js'),today:'2026-10-11'
+  };
+  const value=model.collect(store.salesCounts,cat,'2026-06-21',sales,'2026-06-19',history);
+  assert.deepEqual(value.weeks[5].mask,[true,null,null]);
+  assert.deepEqual(value.averageMask,[true,null,null]);
+  assert.equal(value.salesAverage.trips[0],0);
+  assert.equal(value.salesAverage.total,null);
+  assert.equal(value.salesAverage.totalDays,0);
+  assert.deepEqual(value.recent.map(x=>x.date),['2026-06-14']);
+  assert.equal(JSON.stringify(snapshot),before);
+});
+
+test('現在月の便設定を基本としつつ、現在対象外でも入力された値は非表示にしない',()=>{
+  const cat={id:'food',activeTrips:[true,false,true]};
+  const saved={'2026-10-11':{food:{trips:[
+    {delivery:1,sales:0},{delivery:2,sales:0},{delivery:null,sales:null}
+  ]}}};
+  const snapshot={salesCountManagement:{categories:[cat]},stores:{A:{salesCounts:saved}}};
+  const opts={snapshot,storeId:'A',resolver:require('../insight_trip_history_resolver_v1.js'),today:'2026-10-11'};
+  const actual=model.collect(saved,cat,'2026-10-18',sales,'2026-10-11',opts);
+  assert.deepEqual(actual.weeks[5].mask,[true,true,true]);
+  assert.equal(actual.weeks[5].record.trips[1].sales,0);
+  assert.equal(actual.salesAverage.total,null,'3便未入力なので部分合計は使わない');
+  assert.equal(actual.recent[0].date,'2026-10-11');
+});
