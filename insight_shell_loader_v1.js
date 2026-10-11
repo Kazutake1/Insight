@@ -40,7 +40,7 @@ var orderedFeatureLoads=[
   './insight_weather_temperature_auto_v1.js?v=20260930-hooks1',
   './insight_weather_location_v1.js?v=20260930-security1',
   './insight_input_weather_temp_v1.js?v=20261006-csp-style-input-weather-1',
-  './insight_sales_count_v1.js?v=20261011-historical-results-1',
+  './insight_sales_count_v1.js?v=20261011-forecast-history-1',
   './insight_trip_inference_v1.js?v=20261011-month-infer-1',
   './insight_trip_overrides_v1.js?v=20261011-trip-manual-1',
   './insight_trip_history_resolver_v1.js?v=20261011-trip-averages-1',
@@ -74,7 +74,7 @@ var orderedFeatureLoads=[
   './insight_input_chart_cleanup_v1.js?v=20261006-remove-chart-copy-1',
   './insight_weekday_chart_fix_v1.js?v=20261006-waste-zero-past-1',
   './insight_weekday_chart_spacing_v1.js?v=20261006-csp-style-weekday-1',
-  './insight_order_forecast_v1.js?v=20261011-forecast-6weeks-1'
+  './insight_order_forecast_v1.js?v=20261011-forecast-history-1'
 ];
 function featureSignature(entries){
   var text=entries.join('\n'),hash=2166136261;
