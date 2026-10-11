@@ -67,7 +67,43 @@
     if(unknownCategories)issue(issues,'error','waste_unknown_category',storeId,storeName,null,'登録されていないカテゴリーIDの廃棄数が'+unknownCategories+'件あります。');
     if(invalidRecords)issue(issues,'error','waste_invalid_record',storeId,storeName,null,'廃棄数の便数・数量が不正な記録が'+invalidRecords+'件あります。');
   }
-  function check(snapshot){
+  // Reuse the authoritative event validator without changing any persisted records.
+  // Inspect each scope separately first so the data-state dialog identifies the
+  // affected store; a final full check catches IDs duplicated across scopes.
+  function checkEventRecords(snapshot,issues,eventValidator){
+    var globalPresent=snapshot.eventManagement!==undefined;
+    var scoped=Object.keys(snapshot.stores).filter(function(id){
+      return object(snapshot.stores[id])&&snapshot.stores[id].events!==undefined;
+    });
+    if(!globalPresent&&!scoped.length)return;
+    var validator=eventValidator||root.InsightEvents;
+    if(!validator||typeof validator.validate!=='function'){
+      issue(issues,'error','event_validator_missing',null,'',null,
+        'イベント・催事の整合性を検査できません。イベント検証機能を確認してください。');
+      return;
+    }
+    var failed=false;
+    function inspect(target,code,storeId,storeName,label){
+      try{validator.validate(target);}
+      catch(error){
+        failed=true;
+        issue(issues,'error',code,storeId,storeName,null,
+          label+'の保存データに問題があります：'+String(error&&error.message?error.message:error));
+      }
+    }
+    if(globalPresent)inspect({eventManagement:snapshot.eventManagement,stores:{}},
+      'event_global_invalid',null,'','全店共通のセール・イベント・よく使う設定');
+    scoped.forEach(function(id){
+      var store=snapshot.stores[id],item={events:store.events},stores={};
+      stores[id]=item;
+      inspect({stores:stores},'event_store_invalid',id,
+        typeof store.name==='string'&&store.name?store.name:id,'店舗イベント・催事');
+    });
+    if(!failed)inspect(snapshot,'event_cross_scope_invalid',null,'',
+      '店舗間・全店共通をまたぐイベント');
+  }
+
+  function check(snapshot,eventValidator){
     var issues=[];
     if(!object(snapshot)){issue(issues,'error','root','', '',null,'保存データ全体の形式が不正です。');return finish(issues,0);}
     if(!object(snapshot.stores)||!Object.keys(snapshot.stores).length){issue(issues,'error','stores','', '',null,'店舗データがありません。');return finish(issues,0);}
@@ -124,6 +160,7 @@
       checkWasteCountRecords(store.wasteCounts,snapshot.salesCountManagement&&snapshot.salesCountManagement.categories,issues,storeId,name);
       dateYearCounts(store.hourlyCustomers,registered,'hourly',issues,storeId,name);
     });
+    checkEventRecords(snapshot,issues,eventValidator);
     return finish(issues,storeCount);
   }
 
@@ -175,7 +212,7 @@
       summary.textContent='構造上の問題は見つかりませんでした。';
       applyStatusClass(summary,report);
       issues.innerHTML='';
-      var ok=document.createElement('div');ok.className='insight-health-issue';ok.textContent='正式年度、日別データ、販売数、時間帯別客数の保存構造を確認しました。';
+      var ok=document.createElement('div');ok.className='insight-health-issue';ok.textContent='正式年度、日別データ、販売数・廃棄数、時間帯別客数、イベント・催事の保存構造を確認しました。';
       issues.appendChild(ok);
     }else{
       summary.textContent='要確認：'+report.counts.total+'件（重大 '+report.counts.errors+'件／注意 '+report.counts.warnings+'件）';
