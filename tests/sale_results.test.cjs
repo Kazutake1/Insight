@@ -225,3 +225,96 @@ test('証拠不足で対象便が不明な過去セールは部分合計を平�
   assert.equal(result.groups[0].averageDelivery,null);
   assert.equal(result.occurrences[0].normalCount,0);
 });
+
+
+function allEventsNormalDayFixture(){
+  const mk=n=>({trips:Array.from({length:3},()=>({delivery:n,sales:n}))});
+  const dated=(id,type,scope,date,title,sale)=>({
+    id,type,scope,startDate:date,endDate:date,
+    snapshot:Object.assign({title},sale?{sale}:{}),
+  });
+  const food={categoryId:'food',category:'食品',method:'amount',params:{amount:20}};
+  const other={categoryId:'other',category:'パン',method:'amount',params:{amount:10}};
+  const all={
+    current:'A',
+    salesCountManagement:{version:1,categories:[
+      {id:'food',name:'食品',hidden:false,aliases:[],activeTrips:[true,true,true]},
+      {id:'other',name:'パン',hidden:false,aliases:[],activeTrips:[true,true,true]}
+    ]},
+    eventManagement:{version:1,presets:[],events:[
+      dated('sale_target','sale','global','2026-09-15','食品セール',food),
+      dated('sale_other','sale','global','2026-09-01','別カテゴリーセール',other),
+      dated('campaign','campaign','global','2026-09-29','全店キャンペーン')
+    ]},
+    stores:{
+      A:{name:'A店',events:[
+        dated('nearby','nearby','store','2026-09-08','近隣イベント')
+      ],salesCounts:{}},
+      B:{name:'B店',events:[
+        dated('b_special','special','store','2026-09-22','B店だけの催事')
+      ],salesCounts:{}}
+    }
+  };
+  [['2026-09-01',100],['2026-09-08',40],['2026-09-15',30],
+   ['2026-09-22',10],['2026-09-29',70]].forEach(([date,value])=>{
+    all.stores.A.salesCounts[date]={food:mk(value)};
+  });
+  sales.ensure(all);
+  return {all,dated,mk};
+}
+
+test('通常日比は別カテゴリーのセール・近隣イベント・キャンペーン日を除外し消化率は変えない',()=>{
+  const {all}=allEventsNormalDayFixture();
+  const before=JSON.stringify(all);
+  const withEvents=saleResults.collect(all,'A','food','12','2026-10-11',{events,sales});
+  const target=withEvents.occurrences.find(item=>item.id==='sale_target');
+  assert.ok(target);
+  assert.equal(target.normalCount,1,'9月22日だけを通常日として採用する');
+  assert.equal(target.normalAverageSales,30);
+  assert.equal(target.normalRatio,200);
+  assert.equal(target.averageDelivery,90);
+  assert.equal(target.averageSales,90);
+  assert.equal(target.sellThrough,100,'消化率は従来計算を維持する');
+
+  all.eventManagement.events=all.eventManagement.events.filter(item=>item.id==='sale_target');
+  all.stores.A.events=[];
+  const withoutEvents=saleResults.collect(all,'A','food','12','2026-10-11',{events,sales});
+  const baseline=withoutEvents.occurrences.find(item=>item.id==='sale_target');
+  assert.equal(baseline.normalCount,4,'セール日以外の火曜4日を採用する');
+  assert.equal(baseline.normalAverageSales,(300+120+30+210)/4);
+  assert.equal(baseline.sellThrough,target.sellThrough);
+  // Changing only the event master must never touch previously entered sales.
+  assert.deepEqual(all.stores.A.salesCounts,JSON.parse(before).stores.A.salesCounts);
+});
+
+test('イベント開催日の種別に関係なく通常日から除外する',()=>{
+  for(const kind of ['nearby','special','environment','equipment','staff','bulk','campaign']){
+    const {all,dated}=allEventsNormalDayFixture();
+    // Leave 9/8 free, then independently apply each event type to that date.
+    all.stores.A.events=[];
+    const event=dated('var_'+kind,kind,kind==='campaign'?'global':'store','2026-09-08','イベント検証');
+    if(kind==='campaign')all.eventManagement.events.push(event);
+    else all.stores.A.events.push(event);
+    const data=saleResults.collect(all,'A','food','12','2026-10-11',{events,sales});
+    const target=data.occurrences.find(item=>item.id==='sale_target');
+    assert.equal(target.normalCount,1,kind+' の開催日は通常日ではない');
+    assert.equal(target.normalAverageSales,30,kind+' の影響で通常日平均が変わらない');
+    assert.equal(target.sellThrough,100,kind+' が消化率へ影響しない');
+  }
+});
+
+test('他店舗だけのイベントは除外せず、通常日ゼロ・比較対象ゼロを区別する',()=>{
+  const {all,dated,mk}=allEventsNormalDayFixture();
+  all.stores.A.salesCounts['2026-09-22'].food=mk(0);
+  const result=()=>saleResults.collect(all,'A','food','12','2026-10-11',{events,sales}).occurrences[0];
+  const before=JSON.stringify(all);
+  assert.equal(result().normalCount,1,'B店舗だけのイベント日はA店舗の通常日に含める');
+  assert.equal(result().normalAverageSales,0,'0は有効な実績として平均へ含める');
+  assert.equal(result().normalRatio,null,'通常日平均が0なら割合は算出できない');
+  assert.equal(JSON.stringify(all),before,'集計は保存データを書き換えない');
+
+  all.stores.A.events.push(dated('extra','special','store','2026-09-22','A店舗の催事'));
+  assert.equal(result().normalCount,0,'全ての同曜日がイベントなら比較対象なし');
+  assert.equal(result().normalAverageSales,null);
+  assert.equal(result().normalRatio,null);
+});

@@ -167,3 +167,58 @@ test('過去便の推定・手動確定はセール実績と単日／複数日�
   expect(await page.evaluate(()=>localStorage.getItem('insight_v11'))).toBe(setup.saved);
   expect(errors).toEqual([]);
 });
+
+
+test('セール実績の通常日比は店舗・全店イベントと別カテゴリーのセール日を除外する',async({page,browserName})=>{
+  await page.setViewportSize({width:1194,height:834});
+  const errors=[];page.on('pageerror',err=>errors.push(err.message));
+  if(browserName==='webkit')await page.route('**/Index.html*',async route=>{
+    const response=await route.fetch();
+    await route.fulfill({response,body:(await response.text()).replace(/;?\s*upgrade-insecure-requests/g,'')});
+  });
+  await page.goto('/Index.html',{waitUntil:'domcontentloaded'});
+  await page.waitForFunction(()=>window.InsightSaleResults&&window.InsightEvents&&window.InsightSalesCount);
+  const fixture=await page.evaluate(()=>{
+    const storeId=allStores.current,store=allStores.stores[storeId];
+    const categories=allStores.salesCountManagement.categories;
+    const food=categories.find(item=>!item.hidden),other=categories.find(item=>item.id!==food.id);
+    food.activeTrips=[true,true,true];
+    store.salesCounts={};store.events=[];
+    const row=n=>({trips:Array.from({length:3},()=>({delivery:n,sales:n}))});
+    [['2026-09-01',100],['2026-09-08',40],['2026-09-15',30],
+     ['2026-09-22',10],['2026-09-29',70]].forEach(([date,value])=>{
+      store.salesCounts[date]={[food.id]:row(value)};
+    });
+    const event=(id,type,scope,date,title,sale)=>({
+      id,type,scope,startDate:date,endDate:date,
+      snapshot:Object.assign({version:1,title},sale?{sale}:{})
+    });
+    allStores.eventManagement=allStores.eventManagement||{version:1,presets:[],events:[]};
+    allStores.eventManagement.events=[
+      event('sr_normal_target','sale','global','2026-09-15','対象セール',
+        {categoryId:food.id,category:food.name,method:'amount',params:{amount:20}}),
+      event('sr_normal_other','sale','global','2026-09-01','別カテゴリーセール',
+        {categoryId:other.id,category:other.name,method:'amount',params:{amount:10}}),
+      event('sr_normal_campaign','campaign','global','2026-09-29','全店キャンペーン')
+    ];
+    store.events=[event('sr_normal_nearby','nearby','store','2026-09-08','近隣イベント')];
+    return {storeId,categoryId:food.id,storage:localStorage.getItem('insight_v11')};
+  });
+  await page.locator('#navSaleResults').click();
+  await page.locator('#srCategory').selectOption(fixture.categoryId);
+  const line=page.locator('#srListBody tr').first();
+  await expect(line.locator('td').nth(6)).toHaveText('+200.0%');
+  await expect(line.locator('td').nth(7)).toHaveText('同曜日 1日');
+  await expect(line.locator('td').nth(5)).toHaveText('100%');
+
+  await page.evaluate(({storeId})=>{
+    allStores.eventManagement.events=allStores.eventManagement.events.filter(item=>item.id==='sr_normal_target');
+    allStores.stores[storeId].events=[];
+    InsightSaleResults.render();
+  },fixture);
+  await expect(line.locator('td').nth(6)).toHaveText('-45.5%');
+  await expect(line.locator('td').nth(7)).toHaveText('同曜日 4日');
+  await expect(line.locator('td').nth(5)).toHaveText('100%');
+  expect(await page.evaluate(()=>localStorage.getItem('insight_v11'))).toBe(fixture.storage);
+  expect(errors).toEqual([]);
+});
