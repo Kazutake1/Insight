@@ -63,6 +63,7 @@ const ordered=[
   'insight_ai_context_v1.js',
   'insight_ai_page_comments_v1.js',
   'insight_settings_v1.js',
+  'insight_trip_inference_view_v1.js',
   'insight_weather_bulk_v1.js'
 ];
 
