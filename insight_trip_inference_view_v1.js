@@ -74,7 +74,7 @@
       return '入力 '+trip.observedDays+'日（納品 '+trip.deliveryDays+'日／販売 '+trip.salesDays+'日）';
     if(report.invalidRecordDays)return '記録の形式に問題があり、判定できません。';
     if(trip.status==='inferred_inactive')
-      return '本人は未入力／他便の入力 '+trip.otherTripObservedDays+'日';
+      return 'この便は未入力／他便の入力 '+trip.otherTripObservedDays+'日';
     if(!report.monthCompleted)return '当月・未来月は対象外と推定しません。';
     return '他便の入力 '+trip.otherTripObservedDays+'日（推定基準 '+report.minEvidenceDays+'日）';
   }
