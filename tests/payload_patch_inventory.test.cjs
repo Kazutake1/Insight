@@ -802,7 +802,8 @@ test('保存データ健全性チェックは読み取り専用で不整合を�
   const css=read('insight_payload_core_v1.css');
   assert.match(index,/insight_data_health_v1\.js\?v=20261011-event-health-1/);
   assert.ok(index.indexOf('insight_backup_guard_v1.js')<index.indexOf('insight_data_health_v1.js'));
-  assert.match(health,/function check\(snapshot\)/);
+  assert.match(health,/function check\(snapshot,eventValidator\)/);
+  assert.match(health,/function checkEventRecords\(snapshot,issues,eventValidator\)/);
   assert.match(health,/orphan_data_year/);
   assert.match(health,/kind\+'_unregistered_year'/);
   assert.match(health,/dateYearCounts\(store\.salesCounts,registered,'sales'/);
