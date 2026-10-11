@@ -160,6 +160,17 @@
       checkWasteCountRecords(store.wasteCounts,snapshot.salesCountManagement&&snapshot.salesCountManagement.categories,issues,storeId,name);
       dateYearCounts(store.hourlyCustomers,registered,'hourly',issues,storeId,name);
     });
+    if(snapshot.tripInferenceOverrides!==undefined){
+      var overrides=root.InsightTripOverrides;
+      if(!overrides||typeof overrides.validate!=='function'){
+        issue(issues,'error','trip_overrides_validator_missing',null,'',null,
+          '過去の対象便の手動設定を検証できません。');
+      }else{
+        try{overrides.validate(snapshot);}
+        catch(error){issue(issues,'error','trip_overrides_invalid',null,'',null,
+          '過去の対象便の手動設定が不正です：'+String(error&&error.message?error.message:error));}
+      }
+    }
     checkEventRecords(snapshot,issues,eventValidator);
     return finish(issues,storeCount);
   }
