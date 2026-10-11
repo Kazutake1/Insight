@@ -280,10 +280,10 @@ test('トップページは外部shellと機能manifestの最新版確認をno-s
     fetch('/insight_payload_source_v1.html?e2e-shell-check=1',{cache:'no-store'}).then(r=>r.text())
   ]));
   const [source,boot,loader,payload]=sources;
-  expect(source).toContain('name="insight-shell-version" content="20261011-trip-averages-build-26"');
-  expect(source).toContain('insight_shell_boot_v1.js?v=20261011-trip-averages-build-26');
-  expect(source).toContain('insight_shell_loader_v1.js?v=20261011-trip-averages-build-26');
-  expect(source).toContain('insight_shell_v1.css?v=20261011-trip-averages-build-26');
+  expect(source).toContain('name="insight-shell-version" content="20261011-forecast-weekday-build-27"');
+  expect(source).toContain('insight_shell_boot_v1.js?v=20261011-forecast-weekday-build-27');
+  expect(source).toContain('insight_shell_loader_v1.js?v=20261011-forecast-weekday-build-27');
+  expect(source).toContain('insight_shell_v1.css?v=20261011-forecast-weekday-build-27');
   expect(source).not.toMatch(/<script(?![^>]*\bsrc=)[^>]*>/i);
   expect(source).not.toMatch(/<style\b/i);
   expect(source).not.toMatch(/script-src[^;]*'unsafe-inline'/);
@@ -3523,5 +3523,71 @@ test('過去月で証拠不足なら3便を対象外にせず、合計平均を�
   await expect(tuesday.locator('.sc-average-sales b')).toHaveText(['0','10','?']);
   await expect(tuesday.locator('.sc-average-totals .sc-total-sales')).toHaveText('—');
   await expect(page.locator('#scAnalysis .sc-day-type-card').first().locator('tbody tr').nth(1).locator('td')).toHaveText(['0','10','?','—']);
+  expect(errors).toEqual([]);
+});
+
+
+test('発注予測の天気7日間と前年実績7日間は曜日で揃い、納品日変更でも左右の対応を保つ',async({page})=>{
+  const todayTokyo=new Intl.DateTimeFormat('en-CA',{timeZone:'Asia/Tokyo',year:'numeric',month:'2-digit',day:'2-digit'})
+    .format(new Date());
+  const days=Array.from({length:7},(_,i)=>{
+    const date=new Date(todayTokyo+'T12:00:00Z');
+    date.setUTCDate(date.getUTCDate()+i);
+    return date.toISOString().slice(0,10);
+  });
+  await page.route('https://www.jma.go.jp/bosai/**',async route=>{
+    const url=route.request().url();
+    if(url.endsWith('/common/const/area.json')){
+      await route.fulfill({json:{class20s:{},class15s:{},class10s:{},offices:{}}});return;
+    }
+    if(url.endsWith('/amedas/const/amedastable.json')){
+      await route.fulfill({json:{}});return;
+    }
+    if(url.endsWith('/forecast/data/forecast/230000.json')){
+      await route.fulfill({json:[{
+        reportDatetime:todayTokyo+'T11:00:00+09:00',
+        timeSeries:[{timeDefines:days.map(d=>d+'T09:00:00+09:00'),areas:[{
+          area:{code:'230010'},weatherCodes:days.map(()=>'100'),weathers:days.map(()=>'晴れ')
+        }]}]
+      }]});return;
+    }
+    await route.abort();
+  });
+  const errors=await openInsight(page);
+  await page.evaluate(()=>{allStores.stores[allStores.current].weatherLocation=null;});
+  await page.locator('#navOrderForecast').click();
+  await expect(page.locator('#ofWeather .of-weather-card')).toHaveCount(7);
+  await expect(page.locator('#ofYearCards .sc-day')).toHaveCount(7);
+  await expect(page.locator('#ofWeather .of-weather-card .of-weather-text').first()).toHaveText('晴れ');
+  async function readDates(){
+    return page.evaluate(()=>({
+      weather:Array.from(document.querySelectorAll('#ofWeather .of-weather-card')).map(n=>n.dataset.date),
+      previous:Array.from(document.querySelectorAll('#ofYearCards .sc-day')).map(n=>n.dataset.date),
+      label:document.getElementById('ofPreviousYear').textContent,
+      delivery:document.getElementById('ofDelivery').value
+    }));
+  }
+  let dates=await readDates();
+  expect(dates.weather).toEqual(days);
+  for(let i=0;i<7;i++){
+    const d=new Date(days[i]+'T12:00:00Z');
+    d.setUTCDate(d.getUTCDate()-364);
+    expect(dates.previous[i]).toBe(d.toISOString().slice(0,10));
+    expect(new Date(dates.weather[i]).getUTCDay()).toBe(new Date(dates.previous[i]).getUTCDay());
+  }
+  const d0=new Date(dates.delivery+'T12:00:00Z');
+  d0.setUTCDate(d0.getUTCDate()-364);
+  expect(dates.label).toContain(d0.toISOString().slice(0,10));
+  const another=new Date(dates.delivery+'T12:00:00Z');
+  another.setUTCDate(another.getUTCDate()+2);
+  await page.locator('#ofDelivery').fill(another.toISOString().slice(0,10));
+  await page.locator('#ofDelivery').dispatchEvent('change');
+  const changed=await readDates();
+  expect(changed.weather).toEqual(dates.weather);
+  expect(changed.previous).toEqual(dates.previous);
+  expect(changed.delivery).not.toBe(dates.delivery);
+  const nextBase=new Date(changed.delivery+'T12:00:00Z');
+  nextBase.setUTCDate(nextBase.getUTCDate()-364);
+  expect(changed.label).toContain(nextBase.toISOString().slice(0,10));
   expect(errors).toEqual([]);
 });
