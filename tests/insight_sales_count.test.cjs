@@ -308,7 +308,7 @@ test('過去の日種別平均は既存の通常日判定を維持したまま�
   const plain=sales.dayTypeRecords(records,'cat','2026-09',excluded,holiday);
   const dated=sales.dayTypeRecords(records,'cat','2026-09',excluded,holiday,true);
   assert.deepEqual(dated.weekday.map(item=>item.date),['2026-09-01']);
-  assert.deepEqual(dated.sundayHoliday.map(item=>item.date),['2026-09-06','2026-09-21']);
+  assert.deepEqual(dated.sundayHoliday.map(item=>item.date),['2026-09-06','2026-09-21','2026-09-23']);
   assert.deepEqual(dated.weekday.map(item=>item.record),plain.weekday);
   assert.deepEqual(dated.sundayHoliday.map(item=>item.record),plain.sundayHoliday);
   assert.equal(JSON.stringify(records),original);
