@@ -41,6 +41,7 @@ const ordered=[
   'insight_input_weather_temp_v1.js',
   'insight_sales_count_v1.js',
   'insight_trip_inference_v1.js',
+  'insight_trip_overrides_v1.js',
   'insight_sale_results_v1.js',
   'insight_page_title_layout_v1.js',
   'insight_page_period_sync_v1.js',
@@ -84,7 +85,7 @@ test('機能スクリプトの読み込み順はshell loaderのmanifestで明示
 
 test('Indexはshell loaderを外部scriptとして読み込む',()=>{
   const index=read('Index.html');
-  assert.match(index,/insight_shell_loader_v1\.js\?v=20261011-trip-review-build-24/);
+  assert.match(index,/insight_shell_loader_v1\.js\?v=20261011-trip-manual-build-25/);
   assert.doesNotMatch(index,/var orderedFeatureLoads=/);
   assert.match(read('insight_shell_loader_v1.js'),/var orderedFeatureLoads=/);
 });

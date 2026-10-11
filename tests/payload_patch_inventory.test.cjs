@@ -25,9 +25,9 @@ test('Index shellはinline script/styleを持たず外部assetへ分離する',(
   const boot=read('insight_shell_boot_v1.js');
   const loader=read('insight_shell_loader_v1.js');
   const css=read('insight_shell_v1.css');
-  assert.match(index,/insight_shell_boot_v1\.js\?v=20261011-trip-review-build-24/);
-  assert.match(index,/insight_shell_loader_v1\.js\?v=20261011-trip-review-build-24/);
-  assert.match(index,/insight_shell_v1\.css\?v=20261011-trip-review-build-24/);
+  assert.match(index,/insight_shell_boot_v1\.js\?v=20261011-trip-manual-build-25/);
+  assert.match(index,/insight_shell_loader_v1\.js\?v=20261011-trip-manual-build-25/);
+  assert.match(index,/insight_shell_v1\.css\?v=20261011-trip-manual-build-25/);
   assert.doesNotMatch(index,/<script(?![^>]*\bsrc=)[^>]*>/i);
   assert.doesNotMatch(index,/<style\b/i);
   assert.doesNotMatch(index,/script-src[^;]*'unsafe-inline'/);
@@ -48,7 +48,7 @@ test('canonical payloadはinline script/styleを持たず外部assetを順序固
   const aiPresentation=read('insight_ai_presentation_v1.js');
   const readability=read('insight_readability_v1.js');
   const css=read('insight_payload_core_v1.css');
-  assert.match(payload,/insight_payload_core_v1\.css\?v=20261011-trip-review-ui-1/);
+  assert.match(payload,/insight_payload_core_v1\.css\?v=20261011-trip-manual-1/);
   assert.match(payload,/insight_payload_core_v1\.js\?v=20261007-step4-ai-position-css-1/);
   assert.doesNotMatch(core,/label\.style\.color/);
   assert.doesNotMatch(core,/msg\.style\.display/);
@@ -185,8 +185,8 @@ test('canonical payloadはinline script/styleを持たず外部assetを順序固
 
 test('トップページはキャッシュ抑止とシェル・機能manifestの自己更新を持つ',()=>{
   const index=readShell();
-  assert.match(index,/insight-shell-version" content="20261011-trip-review-build-24/);
-  assert.match(index,/var BUILD="20261011-trip-review-build-24"/);
+  assert.match(index,/insight-shell-version" content="20261011-trip-manual-build-25/);
+  assert.match(index,/var BUILD="20261011-trip-manual-build-25"/);
   assert.match(index,/Shell rule: bump BUILD whenever the loader/);
   assert.match(index,/Cache-Control" content="no-cache, no-store, must-revalidate/);
   assert.match(index,/insight_probe=/);
@@ -553,7 +553,7 @@ test('過去の対象便判定UIは設定ページだけに追加される',()=>
   const manifest=readShell();
   const view=read('insight_trip_inference_view_v1.js');
   const css=read('insight_payload_core_v1.css');
-  assert.ok(manifest.includes('insight_trip_inference_view_v1.js?v=20261011-trip-review-ui-1'));
+  assert.ok(manifest.includes('insight_trip_inference_view_v1.js?v=20261011-trip-manual-1'));
   assert.ok(manifest.indexOf('insight_settings_v1.js')<manifest.indexOf('insight_trip_inference_view_v1.js'));
   assert.match(view,/insightTripHistorySection/);
   assert.match(view,/InsightTripInference.inferAvailableMonths/);
@@ -818,7 +818,7 @@ test('保存データ健全性チェックは読み取り専用で不整合を�
   const index=readShell();
   const health=read('insight_data_health_v1.js');
   const css=read('insight_payload_core_v1.css');
-  assert.match(index,/insight_data_health_v1\.js\?v=20261011-event-health-1/);
+  assert.match(index,/insight_data_health_v1\.js\?v=20261011-trip-manual-1/);
   assert.ok(index.indexOf('insight_backup_guard_v1.js')<index.indexOf('insight_data_health_v1.js'));
   assert.match(health,/function check\(snapshot,eventValidator\)/);
   assert.match(health,/function checkEventRecords\(snapshot,issues,eventValidator\)/);

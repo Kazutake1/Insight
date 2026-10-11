@@ -2,6 +2,7 @@ const test=require('node:test');
 const assert=require('node:assert/strict');
 const health=require('../insight_data_health_v1.js');
 const events=require('../insight_events_v1.js');
+const tripOverrides=require('../insight_trip_overrides_v1.js');
 
 function day(d){return {d:String(d),売上:0,客数:0,買上点数:0,廃棄金額:0,haiki:{},weather:''};}
 function yearData(year){
@@ -174,4 +175,23 @@ test('イベント検証処理が利用できないときは正常扱いにせ�
   const report=health.check(data);
   assert.equal(report.status,'error');
   assert.ok(report.issues.some(item=>item.code==='event_validator_missing'));
+});
+
+test('対象便の手動判定の正常な追加設定は保存データを変更せず正常として検査する',()=>{
+  const data=clean(),before=JSON.stringify(data);
+  data.salesCountManagement={version:1,categories:[{id:'c1',name:'項目'}]};
+  data.stores.s1.tripHistoryOverrides={version:1,categories:{c1:{'2025-09':{'3':'inactive'}}}};
+  const withOverride=JSON.stringify(data),result=health.check(data);
+  assert.equal(result.status,'ok');
+  assert.equal(JSON.stringify(data),withOverride);
+  assert.notEqual(withOverride,before);
+  assert.equal(tripOverrides.validateSnapshot(data),true);
+});
+
+test('対象便の手動判定の破損は店舗名とともに検知してバックアップの復元前検査に備える',()=>{
+  const data=clean();data.stores.s1.tripHistoryOverrides={version:1,categories:{c1:{'2025-09':{'3':'invalid'}}}};
+  const before=JSON.stringify(data),result=health.check(data);
+  assert.equal(result.status,'error');
+  assert.ok(result.issues.some(item=>item.code==='trip_history_overrides_invalid'&&item.storeName==='店舗A'));
+  assert.equal(JSON.stringify(data),before);
 });

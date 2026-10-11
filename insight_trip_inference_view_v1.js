@@ -1,4 +1,4 @@
-/* Settings-only read-only view for historical monthly trip inference. */
+/* Settings monthly trip inference review and optional manual corrections. */
 (function(root){
   'use strict';
   if(root.InsightTripInferenceView)return;
@@ -78,6 +78,48 @@
     if(!report.monthCompleted)return '当月・未来月は対象外と推定しません。';
     return '他便の入力 '+trip.otherTripObservedDays+'日（推定基準 '+report.minEvidenceDays+'日）';
   }
+  function appendManualControl(card,trip,report,all){
+    var overrides=root.InsightTripOverrides;
+    if(!overrides||typeof overrides.getOverride!=='function')return;
+    var storeId=storeSelect.value,categoryId=categorySelect.value,month=monthSelect.value;
+    var previous=overrides.getOverride(all,storeId,categoryId,month,trip.trip);
+    var control=doc.createElement('div');control.className='insight-trip-history-edit';
+    var select=doc.createElement('select');
+    select.className='insight-trip-history-choice';
+    select.setAttribute('aria-label',trip.trip+'便の手動判定');
+    option(select,'','自動判定に戻す');
+    option(select,'active','対象便として確定');
+    option(select,'inactive','対象外として確定');
+    select.value=previous||'';
+    var hasSaved=overrides.hasRecord(all.stores[storeId],categoryId,month,trip.trip);
+    if(hasSaved)select.querySelector('option[value="inactive"]').disabled=true;
+    var save=doc.createElement('button');
+    save.type='button';save.className='insight-trip-history-save';
+    save.textContent='保存';save.disabled=true;
+    function sync(){save.disabled=select.disabled||select.value===(previous||'');}
+    select.addEventListener('change',sync);
+    save.addEventListener('click',function(){
+      var mode=select.value||null;
+      try{
+        overrides.save(snapshot(),root.InsightStorage,storeId,categoryId,month,trip.trip,mode);
+        render();
+        summary.textContent='手動判定を保存しました。 '+summary.textContent;
+      }catch(error){
+        root.alert('対象便判定を保存できませんでした。\\n'+String(error&&error.message?error.message:error));
+        render();
+      }
+    });
+    if(!report.monthCompleted){
+      select.disabled=true;
+      select.title='終了した過去月のみ手動設定できます。';
+    }
+    if(hasSaved&&previous!=='inactive'){
+      select.title='入力実績のある便は対象外として確定できません。';
+    }
+    sync();
+    control.append(select,save);card.appendChild(control);
+  }
+
   function render(){
     if(!results||!summary)return;
     results.replaceChildren();
@@ -99,9 +141,17 @@
         var card=doc.createElement('div');
         card.className='insight-trip-history-card insight-trip-history-'+trip.status;
         text(card,trip.trip+'便','insight-trip-history-trip');
-        text(card,labelFor(trip),'insight-trip-history-status');
+        var overrides=root.InsightTripOverrides,decision=overrides&&overrides.effective?
+          overrides.effective(all,storeSelect.value,categorySelect.value,monthSelect.value,trip.trip,trip.status):null;
+        var title=decision&&decision.mode==='manual'?
+          '手動指定：'+(decision.manual==='active'?'対象便':'対象外'):
+          decision&&decision.mode==='conflict'?'入力実績あり（手動判定と矛盾）':labelFor(trip);
+        text(card,title,'insight-trip-history-status');
         text(card,reasonFor(trip,report),'insight-trip-history-reason');
-        if(trip.needsDateReview)text(card,'月途中の変更・未入力に注意','insight-trip-history-review');
+        if(decision&&decision.mode==='conflict')
+          text(card,'保存済みの実績を優先します。手動判定を確認してください。','insight-trip-history-review');
+        else if(trip.needsDateReview)text(card,'月途中の変更・未入力に注意','insight-trip-history-review');
+        appendManualControl(card,trip,report,all);
         results.appendChild(card);
       });
     }catch(error){
@@ -139,7 +189,7 @@
     section.id='insightTripHistorySection';
     section.className='insight-settings-section insight-trip-history-section';
     section.innerHTML='<h2>過去の対象便判定</h2>'+
-      '<p>保存済みの納品・販売実績から月ごとに推定します。設定や実績は変更しません。</p>'+
+      '<p>保存済みの納品・販売実績から月ごとに推定します。過去月の判定だけ手動で修正できます。</p>'+
       '<div class="insight-trip-history-controls">'+
         '<label>店舗<select id="insightTripHistoryStore"></select></label>'+
         '<label>カテゴリー<select id="insightTripHistoryCategory"></select></label>'+
@@ -147,7 +197,7 @@
       '</div>'+
       '<div id="insightTripHistorySummary" class="insight-trip-history-summary" aria-live="polite"></div>'+
       '<div id="insightTripHistoryResults" class="insight-trip-history-results"></div>'+
-      '<p class="insight-trip-history-note">「対象外」は推定です。未入力や月途中の変更を確定したものではありません。</p>';
+      '<p class="insight-trip-history-note">推定は確定情報ではありません。手動指定は月単位の判定記録で、納品・販売実績や現在の対象便設定は変更しません。</p>';
     container.appendChild(section);
     storeSelect=section.querySelector('#insightTripHistoryStore');
     categorySelect=section.querySelector('#insightTripHistoryCategory');

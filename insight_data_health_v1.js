@@ -158,6 +158,16 @@
       dateYearCounts(store.salesCounts,registered,'sales',issues,storeId,name);
       dateYearCounts(store.wasteCounts,registered,'waste',issues,storeId,name);
       checkWasteCountRecords(store.wasteCounts,snapshot.salesCountManagement&&snapshot.salesCountManagement.categories,issues,storeId,name);
+      if(store.tripHistoryOverrides!==undefined){
+        try{
+          if(!root.InsightTripOverrides||typeof root.InsightTripOverrides.validateStore!=='function')
+            throw new Error('対象便の手動判定の検証機能が利用できません');
+          root.InsightTripOverrides.validateStore(store);
+        }catch(error){
+          issue(issues,'error','trip_history_overrides_invalid',storeId,name,null,
+            '過去の対象便の手動設定が不正です：'+String(error&&error.message?error.message:error));
+        }
+      }
       dateYearCounts(store.hourlyCustomers,registered,'hourly',issues,storeId,name);
     });
     checkEventRecords(snapshot,issues,eventValidator);
