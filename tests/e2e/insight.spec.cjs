@@ -1171,6 +1171,98 @@ test('過去の対象便確認カードはiPad横向き幅で見切れずダー�
   expect(errors).toEqual([]);
 });
 
+
+test('手動判定は月・カテゴリー・便ごとに保存され再読込でき、自動判定に戻せる',async({page})=>{
+  const errors=await openInsight(page);
+  await page.locator('#navSettings').click();
+  const panel=page.locator('#insightTripHistorySection');
+  await expect(panel).toBeVisible();
+  await panel.locator('#insightTripHistoryMonth').selectOption('2026-09');
+  const ids=await page.evaluate(()=>({
+    store:document.getElementById('insightTripHistoryStore').value,
+    category:document.getElementById('insightTripHistoryCategory').value,
+    all:JSON.parse(localStorage.getItem('insight_v11'))
+  }));
+  const third=panel.locator('.insight-trip-history-card').nth(2);
+  await third.locator('.insight-trip-history-choice').selectOption('active');
+  await expect(third.locator('.insight-trip-history-save')).toBeEnabled();
+  await third.locator('.insight-trip-history-save').click();
+  await expect(third.locator('.insight-trip-history-status')).toHaveText('手動指定：対象便');
+  const saved=JSON.parse(await page.evaluate(()=>localStorage.getItem('insight_v11')));
+  expect(saved.stores[ids.store].salesCounts).toEqual(ids.all.stores[ids.store].salesCounts);
+  expect(saved.stores[ids.store].data).toEqual(ids.all.stores[ids.store].data);
+  expect(saved.stores[ids.store].tripHistoryOverrides.categories[ids.category]['2026-09']['3']).toBe('active');
+  const downloadPromise=page.waitForEvent('download');
+  await page.locator('#backupBtn').click();
+  const download=await downloadPromise;
+  const backup=JSON.parse(fs.readFileSync(await download.path(),'utf8'));
+  expect(backup.data.stores[ids.store].tripHistoryOverrides.categories[ids.category]['2026-09']['3']).toBe('active');
+
+  await page.reload();
+  await expect(page.locator('#navSettings')).toBeVisible();
+  await page.locator('#navSettings').click();
+  const restoredPanel=page.locator('#insightTripHistorySection');
+  await restoredPanel.locator('#insightTripHistoryStore').selectOption(ids.store);
+  await restoredPanel.locator('#insightTripHistoryCategory').selectOption(ids.category);
+  await restoredPanel.locator('#insightTripHistoryMonth').selectOption('2026-09');
+  const restoredThird=restoredPanel.locator('.insight-trip-history-card').nth(2);
+  await expect(restoredThird.locator('.insight-trip-history-status')).toHaveText('手動指定：対象便');
+  await restoredThird.locator('.insight-trip-history-choice').selectOption('');
+  await restoredThird.locator('.insight-trip-history-save').click();
+  await expect(restoredThird.locator('.insight-trip-history-status')).not.toContainText('手動指定');
+  const after=JSON.parse(await page.evaluate(()=>localStorage.getItem('insight_v11')));
+  expect(after.stores[ids.store].salesCounts).toEqual(ids.all.stores[ids.store].salesCounts);
+  expect(after.stores[ids.store].data).toEqual(ids.all.stores[ids.store].data);
+  expect(after.stores[ids.store].tripHistoryOverrides).toBeUndefined();
+  expect(errors).toEqual([]);
+});
+
+test('手動判定の保存が競合で失敗した場合は画面表示も確定せず保存内容を保持する',async({page})=>{
+  const errors=await openInsight(page);
+  await page.locator('#navSettings').click();
+  const panel=page.locator('#insightTripHistorySection');
+  await panel.locator('#insightTripHistoryMonth').selectOption('2026-09');
+  const before=await page.evaluate(()=>localStorage.getItem('insight_v11'));
+  await page.evaluate(()=>{
+    window.InsightStorage.transaction=function(){
+      const error=new Error('別のタブでデータが更新されています。');
+      error.name='InsightStorageConflictError';throw error;
+    };
+  });
+  const messages=[];
+  page.on('dialog',async dialog=>{messages.push(dialog.message());await dialog.accept();});
+  const card=panel.locator('.insight-trip-history-card').nth(2);
+  await card.locator('.insight-trip-history-choice').selectOption('active');
+  await card.locator('.insight-trip-history-save').click();
+  await expect.poll(()=>messages.length).toBeGreaterThan(0);
+  expect(messages.join('\n')).toContain('別のタブでデータが更新');
+  expect(await page.evaluate(()=>localStorage.getItem('insight_v11'))).toBe(before);
+  await expect(card.locator('.insight-trip-history-status')).not.toContainText('手動指定');
+  await expect(card.locator('.insight-trip-history-choice')).toHaveValue('');
+  expect(errors).toEqual([]);
+});
+
+test('0個でも数値がある過去便は手動で対象外にできない',async({page})=>{
+  const errors=await openInsight(page);
+  await page.locator('#navSettings').click();
+  const fixture=await page.evaluate(()=>{
+    const store=allStores.stores[allStores.current];
+    const cat=allStores.salesCountManagement.categories[0].id;
+    if(!store.salesCounts)store.salesCounts={};
+    const day=store.salesCounts['2026-09-03']||(store.salesCounts['2026-09-03']={});
+    day[cat]={trips:[{delivery:null,sales:null},{delivery:null,sales:null},{delivery:0,sales:null}]};
+    window.InsightTripInferenceView.refresh(true);
+    return {store:allStores.current,category:cat};
+  });
+  const panel=page.locator('#insightTripHistorySection');
+  await panel.locator('#insightTripHistoryStore').selectOption(fixture.store);
+  await panel.locator('#insightTripHistoryCategory').selectOption(fixture.category);
+  await panel.locator('#insightTripHistoryMonth').selectOption('2026-09');
+  const inactive=panel.locator('.insight-trip-history-card').nth(2).locator('option[value="inactive"]');
+  await expect(inactive).toBeDisabled();
+  expect(errors).toEqual([]);
+});
+
 test('対象便の過去月自動判定は保存内容を変えず、0入力と未入力を識別する',async({page})=>{
   const errors=await openInsight(page);
   await page.waitForFunction(()=>window.InsightTripInference&&window.InsightTripInference.inferMonth);
