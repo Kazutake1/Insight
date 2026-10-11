@@ -231,9 +231,16 @@
       var totals=el('div',undefined,'sc-totals');
       totals.innerHTML='<b class="sc-total-delivery" data-total="delivery"></b><b class="sc-total-sales" data-total="sales"></b>'+(withWaste?'<b class="sc-total-waste"></b>':'');
       card.append(totals);updateTotals(card,r,mask);
-      if(Array.isArray(historyMask)&&historyMask.some(function(value){return value===null;})){
-        // Unknown trip eligibility cannot be silently treated as zero or inactive.
-        totals.querySelectorAll('[data-total]').forEach(function(node){node.textContent='—';node.title='過去の対象便に未確認の便があります';});
+      if(Array.isArray(historyMask)&&historyMask.length===3){
+        // Read-only historical totals require all confirmed active trips to have values.
+        // An unknown trip or a missing active value must never become a partial total.
+        totals.querySelectorAll('[data-total]').forEach(function(node){
+          var key=node.dataset.total;
+          var complete=mask.every(function(active,index){
+            return active===false||(active===true&&r.trips[index][key]!==null);
+          });
+          if(!complete){node.textContent='—';node.title='過去の対象便が未確認、または対象便の実績が未入力です';}
+        });
       }
       if(withWaste){
         var summary=wasteSummary(wasteRecord,mask,date),target=totals.querySelector('.sc-total-waste');
