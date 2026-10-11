@@ -193,3 +193,64 @@ test('サイドバーは分析AIだけを発注予測の直下へ移動しiPad�
   }
   expect(errors).toEqual([]);
 });
+
+
+test('発注予測は過去の対象便を前年・6週・直近カードと平均へ反映し、手動確定で再計算する',async({page})=>{
+  const state=await open(page);
+  const seeded=await page.evaluate(()=>{
+    const storeId=allStores.current,store=allStores.stores[storeId];
+    const cat=allStores.salesCountManagement.categories[0],delivery='2026-07-19';
+    cat.activeTrips=[false,false,true]; // Present settings are intentionally different.
+    const dates=InsightOrderForecast.dates(delivery);
+    const previous=InsightOrderForecast.addDays(InsightOrderForecast.today(),-364);
+    store.salesCounts={};
+    dates.weeks.forEach((date,index)=>{
+      store.salesCounts[date]={[cat.id]:{trips:index<4?
+        [{delivery:10,sales:index===1?0:10},{delivery:20,sales:20},{delivery:null,sales:null}]:
+        [{delivery:10,sales:10},{delivery:null,sales:null},{delivery:30,sales:30}]}};
+    });
+    store.salesCounts[previous]={[cat.id]:{trips:[
+      {delivery:0,sales:0},{delivery:null,sales:null},{delivery:null,sales:null}
+    ]}};
+    store.tripHistoryOverrides={version:1,categories:{[cat.id]:{
+      '2026-06':{'1':'active','2':'active','3':'inactive'},
+      '2026-07':{'1':'active','2':'inactive','3':'active'}
+    }}};
+    return {storeId,categoryId:cat.id,delivery,prior:previous,storage:localStorage.getItem('insight_v11')};
+  });
+  await page.locator('#navOrderForecast').click();
+  await page.locator('#ofDelivery').fill(seeded.delivery);
+  await page.locator('#ofDelivery').dispatchEvent('change');
+  await expect(page.locator('#ofWeekCards .sc-day')).toHaveCount(7);
+  const june=page.locator('#ofWeekCards .sc-day').first();
+  const july=page.locator('#ofWeekCards .sc-day').nth(4);
+  await expect.poll(()=>june.locator('.sc-sales-row input').evaluateAll(items=>items.map(x=>x.value))).toEqual(['10','20','ー']);
+  await expect.poll(()=>july.locator('.sc-sales-row input').evaluateAll(items=>items.map(x=>x.value))).toEqual(['10','ー','30']);
+  await expect(june.locator('.sc-total-sales')).toHaveText('30');
+  await expect(july.locator('.sc-total-sales')).toHaveText('40');
+  const average=page.locator('#ofWeekCards .sc-average-card');
+  await expect.poll(()=>average.locator('.sc-sales-row input').evaluateAll(items=>items.map(x=>x.value))).toEqual(['8.3','20','30']);
+  await expect(average.locator('.sc-total-sales')).toHaveText('31.7');
+  await expect(page.locator('#ofRecentCards [data-date="2026-07-12"] .sc-sales-row input').nth(2)).toHaveValue('30');
+  const prior=page.locator('#ofYearCards [data-date="'+seeded.prior+'"]');
+  await expect(prior.locator('.sc-sales-row input').first()).toHaveValue('0');
+  await expect(prior.locator('.sc-sales-row input').nth(1)).toHaveValue('?');
+  await expect(prior.locator('.sc-total-sales')).toHaveText('—');
+
+  await page.evaluate(({storeId,categoryId})=>{
+    allStores.stores[storeId].tripHistoryOverrides.categories[categoryId]['2026-06']['3']='active';
+    InsightOrderForecast.render();
+  },seeded);
+  await expect(june.locator('.sc-sales-row input').nth(2)).toHaveValue('');
+  await expect(june.locator('.sc-total-sales')).toHaveText('—');
+  await expect(average.locator('.sc-total-sales')).toHaveText('40');
+  await page.evaluate(({storeId,categoryId})=>{
+    allStores.stores[storeId].tripHistoryOverrides.categories[categoryId]['2026-06']['3']='inactive';
+    InsightOrderForecast.render();
+  },seeded);
+  await expect(june.locator('.sc-sales-row input').nth(2)).toHaveValue('ー');
+  await expect(average.locator('.sc-total-sales')).toHaveText('31.7');
+  expect(await page.evaluate(()=>localStorage.getItem('insight_v11'))).toBe(seeded.storage);
+  expect(await page.evaluate(id=>allStores.salesCountManagement.categories.find(c=>c.id===id).activeTrips,seeded.categoryId)).toEqual([false,false,true]);
+  expect(state.errors).toEqual([]);
+});
