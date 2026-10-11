@@ -37,6 +37,7 @@ jobs:
           - insight_sales_count.test.cjs
           - trip_inference.test.cjs
           - trip_inference_view.test.cjs
+          - trip_overrides.test.cjs
           - insight_yoy_policy.test.cjs
           - monthly_review.test.cjs
           - multiyear_analysis.test.cjs
