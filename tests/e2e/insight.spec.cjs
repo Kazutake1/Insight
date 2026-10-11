@@ -280,10 +280,10 @@ test('トップページは外部shellと機能manifestの最新版確認をno-s
     fetch('/insight_payload_source_v1.html?e2e-shell-check=1',{cache:'no-store'}).then(r=>r.text())
   ]));
   const [source,boot,loader,payload]=sources;
-  expect(source).toContain('name="insight-shell-version" content="20261011-forecast-weekday-build-27"');
-  expect(source).toContain('insight_shell_boot_v1.js?v=20261011-forecast-weekday-build-27');
-  expect(source).toContain('insight_shell_loader_v1.js?v=20261011-forecast-weekday-build-27');
-  expect(source).toContain('insight_shell_v1.css?v=20261011-forecast-weekday-build-27');
+  expect(source).toContain('name="insight-shell-version" content="20261011-forecast-6weeks-build-28"');
+  expect(source).toContain('insight_shell_boot_v1.js?v=20261011-forecast-6weeks-build-28');
+  expect(source).toContain('insight_shell_loader_v1.js?v=20261011-forecast-6weeks-build-28');
+  expect(source).toContain('insight_shell_v1.css?v=20261011-forecast-6weeks-build-28');
   expect(source).not.toMatch(/<script(?![^>]*\bsrc=)[^>]*>/i);
   expect(source).not.toMatch(/<style\b/i);
   expect(source).not.toMatch(/script-src[^;]*'unsafe-inline'/);
@@ -3528,6 +3528,7 @@ test('過去月で証拠不足なら3便を対象外にせず、合計平均を�
 
 
 test('発注予測の天気7日間と前年実績7日間は曜日で揃い、納品日変更でも左右の対応を保つ',async({page})=>{
+  await page.setViewportSize({width:1194,height:834});
   const todayTokyo=new Intl.DateTimeFormat('en-CA',{timeZone:'Asia/Tokyo',year:'numeric',month:'2-digit',day:'2-digit'})
     .format(new Date());
   const days=Array.from({length:7},(_,i)=>{
@@ -3559,6 +3560,26 @@ test('発注予測の天気7日間と前年実績7日間は曜日で揃い、納
   await expect(page.locator('#ofWeather .of-weather-card')).toHaveCount(7);
   await expect(page.locator('#ofYearCards .sc-day')).toHaveCount(7);
   await expect(page.locator('#ofWeather .of-weather-card .of-weather-text').first()).toHaveText('晴れ');
+  const weekCards=page.locator('#ofWeekCards > .sc-day');
+  await expect(weekCards).toHaveCount(7);
+  await expect(page.locator('#ofWeekCards > .sc-average-card')).toHaveCount(1);
+  await expect(page.locator('#ofWeekCards > .sc-average-card .sc-day-num')).toHaveText('6週平均');
+  await expect(page.locator('#pageOrderForecast .of-section').nth(2).locator('h2')).toHaveText('過去6週間の同曜日実績');
+  const weeklyLayout=await page.evaluate(()=>{
+    const grid=document.getElementById('ofWeekCards'),children=Array.from(grid.children),
+      delivery=document.getElementById('ofDelivery').value,expected=InsightOrderForecast.dates(delivery).weeks;
+    const positions=children.map(n=>n.getBoundingClientRect()),gridBox=grid.getBoundingClientRect();
+    return {dates:children.slice(0,6).map(n=>n.dataset.date),expected,
+      count:children.length,columns:getComputedStyle(grid).gridTemplateColumns.split(' ').length,
+      tops:positions.map(p=>p.top),right:positions[6].right,gridRight:gridBox.right,
+      scrollWidth:grid.scrollWidth,clientWidth:grid.clientWidth};
+  });
+  expect(weeklyLayout.dates).toEqual(weeklyLayout.expected);
+  expect(weeklyLayout.count).toBe(7);
+  expect(weeklyLayout.columns).toBe(7);
+  expect(Math.max(...weeklyLayout.tops)-Math.min(...weeklyLayout.tops)).toBeLessThanOrEqual(1);
+  expect(weeklyLayout.right).toBeLessThanOrEqual(weeklyLayout.gridRight+1);
+  expect(weeklyLayout.scrollWidth).toBeLessThanOrEqual(weeklyLayout.clientWidth+1);
   async function readDates(){
     return page.evaluate(()=>({
       weather:Array.from(document.querySelectorAll('#ofWeather .of-weather-card')).map(n=>n.dataset.date),
@@ -3586,6 +3607,11 @@ test('発注予測の天気7日間と前年実績7日間は曜日で揃い、納
   expect(changed.weather).toEqual(dates.weather);
   expect(changed.previous).toEqual(dates.previous);
   expect(changed.delivery).not.toBe(dates.delivery);
+  const updatedWeeks=await page.evaluate(()=>({
+    shown:Array.from(document.querySelectorAll('#ofWeekCards > .sc-day')).slice(0,6).map(card=>card.dataset.date),
+    expected:InsightOrderForecast.dates(document.getElementById('ofDelivery').value).weeks
+  }));
+  expect(updatedWeeks.shown).toEqual(updatedWeeks.expected);
   const nextBase=new Date(changed.delivery+'T12:00:00Z');
   nextBase.setUTCDate(nextBase.getUTCDate()-364);
   expect(changed.label).toContain(nextBase.toISOString().slice(0,10));

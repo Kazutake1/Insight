@@ -51,12 +51,12 @@ test('直近実績はD-7からD-3まで・未入力除外・0有効・対象外�
   const before=JSON.stringify(saved);const data=model.collect(saved,category,'2026-10-18',sales);
   assert.deepEqual(data.recent.map(x=>x.date),['2026-10-11','2026-10-15']);assert.equal(JSON.stringify(saved),before);
 });
-test('4週平均は便・納品販売別の有効件数・0を含みセール等で除外しない',()=>{
-  const saved={'2026-09-20':{food:record(0,4)},'2026-09-27':{food:record(10,null)},'2026-10-04':{food:record(null,8)},'2026-10-11':{food:record(20,0)}};
+test('6週平均は6週の便・納品販売別有効件数・0を含みセール等で除外しない',()=>{
+  const saved={'2026-09-06':{food:record(30,6)},'2026-09-13':{food:record(0,0)},'2026-09-20':{food:record(0,4)},'2026-09-27':{food:record(10,null)},'2026-10-04':{food:record(null,8)},'2026-10-11':{food:record(20,0)}};
   saved['2026-10-04'].food.trips[2]={delivery:8,sales:2};
   const data=model.collect(saved,category,'2026-10-18',sales);
-  assert.deepEqual(data.weeks.map(x=>x.date),['2026-09-20','2026-09-27','2026-10-04','2026-10-11']);
-  assert.deepEqual(data.deliveryAverage.trips,[10,null,8]);assert.deepEqual(data.salesAverage.trips,[4,null,2]);assert.equal(data.deliveryAverage.total,null);assert.equal(data.salesAverage.total,10);
+  assert.deepEqual(data.weeks.map(x=>x.date),['2026-09-06','2026-09-13','2026-09-20','2026-09-27','2026-10-04','2026-10-11']);
+  assert.deepEqual(data.deliveryAverage.trips,[12,null,8]);assert.deepEqual(data.salesAverage.trips,[3.6,null,2]);assert.equal(data.deliveryAverage.total,null);assert.equal(data.salesAverage.total,10);
   assert.equal(model.collect(saved,{id:'other',activeTrips:[true,true,true]},'2026-10-18',sales).recent.length,0);
 });
 test('地点は自治体と都道府県で特定し不明・曖昧な地点は代用しない',()=>{
@@ -104,7 +104,7 @@ test('前年7日間は上段天気の表示開始日に52週間前を対応さ�
     assert.equal(range.previousYear[i],model.addDays(weatherDay,-364));
   }
   assert.equal(range.previousYear[2],model.addDays(delivery,-364),'納品日の52週前は同じ列');
-  assert.equal(range.weeks[0],model.addDays(delivery,-28),'4週実績には影響しない');
+  assert.equal(range.weeks[0],model.addDays(delivery,-42),'6週実績は納品日基準である');
   assert.equal(range.recent[0],model.addDays(delivery,-7),'直近実績には影響しない');
 });
 
@@ -112,8 +112,8 @@ test('納品日が予報開始日から離れても天気の先頭と前年の�
   const start='2026-10-11',earlier=model.dates('2026-10-12',start),later=model.dates('2026-10-20',start);
   assert.deepEqual(later.previousYear,earlier.previousYear);
   assert.equal(later.previousYear[0],'2025-10-12');
-  assert.equal(later.weeks[0],model.addDays('2026-10-20',-28));
-  assert.equal(earlier.weeks[0],model.addDays('2026-10-12',-28));
+  assert.equal(later.weeks[0],model.addDays('2026-10-20',-42));
+  assert.equal(earlier.weeks[0],model.addDays('2026-10-12',-42));
 });
 
 test('閏年を跨いでも表示7列が52週前の同じ曜日になり保存データを変更しない',()=>{
@@ -125,7 +125,34 @@ test('閏年を跨いでも表示7列が52週前の同じ曜日になり保存�
       const weather=model.addDays(start,i);
       assert.equal(new Date(weather).getUTCDay(),new Date(row.date).getUTCDay());
     });
-    assert.equal(data.weeks.length,4);
+    assert.equal(data.weeks.length,6);
     assert.equal(JSON.stringify(saved),dataBefore);
   }
+});
+
+test('6週間の各日付は納品日の同曜日・7日刻み、年末や閏年を跨いでも6件',()=>{
+  for(const delivery of ['2026-10-13','2026-01-02','2024-03-01']){
+    const result=model.dates(delivery);
+    assert.equal(result.weeks.length,6);
+    assert.equal(result.weeks[0],model.addDays(delivery,-42));
+    assert.equal(result.weeks[5],model.addDays(delivery,-7));
+    result.weeks.forEach((date,index)=>{
+      assert.equal(date,model.addDays(delivery,-42+index*7));
+      assert.equal(new Date(date).getUTCDay(),new Date(delivery).getUTCDay());
+    });
+    assert.equal(result.previousYear.length,7);
+    assert.equal(result.recent.length,5);
+  }
+});
+
+test('過去6週間の集計で実績の未入力と0を区別し保存データを変更しない',()=>{
+  const delivery='2026-10-18',days=model.dates(delivery).weeks;
+  const saved={};
+  days.forEach((day,index)=>{saved[day]={food:record(index===0?0:index*10,index===0?0:index*2)};});
+  const before=JSON.stringify(saved),actual=model.collect(saved,category,delivery,sales);
+  assert.deepEqual(actual.weeks.map(item=>item.date),days);
+  assert.equal(actual.deliveryAverage.trips[0],25);
+  assert.equal(actual.salesAverage.trips[0],5);
+  assert.equal(actual.deliveryAverage.total,null,'対象便に未入力がある場合1日合計は平均対象外');
+  assert.equal(JSON.stringify(saved),before);
 });
