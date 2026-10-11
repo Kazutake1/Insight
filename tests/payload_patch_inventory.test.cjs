@@ -552,7 +552,7 @@ test('STEP7で将来AI接続用の共通analysisContext境界を追加する',()
 test('過去の対象便判定UIは設定ページだけに追加される',()=>{
   const manifest=readShell();
   const view=read('insight_trip_inference_view_v1.js');
-  const css=read('insight_shell_v1.css');
+  const css=read('insight_payload_core_v1.css');
   assert.ok(manifest.includes('insight_trip_inference_view_v1.js?v=20261011-trip-review-ui-1'));
   assert.ok(manifest.indexOf('insight_settings_v1.js')<manifest.indexOf('insight_trip_inference_view_v1.js'));
   assert.match(view,/insightTripHistorySection/);
