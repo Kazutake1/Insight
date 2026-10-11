@@ -1079,6 +1079,30 @@ test('年度一覧にない古い疎データは起動を妨げず正式年度�
   expect(errors).toEqual([]);
 });
 
+test('対象便の過去月自動判定は保存内容を変えず、0入力と未入力を識別する',async({page})=>{
+  const errors=await openInsight(page);
+  await page.waitForFunction(()=>window.InsightTripInference&&window.InsightTripInference.inferMonth);
+  const rawBefore=await page.evaluate(()=>localStorage.getItem('insight_v11'));
+  const result=await page.evaluate(()=>{
+    const snap={current:'shop1',stores:{shop1:{salesCounts:{}}}};
+    for(let day=1;day<=8;day++){
+      const key='2026-09-'+String(day).padStart(2,'0');
+      snap.stores.shop1.salesCounts[key]={c:{trips:[
+        {delivery:day,sales:0},{delivery:null,sales:null},{delivery:null,sales:null}
+      ]}};
+    }
+    const before=JSON.stringify(snap);
+    const report=window.InsightTripInference.inferMonth(snap,'shop1','c','2026-09',{today:'2026-10-11'});
+    return {report,unchanged:JSON.stringify(snap)===before};
+  });
+  expect(result.report.trips.map(trip=>trip.status)).toEqual(['observed_active','unknown','inferred_inactive']);
+  expect(result.report.trips[0].salesDays).toBe(8);
+  expect(result.report.trips[2].otherTripObservedDays).toBe(8);
+  expect(result.unchanged).toBe(true);
+  expect(await page.evaluate(()=>localStorage.getItem('insight_v11'))).toBe(rawBefore);
+  expect(errors).toEqual([]);
+});
+
 test('データ状態チェックは未登録年度を要確認表示し保存内容を変更しない',async({page})=>{
   const errors=await openInsight(page);
   await page.waitForFunction(()=>window.InsightDataHealth&&document.getElementById('insightDataHealthButton'));
