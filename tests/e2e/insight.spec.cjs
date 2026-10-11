@@ -1432,7 +1432,8 @@ test('セール実績は内容別に表示し開催回ごとに行を分けて7�
   expect(layout.secondOccurrenceTop).toBeGreaterThan(layout.eighthTop+20);
   expect(layout.seventhRight).toBeLessThanOrEqual(layout.gridRight+1);
   expect(layout.gridScrollWidth).toBeLessThanOrEqual(layout.gridClientWidth+1);
-  expect(layout.saleChildren.filter(name=>name!=='sc-history-weather')).toEqual(layout.inputChildren.filter(name=>name!=='sc-trip sc-waste-row'));
+  expect(layout.saleChildren).toContain('sc-trip sc-waste-row');
+  expect(layout.saleChildren.filter(name=>name!=='sc-history-weather'&&name!=='sc-trip sc-waste-row')).toEqual(layout.inputChildren.filter(name=>name!=='sc-trip sc-waste-row'));
   await expect(page.locator('.sr-group .sc-history-weather')).toHaveCount(11);
   expect(layout.allReadOnly).toBe(true);
 
