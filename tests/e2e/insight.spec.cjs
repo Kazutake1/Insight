@@ -280,10 +280,10 @@ test('トップページは外部shellと機能manifestの最新版確認をno-s
     fetch('/insight_payload_source_v1.html?e2e-shell-check=1',{cache:'no-store'}).then(r=>r.text())
   ]));
   const [source,boot,loader,payload]=sources;
-  expect(source).toContain('name="insight-shell-version" content="20261011-readonly-waste-build-19"');
-  expect(source).toContain('insight_shell_boot_v1.js?v=20261011-readonly-waste-build-19');
-  expect(source).toContain('insight_shell_loader_v1.js?v=20261011-readonly-waste-build-19');
-  expect(source).toContain('insight_shell_v1.css?v=20261011-readonly-waste-build-19');
+  expect(source).toContain('name="insight-shell-version" content="20261011-stale-tab-build-20"');
+  expect(source).toContain('insight_shell_boot_v1.js?v=20261011-stale-tab-build-20');
+  expect(source).toContain('insight_shell_loader_v1.js?v=20261011-stale-tab-build-20');
+  expect(source).toContain('insight_shell_v1.css?v=20261011-stale-tab-build-20');
   expect(source).not.toMatch(/<script(?![^>]*\bsrc=)[^>]*>/i);
   expect(source).not.toMatch(/<style\b/i);
   expect(source).not.toMatch(/script-src[^;]*'unsafe-inline'/);
@@ -3093,3 +3093,33 @@ test('販売数入力の平日・日祝平均は保存済み通常日を分類�
   expect(errors).toEqual([]);
 });
 
+
+test('別タブからの古い保存を拒否し先に保存された店舗データを維持する',async({page,context})=>{
+  const firstErrors=await openInsight(page);
+  const second=await context.newPage();
+  const secondErrors=await openInsight(second);
+  const warnings=[];
+  second.on('dialog',async dialog=>{warnings.push(dialog.message());await dialog.accept();});
+
+  await page.evaluate(()=>{
+    allStores.stores[allStores.current].name='タブAで変更した店舗名';
+    persist();
+  });
+  const rejected=await second.evaluate(()=>{
+    allStores.stores[allStores.current].name='古いタブBの店舗名';
+    try{persist();return null;}catch(error){
+      return {name:error.name,cause:error.cause&&error.cause.name};
+    }
+  });
+  expect(rejected).toEqual({name:'InsightPersistError',cause:'InsightStorageConflictError'});
+  expect(warnings.length).toBe(1);
+  expect(warnings[0]).toContain('別のタブでデータが更新されています');
+  const saved=await page.evaluate(()=>{
+    const raw=localStorage.getItem('insight_v11'),data=JSON.parse(raw);
+    return data.stores[data.current].name;
+  });
+  expect(saved).toBe('タブAで変更した店舗名');
+  expect(firstErrors).toEqual([]);
+  expect(secondErrors).toEqual([]);
+  await second.close();
+});
