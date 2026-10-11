@@ -6,7 +6,7 @@ const vm=require('node:vm');
 
 const root=path.join(__dirname,'..');
 const view=fs.readFileSync(path.join(root,'insight_trip_inference_view_v1.js'),'utf8');
-const theme=fs.readFileSync(path.join(root,'insight_shell_v1.css'),'utf8');
+const theme=fs.readFileSync(path.join(root,'insight_payload_core_v1.css'),'utf8');
 const manifest=fs.readFileSync(path.join(root,'insight_shell_loader_v1.js'),'utf8');
 
 test('過去の対象便UIは読み取り専用の独立モジュールとして定義する',()=>{
