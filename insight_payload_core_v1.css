@@ -1545,3 +1545,10 @@ body.ai-analysis-open #main{margin-right:0!important}
 #insightTripHistorySection .insight-trip-history-note{font-size:12px;color:var(--text4);line-height:1.5;margin:11px 0 0}
 @media(max-width:720px){#insightTripHistorySection .insight-trip-history-controls{grid-template-columns:1fr 1fr}#insightTripHistorySection .insight-trip-history-controls label:last-child{grid-column:span 2}}
 @media(max-width:520px){#insightTripHistorySection .insight-trip-history-results{grid-template-columns:1fr}}
+
+/* Historical trip confirmation controls. Theme-aware, 11-inch iPad. */
+#insightTripHistorySection .insight-trip-history-edit{display:flex;gap:7px;align-items:center;margin-top:12px}
+#insightTripHistorySection .insight-trip-history-edit select{min-width:0;flex:1;min-height:40px;padding:6px 7px;border:1px solid var(--border);border-radius:9px;background:var(--surface);color:var(--text);font:600 12px/1.35 inherit}
+#insightTripHistorySection .insight-trip-history-edit button{min-height:40px;padding:6px 12px;border:1px solid var(--border);border-radius:9px;background:var(--text);color:var(--surface);font:600 12px/1.35 inherit;cursor:pointer}
+#insightTripHistorySection .insight-trip-history-edit button:disabled{opacity:.42;cursor:default}
+#insightTripHistorySection .insight-trip-history-edit select:focus-visible,#insightTripHistorySection .insight-trip-history-edit button:focus-visible{outline:2px solid var(--text3);outline-offset:2px}
