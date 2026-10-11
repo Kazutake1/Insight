@@ -505,6 +505,12 @@ test('分析AIの対象年月をサイドバー切替後も固定し各ページ
   const pageAI=read('insight_ai_page_comments_v1.js');
   const lock=read('insight_analysis_period_lock_v1.js');
   const salesCount=read('insight_sales_count_v1.js');
+  const tripInference=read('insight_trip_inference_v1.js');
+  assert.match(index,/insight_trip_inference_v1\\.js\\?v=20261011-month-infer-1/);
+  assert.ok(index.indexOf('insight_sales_count_v1.js')<index.indexOf('insight_trip_inference_v1.js'));
+  assert.match(tripInference,/function inferMonth\\(snapshot,storeId,categoryId,month,options\\)/);
+  assert.doesNotMatch(tripInference,/localStorage\\.setItem|InsightStorage\\.writeSnapshot|\\bpersist\\(/);
+  assert.doesNotThrow(()=>new vm.Script(tripInference),'trip inference module should parse as JavaScript');
   assert.match(index,/insight_analysis_period_lock_v1\.js\?v=20261001-sync-owner/);
   assert.match(index,/insight_sales_count_v1\.js\?v=20261011-readonly-waste-1/);
   assert.match(presentation,/aiAnalysisTarget/);
