@@ -117,6 +117,7 @@ test('過去便の推定・手動確定はセール実績と単日／複数日�
       {id:'historical_trip_event_single',type:'special',scope:'store',startDate:'2026-09-20',endDate:'2026-09-20',
         snapshot:{version:1,title:'歴史便・単日催事'}}
     ];
+    allStores.eventManagement=allStores.eventManagement||{version:1,presets:[],events:[]};
     allStores.eventManagement.events=[
       {id:'historical_trip_sale',type:'sale',scope:'global',startDate:'2026-09-15',endDate:'2026-09-16',
         snapshot:{title:'歴史便検証セール',sale:{categoryId:category.id,category:category.name,
