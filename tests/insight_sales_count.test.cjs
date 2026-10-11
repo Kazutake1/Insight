@@ -286,7 +286,7 @@ test('セール・イベント・発注予測の実績カードだけ廃棄数�
   assert.match(saleSource,/createReadOnlyDayCard\(day\.date,day\.record,category,root\.InsightSalesCount\.wasteRecordAt/);
   assert.equal((eventSource.match(/createReadOnlyDayCard\([^\n]*wasteRecordAt/g)||[]).length,2);
   assert.match(forecastSource,/createReadOnlyDayCard\(item\.date,item\.record,category,sales\.wasteRecordAt/);
-  assert.match(forecastSource,/sales\.createAverageCard\('4週平均',data\.deliveryAverage,data\.salesAverage,null,category\)/);
+  assert.match(forecastSource,/sales\.createAverageCard\('6週平均',data\.deliveryAverage,data\.salesAverage,null,category\)/);
   assert.match(css,/#pageSalesCount \.sc-calendar \.sc-total-waste\{color:#111\}/);
   assert.match(css,/\.sc-day\.sc-readonly-waste\{height:auto;min-height:268px\}/);
   assert.match(css,/\.sc-day\.sc-readonly-waste \.sc-totals\{grid-template-columns:repeat\(3,minmax\(0,1fr\)\)\}/);
