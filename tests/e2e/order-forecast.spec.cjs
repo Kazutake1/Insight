@@ -256,3 +256,31 @@ test('発注予測は過去の対象便を前年・6週・直近カードと平�
   expect(await page.evaluate(id=>allStores.salesCountManagement.categories.find(c=>c.id===id).activeTrips,seeded.categoryId)).toEqual([false,false,true]);
   expect(state.errors).toEqual([]);
 });
+
+
+test('天気予報の更新ボタンとカード間に12pxの余白がある（iPad縦横・ライト/ダーク）',async({page})=>{
+  const result=await open(page);
+  await page.locator('#navOrderForecast').click();
+  await expect(page.locator('#ofWeather .of-weather-card')).toHaveCount(7);
+  for(const viewport of [{width:1194,height:834},{width:834,height:1194}]){
+    await page.setViewportSize(viewport);
+    for(const dark of [false,true]){
+      await page.evaluate(enabled=>{
+        document.documentElement.classList.toggle('dark',enabled);
+        document.body.classList.toggle('dark',enabled);
+      },dark);
+      const spacing=await page.evaluate(()=>{
+        const cards=document.querySelector('#ofWeather');
+        const refresh=document.querySelector('#ofRefresh');
+        const cardRect=cards.getBoundingClientRect();
+        const buttonRect=refresh.getBoundingClientRect();
+        return {margin:getComputedStyle(cards).marginTop,gap:cardRect.top-buttonRect.bottom,
+          cardWidth:cards.querySelector('.of-weather-card').getBoundingClientRect().width};
+      });
+      expect(spacing.margin).toBe('12px');
+      expect(spacing.gap).toBeGreaterThanOrEqual(11);
+      expect(spacing.cardWidth).toBeGreaterThan(0);
+    }
+  }
+  expect(result.errors).toEqual([]);
+});
