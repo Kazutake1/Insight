@@ -128,3 +128,23 @@ for(const count of [1,2,4])test(`特需表示の${count}カテゴリーでも全
   assert.equal(comparison.at(-1).current.sellThrough,null);
   assert.equal(JSON.stringify(all),before);
 });
+
+
+test('同名・同会場の開催は補足が違っても集約し、保存済み補足を保持してデータを変更しない',()=>{
+  const all=data(),before=JSON.stringify(all);
+  all.stores.a.events[0].snapshot.title='ライブ・コンサート';
+  all.stores.a.events[0].snapshot.note='アーティストA';
+  all.stores.a.events[1].snapshot.title='ライブ・コンサート';
+  all.stores.a.events[1].snapshot.note='アーティストB';
+  all.stores.a.events[2].snapshot.title='舞台・演劇';
+  all.stores.a.events[2].snapshot.note='演目C';
+  const saved=JSON.stringify(all);
+  const live=results.collect(all,'a','文化フォーラム','ライブ・コンサート',analysis);
+  const stage=results.collect(all,'a','市民会館','舞台・演劇',analysis);
+  assert.equal(live.occurrences.length,2);
+  assert.deepEqual(live.occurrences.map(item=>item.note),['アーティストA','アーティストB']);
+  assert.equal(stage.occurrences.length,1);
+  assert.equal(stage.occurrences[0].note,'演目C');
+  assert.equal(JSON.stringify(all),saved);
+  assert.notEqual(saved,before);
+});
