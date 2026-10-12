@@ -222,3 +222,57 @@ test('セール実績の通常日比は店舗・全店イベントと別カテ�
   expect(await page.evaluate(()=>localStorage.getItem('insight_v11'))).toBe(fixture.storage);
   expect(errors).toEqual([]);
 });
+
+
+test('近隣イベントは共通名で開催履歴を集約し補足の演者名・演目名を一覧と詳細に表示する',async({page,browserName})=>{
+  await page.setViewportSize({width:1194,height:834});
+  const errors=[];page.on('pageerror',error=>errors.push(error.message));
+  if(browserName==='webkit')await page.route('**/Index.html*',async route=>{
+    const response=await route.fetch();
+    await route.fulfill({response,body:(await response.text()).replace(/;?\\s*upgrade-insecure-requests/g,'')});
+  });
+  await page.goto('/Index.html',{waitUntil:'domcontentloaded'});
+  await page.waitForFunction(()=>window.InsightEventResults&&window.InsightAnalysisContext);
+  const saved=await page.evaluate(()=>{
+    const store=allStores.stores[allStores.current];
+    const mk=(id,title,note,date)=>({
+      id,type:'nearby',scope:'store',startDate:date,endDate:date,
+      snapshot:{version:1,title,note,location:'検証用大ホール'}
+    });
+    store.events=store.events||[];
+    store.events.push(
+      mk('event_note_live_a','ライブ・コンサート','アーティストA\\n全国ツアー','2026-09-20'),
+      mk('event_note_live_b','ライブ・コンサート','アーティストB','2026-09-13'),
+      mk('event_note_live_empty','ライブ・コンサート','  ','2026-09-06'),
+      mk('event_note_stage','舞台・演劇','演目C','2026-09-27')
+    );
+    window.InsightEventResults.render();
+    return localStorage.getItem('insight_v11');
+  });
+  await page.locator('#navEventResults').click();
+  await page.locator('#erLocation').selectOption({label:'検証用大ホール'});
+  await page.locator('#erEvent').selectOption({label:'ライブ・コンサート'});
+  const rows=page.locator('.er-occurrence');
+  await expect(rows).toHaveCount(3);
+  await expect(rows.nth(0).locator('.er-occurrence-note')).toHaveText('アーティストA\\n全国ツアー');
+  await expect(rows.nth(1).locator('.er-occurrence-note')).toHaveText('アーティストB');
+  await expect(rows.nth(2).locator('.er-occurrence-note')).toHaveCount(0);
+  await expect(rows.nth(0).locator('.er-occurrence-metrics')).toContainText('売上');
+  await expect(rows.nth(0).locator('.er-occurrence-metrics')).toContainText('客数');
+  await rows.nth(0).click();
+  await expect(page.locator('.er-detail-title h2')).toHaveText('ライブ・コンサート');
+  await expect(page.locator('.er-detail-note')).toHaveText('補足：アーティストA\\n全国ツアー');
+  await page.locator('.er-back').click();
+  await rows.nth(2).click();
+  await expect(page.locator('.er-detail-note')).toHaveCount(0);
+  await page.locator('.er-back').click();
+  await page.locator('#erEvent').selectOption({label:'舞台・演劇'});
+  await expect(rows).toHaveCount(1);
+  await expect(rows.first().locator('.er-occurrence-note')).toHaveText('演目C');
+  await rows.first().click();
+  await expect(page.locator('.er-detail-note')).toHaveText('補足：演目C');
+  const overflow=await page.locator('#pageEventResults').evaluate(node=>node.scrollWidth-node.clientWidth);
+  expect(overflow).toBeLessThanOrEqual(1);
+  expect(await page.evaluate(()=>localStorage.getItem('insight_v11'))).toBe(saved);
+  expect(errors).toEqual([]);
+});
