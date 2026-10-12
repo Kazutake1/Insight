@@ -229,7 +229,7 @@ test('近隣イベントは共通名で開催履歴を集約し補足の演者�
   const errors=[];page.on('pageerror',error=>errors.push(error.message));
   if(browserName==='webkit')await page.route('**/Index.html*',async route=>{
     const response=await route.fetch();
-    await route.fulfill({response,body:(await response.text()).replace(/;?\\s*upgrade-insecure-requests/g,'')});
+    await route.fulfill({response,body:(await response.text()).replace(/;?\s*upgrade-insecure-requests/g,'')});
   });
   await page.goto('/Index.html',{waitUntil:'domcontentloaded'});
   await page.waitForFunction(()=>window.InsightEventResults&&window.InsightAnalysisContext);
@@ -241,7 +241,7 @@ test('近隣イベントは共通名で開催履歴を集約し補足の演者�
     });
     store.events=store.events||[];
     store.events.push(
-      mk('event_note_live_a','ライブ・コンサート','アーティストA\\n全国ツアー','2026-09-20'),
+      mk('event_note_live_a','ライブ・コンサート','アーティストA\n全国ツアー','2026-09-20'),
       mk('event_note_live_b','ライブ・コンサート','アーティストB','2026-09-13'),
       mk('event_note_live_empty','ライブ・コンサート','  ','2026-09-06'),
       mk('event_note_stage','舞台・演劇','演目C','2026-09-27')
@@ -254,14 +254,14 @@ test('近隣イベントは共通名で開催履歴を集約し補足の演者�
   await page.locator('#erEvent').selectOption({label:'ライブ・コンサート'});
   const rows=page.locator('.er-occurrence');
   await expect(rows).toHaveCount(3);
-  await expect(rows.nth(0).locator('.er-occurrence-note')).toHaveText('アーティストA\\n全国ツアー');
+  await expect(rows.nth(0).locator('.er-occurrence-note')).toHaveText('アーティストA\n全国ツアー');
   await expect(rows.nth(1).locator('.er-occurrence-note')).toHaveText('アーティストB');
   await expect(rows.nth(2).locator('.er-occurrence-note')).toHaveCount(0);
   await expect(rows.nth(0).locator('.er-occurrence-metrics')).toContainText('売上');
   await expect(rows.nth(0).locator('.er-occurrence-metrics')).toContainText('客数');
   await rows.nth(0).click();
   await expect(page.locator('.er-detail-title h2')).toHaveText('ライブ・コンサート');
-  await expect(page.locator('.er-detail-note')).toHaveText('補足：アーティストA\\n全国ツアー');
+  await expect(page.locator('.er-detail-note')).toHaveText('補足：アーティストA\n全国ツアー');
   await page.locator('.er-back').click();
   await rows.nth(2).click();
   await expect(page.locator('.er-detail-note')).toHaveCount(0);
