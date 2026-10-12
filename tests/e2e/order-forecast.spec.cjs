@@ -39,6 +39,8 @@ async function open(page,failed=false,forecastStart=null){
   return {errors,calls:()=>calls};
 }
 test('発注予測は閲覧専用・実績と平均・店舗カテゴリー切替・選択維持・保存保護',async({page})=>{
+  // This fixture targets 2026-10-11; the forecast window uses the browser's current date.
+  await page.clock.install({time:new Date('2026-10-11T03:00:00Z')});
   const result=await open(page,false,'2026-10-11');await page.setViewportSize({width:1194,height:834});
   await page.locator('#navOrderForecast').click();await expect(page.locator('#pageOrderForecast')).toHaveClass(/show/);
   const initial=await page.evaluate(()=>InsightOrderForecast.addDays(InsightOrderForecast.today(),2));await expect(page.locator('#ofDelivery')).toHaveValue(initial);
