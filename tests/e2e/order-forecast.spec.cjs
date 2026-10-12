@@ -1,5 +1,5 @@
 const {test,expect}=require('@playwright/test');
-async function open(page,failed=false){
+async function open(page,failed=false,forecastStart=null){
   const errors=[];page.on('pageerror',e=>errors.push(e.message));
   await page.route('**/Index.html*',async route=>{const response=await route.fetch();await route.fulfill({response,body:(await response.text()).replace(/;?\s*upgrade-insecure-requests/g,'')});});
   let calls=0;
@@ -9,7 +9,7 @@ async function open(page,failed=false){
     let json;
     if(url.endsWith('/area.json'))json={class20s:{'23220':{name:'稲沢市',parent:'230011'}},class15s:{'230011':{parent:'230010'}},class10s:{'230010':{name:'西部',parent:'230000'}},offices:{'230000':{name:'愛知県'}}};
     else if(url.endsWith('/amedastable.json'))json={'51106':{lat:[35,10],lon:[136,58]}};
-    else {calls++;const start=new Intl.DateTimeFormat('en-CA',{timeZone:'Asia/Tokyo',year:'numeric',month:'2-digit',day:'2-digit'}).format(new Date());const times=Array.from({length:7},(_,i)=>new Date(Date.parse(start+'T00:00:00Z')+i*86400000).toISOString().slice(0,10)+'T00:00:00+09:00');json=[{reportDatetime:start+'T17:00:00+09:00',timeSeries:[{timeDefines:times,areas:[{area:{code:'230010',name:'西部'},weatherCodes:times.map((_,i)=>['100','101','112','200','202','300','400'][i]),pops:times.map(()=> '20')}]},{timeDefines:times,areas:[{area:{code:'51106',name:'名古屋'},tempsMin:times.map(()=> '18'),tempsMax:times.map(()=> '28')}]}]}];}
+    else {calls++;const start=forecastStart||new Intl.DateTimeFormat('en-CA',{timeZone:'Asia/Tokyo',year:'numeric',month:'2-digit',day:'2-digit'}).format(new Date());const times=Array.from({length:7},(_,i)=>new Date(Date.parse(start+'T00:00:00Z')+i*86400000).toISOString().slice(0,10)+'T00:00:00+09:00');json=[{reportDatetime:start+'T17:00:00+09:00',timeSeries:[{timeDefines:times,areas:[{area:{code:'230010',name:'西部'},weatherCodes:times.map((_,i)=>['100','101','112','200','202','300','400'][i]),pops:times.map(()=> '20')}]},{timeDefines:times,areas:[{area:{code:'51106',name:'名古屋'},tempsMin:times.map(()=> '18'),tempsMax:times.map(()=> '28')}]}]}];}
     await route.fulfill({json});
   });
   await page.goto('/Index.html');await page.waitForFunction(()=>document.getElementById('navOrderForecast'));
@@ -39,7 +39,9 @@ async function open(page,failed=false){
   return {errors,calls:()=>calls};
 }
 test('発注予測は閲覧専用・実績と平均・店舗カテゴリー切替・選択維持・保存保護',async({page})=>{
-  const result=await open(page);await page.setViewportSize({width:1194,height:834});
+  // This fixture targets 2026-10-11; the forecast window uses the browser's current date.
+  await page.clock.install({time:new Date('2026-10-11T03:00:00Z')});
+  const result=await open(page,false,'2026-10-11');await page.setViewportSize({width:1194,height:834});
   await page.locator('#navOrderForecast').click();await expect(page.locator('#pageOrderForecast')).toHaveClass(/show/);
   const initial=await page.evaluate(()=>InsightOrderForecast.addDays(InsightOrderForecast.today(),2));await expect(page.locator('#ofDelivery')).toHaveValue(initial);
   await page.locator('#ofDelivery').fill('2026-10-11');await page.locator('#ofDelivery').dispatchEvent('change');await expect(page.locator('#ofSchedule')).toHaveCount(0);
