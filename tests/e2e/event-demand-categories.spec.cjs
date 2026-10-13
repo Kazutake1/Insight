@@ -278,7 +278,7 @@ test('近隣イベントは共通名で開催履歴を集約し補足の演者�
 });
 
 
-test('廃棄の過去対象便未確認は／表示で凡例なし・納品販売の？は維持する',async({page,browserName})=>{
+test('納品販売廃棄の過去対象便未確認は／表示で凡例なし・数値保護',async({page,browserName})=>{
   await page.clock.setFixedTime(new Date('2026-10-13T03:00:00Z'));
   await page.setViewportSize({width:1194,height:834});
   const errors=[];page.on('pageerror',err=>errors.push(err.message));
@@ -302,6 +302,10 @@ test('廃棄の過去対象便未確認は／表示で凡例なし・納品販�
     const inactive=InsightSalesCount.createReadOnlyDayCard('2026-10-13',empty,category,
       {trips:[null,null,0]},[true,false,true]);
     inactive.id='wasteSlashInactiveE2E';document.body.append(inactive);
+    const average=InsightSalesCount.createAverageCard('6週平均',
+      {trips:[0,null,null],total:null},{trips:[null,null,null],total:null},
+      null,category,[true,null,false]);
+    average.id='unknownTripAverageE2E';document.body.append(average);
   });
   const history=page.locator('#wasteSlashHistoryE2E');
   await expect(history.locator('.sc-waste-row input')).toHaveCount(3);
@@ -312,8 +316,19 @@ test('廃棄の過去対象便未確認は／表示で凡例なし・納品販�
   await expect(slash).toHaveAttribute('readonly','');
   await expect(slash).toHaveAttribute('aria-label',/過去の対象便は未確認/);
   await expect(history.locator('.sc-waste-row input').nth(2)).toHaveValue('0');
-  await expect(history.locator('.sc-delivery-row input').nth(1)).toHaveValue('?');
-  await expect(history.locator('.sc-sales-row input').nth(1)).toHaveValue('?');
+  await expect(history.locator('.sc-delivery-row input').nth(1)).toHaveValue('／');
+  await expect(history.locator('.sc-sales-row input').nth(1)).toHaveValue('／');
+  await expect(history.locator('.sc-delivery-row input').nth(0)).toHaveValue('');
+  await expect(history.locator('.sc-sales-row input').nth(0)).toHaveValue('');
+  await expect(history.locator('.sc-delivery-row input').nth(2)).toHaveValue('');
+  await expect(history.locator('.sc-sales-row input').nth(2)).toHaveValue('');
+  const average=page.locator('#unknownTripAverageE2E');
+  await expect(average.locator('.sc-delivery-row input').nth(0)).toHaveValue('0');
+  await expect(average.locator('.sc-sales-row input').nth(0)).toHaveValue('');
+  await expect(average.locator('.sc-delivery-row input').nth(1)).toHaveValue('／');
+  await expect(average.locator('.sc-sales-row input').nth(1)).toHaveValue('／');
+  await expect(average.locator('.sc-delivery-row input').nth(2)).toHaveValue('ー');
+  await expect(average.locator('.sc-sales-row input').nth(2)).toHaveValue('ー');
   const sizes=await history.locator('.sc-waste-row').evaluate(row=>{
     const inputs=row.querySelectorAll('input');
     return {slash:parseFloat(getComputedStyle(inputs[1]).fontSize),
