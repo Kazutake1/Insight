@@ -1255,7 +1255,7 @@ test('販売数カテゴリーの対象便設定を全関連層で共有する',
 
 test('対象外便のカード表示は簡潔なダッシュを使い判定文言は維持する',()=>{
   const sales=read('insight_sales_count_v1.js');
-  assert.match(sales,/i\.value='ー';i\.readOnly=true/);
+  assert.match(sales,/i\.value='／';i\.readOnly=true/);
   assert.match(sales,/便 対象外/);
   assert.match(sales,/対象便を1つ以上選択してください/);
 });
@@ -1293,7 +1293,7 @@ test('曜日別平均も対象外便をダッシュ＋グレー表示に統一�
   assert.ok(start>=0);
   const block=sales.slice(start,start+2600);
   assert.match(block,/class="sc-not-applicable"/);
-  assert.match(block,/\?'ー':fmt\(value\)/);
+  assert.match(block,/\?'／':value===null\?'':fmt\(value\)/);
   assert.doesNotMatch(block,/対象外/);
   assert.match(css,/\.sc-average-row b\.sc-not-applicable\{background:var\(--surface2\)!important;border-color:var\(--border\)!important;color:var\(--text4\)!important/);
 });
