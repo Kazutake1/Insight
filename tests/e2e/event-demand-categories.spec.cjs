@@ -278,7 +278,7 @@ test('近隣イベントは共通名で開催履歴を集約し補足の演者�
 });
 
 
-test('納品販売廃棄の過去対象便未確認は／表示で凡例なし・数値保護',async({page,browserName})=>{
+test('納品販売廃棄の対象外は／・未確認はー・未入力は空欄とする',async({page,browserName})=>{
   await page.clock.setFixedTime(new Date('2026-10-13T03:00:00Z'));
   await page.setViewportSize({width:1194,height:834});
   const errors=[];page.on('pageerror',err=>errors.push(err.message));
@@ -309,15 +309,15 @@ test('納品販売廃棄の過去対象便未確認は／表示で凡例なし�
   });
   const history=page.locator('#wasteSlashHistoryE2E');
   await expect(history.locator('.sc-waste-row input')).toHaveCount(3);
-  await expect(history.locator('.sc-waste-row input').nth(0)).toHaveValue('—');
+  await expect(history.locator('.sc-waste-row input').nth(0)).toHaveValue('');
   const slash=history.locator('.sc-waste-row input').nth(1);
-  await expect(slash).toHaveValue('／');
+  await expect(slash).toHaveValue('ー');
   await expect(slash).toHaveClass(/sc-waste-unverified/);
   await expect(slash).toHaveAttribute('readonly','');
   await expect(slash).toHaveAttribute('aria-label',/過去の対象便は未確認/);
   await expect(history.locator('.sc-waste-row input').nth(2)).toHaveValue('0');
-  await expect(history.locator('.sc-delivery-row input').nth(1)).toHaveValue('／');
-  await expect(history.locator('.sc-sales-row input').nth(1)).toHaveValue('／');
+  await expect(history.locator('.sc-delivery-row input').nth(1)).toHaveValue('ー');
+  await expect(history.locator('.sc-sales-row input').nth(1)).toHaveValue('ー');
   await expect(history.locator('.sc-delivery-row input').nth(0)).toHaveValue('');
   await expect(history.locator('.sc-sales-row input').nth(0)).toHaveValue('');
   await expect(history.locator('.sc-delivery-row input').nth(2)).toHaveValue('');
@@ -325,10 +325,10 @@ test('納品販売廃棄の過去対象便未確認は／表示で凡例なし�
   const average=page.locator('#unknownTripAverageE2E');
   await expect(average.locator('.sc-delivery-row input').nth(0)).toHaveValue('0');
   await expect(average.locator('.sc-sales-row input').nth(0)).toHaveValue('');
-  await expect(average.locator('.sc-delivery-row input').nth(1)).toHaveValue('／');
-  await expect(average.locator('.sc-sales-row input').nth(1)).toHaveValue('／');
-  await expect(average.locator('.sc-delivery-row input').nth(2)).toHaveValue('ー');
-  await expect(average.locator('.sc-sales-row input').nth(2)).toHaveValue('ー');
+  await expect(average.locator('.sc-delivery-row input').nth(1)).toHaveValue('ー');
+  await expect(average.locator('.sc-sales-row input').nth(1)).toHaveValue('ー');
+  await expect(average.locator('.sc-delivery-row input').nth(2)).toHaveValue('／');
+  await expect(average.locator('.sc-sales-row input').nth(2)).toHaveValue('／');
   const sizes=await history.locator('.sc-waste-row').evaluate(row=>{
     const inputs=row.querySelectorAll('input');
     return {slash:parseFloat(getComputedStyle(inputs[1]).fontSize),
@@ -337,8 +337,15 @@ test('納品販売廃棄の過去対象便未確認は／表示で凡例なし�
   });
   expect(sizes.slash).toBe(sizes.number);
   expect(sizes.color).not.toBe(sizes.numberColor);
+  const styling=await history.locator('.sc-waste-row').evaluate(row=>{
+    const inputs=row.querySelectorAll('input');
+    const unknown=getComputedStyle(inputs[1]),ordinary=getComputedStyle(inputs[0]);
+    return {background:unknown.backgroundColor,normalBackground:ordinary.backgroundColor,border:unknown.borderStyle};
+  });
+  expect(styling.background).toBe(styling.normalBackground);
+  expect(styling.border).toBe('solid');
   await expect(page.locator('#wasteSlashSavedE2E .sc-waste-row input').nth(1)).toHaveValue('4');
-  await expect(page.locator('#wasteSlashInactiveE2E .sc-waste-row input').nth(1)).toHaveValue('ー');
+  await expect(page.locator('#wasteSlashInactiveE2E .sc-waste-row input').nth(1)).toHaveValue('／');
   await expect(page.locator('#pageSalesCount .sc-legend')).not.toContainText('過去の対象便未確認');
   await expect(page.locator('#pageSalesCount .sc-legend')).not.toContainText('／');
   expect(await page.evaluate(()=>localStorage.getItem('insight_v11'))).toBe(baseline);
