@@ -245,6 +245,7 @@
       if(withWaste){
         var summary=wasteSummary(wasteRecord,mask,date),target=totals.querySelector('.sc-total-waste');
         target.textContent=summary.total===null?'—':String(summary.total)+(summary.complete?'':'※');
+        target.classList.toggle('has-val',summary.total!==null);
         target.setAttribute('aria-label',summary.total===null?'廃棄数未入力':summary.complete?'廃棄合計 '+summary.total+'個':'廃棄入力済み合計 '+summary.total+'個。一部未入力');
       }
       return card;
@@ -281,6 +282,7 @@
       var target=card.querySelector('.sc-total-waste');if(!target)return;
       var summary=wasteSummary(state.wasteDraft[date]||emptyWasteRecord(),activeTrips(selectedCategory()),date);
       target.textContent=summary.total===null?'—':String(summary.total)+(summary.complete?'':'※');
+        target.classList.toggle('has-val',summary.total!==null);
       target.setAttribute('aria-label',summary.total===null?'廃棄数未入力':summary.complete?'廃棄合計 '+summary.total+'個':'廃棄入力済み合計 '+summary.total+'個。一部未入力');
     }
     function renderCalendar(){var grid=doc.getElementById('scCalendar');grid.replaceChildren();WEEKDAYS.forEach(function(w,i){var h=el('div',w,'sc-weekhead '+(i===0?'sun':i===6?'sat':''));grid.append(h);});var first=new Date(Number(state.year),state.month-1,1).getDay(),col=first;for(var b=0;b<first;b++)grid.append(el('div',undefined,'sc-day empty'));var days=daysInMonth();for(var day=1;day<=days;day++){var date=monthPrefix()+'-'+pad(day),r=state.draft[date]||emptyRecord(),wd=new Date(Number(state.year),state.month-1,day).getDay(),holiday=typeof isHoliday==='function'&&isHoliday(Number(state.year),state.month,day),red=wd===0||holiday,card=el('div',undefined,'sc-day '+(wd===6?'sat-card':red?'sun-card':''));var head=el('div',undefined,'sc-day-title'),num=el('strong',String(day),'sc-day-num '+(wd===6?'sat':red?'sun':''));head.append(num,holiday?el('small','祝日'):el('span'));card.append(head);var labels=el('div',undefined,'sc-col-head');labels.innerHTML='<span>1便</span><span>2便</span><span>3便</span>';card.append(labels);var delivery=el('div',undefined,'sc-trip sc-delivery-row'),salesRow=el('div',undefined,'sc-trip sc-sales-row'),wasteRow=el('div',undefined,'sc-trip sc-waste-row');delivery.append(buildInput(date,r,0,'delivery'),buildInput(date,r,1,'delivery'),buildInput(date,r,2,'delivery'));salesRow.append(buildInput(date,r,0,'sales'),buildInput(date,r,1,'sales'),buildInput(date,r,2,'sales'));wasteRow.append(buildWasteInput(date,0),buildWasteInput(date,1),buildWasteInput(date,2));card.append(delivery,salesRow,wasteRow);var totals=el('div',undefined,'sc-totals');totals.innerHTML='<b class="sc-total-delivery" data-total="delivery"></b><b class="sc-total-sales" data-total="sales"></b><b class="sc-total-waste"></b>';card.append(totals);updateTotals(card,r);updateWasteTotal(card,date);grid.append(card);col=(col+1)%7;if(wd===6&&day<days){grid.append(el('div',undefined,'sc-week-sep'));col=0;}}if(col>0){for(var x=col;x<7;x++)grid.append(el('div',undefined,'sc-day empty'));}}
