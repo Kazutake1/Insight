@@ -3403,9 +3403,9 @@ test('販売数入力の平日・日祝平均は保存済み通常日を分類�
   expect(await page.locator('#scAnalysis .sc-comparisons').evaluate(n=>getComputedStyle(n).gridTemplateColumns.split(' ').length)).toBe(1);
   await page.screenshot({path:'test-results/day-type-averages-tablet.png',fullPage:true});
   await page.locator('#scCategory').selectOption('cat_sandwich');
-  await expect(weekday.locator('tbody tr').nth(1).locator('td')).toHaveText(['—','—','—','—']);
+  await expect(weekday.locator('tbody tr').nth(1).locator('td')).toHaveText(['','','','—']);
   await page.locator('#scNext').click();
-  await expect(holiday.locator('tbody tr').nth(1).locator('td')).toHaveText(['—','—','—','—']);
+  await expect(holiday.locator('tbody tr').nth(1).locator('td')).toHaveText(['','','','—']);
   expect(errors).toEqual([]);
 });
 
