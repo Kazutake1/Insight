@@ -318,9 +318,10 @@ test('廃棄の過去対象便未確認は／表示で凡例なし・納品販�
     const inputs=row.querySelectorAll('input');
     return {slash:parseFloat(getComputedStyle(inputs[1]).fontSize),
       number:parseFloat(getComputedStyle(inputs[2]).fontSize),
-      color:getComputedStyle(inputs[1]).color};
+      color:getComputedStyle(inputs[1]).color,numberColor:getComputedStyle(inputs[2]).color};
   });
-  expect(sizes.slash).toBeGreaterThan(sizes.number);
+  expect(sizes.slash).toBe(sizes.number);
+  expect(sizes.color).not.toBe(sizes.numberColor);
   await expect(page.locator('#wasteSlashSavedE2E .sc-waste-row input').nth(1)).toHaveValue('4');
   await expect(page.locator('#wasteSlashInactiveE2E .sc-waste-row input').nth(1)).toHaveValue('ー');
   await expect(page.locator('#pageSalesCount .sc-legend')).not.toContainText('過去の対象便未確認');
