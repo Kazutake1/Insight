@@ -160,7 +160,7 @@
     }
     function changePeriod(delta){var d=new Date(Number(state.year),state.month-1+delta,1);setPeriod(d.getFullYear(),d.getMonth()+1);}
     function changeCategory(id){if(id===state.categoryId)return;if(!confirmLeave()){doc.getElementById('scCategory').value=state.categoryId;return;}state.categoryId=id;readMonth();render();}
-    function buildInput(date,r,trip,key){var i=el('input');if(!tripActive(selectedCategory(),trip)){i.type='text';i.value='ー';i.readOnly=true;i.tabIndex=-1;i.className='sc-not-applicable';i.setAttribute('aria-readonly','true');i.setAttribute('aria-label',date+' '+(trip+1)+'便 対象外');return i;}i.type='number';i.min='0';i.step='1';i.inputMode='numeric';i.value=r.trips[trip][key]===null?'':String(r.trips[trip][key]);i.classList.toggle('has-val',i.value!=='');i.setAttribute('aria-label',date+' '+(trip+1)+'便 '+(key==='delivery'?'納品数':'販売数'));i.oninput=function(){if(!state.draft[date])state.draft[date]=r;i.setCustomValidity('');if(i.value===''){r.trips[trip][key]=null;}else{var n=Number(i.value);if(!Number.isSafeInteger(n)||n<0){i.setCustomValidity('0以上の整数を入力してください');setDirty(true);return;}r.trips[trip][key]=n;}i.classList.toggle('has-val',i.value!=='');setDirty(true);updateTotals(i.closest('.sc-day'),r);renderAverages();};return i;}
+    function buildInput(date,r,trip,key){var i=el('input');if(!tripActive(selectedCategory(),trip)){i.type='text';i.value='／';i.readOnly=true;i.tabIndex=-1;i.className='sc-not-applicable';i.setAttribute('aria-readonly','true');i.setAttribute('aria-label',date+' '+(trip+1)+'便 対象外');return i;}i.type='number';i.min='0';i.step='1';i.inputMode='numeric';i.value=r.trips[trip][key]===null?'':String(r.trips[trip][key]);i.classList.toggle('has-val',i.value!=='');i.setAttribute('aria-label',date+' '+(trip+1)+'便 '+(key==='delivery'?'納品数':'販売数'));i.oninput=function(){if(!state.draft[date])state.draft[date]=r;i.setCustomValidity('');if(i.value===''){r.trips[trip][key]=null;}else{var n=Number(i.value);if(!Number.isSafeInteger(n)||n<0){i.setCustomValidity('0以上の整数を入力してください');setDirty(true);return;}r.trips[trip][key]=n;}i.classList.toggle('has-val',i.value!=='');setDirty(true);updateTotals(i.closest('.sc-day'),r);renderAverages();};return i;}
     function updateTotals(card,r,mask){var vals=card.querySelectorAll('[data-total]');vals.forEach(function(n){var v=total(r,n.dataset.total,mask);n.textContent=v===null?'—':String(v);});}
     function buildReadOnlyInput(date,r,trip,key,category,historyMask){
       var i=el('input'),hasHistory=Array.isArray(historyMask)&&historyMask.length===3,
@@ -168,11 +168,11 @@
         saved=r.trips[trip][key],recorded=r.trips[trip].delivery!==null||r.trips[trip].sales!==null;
       // Historical read-only cards must never hide a saved count (including zero).
       if(status===false&&(!hasHistory||!recorded)){
-        i.type='text';i.value='ー';i.readOnly=true;i.tabIndex=-1;i.className='sc-not-applicable';
+        i.type='text';i.value='／';i.readOnly=true;i.tabIndex=-1;i.className='sc-not-applicable';
         i.setAttribute('aria-readonly','true');i.setAttribute('aria-label',date+' '+(trip+1)+'便 対象外');return i;
       }
       if(status===null&&saved===null){
-        i.type='text';i.value='／';i.readOnly=true;i.tabIndex=-1;i.className='sc-waste-unverified';
+        i.type='text';i.value='ー';i.readOnly=true;i.tabIndex=-1;i.className='sc-waste-unverified';
         i.setAttribute('aria-readonly','true');i.setAttribute('aria-label',date+' '+(trip+1)+'便 '+(key==='delivery'?'納品数':'販売数')+'（対象便未確認）');return i;
       }
       i.type='number';i.min='0';i.step='1';i.inputMode='numeric';i.value=saved===null?'':String(saved);
@@ -184,7 +184,7 @@
       var input=el('input'),value=record.trips[index];
       var status=wasteTripStatus(activeTrips(category||selectedCategory()),date,index);
       input.type='text';
-      input.value=value===null?(status==='inactive'?'ー':status==='unverified'?'／':'—'):String(value);
+      input.value=value===null?(status==='inactive'?'／':status==='unverified'?'ー':''):String(value);
       input.readOnly=true;input.tabIndex=-1;
       input.setAttribute('aria-readonly','true');
       input.setAttribute('aria-label',date+' '+(index+1)+'便 廃棄数'+(status==='unverified'?'（過去の対象便は未確認）':''));
@@ -254,7 +254,7 @@
       // Follow the same current category trip mask as delivery/sales for editing.
       // A saved waste count must remain visible and preserved, even when the trip is now excluded.
       if(!tripActive(selectedCategory(),index)){
-        input.type='text';input.value=value===null?'ー':String(value);input.readOnly=true;input.tabIndex=-1;input.className='sc-not-applicable';
+        input.type='text';input.value=value===null?'／':String(value);input.readOnly=true;input.tabIndex=-1;input.className='sc-not-applicable';
         input.setAttribute('aria-readonly','true');input.setAttribute('aria-label',date+' '+(index+1)+'便 廃棄 対象外'+(value===null?'':'（保存済み・編集不可）'));return input;
       }
       input.type='number';input.min='0';input.step='1';input.inputMode='numeric';
@@ -306,7 +306,7 @@
       });
       return groups.map(function(group){return datedAverage(group,key);});
     }
-    function averageTable(title,key){var box=el('section',undefined,'sc-card'),h=el('h3',title),table=el('table'),mask=activeTrips(selectedCategory());table.innerHTML='<thead><tr><th>曜日</th><th>1便平均</th><th>2便平均</th><th>3便平均</th><th>1日合計平均</th></tr></thead>';var body=el('tbody'),values=weekdayRecords(key);values.forEach(function(a,i){var tr=el('tr');tr.innerHTML='<th>'+WEEKDAYS[i]+'</th><td>'+(mask[0]===false?'ー':fmt(a.trips[0]))+'</td><td>'+(mask[1]===false?'ー':fmt(a.trips[1]))+'</td><td>'+(mask[2]===false?'ー':fmt(a.trips[2]))+'</td><td>'+fmt(a.total)+'</td>';body.append(tr);});table.append(body);box.append(h,table);return box;}
+    function averageTable(title,key){var box=el('section',undefined,'sc-card'),h=el('h3',title),table=el('table'),mask=activeTrips(selectedCategory());table.innerHTML='<thead><tr><th>曜日</th><th>1便平均</th><th>2便平均</th><th>3便平均</th><th>1日合計平均</th></tr></thead>';var body=el('tbody'),values=weekdayRecords(key);values.forEach(function(a,i){var tr=el('tr');tr.innerHTML='<th>'+WEEKDAYS[i]+'</th><td>'+(mask[0]===false?'／':a.trips[0]===null?'':fmt(a.trips[0]))+'</td><td>'+(mask[1]===false?'／':a.trips[1]===null?'':fmt(a.trips[1]))+'</td><td>'+(mask[2]===false?'／':a.trips[2]===null?'':fmt(a.trips[2]))+'</td><td>'+fmt(a.total)+'</td>';body.append(tr);});table.append(body);box.append(h,table);return box;}
     function eventMatches(e){if(!e||e.type!=='sale'||!e.snapshot||!e.snapshot.sale)return false;return categoriesForSale(allStores,e.snapshot.sale).some(function(c){return c.id===state.categoryId;});}
     function eventsFor(storeId,date){try{return root.InsightEvents?root.InsightEvents.list(allStores,storeId,date).filter(eventMatches):[];}catch(_){return [];}}
     function analysisData(){var saleRows=[],normal=[],saleWeekdays=new Set(),days=daysInMonth(),storeId=allStores.current,st=allStores.stores[storeId];if(!st)return {sales:saleRows,normal:normal};for(var d=1;d<=days;d++){var date=monthPrefix()+'-'+pad(d),evs=eventsFor(storeId,date),r=st.salesCounts&&st.salesCounts[date]&&st.salesCounts[date][state.categoryId]?normalizeRecord(st.salesCounts[date][state.categoryId]):null;if(evs.length){saleWeekdays.add(new Date(date+'T12:00:00').getDay());evs.forEach(function(e){saleRows.push({date:date,store:st.name,event:e,record:r||emptyRecord()});});}}for(var n=1;n<=days;n++){var normalDate=monthPrefix()+'-'+pad(n),wd=new Date(normalDate+'T12:00:00').getDay();if(saleWeekdays.has(wd)&&eventsFor(storeId,normalDate).length===0){var normalRecord=st.salesCounts&&st.salesCounts[normalDate]&&st.salesCounts[normalDate][state.categoryId];if(normalRecord)normal.push(normalizeRecord(normalRecord));}}return {sales:saleRows,normal:normal};}
@@ -355,7 +355,7 @@
         box=el('section',undefined,'sc-card'),table=el('table'),mask=d.mask;
       box.append(el('h3',title));
       function v(value,index){
-        return mask[index]===false?'ー':mask[index]===null&&value===null&&records.length?'?':fmt(value);
+        return mask[index]===false?'／':mask[index]===null&&value===null&&records.length?'ー':value===null?'':fmt(value);
       }
       table.innerHTML='<thead><tr><th></th><th>1便</th><th>2便</th><th>3便</th><th>1日</th></tr></thead>'+
         '<tbody><tr><th>平均納品</th><td>'+v(d.trips[0],0)+'</td><td>'+v(d.trips[1],1)+'</td><td>'+v(d.trips[2],2)+'</td><td>'+fmt(d.total)+'</td></tr>'+
@@ -380,8 +380,8 @@
     function disp(t,index){return tripActive(selectedCategory(),index)?dispValue(t.delivery)+' / '+dispValue(t.sales):'対象外';}function dispValue(v){return v===null?'—':String(v);}
     function buildAverageInput(value,label,enabled){
       var i=el('input');
-      if(enabled===false){i.type='text';i.value='ー';i.readOnly=true;i.tabIndex=-1;i.className='sc-not-applicable';i.setAttribute('aria-readonly','true');i.setAttribute('aria-label',label+' 対象外');return i;}
-      if(enabled===null&&value===null){i.type='text';i.value='／';i.readOnly=true;i.tabIndex=-1;i.className='sc-waste-unverified';i.setAttribute('aria-readonly','true');i.setAttribute('aria-label',label+' 対象便未確認');return i;}
+      if(enabled===false){i.type='text';i.value='／';i.readOnly=true;i.tabIndex=-1;i.className='sc-not-applicable';i.setAttribute('aria-readonly','true');i.setAttribute('aria-label',label+' 対象外');return i;}
+      if(enabled===null&&value===null){i.type='text';i.value='ー';i.readOnly=true;i.tabIndex=-1;i.className='sc-waste-unverified';i.setAttribute('aria-readonly','true');i.setAttribute('aria-label',label+' 対象便未確認');return i;}
       i.type='number';i.value=value===null?'':fmt(value);i.readOnly=true;i.tabIndex=-1;i.setAttribute('aria-readonly','true');i.setAttribute('aria-label',label);i.classList.toggle('has-val',value!==null);return i;
     }
     function createAverageCard(label,deliveryAverage,salesAverage,tone,category,historyMask){var mask=Array.isArray(historyMask)&&historyMask.length===3?historyMask:activeTrips(category||selectedCategory());deliveryAverage=deliveryAverage||{trips:[null,null,null],total:null};salesAverage=salesAverage||{trips:[null,null,null],total:null};var card=el('section',undefined,'sc-day sc-average-card '+(tone==='sun'?'sun-card':tone==='sat'?'sat-card':'')),title=el('div',undefined,'sc-day-title'),num=el('strong',label,'sc-day-num '+(tone==='sun'?'sun':tone==='sat'?'sat':'')),head=el('div',undefined,'sc-col-head'),delivery=el('div',undefined,'sc-trip sc-delivery-row'),salesRow=el('div',undefined,'sc-trip sc-sales-row'),totals=el('div',undefined,'sc-totals');title.append(num,el('span'));head.innerHTML='<span>1便</span><span>2便</span><span>3便</span>';delivery.append(buildAverageInput(deliveryAverage.trips[0],label+' 1便 平均納品',mask[0]),buildAverageInput(deliveryAverage.trips[1],label+' 2便 平均納品',mask[1]),buildAverageInput(deliveryAverage.trips[2],label+' 3便 平均納品',mask[2]));salesRow.append(buildAverageInput(salesAverage.trips[0],label+' 1便 平均販売',mask[0]),buildAverageInput(salesAverage.trips[1],label+' 2便 平均販売',mask[1]),buildAverageInput(salesAverage.trips[2],label+' 3便 平均販売',mask[2]));totals.innerHTML='<b class="sc-total-delivery">'+fmt(deliveryAverage.total)+'</b><b class="sc-total-sales">'+fmt(salesAverage.total)+'</b>';card.append(title,head,delivery,salesRow,totals);return card;}
@@ -392,7 +392,7 @@
         deliveries=weekdayRecords('delivery'),salesValues=weekdayRecords('sales');
       function v(value,index,mask,recordDays){
         return '<b'+(mask[index]===false?' class="sc-not-applicable"':'')+'>'+
-          (mask[index]===null&&value===null&&recordDays?'?':mask[index]===false?'ー':fmt(value))+'</b>';
+          (mask[index]===null&&value===null&&recordDays?'ー':mask[index]===false?'／':value===null?'':fmt(value))+'</b>';
       }
       WEEKDAYS.forEach(function(day,i){
         var card=el('section',undefined,'sc-average-day '+(i===0?'sun-card':i===6?'sat-card':'')),
