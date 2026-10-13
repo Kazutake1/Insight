@@ -166,3 +166,34 @@ test('WebKitで分析AIの左側をスクロールして末尾まで確認でき
   expect(result).toEqual({scrollable:true,scrolled:true,endVisible:true,dockFixed:true});
   expect(errors).toEqual([]);
 });
+
+
+test('WebKitで対象外便の廃棄入力はロックされ保存済み値が維持される',async({page})=>{
+  const errors=await openInsight(page);
+  await page.setViewportSize({width:1194,height:834});
+  await page.locator('#navSalesCount').click();
+  const before=await page.evaluate(()=>{
+    const categoryId=document.getElementById('scCategory').value;
+    const storeId=allStores.current,p=InsightSalesCount.getPeriod();
+    const date=p.year+'-'+String(p.month).padStart(2,'0')+'-01';
+    allStores.salesCountManagement.categories.find(c=>c.id===categoryId).activeTrips=[true,false,true];
+    const store=allStores.stores[storeId];
+    store.wasteCounts=store.wasteCounts||{};
+    store.wasteCounts[date]=store.wasteCounts[date]||{};
+    store.wasteCounts[date][categoryId]={trips:[0,7,null]};
+    InsightSalesCount.reloadFromStore();
+    return {storeId,date,categoryId};
+  });
+  const card=page.locator('#scCalendar .sc-day:not(.empty)').first();
+  await expect(card.locator('.sc-waste-row input').nth(1)).toHaveValue('7');
+  await expect(card.locator('.sc-waste-row input').nth(1)).toHaveAttribute('readonly','');
+  await expect(card.locator('.sc-delivery-row input').nth(1)).toHaveValue('ー');
+  await expect(card.locator('.sc-sales-row input').nth(1)).toHaveValue('ー');
+  await expect(card.locator('.sc-waste-row input').first()).toBeEditable();
+  await card.locator('.sc-waste-row input').first().fill('3');
+  await page.locator('#scSave').click();
+  await expect(page.locator('#scSave')).toBeDisabled();
+  expect(await page.evaluate(({storeId,date,categoryId})=>
+    allStores.stores[storeId].wasteCounts[date][categoryId].trips,before)).toEqual([3,7,null]);
+  expect(errors).toEqual([]);
+});
