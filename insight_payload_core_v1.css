@@ -1524,7 +1524,7 @@ body.ai-analysis-open #main{margin-right:0!important}
 .sc-day.sc-readonly-waste .sc-waste-row input.has-val{background:#ffe4e6;border-color:#fb7185;color:var(--text)}
 .dark .sc-day.sc-readonly-waste .sc-waste-row input.has-val{background:var(--surface2);border-color:#fb7185;color:var(--text)}
 .sc-day.sc-readonly-waste .sc-waste-row input.sc-not-applicable{background:var(--surface2)!important;border-color:var(--border)!important;color:var(--text4)!important}
-.sc-day.sc-readonly-waste .sc-waste-row input.sc-waste-unverified{border-style:dashed;color:var(--text4);font-size:16px}
+.sc-day.sc-readonly-waste .sc-waste-row input.sc-waste-unverified{border-style:dashed;color:var(--text4)}
 
 #pageSalesCount .sc-legend-waste{background:#ffe4e6;border-color:#fb7185!important}
 #pageSalesCount .sc-legend{flex-wrap:wrap}
