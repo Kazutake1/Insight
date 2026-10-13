@@ -17,6 +17,7 @@ test('納品・販売・廃棄を同じ日付カードから一括保存し再�
   await expect(card.locator('.sc-trip')).toHaveCount(3);
   await expect(card.locator('.sc-waste-row input')).toHaveCount(3);
   await expect(card.locator('.sc-total-waste')).toHaveText('—');
+  await expect(card.locator('.sc-total-waste')).not.toHaveClass(/has-val/);
   await expect(page.locator('.sc-average-card .sc-waste-row')).toHaveCount(0);
   const initial=await page.evaluate(()=>{
     const store=allStores.stores[allStores.current];
@@ -32,6 +33,29 @@ test('納品・販売・廃棄を同じ日付カードから一括保存し再�
   await card.locator('.sc-waste-row input').first().fill('0');
   await card.locator('.sc-waste-row input').nth(1).fill('3');
   await expect(card.locator('.sc-total-waste')).toHaveText('3※');
+  await expect(card.locator('.sc-total-waste')).toHaveClass(/has-val/);
+  await page.evaluate(()=>{
+    document.documentElement.classList.remove('dark');
+    document.body.classList.remove('dark');
+  });
+  // The input transitions its foreground for 150ms after entry and theme changes.
+  await expect.poll(()=>card.locator('.sc-waste-row input').first()
+    .evaluate(input=>getComputedStyle(input).color)).toBe('rgb(37, 99, 235)');
+  const blue=await card.evaluate(node=>{
+    const color=el=>getComputedStyle(el).color;
+    return {
+      zero:color(node.querySelector('.sc-waste-row input')),
+      positive:color(node.querySelectorAll('.sc-waste-row input')[1]),
+      total:color(node.querySelector('.sc-total-waste')),
+      deliveryTotal:color(node.querySelector('.sc-total-delivery')),
+      salesTotal:color(node.querySelector('.sc-total-sales')),
+    };
+  });
+  expect(blue.zero).toBe('rgb(37, 99, 235)');
+  expect(blue.positive).toBe(blue.zero);
+  expect(blue.total).toBe(blue.zero);
+  expect(blue.deliveryTotal).not.toBe(blue.total);
+  expect(blue.salesTotal).not.toBe(blue.total);
   await expect(page.locator('#scSave')).toBeEnabled();
   await page.locator('#scSave').click();
   await expect(page.locator('#scSave')).toBeDisabled();

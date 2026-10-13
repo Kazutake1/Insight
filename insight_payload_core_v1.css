@@ -1527,6 +1527,16 @@ body.ai-analysis-open #main{margin-right:0!important}
 .sc-day .sc-trip input.sc-waste-unverified{color:var(--text4)!important}
 .sc-day.sc-readonly-waste .sc-waste-row input.sc-waste-unverified{border-style:solid;color:var(--text4)}
 
+/* Waste count numbers only: preserve pink inputs and muted status markers. */
+#pageSalesCount .sc-calendar .sc-waste-row input.has-val:not(.sc-not-applicable),
+.sc-day.sc-readonly-waste .sc-waste-row input.has-val:not(.sc-not-applicable),
+#pageSalesCount .sc-calendar .sc-total-waste.has-val,
+.sc-day.sc-readonly-waste .sc-total-waste.has-val{color:#2563eb!important}
+.dark #pageSalesCount .sc-calendar .sc-waste-row input.has-val:not(.sc-not-applicable),
+.dark .sc-day.sc-readonly-waste .sc-waste-row input.has-val:not(.sc-not-applicable),
+.dark #pageSalesCount .sc-calendar .sc-total-waste.has-val,
+.dark .sc-day.sc-readonly-waste .sc-total-waste.has-val{color:#93c5fd!important}
+
 #pageSalesCount .sc-legend-waste{background:#ffe4e6;border-color:#fb7185!important}
 #pageSalesCount .sc-legend{flex-wrap:wrap}
 
