@@ -83,26 +83,48 @@ test('11インチ相当の画面幅でカレンダーカードの3入力行が�
 });
 
 
-test('過去の対象便は現在の対象外設定だけでロックせず未確認として入力できる',async({page})=>{
+test('対象便を外すと過去日も廃棄は編集不可で保存済みの値は残る',async({page})=>{
   await page.clock.setFixedTime(new Date('2026-10-11T12:00:00'));
   await page.route('**/Index.html*',async route=>{
     const response=await route.fetch();
-    await route.fulfill({response,body:(await response.text()).replace(/;?\s*upgrade-insecure-requests/g,'')});
+    await route.fulfill({response,body:(await response.text()).replace(/;?\\s*upgrade-insecure-requests/g,'')});
   });
   await page.goto('/Index.html');
   await page.locator('#navSalesCount').click();
+  const key=await page.evaluate(()=>{
+    const categoryId=document.getElementById('scCategory').value;
+    const storeId=allStores.current,p=InsightSalesCount.getPeriod(),date=p.year+'-'+String(p.month).padStart(2,'0')+'-01';
+    allStores.salesCountManagement.categories.find(c=>c.id===categoryId).activeTrips=[true,false,true];
+    const store=allStores.stores[storeId];
+    store.wasteCounts=store.wasteCounts||{};
+    store.wasteCounts[date]=store.wasteCounts[date]||{};
+    store.wasteCounts[date][categoryId]={trips:[null,4,null]};
+    InsightSalesCount.reloadFromStore();
+    return {storeId,categoryId,date};
+  });
+  const first=page.locator('#scCalendar .sc-day:not(.empty)').first();
+  const second=first.locator('.sc-waste-row input').nth(1);
+  await expect(second).toHaveValue('4');
+  await expect(second).toHaveAttribute('readonly','');
+  await expect(second).toHaveAttribute('aria-label',/保存済み・編集不可/);
+  await expect(first.locator('.sc-delivery-row input').nth(1)).toHaveValue('ー');
+  await expect(first.locator('.sc-sales-row input').nth(1)).toHaveValue('ー');
+  await expect(first.locator('.sc-waste-row input').first()).toBeEditable();
+  const next=page.locator('#scCalendar .sc-day:not(.empty)').nth(1).locator('.sc-waste-row input').nth(1);
+  await expect(next).toHaveValue('ー');
+  await expect(next).toHaveAttribute('readonly','');
+  await first.locator('.sc-waste-row input').first().fill('2');
+  await page.locator('#scSave').click();
+  await expect(page.locator('#scSave')).toBeDisabled();
+  expect(await page.evaluate(({storeId,date,categoryId})=>
+    allStores.stores[storeId].wasteCounts[date][categoryId].trips,key)).toEqual([2,4,null]);
   await page.evaluate(()=>{
     const id=document.getElementById('scCategory').value;
-    allStores.salesCountManagement.categories.find(c=>c.id===id).activeTrips=[true,false,true];
+    allStores.salesCountManagement.categories.find(c=>c.id===id).activeTrips=[true,true,true];
     InsightSalesCount.reloadFromStore();
   });
-  const card=page.locator('#scCalendar .sc-day:not(.empty)').first();
-  const second=card.locator('.sc-waste-row input').nth(1);
-  await expect(second).toBeEditable();
-  await expect(second).toHaveAttribute('placeholder','?');
-  await expect(card.locator('.sc-sales-row input').nth(1)).toHaveValue('ー');
-  await second.fill('2');
-  await expect(card.locator('.sc-total-waste')).toHaveText('2※');
+  await expect(first.locator('.sc-waste-row input').nth(1)).toBeEditable();
+  await expect(first.locator('.sc-waste-row input').nth(1)).toHaveValue('4');
 });
 
 test('保存後の廃棄入力編集履歴を消し、販売数だけの再保存で別の廃棄数を上書きしない',async({page})=>{
@@ -168,4 +190,32 @@ test('セール・イベント・発注予測が共有する読み取りカー�
   await expect(page.locator('#pageOrderForecast')).toHaveClass(/show/);
   expect(await page.evaluate(()=>JSON.stringify(allStores.stores[allStores.current].wasteCounts||{}))).toBe(original);
   expect(before).not.toBe(original);
+});
+
+
+test('カテゴリー管理で対象便を解除すると廃棄の入力も即座にロックされる',async({page})=>{
+  await page.route('**/Index.html*',async route=>{
+    const response=await route.fetch();
+    await route.fulfill({response,body:(await response.text()).replace(/;?\\s*upgrade-insecure-requests/g,'')});
+  });
+  await page.goto('/Index.html');
+  await page.locator('#navSalesCount').click();
+  const card=page.locator('#scCalendar .sc-day:not(.empty)').first();
+  const before=await page.evaluate(()=>JSON.stringify(allStores.stores[allStores.current].wasteCounts||{}));
+  await page.locator('#scManage').click();
+  const dialog=page.locator('dialog.sc-dialog');
+  await expect(dialog).toBeVisible();
+  const row=dialog.locator('.sc-category-row').first();
+  const second=row.locator('.sc-category-trips input[type=checkbox]').nth(1);
+  await expect(second).toBeChecked();
+  await second.uncheck();
+  await dialog.locator('[data-save]').click();
+  await expect(dialog).toHaveCount(0);
+  for(const selector of ['.sc-delivery-row','.sc-sales-row','.sc-waste-row']){
+    const input=card.locator(selector+' input').nth(1);
+    await expect(input).toHaveValue('ー');
+    await expect(input).toHaveAttribute('readonly','');
+  }
+  await expect(card.locator('.sc-waste-row input').first()).toBeEditable();
+  expect(await page.evaluate(()=>JSON.stringify(allStores.stores[allStores.current].wasteCounts||{}))).toBe(before);
 });
