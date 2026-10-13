@@ -127,8 +127,8 @@ test('過去便の推定・手動確定はセール実績と単日／複数日�
   });
   await page.locator('#navSaleResults').click();
   const saleCard=page.locator('#srGroups .sc-day').filter({has:page.locator('.sc-day-num')}).first();
-  await expect.poll(()=>saleCard.locator('.sc-delivery-row input').evaluateAll(inputs=>inputs.map(i=>i.value))).toEqual(['0','20','ー']);
-  await expect.poll(()=>saleCard.locator('.sc-sales-row input').evaluateAll(inputs=>inputs.map(i=>i.value))).toEqual(['0','18','ー']);
+  await expect.poll(()=>saleCard.locator('.sc-delivery-row input').evaluateAll(inputs=>inputs.map(i=>i.value))).toEqual(['0','20','／']);
+  await expect.poll(()=>saleCard.locator('.sc-sales-row input').evaluateAll(inputs=>inputs.map(i=>i.value))).toEqual(['0','18','／']);
   await expect(saleCard.locator('.sc-total-sales')).toHaveText('18');
   await expect(page.locator('#srGroups .sr-stat').nth(1)).toContainText('平均販売');
 
@@ -146,7 +146,7 @@ test('過去便の推定・手動確定はセール実績と単日／複数日�
     allStores.stores[storeId].tripHistoryOverrides.categories[categoryId]['2026-09']['3']='inactive';
     InsightSaleResults.render();
   },setup);
-  await expect.poll(()=>saleCard.locator('.sc-sales-row input').evaluateAll(inputs=>inputs.map(i=>i.value))).toEqual(['0','18','ー']);
+  await expect.poll(()=>saleCard.locator('.sc-sales-row input').evaluateAll(inputs=>inputs.map(i=>i.value))).toEqual(['0','18','／']);
   await expect(saleCard.locator('.sc-total-sales')).toHaveText('18');
 
   await page.locator('#navEventResults').click();
@@ -154,7 +154,7 @@ test('過去便の推定・手動確定はセール実績と単日／複数日�
   await page.locator('#erEvent').selectOption({label:'歴史便・複数日催事'});
   await page.locator('.er-occurrence').first().click();
   const periodCard=page.locator('.er-period-day-grid .sc-day').first();
-  await expect.poll(()=>periodCard.locator('.sc-sales-row input').evaluateAll(inputs=>inputs.map(i=>i.value))).toEqual(['0','18','ー']);
+  await expect.poll(()=>periodCard.locator('.sc-sales-row input').evaluateAll(inputs=>inputs.map(i=>i.value))).toEqual(['0','18','／']);
   await expect(periodCard.locator('.sc-total-sales')).toHaveText('18');
   await expect(page.locator('.er-overview-grid .er-overview-title')).toHaveText(['売上','客数']);
 
@@ -162,7 +162,7 @@ test('過去便の推定・手動確定はセール実績と単日／複数日�
   await page.locator('#erEvent').selectOption({label:'歴史便・単日催事'});
   await page.locator('.er-occurrence').first().click();
   const singleCard=page.locator('.er-category-grid .sc-day').first();
-  await expect.poll(()=>singleCard.locator('.sc-sales-row input').evaluateAll(inputs=>inputs.map(i=>i.value))).toEqual(['8','18','ー']);
+  await expect.poll(()=>singleCard.locator('.sc-sales-row input').evaluateAll(inputs=>inputs.map(i=>i.value))).toEqual(['8','18','／']);
   await expect(singleCard.locator('.sc-total-sales')).toHaveText('26');
   expect(await page.evaluate(()=>localStorage.getItem('insight_v11'))).toBe(setup.saved);
   expect(errors).toEqual([]);
@@ -278,7 +278,7 @@ test('近隣イベントは共通名で開催履歴を集約し補足の演者�
 });
 
 
-test('納品販売廃棄の過去対象便未確認は／表示で凡例なし・数値保護',async({page,browserName})=>{
+test('納品販売廃棄の対象外は／・未確認はー・未入力は空欄とする',async({page,browserName})=>{
   await page.clock.setFixedTime(new Date('2026-10-13T03:00:00Z'));
   await page.setViewportSize({width:1194,height:834});
   const errors=[];page.on('pageerror',err=>errors.push(err.message));
@@ -309,15 +309,15 @@ test('納品販売廃棄の過去対象便未確認は／表示で凡例なし�
   });
   const history=page.locator('#wasteSlashHistoryE2E');
   await expect(history.locator('.sc-waste-row input')).toHaveCount(3);
-  await expect(history.locator('.sc-waste-row input').nth(0)).toHaveValue('—');
+  await expect(history.locator('.sc-waste-row input').nth(0)).toHaveValue('');
   const slash=history.locator('.sc-waste-row input').nth(1);
-  await expect(slash).toHaveValue('／');
+  await expect(slash).toHaveValue('ー');
   await expect(slash).toHaveClass(/sc-waste-unverified/);
   await expect(slash).toHaveAttribute('readonly','');
   await expect(slash).toHaveAttribute('aria-label',/過去の対象便は未確認/);
   await expect(history.locator('.sc-waste-row input').nth(2)).toHaveValue('0');
-  await expect(history.locator('.sc-delivery-row input').nth(1)).toHaveValue('／');
-  await expect(history.locator('.sc-sales-row input').nth(1)).toHaveValue('／');
+  await expect(history.locator('.sc-delivery-row input').nth(1)).toHaveValue('ー');
+  await expect(history.locator('.sc-sales-row input').nth(1)).toHaveValue('ー');
   await expect(history.locator('.sc-delivery-row input').nth(0)).toHaveValue('');
   await expect(history.locator('.sc-sales-row input').nth(0)).toHaveValue('');
   await expect(history.locator('.sc-delivery-row input').nth(2)).toHaveValue('');
@@ -325,10 +325,10 @@ test('納品販売廃棄の過去対象便未確認は／表示で凡例なし�
   const average=page.locator('#unknownTripAverageE2E');
   await expect(average.locator('.sc-delivery-row input').nth(0)).toHaveValue('0');
   await expect(average.locator('.sc-sales-row input').nth(0)).toHaveValue('');
-  await expect(average.locator('.sc-delivery-row input').nth(1)).toHaveValue('／');
-  await expect(average.locator('.sc-sales-row input').nth(1)).toHaveValue('／');
-  await expect(average.locator('.sc-delivery-row input').nth(2)).toHaveValue('ー');
-  await expect(average.locator('.sc-sales-row input').nth(2)).toHaveValue('ー');
+  await expect(average.locator('.sc-delivery-row input').nth(1)).toHaveValue('ー');
+  await expect(average.locator('.sc-sales-row input').nth(1)).toHaveValue('ー');
+  await expect(average.locator('.sc-delivery-row input').nth(2)).toHaveValue('／');
+  await expect(average.locator('.sc-sales-row input').nth(2)).toHaveValue('／');
   const sizes=await history.locator('.sc-waste-row').evaluate(row=>{
     const inputs=row.querySelectorAll('input');
     return {slash:parseFloat(getComputedStyle(inputs[1]).fontSize),
@@ -337,8 +337,15 @@ test('納品販売廃棄の過去対象便未確認は／表示で凡例なし�
   });
   expect(sizes.slash).toBe(sizes.number);
   expect(sizes.color).not.toBe(sizes.numberColor);
+  const styling=await history.locator('.sc-waste-row').evaluate(row=>{
+    const inputs=row.querySelectorAll('input');
+    const unknown=getComputedStyle(inputs[1]),ordinary=getComputedStyle(inputs[0]);
+    return {background:unknown.backgroundColor,normalBackground:ordinary.backgroundColor,border:unknown.borderStyle};
+  });
+  expect(styling.background).toBe(styling.normalBackground);
+  expect(styling.border).toBe('solid');
   await expect(page.locator('#wasteSlashSavedE2E .sc-waste-row input').nth(1)).toHaveValue('4');
-  await expect(page.locator('#wasteSlashInactiveE2E .sc-waste-row input').nth(1)).toHaveValue('ー');
+  await expect(page.locator('#wasteSlashInactiveE2E .sc-waste-row input').nth(1)).toHaveValue('／');
   await expect(page.locator('#pageSalesCount .sc-legend')).not.toContainText('過去の対象便未確認');
   await expect(page.locator('#pageSalesCount .sc-legend')).not.toContainText('／');
   expect(await page.evaluate(()=>localStorage.getItem('insight_v11'))).toBe(baseline);

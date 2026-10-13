@@ -146,7 +146,7 @@ test('カテゴリーは対象便を最低1便必要とする',()=>{
 test('対象外便のUIは対象外表示となり入力対象から外れる',()=>{
   const source=fs.readFileSync(path.join(__dirname,'..','insight_sales_count_v1.js'),'utf8');
   assert.match(source,/activeTrips:\[true,true,true\]/);
-  assert.match(source,/value='ー'/);
+  assert.match(source,/value='／'/);
   assert.match(source,/sc-not-applicable/);
   assert.match(source,/対象便を1つ以上選択してください/);
   assert.match(source,/sc-category-trips/);
@@ -159,7 +159,7 @@ test('曜日別平均の対象外便はダッシュ表示かつグレー表示�
   assert.ok(start>=0);
   const block=source.slice(start,start+2600);
   assert.match(block,/class="sc-not-applicable"/);
-  assert.match(block,/\?'ー':fmt\(value\)/);
+  assert.match(block,/\?'／':value===null\?'':fmt\(value\)/);
   assert.doesNotMatch(block,/対象外/);
   const css=fs.readFileSync(path.join(__dirname,'..','insight_payload_core_v1.css'),'utf8');
   assert.match(css,/\.sc-average-row b\.sc-not-applicable\{background:var\(--surface2\)!important;border-color:var\(--border\)!important;color:var\(--text4\)!important/);
@@ -340,7 +340,7 @@ test('廃棄編集の対象外判定は現在のカテゴリー対象便と一�
   const input=source.slice(source.indexOf('function buildWasteInput('),source.indexOf('function updateWasteTotal('));
   assert.match(input,/!tripActive\(selectedCategory\(\),index\)/);
   assert.match(input,/input\.readOnly=true/);
-  assert.match(input,/value===null\?'ー':String\(value\)/);
+  assert.match(input,/value===null\?'／':String\(value\)/);
   assert.match(input,/保存済み・編集不可/);
   assert.doesNotMatch(input,/wasteTripStatus\(/);
   const all=base();sales.ensure(all);
@@ -357,7 +357,7 @@ test('廃棄編集の対象外判定は現在のカテゴリー対象便と一�
 test('過去の廃棄対象便未確認は斜線で表示し、凡例を追加せず集計値を保持する',()=>{
   const source=fs.readFileSync(path.join(__dirname,'..','insight_sales_count_v1.js'),'utf8');
   const renderer=source.slice(source.indexOf('function buildReadOnlyWasteInput('),source.indexOf('function createHistoricalWeatherRow('));
-  assert.match(renderer,/status==='unverified'\?'／':'—'/);
+  assert.match(renderer,/status==='unverified'\?'ー':''/);
   assert.match(renderer,/value===null\?/);
   assert.match(renderer,/input\.classList\.add\('sc-waste-unverified'\)/);
   assert.doesNotMatch(source,/\?＝過去の対象便未確認|／＝過去の対象便未確認/);
@@ -376,7 +376,7 @@ test('共有の実績・平均カードは未確認便だけ／表示にし、�
   const average=source.slice(source.indexOf('function buildAverageInput('),source.indexOf('function createAverageCard('));
   const entry=source.slice(source.indexOf('function buildInput('),source.indexOf('function updateTotals('));
   for(const code of [readonly,average]){
-    assert.match(code,/value='／'/);
+    assert.match(code,/value='ー'/);
     assert.doesNotMatch(code,/value='\?'/);
     assert.match(code,/sc-waste-unverified/);
     assert.match(code,/sc-not-applicable/);

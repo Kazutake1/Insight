@@ -280,10 +280,10 @@ test('トップページは外部shellと機能manifestの最新版確認をno-s
     fetch('/insight_payload_source_v1.html?e2e-shell-check=1',{cache:'no-store'}).then(r=>r.text())
   ]));
   const [source,boot,loader,payload]=sources;
-  expect(source).toContain('name="insight-shell-version" content="20261013-trip-slash-build-36"');
-  expect(source).toContain('insight_shell_boot_v1.js?v=20261013-trip-slash-build-36');
-  expect(source).toContain('insight_shell_loader_v1.js?v=20261013-trip-slash-build-36');
-  expect(source).toContain('insight_shell_v1.css?v=20261013-trip-slash-build-36');
+  expect(source).toContain('name="insight-shell-version" content="20261013-trip-symbols-build-37"');
+  expect(source).toContain('insight_shell_boot_v1.js?v=20261013-trip-symbols-build-37');
+  expect(source).toContain('insight_shell_loader_v1.js?v=20261013-trip-symbols-build-37');
+  expect(source).toContain('insight_shell_v1.css?v=20261013-trip-symbols-build-37');
   expect(source).not.toMatch(/<script(?![^>]*\bsrc=)[^>]*>/i);
   expect(source).not.toMatch(/<style\b/i);
   expect(source).not.toMatch(/script-src[^;]*'unsafe-inline'/);
@@ -296,7 +296,7 @@ test('トップページは外部shellと機能manifestの最新版確認をno-s
   expect(source).toContain('https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js');
   expect(source).toContain('integrity="sha512-CQBWl4fJHWbryGE+Pc7UAxWMUMNMWzWxF4SQo9CgkJIN1kx6djDQZjh3Y8SZ1d+6I+1zze6Z7kHXO7q3UyZAWw=="');
   expect(loader).not.toContain('stripPayloadChartScript');
-  expect(payload).toContain('insight_payload_core_v1.css?v=20261012-event-notes-1');
+  expect(payload).toContain('insight_payload_core_v1.css?v=20261013-trip-symbol-1');
   expect(payload).toContain('insight_payload_core_v1.js?v=20261007-step4-ai-position-css-1');
   expect(payload).toContain('insight_payload_ai_legacy_v1.js?v=20261006-payload-assets-1');
   expect(payload).toContain('insight_payload_bindings_v1.js?v=20261006-inline-bindings-1');
@@ -3231,8 +3231,8 @@ test('カテゴリーごとの対象便設定で対象外便を入力漏れ扱�
 
   expect(saved.activeTrips).toEqual([false,true,true]);
   expect(saved.contextTrips).toEqual([false,true,true]);
-  expect(saved.delivery[0].value).toBe('ー');
-  expect(saved.sales[0].value).toBe('ー');
+  expect(saved.delivery[0].value).toBe('／');
+  expect(saved.sales[0].value).toBe('／');
   expect(saved.delivery[0].readOnly).toBe(true);
   expect(saved.sales[0].readOnly).toBe(true);
   expect(saved.delivery[0].className).toContain('sc-not-applicable');
@@ -3240,8 +3240,8 @@ test('カテゴリーごとの対象便設定で対象外便を入力漏れ扱�
   expect(saved.delivery[2].type).toBe('number');
   const weekdayDelivery=page.locator('#scAverages .sc-average-day').first().locator('.sc-average-delivery b').nth(0);
   const weekdaySales=page.locator('#scAverages .sc-average-day').first().locator('.sc-average-sales b').nth(0);
-  await expect(weekdayDelivery).toHaveText('ー');
-  await expect(weekdaySales).toHaveText('ー');
+  await expect(weekdayDelivery).toHaveText('／');
+  await expect(weekdaySales).toHaveText('／');
   await expect(weekdayDelivery).toHaveClass(/sc-not-applicable/);
   await expect(weekdaySales).toHaveClass(/sc-not-applicable/);
 
@@ -3264,8 +3264,8 @@ test('カテゴリーごとの対象便設定で対象外便を入力漏れ扱�
 
   await page.locator('#aiAnalysisToggle').click();
   await expect(page.locator('body')).toHaveClass(/ai-analysis-open/);
-  await expect(page.locator('#aiAnalysisSummary .ai-sales-count-overall .sc-delivery-row input').nth(0)).toHaveValue('ー');
-  await expect(page.locator('#aiAnalysisSummary .ai-sales-count-overall .sc-sales-row input').nth(0)).toHaveValue('ー');
+  await expect(page.locator('#aiAnalysisSummary .ai-sales-count-overall .sc-delivery-row input').nth(0)).toHaveValue('／');
+  await expect(page.locator('#aiAnalysisSummary .ai-sales-count-overall .sc-sales-row input').nth(0)).toHaveValue('／');
   expect(errors).toEqual([]);
 });
 
@@ -3403,9 +3403,9 @@ test('販売数入力の平日・日祝平均は保存済み通常日を分類�
   expect(await page.locator('#scAnalysis .sc-comparisons').evaluate(n=>getComputedStyle(n).gridTemplateColumns.split(' ').length)).toBe(1);
   await page.screenshot({path:'test-results/day-type-averages-tablet.png',fullPage:true});
   await page.locator('#scCategory').selectOption('cat_sandwich');
-  await expect(weekday.locator('tbody tr').nth(1).locator('td')).toHaveText(['—','—','—','—']);
+  await expect(weekday.locator('tbody tr').nth(1).locator('td')).toHaveText(['','','','—']);
   await page.locator('#scNext').click();
-  await expect(holiday.locator('tbody tr').nth(1).locator('td')).toHaveText(['—','—','—','—']);
+  await expect(holiday.locator('tbody tr').nth(1).locator('td')).toHaveText(['','','','—']);
   expect(errors).toEqual([]);
 });
 
@@ -3467,26 +3467,26 @@ test('過去の対象便推定と手動確定が曜日別・平日・日祝平�
   const tuesday=page.locator('#scAverages .sc-average-day').nth(2);
   const weekday=page.locator('#scAnalysis .sc-day-type-card').first();
   const sundayHoliday=page.locator('#scAnalysis .sc-day-type-card').nth(1);
-  await expect(tuesday.locator('.sc-average-sales b')).toHaveText(['10','20','ー']);
+  await expect(tuesday.locator('.sc-average-sales b')).toHaveText(['10','20','／']);
   await expect(tuesday.locator('.sc-average-totals .sc-total-sales')).toHaveText('30');
-  await expect(weekday.locator('tbody tr').nth(1).locator('td')).toHaveText(['10','20','ー','30']);
-  await expect(sundayHoliday.locator('tbody tr').nth(1).locator('td')).toHaveText(['10','20','ー','30']);
+  await expect(weekday.locator('tbody tr').nth(1).locator('td')).toHaveText(['10','20','／','30']);
+  await expect(sundayHoliday.locator('tbody tr').nth(1).locator('td')).toHaveText(['10','20','／','30']);
 
   await page.evaluate(({storeId,categoryId})=>{
     const st=allStores.stores[storeId];
     st.tripHistoryOverrides={version:1,categories:{[categoryId]:{'2026-09':{'3':'active'}}}};
     InsightSalesCount.reloadFromStore();
   },baseline);
-  await expect(tuesday.locator('.sc-average-sales b')).toHaveText(['10','20','—']);
+  await expect(tuesday.locator('.sc-average-sales b')).toHaveText(['10','20','']);
   await expect(tuesday.locator('.sc-average-totals .sc-total-sales')).toHaveText('—');
-  await expect(weekday.locator('tbody tr').nth(1).locator('td')).toHaveText(['10','20','—','—']);
-  await expect(sundayHoliday.locator('tbody tr').nth(1).locator('td')).toHaveText(['10','20','—','—']);
+  await expect(weekday.locator('tbody tr').nth(1).locator('td')).toHaveText(['10','20','','—']);
+  await expect(sundayHoliday.locator('tbody tr').nth(1).locator('td')).toHaveText(['10','20','','—']);
 
   await page.evaluate(({storeId,categoryId})=>{
     allStores.stores[storeId].tripHistoryOverrides.categories[categoryId]['2026-09']['3']='inactive';
     InsightSalesCount.reloadFromStore();
   },baseline);
-  await expect(tuesday.locator('.sc-average-sales b')).toHaveText(['10','20','ー']);
+  await expect(tuesday.locator('.sc-average-sales b')).toHaveText(['10','20','／']);
   await expect(tuesday.locator('.sc-average-totals .sc-total-sales')).toHaveText('30');
 
   await page.evaluate(({storeId})=>{
@@ -3520,9 +3520,9 @@ test('過去月で証拠不足なら3便を対象外にせず、合計平均を�
     InsightSalesCount.reloadFromStore();
   });
   const tuesday=page.locator('#scAverages .sc-average-day').nth(2);
-  await expect(tuesday.locator('.sc-average-sales b')).toHaveText(['0','10','?']);
+  await expect(tuesday.locator('.sc-average-sales b')).toHaveText(['0','10','ー']);
   await expect(tuesday.locator('.sc-average-totals .sc-total-sales')).toHaveText('—');
-  await expect(page.locator('#scAnalysis .sc-day-type-card').first().locator('tbody tr').nth(1).locator('td')).toHaveText(['0','10','?','—']);
+  await expect(page.locator('#scAnalysis .sc-day-type-card').first().locator('tbody tr').nth(1).locator('td')).toHaveText(['0','10','ー','—']);
   expect(errors).toEqual([]);
 });
 

@@ -187,8 +187,8 @@ test('WebKitで対象外便の廃棄入力はロックされ保存済み値が�
   const card=page.locator('#scCalendar .sc-day:not(.empty)').first();
   await expect(card.locator('.sc-waste-row input').nth(1)).toHaveValue('7');
   await expect(card.locator('.sc-waste-row input').nth(1)).toHaveAttribute('readonly','');
-  await expect(card.locator('.sc-delivery-row input').nth(1)).toHaveValue('ー');
-  await expect(card.locator('.sc-sales-row input').nth(1)).toHaveValue('ー');
+  await expect(card.locator('.sc-delivery-row input').nth(1)).toHaveValue('／');
+  await expect(card.locator('.sc-sales-row input').nth(1)).toHaveValue('／');
   await expect(card.locator('.sc-waste-row input').first()).toBeEditable();
   await card.locator('.sc-waste-row input').first().fill('3');
   await page.locator('#scSave').click();
