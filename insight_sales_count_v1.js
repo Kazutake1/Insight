@@ -251,15 +251,15 @@
     }
     function buildWasteInput(date,index){
       var rec=state.wasteDraft[date]||emptyWasteRecord(),value=rec.trips[index],input=el('input');
-      var status=wasteTripStatus(activeTrips(selectedCategory()),date,index);
-      if(status==='inactive'&&value===null){
-        input.type='text';input.value='ー';input.readOnly=true;input.tabIndex=-1;input.className='sc-not-applicable';
-        input.setAttribute('aria-readonly','true');input.setAttribute('aria-label',date+' '+(index+1)+'便 廃棄 対象外');return input;
+      // Follow the same current category trip mask as delivery/sales for editing.
+      // A saved waste count must remain visible and preserved, even when the trip is now excluded.
+      if(!tripActive(selectedCategory(),index)){
+        input.type='text';input.value=value===null?'ー':String(value);input.readOnly=true;input.tabIndex=-1;input.className='sc-not-applicable';
+        input.setAttribute('aria-readonly','true');input.setAttribute('aria-label',date+' '+(index+1)+'便 廃棄 対象外'+(value===null?'':'（保存済み・編集不可）'));return input;
       }
       input.type='number';input.min='0';input.step='1';input.inputMode='numeric';
       input.value=value===null?'':String(value);input.classList.toggle('has-val',value!==null);
-      if(status==='unverified'&&value===null){input.placeholder='?';input.title='過去の対象便は未確認です。実績がある場合は入力できます。';input.classList.add('sc-waste-unverified');}
-      input.setAttribute('aria-label',date+' '+(index+1)+'便 廃棄数'+(status==='unverified'?'（過去の対象便は未確認）':''));
+      input.setAttribute('aria-label',date+' '+(index+1)+'便 廃棄数');
       input.oninput=function(){
         input.setCustomValidity('');
         var nextValue=null;
