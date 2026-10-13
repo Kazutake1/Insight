@@ -127,8 +127,8 @@ test('過去便の推定・手動確定はセール実績と単日／複数日�
   });
   await page.locator('#navSaleResults').click();
   const saleCard=page.locator('#srGroups .sc-day').filter({has:page.locator('.sc-day-num')}).first();
-  await expect.poll(()=>saleCard.locator('.sc-delivery-row input').evaluateAll(inputs=>inputs.map(i=>i.value))).toEqual(['0','20','ー']);
-  await expect.poll(()=>saleCard.locator('.sc-sales-row input').evaluateAll(inputs=>inputs.map(i=>i.value))).toEqual(['0','18','ー']);
+  await expect.poll(()=>saleCard.locator('.sc-delivery-row input').evaluateAll(inputs=>inputs.map(i=>i.value))).toEqual(['0','20','／']);
+  await expect.poll(()=>saleCard.locator('.sc-sales-row input').evaluateAll(inputs=>inputs.map(i=>i.value))).toEqual(['0','18','／']);
   await expect(saleCard.locator('.sc-total-sales')).toHaveText('18');
   await expect(page.locator('#srGroups .sr-stat').nth(1)).toContainText('平均販売');
 
@@ -146,7 +146,7 @@ test('過去便の推定・手動確定はセール実績と単日／複数日�
     allStores.stores[storeId].tripHistoryOverrides.categories[categoryId]['2026-09']['3']='inactive';
     InsightSaleResults.render();
   },setup);
-  await expect.poll(()=>saleCard.locator('.sc-sales-row input').evaluateAll(inputs=>inputs.map(i=>i.value))).toEqual(['0','18','ー']);
+  await expect.poll(()=>saleCard.locator('.sc-sales-row input').evaluateAll(inputs=>inputs.map(i=>i.value))).toEqual(['0','18','／']);
   await expect(saleCard.locator('.sc-total-sales')).toHaveText('18');
 
   await page.locator('#navEventResults').click();
@@ -154,7 +154,7 @@ test('過去便の推定・手動確定はセール実績と単日／複数日�
   await page.locator('#erEvent').selectOption({label:'歴史便・複数日催事'});
   await page.locator('.er-occurrence').first().click();
   const periodCard=page.locator('.er-period-day-grid .sc-day').first();
-  await expect.poll(()=>periodCard.locator('.sc-sales-row input').evaluateAll(inputs=>inputs.map(i=>i.value))).toEqual(['0','18','ー']);
+  await expect.poll(()=>periodCard.locator('.sc-sales-row input').evaluateAll(inputs=>inputs.map(i=>i.value))).toEqual(['0','18','／']);
   await expect(periodCard.locator('.sc-total-sales')).toHaveText('18');
   await expect(page.locator('.er-overview-grid .er-overview-title')).toHaveText(['売上','客数']);
 
@@ -162,7 +162,7 @@ test('過去便の推定・手動確定はセール実績と単日／複数日�
   await page.locator('#erEvent').selectOption({label:'歴史便・単日催事'});
   await page.locator('.er-occurrence').first().click();
   const singleCard=page.locator('.er-category-grid .sc-day').first();
-  await expect.poll(()=>singleCard.locator('.sc-sales-row input').evaluateAll(inputs=>inputs.map(i=>i.value))).toEqual(['8','18','ー']);
+  await expect.poll(()=>singleCard.locator('.sc-sales-row input').evaluateAll(inputs=>inputs.map(i=>i.value))).toEqual(['8','18','／']);
   await expect(singleCard.locator('.sc-total-sales')).toHaveText('26');
   expect(await page.evaluate(()=>localStorage.getItem('insight_v11'))).toBe(setup.saved);
   expect(errors).toEqual([]);
