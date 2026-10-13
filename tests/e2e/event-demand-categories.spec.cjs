@@ -344,6 +344,34 @@ test('納品販売廃棄の対象外は／・未確認はー・未入力は空�
   });
   expect(styling.background).toBe(styling.normalBackground);
   expect(styling.border).toBe('solid');
+  // Stored 0 and positive waste counts, including the total, use the theme-specific blue.
+  // Unknown/excluded symbols remain muted, and normal missing entries remain blank.
+  for(const [isDark,expected] of [[false,'rgb(37, 99, 235)'],[true,'rgb(147, 197, 253)']]){
+    const colors=await page.evaluate(dark=>{
+      document.documentElement.classList.toggle('dark',dark);
+      document.body.classList.toggle('dark',dark);
+      const card=document.getElementById('wasteSlashHistoryE2E');
+      const saved=document.getElementById('wasteSlashSavedE2E');
+      const inactive=document.getElementById('wasteSlashInactiveE2E');
+      const color=(node)=>getComputedStyle(node).color;
+      return {
+        zero:color(card.querySelectorAll('.sc-waste-row input')[2]),
+        saved:color(saved.querySelectorAll('.sc-waste-row input')[1]),
+        total:color(card.querySelector('.sc-total-waste')),
+        totalNumeric:card.querySelector('.sc-total-waste').classList.contains('has-val'),
+        missingTotalNumeric:inactive.querySelector('.sc-total-waste').classList.contains('has-val'),
+        unknown:color(card.querySelectorAll('.sc-waste-row input')[1]),
+        excluded:color(inactive.querySelectorAll('.sc-waste-row input')[1])
+      };
+    },isDark);
+    expect(colors.zero).toBe(expected);
+    expect(colors.saved).toBe(expected);
+    expect(colors.totalNumeric).toBe(true);
+    expect(colors.total).toBe(expected);
+    expect(colors.unknown).not.toBe(expected);
+    expect(colors.excluded).not.toBe(expected);
+  }
+  await page.evaluate(()=>{document.documentElement.classList.remove('dark');document.body.classList.remove('dark');});
   await expect(page.locator('#wasteSlashSavedE2E .sc-waste-row input').nth(1)).toHaveValue('4');
   await expect(page.locator('#wasteSlashInactiveE2E .sc-waste-row input').nth(1)).toHaveValue('／');
   await expect(page.locator('#pageSalesCount .sc-legend')).not.toContainText('過去の対象便未確認');
