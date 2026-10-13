@@ -226,8 +226,8 @@ test('発注予測は過去の対象便を前年・6週・直近カードと平�
   await expect(page.locator('#ofWeekCards .sc-day')).toHaveCount(7);
   const june=page.locator('#ofWeekCards .sc-day').first();
   const july=page.locator('#ofWeekCards .sc-day').nth(4);
-  await expect.poll(()=>june.locator('.sc-sales-row input').evaluateAll(items=>items.map(x=>x.value))).toEqual(['10','20','ー']);
-  await expect.poll(()=>july.locator('.sc-sales-row input').evaluateAll(items=>items.map(x=>x.value))).toEqual(['10','ー','30']);
+  await expect.poll(()=>june.locator('.sc-sales-row input').evaluateAll(items=>items.map(x=>x.value))).toEqual(['10','20','／']);
+  await expect.poll(()=>july.locator('.sc-sales-row input').evaluateAll(items=>items.map(x=>x.value))).toEqual(['10','／','30']);
   await expect(june.locator('.sc-total-sales')).toHaveText('30');
   await expect(july.locator('.sc-total-sales')).toHaveText('40');
   const average=page.locator('#ofWeekCards .sc-average-card');
