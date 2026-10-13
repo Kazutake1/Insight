@@ -399,8 +399,8 @@ test('廃棄の数字と合計だけを青くし、0・未入力・対象外を�
   const css=fs.readFileSync(path.join(__dirname,'..','insight_payload_core_v1.css'),'utf8');
   const js=fs.readFileSync(path.join(__dirname,'..','insight_sales_count_v1.js'),'utf8');
   assert.match(css,/input\.has-val:not\(\.sc-not-applicable\)/);
-  assert.match(css,/\.sc-total-waste\.has-val\{color:#2563eb\}/);
-  assert.match(css,/\.sc-total-waste\.has-val\{color:#93c5fd\}/);
+  assert.match(css,/\.sc-total-waste\.has-val\{color:#2563eb!important\}/);
+  assert.match(css,/\.sc-total-waste\.has-val\{color:#93c5fd!important\}/);
   assert.match(css,/\.sc-waste-row input\.sc-not-applicable\{background:/);
   assert.match(css,/\.sc-waste-row input\.sc-waste-unverified\{border-style:solid/);
   assert.equal(js.split("target.classList.toggle('has-val',summary.total!==null);").length-1,2);
