@@ -25,9 +25,9 @@ test('Index shellはinline script/styleを持たず外部assetへ分離する',(
   const boot=read('insight_shell_boot_v1.js');
   const loader=read('insight_shell_loader_v1.js');
   const css=read('insight_shell_v1.css');
-  assert.match(index,/insight_shell_boot_v1\.js\?v=20261013-waste-mask-build-34/);
-  assert.match(index,/insight_shell_loader_v1\.js\?v=20261013-waste-mask-build-34/);
-  assert.match(index,/insight_shell_v1\.css\?v=20261013-waste-mask-build-34/);
+  assert.match(index,/insight_shell_boot_v1\.js\?v=20261013-waste-slash-build-35/);
+  assert.match(index,/insight_shell_loader_v1\.js\?v=20261013-waste-slash-build-35/);
+  assert.match(index,/insight_shell_v1\.css\?v=20261013-waste-slash-build-35/);
   assert.doesNotMatch(index,/<script(?![^>]*\bsrc=)[^>]*>/i);
   assert.doesNotMatch(index,/<style\b/i);
   assert.doesNotMatch(index,/script-src[^;]*'unsafe-inline'/);
@@ -48,7 +48,7 @@ test('canonical payloadはinline script/styleを持たず外部assetを順序固
   const aiPresentation=read('insight_ai_presentation_v1.js');
   const readability=read('insight_readability_v1.js');
   const css=read('insight_payload_core_v1.css');
-  assert.match(payload,/insight_payload_core_v1\.css\?v=20261012-event-notes-1/);
+  assert.match(payload,/insight_payload_core_v1\.css\?v=20261013-waste-slash-1/);
   assert.match(payload,/insight_payload_core_v1\.js\?v=20261007-step4-ai-position-css-1/);
   assert.doesNotMatch(core,/label\.style\.color/);
   assert.doesNotMatch(core,/msg\.style\.display/);
@@ -185,8 +185,8 @@ test('canonical payloadはinline script/styleを持たず外部assetを順序固
 
 test('トップページはキャッシュ抑止とシェル・機能manifestの自己更新を持つ',()=>{
   const index=readShell();
-  assert.match(index,/insight-shell-version" content="20261013-waste-mask-build-34/);
-  assert.match(index,/var BUILD="20261013-waste-mask-build-34"/);
+  assert.match(index,/insight-shell-version" content="20261013-waste-slash-build-35/);
+  assert.match(index,/var BUILD="20261013-waste-slash-build-35"/);
   assert.match(index,/Shell rule: bump BUILD whenever the loader/);
   assert.match(index,/Cache-Control" content="no-cache, no-store, must-revalidate/);
   assert.match(index,/insight_probe=/);
@@ -512,7 +512,7 @@ test('分析AIの対象年月をサイドバー切替後も固定し各ページ
   assert.ok(!tripInference.includes('localStorage.setItem')&&!tripInference.includes('InsightStorage.writeSnapshot')&&!tripInference.includes('persist('));
   assert.doesNotThrow(()=>new vm.Script(tripInference),'trip inference module should parse as JavaScript');
   assert.match(index,/insight_analysis_period_lock_v1\.js\?v=20261001-sync-owner/);
-  assert.match(index,/insight_sales_count_v1\.js\?v=20261013-waste-trip-mask-1/);
+  assert.match(index,/insight_sales_count_v1\.js\?v=20261013-waste-slash-1/);
   assert.match(presentation,/aiAnalysisTarget/);
   assert.match(css,/\.ai-workspace-period-label\{display:none!important\}/);
   assert.match(css,/\.ai-workspace-brand\{min-width:0;display:grid;align-content:center;gap:2px\}/);
@@ -1047,7 +1047,7 @@ test('セール実績ページは販売数入力直後に読み込み同一日�
   const index=readShell();
   const saleResults=read('insight_sale_results_v1.js');
   const sales=read('insight_sales_count_v1.js');
-  assert.match(index,/insight_sales_count_v1\.js\?v=20261013-waste-trip-mask-1/);
+  assert.match(index,/insight_sales_count_v1\.js\?v=20261013-waste-slash-1/);
   assert.match(index,/insight_sale_results_v1\.js\?v=20261011-sale-normal-days-1/);
   assert.ok(index.indexOf('insight_sales_count_v1.js')<index.indexOf('insight_sale_results_v1.js'));
   assert.ok(index.indexOf('insight_sale_results_v1.js')<index.indexOf('insight_page_period_sync_v1.js'));
@@ -1239,7 +1239,7 @@ test('販売数カテゴリーの対象便設定を全関連層で共有する',
   const analysis=read('insight_analysis_context_v1.js');
   const saleResults=read('insight_sale_results_v1.js');
   const pageAI=read('insight_ai_page_comments_v1.js');
-  assert.match(index,/insight_sales_count_v1\.js\?v=20261013-waste-trip-mask-1/);
+  assert.match(index,/insight_sales_count_v1\.js\?v=20261013-waste-slash-1/);
   assert.match(index,/insight_sale_results_v1\.js\?v=20261011-sale-normal-days-1/);
   assert.match(index,/insight_analysis_context_v1\.js\?v=20261004-special-demand/);
   assert.match(index,/insight_ai_page_comments_v1\.js\?v=20261001-decision-analysis/);
