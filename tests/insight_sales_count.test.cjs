@@ -242,7 +242,7 @@ test('廃棄数3行目は販売数入力ページだけに追加し既存平均�
 });
 
 
-test('過去の対象便設定を推測で対象外と確定せず入力可能にする',()=>{
+test('廃棄集計と参照で過去の対象便の不明状態を保持する',()=>{
   assert.equal(sales.wasteTripStatus([true,false,true],'2025-09-11',1,'2026-10-11'),'unverified');
   assert.equal(sales.wasteTripStatus([true,false,true],'2026-10-11',1,'2026-10-11'),'inactive');
   assert.equal(sales.wasteTripStatus([true,false,true],'2026-10-12',1,'2026-10-11'),'inactive');
@@ -332,4 +332,23 @@ test('曜日別・平日・日祝平均の実装だけを月別の読み取り�
   assert.match(resolver,/function resolveDate\(/);
   assert.ok(loader.indexOf('insight_trip_history_resolver_v1.js')>loader.indexOf('insight_trip_overrides_v1.js'));
   assert.ok(loader.indexOf('insight_trip_history_resolver_v1.js')<loader.indexOf('insight_sale_results_v1.js'));
+});
+
+
+test('廃棄編集の対象外判定は現在のカテゴリー対象便と一致し過去値を消さない',()=>{
+  const source=fs.readFileSync(path.join(__dirname,'..','insight_sales_count_v1.js'),'utf8');
+  const input=source.slice(source.indexOf('function buildWasteInput('),source.indexOf('function updateWasteTotal('));
+  assert.match(input,/!tripActive\(selectedCategory\(\),index\)/);
+  assert.match(input,/input\.readOnly=true/);
+  assert.match(input,/value===null\?'ー':String\(value\)/);
+  assert.match(input,/保存済み・編集不可/);
+  assert.doesNotMatch(input,/wasteTripStatus\(/);
+  const all=base();sales.ensure(all);
+  const id=all.salesCountManagement.categories[0].id;
+  all.salesCountManagement.categories[0].activeTrips=[true,false,true];
+  all.stores.a.wasteCounts={'2025-09-11':{[id]:{trips:[0,4,null]}}};
+  const before=JSON.stringify(all);
+  assert.doesNotThrow(()=>sales.validate(all));
+  assert.deepEqual(sales.wasteRecordAt(all,'a','2025-09-11',id),{trips:[0,4,null]});
+  assert.equal(JSON.stringify(all),before);
 });
