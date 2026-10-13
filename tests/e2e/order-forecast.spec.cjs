@@ -236,7 +236,7 @@ test('発注予測は過去の対象便を前年・6週・直近カードと平�
   await expect(page.locator('#ofRecentCards [data-date="2026-07-12"] .sc-sales-row input').nth(2)).toHaveValue('30');
   const prior=page.locator('#ofYearCards [data-date="'+seeded.prior+'"]');
   await expect(prior.locator('.sc-sales-row input').first()).toHaveValue('0');
-  await expect(prior.locator('.sc-sales-row input').nth(1)).toHaveValue('?');
+  await expect(prior.locator('.sc-sales-row input').nth(1)).toHaveValue('／');
   await expect(prior.locator('.sc-total-sales')).toHaveText('—');
 
   await page.evaluate(({storeId,categoryId})=>{
