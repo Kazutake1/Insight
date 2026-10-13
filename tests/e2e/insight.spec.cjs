@@ -3231,8 +3231,8 @@ test('カテゴリーごとの対象便設定で対象外便を入力漏れ扱�
 
   expect(saved.activeTrips).toEqual([false,true,true]);
   expect(saved.contextTrips).toEqual([false,true,true]);
-  expect(saved.delivery[0].value).toBe('ー');
-  expect(saved.sales[0].value).toBe('ー');
+  expect(saved.delivery[0].value).toBe('／');
+  expect(saved.sales[0].value).toBe('／');
   expect(saved.delivery[0].readOnly).toBe(true);
   expect(saved.sales[0].readOnly).toBe(true);
   expect(saved.delivery[0].className).toContain('sc-not-applicable');
@@ -3240,8 +3240,8 @@ test('カテゴリーごとの対象便設定で対象外便を入力漏れ扱�
   expect(saved.delivery[2].type).toBe('number');
   const weekdayDelivery=page.locator('#scAverages .sc-average-day').first().locator('.sc-average-delivery b').nth(0);
   const weekdaySales=page.locator('#scAverages .sc-average-day').first().locator('.sc-average-sales b').nth(0);
-  await expect(weekdayDelivery).toHaveText('ー');
-  await expect(weekdaySales).toHaveText('ー');
+  await expect(weekdayDelivery).toHaveText('／');
+  await expect(weekdaySales).toHaveText('／');
   await expect(weekdayDelivery).toHaveClass(/sc-not-applicable/);
   await expect(weekdaySales).toHaveClass(/sc-not-applicable/);
 
@@ -3264,8 +3264,8 @@ test('カテゴリーごとの対象便設定で対象外便を入力漏れ扱�
 
   await page.locator('#aiAnalysisToggle').click();
   await expect(page.locator('body')).toHaveClass(/ai-analysis-open/);
-  await expect(page.locator('#aiAnalysisSummary .ai-sales-count-overall .sc-delivery-row input').nth(0)).toHaveValue('ー');
-  await expect(page.locator('#aiAnalysisSummary .ai-sales-count-overall .sc-sales-row input').nth(0)).toHaveValue('ー');
+  await expect(page.locator('#aiAnalysisSummary .ai-sales-count-overall .sc-delivery-row input').nth(0)).toHaveValue('／');
+  await expect(page.locator('#aiAnalysisSummary .ai-sales-count-overall .sc-sales-row input').nth(0)).toHaveValue('／');
   expect(errors).toEqual([]);
 });
 
@@ -3467,26 +3467,26 @@ test('過去の対象便推定と手動確定が曜日別・平日・日祝平�
   const tuesday=page.locator('#scAverages .sc-average-day').nth(2);
   const weekday=page.locator('#scAnalysis .sc-day-type-card').first();
   const sundayHoliday=page.locator('#scAnalysis .sc-day-type-card').nth(1);
-  await expect(tuesday.locator('.sc-average-sales b')).toHaveText(['10','20','ー']);
+  await expect(tuesday.locator('.sc-average-sales b')).toHaveText(['10','20','／']);
   await expect(tuesday.locator('.sc-average-totals .sc-total-sales')).toHaveText('30');
-  await expect(weekday.locator('tbody tr').nth(1).locator('td')).toHaveText(['10','20','ー','30']);
-  await expect(sundayHoliday.locator('tbody tr').nth(1).locator('td')).toHaveText(['10','20','ー','30']);
+  await expect(weekday.locator('tbody tr').nth(1).locator('td')).toHaveText(['10','20','／','30']);
+  await expect(sundayHoliday.locator('tbody tr').nth(1).locator('td')).toHaveText(['10','20','／','30']);
 
   await page.evaluate(({storeId,categoryId})=>{
     const st=allStores.stores[storeId];
     st.tripHistoryOverrides={version:1,categories:{[categoryId]:{'2026-09':{'3':'active'}}}};
     InsightSalesCount.reloadFromStore();
   },baseline);
-  await expect(tuesday.locator('.sc-average-sales b')).toHaveText(['10','20','—']);
+  await expect(tuesday.locator('.sc-average-sales b')).toHaveText(['10','20','']);
   await expect(tuesday.locator('.sc-average-totals .sc-total-sales')).toHaveText('—');
-  await expect(weekday.locator('tbody tr').nth(1).locator('td')).toHaveText(['10','20','—','—']);
-  await expect(sundayHoliday.locator('tbody tr').nth(1).locator('td')).toHaveText(['10','20','—','—']);
+  await expect(weekday.locator('tbody tr').nth(1).locator('td')).toHaveText(['10','20','','—']);
+  await expect(sundayHoliday.locator('tbody tr').nth(1).locator('td')).toHaveText(['10','20','','—']);
 
   await page.evaluate(({storeId,categoryId})=>{
     allStores.stores[storeId].tripHistoryOverrides.categories[categoryId]['2026-09']['3']='inactive';
     InsightSalesCount.reloadFromStore();
   },baseline);
-  await expect(tuesday.locator('.sc-average-sales b')).toHaveText(['10','20','ー']);
+  await expect(tuesday.locator('.sc-average-sales b')).toHaveText(['10','20','／']);
   await expect(tuesday.locator('.sc-average-totals .sc-total-sales')).toHaveText('30');
 
   await page.evaluate(({storeId})=>{
@@ -3520,9 +3520,9 @@ test('過去月で証拠不足なら3便を対象外にせず、合計平均を�
     InsightSalesCount.reloadFromStore();
   });
   const tuesday=page.locator('#scAverages .sc-average-day').nth(2);
-  await expect(tuesday.locator('.sc-average-sales b')).toHaveText(['0','10','?']);
+  await expect(tuesday.locator('.sc-average-sales b')).toHaveText(['0','10','ー']);
   await expect(tuesday.locator('.sc-average-totals .sc-total-sales')).toHaveText('—');
-  await expect(page.locator('#scAnalysis .sc-day-type-card').first().locator('tbody tr').nth(1).locator('td')).toHaveText(['0','10','?','—']);
+  await expect(page.locator('#scAnalysis .sc-day-type-card').first().locator('tbody tr').nth(1).locator('td')).toHaveText(['0','10','ー','—']);
   expect(errors).toEqual([]);
 });
 
