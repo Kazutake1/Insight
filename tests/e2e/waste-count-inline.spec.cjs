@@ -34,6 +34,13 @@ test('納品・販売・廃棄を同じ日付カードから一括保存し再�
   await card.locator('.sc-waste-row input').nth(1).fill('3');
   await expect(card.locator('.sc-total-waste')).toHaveText('3※');
   await expect(card.locator('.sc-total-waste')).toHaveClass(/has-val/);
+  await page.evaluate(()=>{
+    document.documentElement.classList.remove('dark');
+    document.body.classList.remove('dark');
+  });
+  // The input transitions its foreground for 150ms after entry and theme changes.
+  await expect.poll(()=>card.locator('.sc-waste-row input').first()
+    .evaluate(input=>getComputedStyle(input).color)).toBe('rgb(37, 99, 235)');
   const blue=await card.evaluate(node=>{
     const color=el=>getComputedStyle(el).color;
     return {
