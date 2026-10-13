@@ -107,11 +107,11 @@ test('対象便を外すと過去日も廃棄は編集不可で保存済みの�
   await expect(second).toHaveValue('4');
   await expect(second).toHaveAttribute('readonly','');
   await expect(second).toHaveAttribute('aria-label',/保存済み・編集不可/);
-  await expect(first.locator('.sc-delivery-row input').nth(1)).toHaveValue('ー');
-  await expect(first.locator('.sc-sales-row input').nth(1)).toHaveValue('ー');
+  await expect(first.locator('.sc-delivery-row input').nth(1)).toHaveValue('／');
+  await expect(first.locator('.sc-sales-row input').nth(1)).toHaveValue('／');
   await expect(first.locator('.sc-waste-row input').first()).toBeEditable();
   const next=page.locator('#scCalendar .sc-day:not(.empty)').nth(1).locator('.sc-waste-row input').nth(1);
-  await expect(next).toHaveValue('ー');
+  await expect(next).toHaveValue('／');
   await expect(next).toHaveAttribute('readonly','');
   await first.locator('.sc-waste-row input').first().fill('2');
   await page.locator('#scSave').click();
@@ -177,7 +177,7 @@ test('セール・イベント・発注予測が共有する読み取りカー�
   });
   const card=page.locator('#wasteReadOnlyE2E');
   await expect(card.locator('.sc-waste-row input')).toHaveCount(3);
-  await expect(card.locator('.sc-waste-row input').nth(0)).toHaveValue('—');
+  await expect(card.locator('.sc-waste-row input').nth(0)).toHaveValue('');
   await expect(card.locator('.sc-waste-row input').nth(1)).toHaveValue('0');
   await expect(card.locator('.sc-waste-row input').nth(2)).toHaveValue('3');
   await expect(card.locator('.sc-total-waste')).toHaveText('3※');
@@ -213,7 +213,7 @@ test('カテゴリー管理で対象便を解除すると廃棄の入力も即�
   await expect(dialog).toHaveCount(0);
   for(const selector of ['.sc-delivery-row','.sc-sales-row','.sc-waste-row']){
     const input=card.locator(selector+' input').nth(1);
-    await expect(input).toHaveValue('ー');
+    await expect(input).toHaveValue('／');
     await expect(input).toHaveAttribute('readonly','');
   }
   await expect(card.locator('.sc-waste-row input').first()).toBeEditable();
