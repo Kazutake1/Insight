@@ -352,3 +352,19 @@ test('廃棄編集の対象外判定は現在のカテゴリー対象便と一�
   assert.deepEqual(sales.wasteRecordAt(all,'a','2025-09-11',id),{trips:[0,4,null]});
   assert.equal(JSON.stringify(all),before);
 });
+
+
+test('過去の廃棄対象便未確認は斜線で表示し、凡例を追加せず集計値を保持する',()=>{
+  const source=fs.readFileSync(path.join(__dirname,'..','insight_sales_count_v1.js'),'utf8');
+  const renderer=source.slice(source.indexOf('function buildReadOnlyWasteInput('),source.indexOf('function createHistoricalWeatherRow('));
+  assert.match(renderer,/status==='unverified'\?'／':'—'/);
+  assert.match(renderer,/value===null\?/);
+  assert.match(renderer,/input\.classList\.add\('sc-waste-unverified'\)/);
+  assert.doesNotMatch(source,/\?＝過去の対象便未確認|／＝過去の対象便未確認/);
+  const all=base();sales.ensure(all);
+  const id=all.salesCountManagement.categories[0].id;
+  all.stores.a.wasteCounts={'2025-09-11':{[id]:{trips:[null,null,0]}}};
+  const before=JSON.stringify(all);
+  assert.deepEqual(sales.wasteRecordAt(all,'a','2025-09-11',id),{trips:[null,null,0]});
+  assert.equal(JSON.stringify(all),before);
+});
