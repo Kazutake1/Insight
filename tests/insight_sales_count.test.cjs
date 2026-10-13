@@ -393,3 +393,22 @@ test('共有の実績・平均カードは未確認便だけ／表示にし、�
   assert.doesNotThrow(()=>sales.validate(all));
   assert.equal(JSON.stringify(all),baseline);
 });
+
+
+test('廃棄の数字と合計だけを青くし、0・未入力・対象外を区別する',()=>{
+  const css=fs.readFileSync(path.join(__dirname,'..','insight_payload_core_v1.css'),'utf8');
+  const js=fs.readFileSync(path.join(__dirname,'..','insight_sales_count_v1.js'),'utf8');
+  assert.match(css,/input\.has-val:not\(\.sc-not-applicable\)/);
+  assert.match(css,/\.sc-total-waste\.has-val\{color:#2563eb\}/);
+  assert.match(css,/\.sc-total-waste\.has-val\{color:#93c5fd\}/);
+  assert.match(css,/\.sc-waste-row input\.sc-not-applicable\{background:/);
+  assert.match(css,/\.sc-waste-row input\.sc-waste-unverified\{border-style:solid/);
+  assert.equal(js.split("target.classList.toggle('has-val',summary.total!==null);").length-1,2);
+  assert.match(js,/input\.classList\.toggle\('has-val',value!==null\)/);
+  const all=base();sales.ensure(all);
+  const category=all.salesCountManagement.categories[0];
+  all.stores.a.wasteCounts={'2025-08-11':{[category.id]:{trips:[0,3,null]}}};
+  const original=JSON.stringify(all);
+  assert.deepEqual(sales.wasteRecordAt(all,'a','2025-08-11',category.id),{trips:[0,3,null]});
+  assert.equal(JSON.stringify(all),original);
+});
