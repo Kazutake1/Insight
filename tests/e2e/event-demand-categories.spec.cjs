@@ -276,3 +276,55 @@ test('近隣イベントは共通名で開催履歴を集約し補足の演者�
   expect(await page.evaluate(()=>localStorage.getItem('insight_v11'))).toBe(saved);
   expect(errors).toEqual([]);
 });
+
+
+test('廃棄の過去対象便未確認は／表示で凡例なし・納品販売の？は維持する',async({page,browserName})=>{
+  await page.clock.setFixedTime(new Date('2026-10-13T03:00:00Z'));
+  await page.setViewportSize({width:1194,height:834});
+  const errors=[];page.on('pageerror',err=>errors.push(err.message));
+  if(browserName==='webkit')await page.route('**/Index.html*',async route=>{
+    const response=await route.fetch();
+    await route.fulfill({response,body:(await response.text()).replace(/;?\s*upgrade-insecure-requests/g,'')});
+  });
+  await page.goto('/Index.html',{waitUntil:'domcontentloaded'});
+  await page.waitForFunction(()=>window.InsightSalesCount&&document.getElementById('navSalesCount'));
+  await page.locator('#navSalesCount').click();
+  const baseline=await page.evaluate(()=>localStorage.getItem('insight_v11'));
+  await page.evaluate(()=>{
+    const category=Object.assign({},allStores.salesCountManagement.categories[0],{activeTrips:[true,false,true]});
+    const empty=InsightSalesCount.emptyRecord();
+    const history=InsightSalesCount.createReadOnlyDayCard('2026-09-01',empty,category,
+      {trips:[null,null,0]},[true,null,true]);
+    history.id='wasteSlashHistoryE2E';document.body.append(history);
+    const saved=InsightSalesCount.createReadOnlyDayCard('2026-09-08',empty,category,
+      {trips:[null,4,0]},[true,null,true]);
+    saved.id='wasteSlashSavedE2E';document.body.append(saved);
+    const inactive=InsightSalesCount.createReadOnlyDayCard('2026-10-13',empty,category,
+      {trips:[null,null,0]},[true,false,true]);
+    inactive.id='wasteSlashInactiveE2E';document.body.append(inactive);
+  });
+  const history=page.locator('#wasteSlashHistoryE2E');
+  await expect(history.locator('.sc-waste-row input')).toHaveCount(3);
+  await expect(history.locator('.sc-waste-row input').nth(0)).toHaveValue('—');
+  const slash=history.locator('.sc-waste-row input').nth(1);
+  await expect(slash).toHaveValue('／');
+  await expect(slash).toHaveClass(/sc-waste-unverified/);
+  await expect(slash).toHaveAttribute('readonly','');
+  await expect(slash).toHaveAttribute('aria-label',/過去の対象便は未確認/);
+  await expect(history.locator('.sc-waste-row input').nth(2)).toHaveValue('0');
+  await expect(history.locator('.sc-delivery-row input').nth(1)).toHaveValue('?');
+  await expect(history.locator('.sc-sales-row input').nth(1)).toHaveValue('?');
+  const sizes=await history.locator('.sc-waste-row').evaluate(row=>{
+    const inputs=row.querySelectorAll('input');
+    return {slash:parseFloat(getComputedStyle(inputs[1]).fontSize),
+      number:parseFloat(getComputedStyle(inputs[2]).fontSize),
+      color:getComputedStyle(inputs[1]).color};
+  });
+  expect(sizes.slash).toBeGreaterThan(sizes.number);
+  await expect(page.locator('#wasteSlashSavedE2E .sc-waste-row input').nth(1)).toHaveValue('4');
+  await expect(page.locator('#wasteSlashInactiveE2E .sc-waste-row input').nth(1)).toHaveValue('ー');
+  await expect(page.locator('#pageSalesCount .sc-legend')).not.toContainText('過去の対象便未確認');
+  await expect(page.locator('#pageSalesCount .sc-legend')).not.toContainText('／');
+  expect(await page.evaluate(()=>localStorage.getItem('insight_v11'))).toBe(baseline);
+  expect(errors).toEqual([]);
+});
