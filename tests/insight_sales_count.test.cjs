@@ -368,3 +368,28 @@ test('過去の廃棄対象便未確認は斜線で表示し、凡例を追加�
   assert.deepEqual(sales.wasteRecordAt(all,'a','2025-09-11',id),{trips:[null,null,0]});
   assert.equal(JSON.stringify(all),before);
 });
+
+
+test('共有の実績・平均カードは未確認便だけ／表示にし、入力と履歴判定・データは変更しない',()=>{
+  const source=fs.readFileSync(path.join(__dirname,'..','insight_sales_count_v1.js'),'utf8');
+  const readonly=source.slice(source.indexOf('function buildReadOnlyInput('),source.indexOf('function buildReadOnlyWasteInput('));
+  const average=source.slice(source.indexOf('function buildAverageInput('),source.indexOf('function createAverageCard('));
+  const entry=source.slice(source.indexOf('function buildInput('),source.indexOf('function updateTotals('));
+  for(const code of [readonly,average]){
+    assert.match(code,/value='／'/);
+    assert.doesNotMatch(code,/value='\?'/);
+    assert.match(code,/sc-waste-unverified/);
+    assert.match(code,/sc-not-applicable/);
+  }
+  assert.match(readonly,/status===null&&saved===null/);
+  assert.match(average,/enabled===null&&value===null/);
+  assert.match(entry,/i\.value=r\.trips\[trip\]\[key\]===null\?'':String/);
+  const all=base();sales.ensure(all);
+  const id=all.salesCountManagement.categories[0].id;
+  all.stores.a.salesCounts={'2026-09-01':{[id]:{trips:[
+    {delivery:0,sales:null},{delivery:null,sales:null},{delivery:3,sales:2}
+  ]}}};
+  const baseline=JSON.stringify(all);
+  assert.doesNotThrow(()=>sales.validate(all));
+  assert.equal(JSON.stringify(all),baseline);
+});
