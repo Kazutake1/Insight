@@ -160,14 +160,14 @@
     }
     function changePeriod(delta){var d=new Date(Number(state.year),state.month-1+delta,1);setPeriod(d.getFullYear(),d.getMonth()+1);}
     function changeCategory(id){if(id===state.categoryId)return;if(!confirmLeave()){doc.getElementById('scCategory').value=state.categoryId;return;}state.categoryId=id;readMonth();render();}
-    function buildInput(date,r,trip,key){var i=el('input');if(!tripActive(selectedCategory(),trip)){i.type='text';i.value='／';i.readOnly=true;i.tabIndex=-1;i.className='sc-not-applicable';i.setAttribute('aria-readonly','true');i.setAttribute('aria-label',date+' '+(trip+1)+'便 対象外');return i;}i.type='number';i.min='0';i.step='1';i.inputMode='numeric';i.value=r.trips[trip][key]===null?'':String(r.trips[trip][key]);i.classList.toggle('has-val',i.value!=='');i.setAttribute('aria-label',date+' '+(trip+1)+'便 '+(key==='delivery'?'納品数':'販売数'));i.oninput=function(){if(!state.draft[date])state.draft[date]=r;i.setCustomValidity('');if(i.value===''){r.trips[trip][key]=null;}else{var n=Number(i.value);if(!Number.isSafeInteger(n)||n<0){i.setCustomValidity('0以上の整数を入力してください');setDirty(true);return;}r.trips[trip][key]=n;}i.classList.toggle('has-val',i.value!=='');setDirty(true);updateTotals(i.closest('.sc-day'),r);renderAverages();};return i;}
+    function buildInput(date,r,trip,key){var i=el('input');if(!tripActive(selectedCategory(),trip)){var saved=r.trips[trip][key];i.type='text';i.value=saved===null?'／':String(saved);i.readOnly=true;i.tabIndex=-1;i.className='sc-not-applicable';i.setAttribute('aria-readonly','true');i.setAttribute('aria-label',date+' '+(trip+1)+'便 '+(key==='delivery'?'納品数':'販売数')+' 対象外'+(saved===null?'':'（保存済み・編集不可）'));return i;}i.type='number';i.min='0';i.step='1';i.inputMode='numeric';i.value=r.trips[trip][key]===null?'':String(r.trips[trip][key]);i.classList.toggle('has-val',i.value!=='');i.setAttribute('aria-label',date+' '+(trip+1)+'便 '+(key==='delivery'?'納品数':'販売数'));i.oninput=function(){if(!state.draft[date])state.draft[date]=r;i.setCustomValidity('');if(i.value===''){r.trips[trip][key]=null;}else{var n=Number(i.value);if(!Number.isSafeInteger(n)||n<0){i.setCustomValidity('0以上の整数を入力してください');setDirty(true);return;}r.trips[trip][key]=n;}i.classList.toggle('has-val',i.value!=='');setDirty(true);updateTotals(i.closest('.sc-day'),r);renderAverages();};return i;}
     function updateTotals(card,r,mask){var vals=card.querySelectorAll('[data-total]');vals.forEach(function(n){var v=total(r,n.dataset.total,mask);n.textContent=v===null?'—':String(v);});}
     function buildReadOnlyInput(date,r,trip,key,category,historyMask){
       var i=el('input'),hasHistory=Array.isArray(historyMask)&&historyMask.length===3,
         status=hasHistory?historyMask[trip]:activeTrips(category||selectedCategory())[trip],
-        saved=r.trips[trip][key],recorded=r.trips[trip].delivery!==null||r.trips[trip].sales!==null;
+        saved=r.trips[trip][key];
       // Historical read-only cards must never hide a saved count (including zero).
-      if(status===false&&(!hasHistory||!recorded)){
+      if(status===false&&saved===null){
         i.type='text';i.value='／';i.readOnly=true;i.tabIndex=-1;i.className='sc-not-applicable';
         i.setAttribute('aria-readonly','true');i.setAttribute('aria-label',date+' '+(trip+1)+'便 対象外');return i;
       }
@@ -177,7 +177,7 @@
       }
       i.type='number';i.min='0';i.step='1';i.inputMode='numeric';i.value=saved===null?'':String(saved);
       i.classList.toggle('has-val',i.value!=='');i.readOnly=true;i.tabIndex=-1;
-      i.setAttribute('aria-readonly','true');i.setAttribute('aria-label',date+' '+(trip+1)+'便 '+(key==='delivery'?'納品数':'販売数'));return i;
+      i.setAttribute('aria-readonly','true');i.setAttribute('aria-label',date+' '+(trip+1)+'便 '+(key==='delivery'?'納品数':'販売数')+(status===false?' 対象外（保存済み・編集不可）':''));return i;
     }
 
     function buildReadOnlyWasteInput(date,record,index,category){
