@@ -47,6 +47,7 @@ const ordered=[
   'insight_page_title_layout_v1.js',
   'insight_page_period_sync_v1.js',
   'insight_sales_period_selector_v1.js',
+  'insight_input_day_nav_v1.js',
   'insight_analysis_period_lock_v1.js',
   'insight_analysis_context_v1.js',
   'insight_multiyear_analysis_v1.js',
@@ -86,7 +87,7 @@ test('機能スクリプトの読み込み順はshell loaderのmanifestで明示
 
 test('Indexはshell loaderを外部scriptとして読み込む',()=>{
   const index=read('Index.html');
-  assert.match(index,/insight_shell_loader_v1\.js\?v=20261014-excluded-saved-build-39/);
+  assert.match(index,/insight_shell_loader_v1\.js\?v=20261014-input-day-nav-build-40/);
   assert.doesNotMatch(index,/var orderedFeatureLoads=/);
   assert.match(read('insight_shell_loader_v1.js'),/var orderedFeatureLoads=/);
 });
