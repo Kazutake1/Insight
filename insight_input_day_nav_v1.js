@@ -102,14 +102,15 @@
     if(!container)return;
     var cards=container.querySelectorAll(spec.key==='kyaku'?'.kyaku-day-card:not(.empty)':
       '.sc-day:not(.empty)');
-    var chosen=cards[date.getDate()-1];
+    var chosen=cards[date.getDate()-1],outlined=chosen;
     if(spec.kind==='count'){
-      // The sales-count calendar outline marks today, not the date navigator's selection.
+      // Keep date navigation and scrolling tied to the selected day.
+      // The sales-count outline itself always marks today, and only in this month.
       var today=new Date();
-      chosen=date.getFullYear()===today.getFullYear()&&date.getMonth()===today.getMonth()?
+      outlined=date.getFullYear()===today.getFullYear()&&date.getMonth()===today.getMonth()?
         cards[today.getDate()-1]:null;
     }
-    cards.forEach(function(card){card.classList.toggle('insight-day-selected',!!chosen&&card===chosen);});
+    cards.forEach(function(card){card.classList.toggle('insight-day-selected',!!outlined&&card===outlined);});
     if(scroll&&chosen&&chosen.scrollIntoView)chosen.scrollIntoView({block:'nearest',inline:'nearest'});
   }
   function sync(spec){
