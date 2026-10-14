@@ -25,9 +25,9 @@ test('Index shellはinline script/styleを持たず外部assetへ分離する',(
   const boot=read('insight_shell_boot_v1.js');
   const loader=read('insight_shell_loader_v1.js');
   const css=read('insight_shell_v1.css');
-  assert.match(index,/insight_shell_boot_v1\.js\?v=20261014-event-selected-border-build-42/);
-  assert.match(index,/insight_shell_loader_v1\.js\?v=20261014-event-selected-border-build-42/);
-  assert.match(index,/insight_shell_v1\.css\?v=20261014-event-selected-border-build-42/);
+  assert.match(index,/insight_shell_boot_v1\.js\?v=20261014-event-hourly-label-build-43/);
+  assert.match(index,/insight_shell_loader_v1\.js\?v=20261014-event-hourly-label-build-43/);
+  assert.match(index,/insight_shell_v1\.css\?v=20261014-event-hourly-label-build-43/);
   assert.doesNotMatch(index,/<script(?![^>]*\bsrc=)[^>]*>/i);
   assert.doesNotMatch(index,/<style\b/i);
   assert.doesNotMatch(index,/script-src[^;]*'unsafe-inline'/);
@@ -185,8 +185,8 @@ test('canonical payloadはinline script/styleを持たず外部assetを順序固
 
 test('トップページはキャッシュ抑止とシェル・機能manifestの自己更新を持つ',()=>{
   const index=readShell();
-  assert.match(index,/insight-shell-version" content="20261014-event-selected-border-build-42/);
-  assert.match(index,/var BUILD="20261014-event-selected-border-build-42"/);
+  assert.match(index,/insight-shell-version" content="20261014-event-hourly-label-build-43/);
+  assert.match(index,/var BUILD="20261014-event-hourly-label-build-43"/);
   assert.match(index,/Shell rule: bump BUILD whenever the loader/);
   assert.match(index,/Cache-Control" content="no-cache, no-store, must-revalidate/);
   assert.match(index,/insight_probe=/);
@@ -937,7 +937,7 @@ test('イベント実績は過去開催・日付カード・時間帯グラフ�
   const eventResults=read('insight_event_results_v1.js');
   const events=read('insight_events_v1.js');
   assert.match(index,/insight_events_v1\.js\?v=20261007-step3-event-target-visibility-1/);
-  assert.match(index,/insight_event_results_v1\.js\?v=20261012-event-notes-1/);
+  assert.match(index,/insight_event_results_v1\.js\?v=20261014-no-hourly-label-1/);
   assert.ok(index.indexOf('insight_analysis_context_v1.js')<index.indexOf('insight_event_results_v1.js'));
   assert.ok(index.indexOf('insight_event_results_v1.js')<index.indexOf('insight_daily_anomaly_v1.js'));
   assert.match(css,/\.ie-dialog\.ie-event-add \.ie-presets\{margin-top:10px\}/);
