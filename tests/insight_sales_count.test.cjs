@@ -412,3 +412,31 @@ test('廃棄の数字と合計だけを青くし、0・未入力・対象外を�
   assert.deepEqual(sales.wasteRecordAt(all,'a','2025-08-11',category.id),{trips:[0,3,null]});
   assert.equal(JSON.stringify(all),original);
 });
+
+
+test('対象外に変更しても保存済みの納品・販売の0と正数を読み取り専用で表示する',()=>{
+  const source=fs.readFileSync(path.join(__dirname,'..','insight_sales_count_v1.js'),'utf8');
+  const editable=source.slice(source.indexOf('function buildInput('),source.indexOf('function updateTotals('));
+  const readonly=source.slice(source.indexOf('function buildReadOnlyInput('),source.indexOf('function buildReadOnlyWasteInput('));
+  assert.match(editable,/if\(!tripActive\(selectedCategory\(\),trip\)\)\{var saved=r\.trips\[trip\]\[key\]/);
+  assert.match(editable,/i\.value=saved===null\?'／':String\(saved\)/);
+  assert.match(editable,/i\.readOnly=true/);
+  assert.match(editable,/保存済み・編集不可/);
+  assert.match(readonly,/status===false&&saved===null/);
+  assert.doesNotMatch(readonly,/status===false&&\(!hasHistory\|\|!recorded\)/);
+  assert.match(readonly,/status===false\?' 対象外（保存済み・編集不可）'/);
+  const all=base();sales.ensure(all);
+  const category=all.salesCountManagement.categories[0];
+  const before={trips:[
+    {delivery:null,sales:null},
+    {delivery:0,sales:12},
+    {delivery:7,sales:0}
+  ]};
+  all.stores.a.salesCounts={'2026-10-01':{[category.id]:before}};
+  category.activeTrips=[true,false,true];
+  const snapshot=JSON.stringify(all);
+  assert.doesNotThrow(()=>sales.validate(all));
+  assert.deepEqual(all.stores.a.salesCounts['2026-10-01'][category.id].trips[1],
+    {delivery:0,sales:12});
+  assert.equal(JSON.stringify(all),snapshot);
+});
