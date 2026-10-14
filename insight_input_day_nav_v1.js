@@ -103,7 +103,13 @@
     var cards=container.querySelectorAll(spec.key==='kyaku'?'.kyaku-day-card:not(.empty)':
       '.sc-day:not(.empty)');
     var chosen=cards[date.getDate()-1];
-    cards.forEach(function(card){card.classList.toggle('insight-day-selected',card===chosen);});
+    if(spec.kind==='count'){
+      // The sales-count calendar outline marks today, not the date navigator's selection.
+      var today=new Date();
+      chosen=date.getFullYear()===today.getFullYear()&&date.getMonth()===today.getMonth()?
+        cards[today.getDate()-1]:null;
+    }
+    cards.forEach(function(card){card.classList.toggle('insight-day-selected',!!chosen&&card===chosen);});
     if(scroll&&chosen&&chosen.scrollIntoView)chosen.scrollIntoView({block:'nearest',inline:'nearest'});
   }
   function sync(spec){
