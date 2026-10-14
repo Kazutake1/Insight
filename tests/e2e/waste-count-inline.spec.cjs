@@ -243,3 +243,83 @@ test('カテゴリー管理で対象便を解除すると廃棄の入力も即�
   await expect(card.locator('.sc-waste-row input').first()).toBeEditable();
   expect(await page.evaluate(()=>JSON.stringify(allStores.stores[allStores.current].wasteCounts||{}))).toBe(before);
 });
+
+
+test('対象便のチェック解除後も納品・販売・廃棄の保存済み数値を表示し編集不可にする',async({page})=>{
+  await page.route('**/Index.html*',async route=>{
+    const response=await route.fetch();
+    await route.fulfill({response,body:(await response.text()).replace(/;?\\s*upgrade-insecure-requests/g,'')});
+  });
+  await page.goto('/Index.html');
+  await page.locator('#navSalesCount').click();
+  const dates=page.locator('#scCalendar .sc-day:not(.empty)');
+  const first=dates.nth(0),second=dates.nth(1),third=dates.nth(2);
+  const key=await page.evaluate(()=>{
+    const p=InsightSalesCount.getPeriod(),prefix=p.year+'-'+String(p.month).padStart(2,'0');
+    return {storeId:allStores.current,categoryId:document.getElementById('scCategory').value,dates:[prefix+'-01',prefix+'-02']};
+  });
+  await first.locator('.sc-delivery-row input').nth(1).fill('12');
+  await first.locator('.sc-sales-row input').nth(1).fill('0');
+  await first.locator('.sc-waste-row input').nth(1).fill('4');
+  await second.locator('.sc-delivery-row input').nth(1).fill('0');
+  await second.locator('.sc-sales-row input').nth(1).fill('7');
+  await second.locator('.sc-waste-row input').nth(1).fill('0');
+  await page.locator('#scSave').click();
+  await expect(page.locator('#scSave')).toBeDisabled();
+  const saved=await page.evaluate(({storeId,categoryId,dates})=>{
+    const store=allStores.stores[storeId];
+    return dates.map(date=>({
+      delivery:store.salesCounts[date][categoryId].trips[1].delivery,
+      sales:store.salesCounts[date][categoryId].trips[1].sales,
+      waste:store.wasteCounts[date][categoryId].trips[1]
+    }));
+  },key);
+  expect(saved).toEqual([{delivery:12,sales:0,waste:4},{delivery:0,sales:7,waste:0}]);
+  const manage=async(check)=>{
+    await page.locator('#scManage').click();
+    const dialog=page.locator('dialog.sc-dialog');
+    const box=dialog.locator('.sc-category-row').first().locator('.sc-category-trips input[type=checkbox]').nth(1);
+    if(check)await box.check();else await box.uncheck();
+    await dialog.locator('[data-save]').click();
+    await expect(dialog).toHaveCount(0);
+  };
+  await manage(false);
+  for(const [day,values] of [[first,['12','0','4']],[second,['0','7','0']]]){
+    for(const [i,selector] of ['.sc-delivery-row','.sc-sales-row','.sc-waste-row'].entries()){
+      const input=day.locator(selector+' input').nth(1);
+      await expect(input).toHaveValue(values[i]);
+      await expect(input).toHaveAttribute('readonly','');
+      await expect(input).toHaveAttribute('aria-readonly','true');
+      await expect(input).toHaveAttribute('aria-label',/対象外.*保存済み・編集不可/);
+    }
+  }
+  for(const selector of ['.sc-delivery-row','.sc-sales-row','.sc-waste-row']){
+    const input=third.locator(selector+' input').nth(1);
+    await expect(input).toHaveValue('／');
+    await expect(input).toHaveAttribute('readonly','');
+  }
+  await first.locator('.sc-delivery-row input').nth(0).fill('8');
+  await page.locator('#scSave').click();
+  await expect(page.locator('#scSave')).toBeDisabled();
+  expect(await page.evaluate(({storeId,categoryId,dates})=>{
+    const store=allStores.stores[storeId];
+    return dates.map(date=>({
+      delivery:store.salesCounts[date][categoryId].trips[1].delivery,
+      sales:store.salesCounts[date][categoryId].trips[1].sales,
+      waste:store.wasteCounts[date][categoryId].trips[1]
+    }));
+  },key)).toEqual(saved);
+  await page.reload();
+  await page.locator('#navSalesCount').click();
+  for(const [selector,value] of [['.sc-delivery-row','12'],['.sc-sales-row','0'],['.sc-waste-row','4']]){
+    const input=page.locator('#scCalendar .sc-day:not(.empty)').first().locator(selector+' input').nth(1);
+    await expect(input).toHaveValue(value);
+    await expect(input).toHaveAttribute('readonly','');
+  }
+  await manage(true);
+  for(const [selector,value] of [['.sc-delivery-row','12'],['.sc-sales-row','0'],['.sc-waste-row','4']]){
+    const input=page.locator('#scCalendar .sc-day:not(.empty)').first().locator(selector+' input').nth(1);
+    await expect(input).toHaveValue(value);
+    await expect(input).toBeEditable();
+  }
+});
