@@ -2386,16 +2386,27 @@ test('イベント実績は過去開催→複数日→カテゴリー便別実�
   await expect(page.locator('.er-daily-summary')).toHaveCount(0);
   await expect(page.locator('.er-day-tab')).toHaveCount(2);
   await expect(page.locator('.er-day-tab').first()).toHaveClass(/active/);
-  const expectNoSelectedDayOutline=async()=>{
+  const expectSelectedDayBorder=async(selectedIndex)=>{
     const frames=await page.locator('.er-day-tab').evaluateAll(cards=>cards.map(card=>{
       const style=getComputedStyle(card);
-      return {borderColor:style.borderColor,boxShadow:style.boxShadow};
+      return {active:card.classList.contains('active'),borderColor:style.borderColor,
+        boxShadow:style.boxShadow,padding:style.padding};
     }));
     expect(frames).toHaveLength(2);
-    expect(frames[0].borderColor).toBe(frames[1].borderColor);
-    expect(frames.every(frame=>frame.boxShadow==='none')).toBe(true);
+    expect(frames.filter(frame=>frame.active)).toHaveLength(1);
+    frames.forEach((frame,index)=>{
+      expect(frame.active).toBe(index===selectedIndex);
+      if(frame.active){
+        expect(frame.borderColor).toBe('rgb(0, 0, 0)');
+        expect(frame.boxShadow).toContain('inset');
+      }else{
+        expect(frame.borderColor).not.toBe('rgb(0, 0, 0)');
+        expect(frame.boxShadow).toBe('none');
+      }
+      expect(frame.padding).toBe('13px 15px'); // Selection does not resize the card.
+    });
   };
-  await expectNoSelectedDayOutline();
+  await expectSelectedDayBorder(0);
   const dayCardStyle=await page.locator('.er-day-tab').first().evaluate(card=>({
     width:getComputedStyle(card).width,
     padding:getComputedStyle(card).padding,
@@ -2558,7 +2569,7 @@ test('イベント実績は過去開催→複数日→カテゴリー便別実�
 
   await page.locator('.er-day-tab').nth(1).click();
   await expect(page.locator('.er-day-tab').nth(1)).toHaveClass(/active/);
-  await expectNoSelectedDayOutline();
+  await expectSelectedDayBorder(1);
   await expect(page.locator('.er-hourly-section')).toHaveCount(0);
   await expect(page.locator('.er-sales-section')).toHaveCount(0);
   await expect(periodSection.locator('.er-period-category')).toHaveCount(2);
@@ -2697,6 +2708,8 @@ test('イベント実績の催事は場所選択なしで過去開催を参照�
   await page.locator('.er-occurrence').first().click();
   await expect(page.locator('.er-detail-title h2')).toHaveText('E2Eクリスマス');
   await expect(page.locator('.er-day-tab')).toHaveCount(2);
+  await expect(page.locator('.er-day-tab.active')).toHaveCount(1);
+  await expect(page.locator('.er-day-tab.active')).toHaveCSS('border-color','rgb(0, 0, 0)');
   await expect(page.locator('.er-sales-section')).toHaveCount(0);
   const period=page.locator('.er-period-section');
   const orderedSections=await page.locator('#erResults').evaluate(container=>{
