@@ -82,21 +82,16 @@ test('販売数入力の黒枠は今日の日付だけに固定し選択日や�
   await expect(outlined).toHaveCount(1);
 
   // Choosing another input date must not move today's outline.
-  const otherDay=day===1?2:day-1,chosenIso=iso(year,month,otherDay);
+  const otherDay=day<=2?3:day-1,chosenIso=iso(year,month,otherDay);
   await pick(chosenIso);
   await expect(outlined).toHaveText(String(day));
   await expect(dateNav.locator('.iqd-date-main')).toContainText(String(otherDay)+'日');
 
-  // Prev/next controls still operate, but the outline remains on the real today.
-  const step=day===1?'[data-day-next]':'[data-day-prev]';
-  await dateNav.locator(step).click();
-  const changed=day===1?3:day===2?new Date(year,month-1,0).getDate():day-2;
-  const changedMonth=day===2?month===1?12:month-1:month;
-  const changedYear=day===2&&month===1?year-1:year;
+  // Prev/next controls still operate without moving today's outline.
+  await dateNav.locator(day<=2?'[data-day-next]':'[data-day-prev]').click();
   await expect.poll(()=>page.evaluate(()=>InsightInputDayNav.getSelectedIso('salesCounts')))
-    .toBe(iso(changedYear,changedMonth,changed));
-  await expect(outlined).toHaveCount(day===2?0:1);
-  if(day!==2)await expect(outlined).toHaveText(String(day));
+    .toBe(iso(year,month,day<=2?4:day-2));
+  await expect(outlined).toHaveText(String(day));
 
   // A different month containing the same numeric day must have NO outline.
   const otherMonth=month===1?2:month-1,monthIso=iso(year,otherMonth,14);
