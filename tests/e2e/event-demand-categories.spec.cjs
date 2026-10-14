@@ -302,6 +302,14 @@ test('納品販売廃棄の対象外は／・未確認はー・未入力は空�
     const inactive=InsightSalesCount.createReadOnlyDayCard('2026-10-13',empty,category,
       {trips:[null,null,0]},[true,false,true]);
     inactive.id='wasteSlashInactiveE2E';document.body.append(inactive);
+    const previouslySaved=InsightSalesCount.createReadOnlyDayCard('2026-10-01',
+      {trips:[{delivery:null,sales:null},{delivery:0,sales:15},{delivery:null,sales:null}]},
+      category,{trips:[null,4,null]},[true,false,true]);
+    previouslySaved.id='excludedSavedReadOnlyE2E';document.body.append(previouslySaved);
+    const partiallySaved=InsightSalesCount.createReadOnlyDayCard('2026-10-02',
+      {trips:[{delivery:null,sales:null},{delivery:8,sales:null},{delivery:null,sales:null}]},
+      category,{trips:[null,null,null]},[true,false,true]);
+    partiallySaved.id='excludedPartialReadOnlyE2E';document.body.append(partiallySaved);
     const average=InsightSalesCount.createAverageCard('6週平均',
       {trips:[0,null,null],total:null},{trips:[null,null,null],total:null},
       null,category,[true,null,false]);
@@ -379,6 +387,21 @@ test('納品販売廃棄の対象外は／・未確認はー・未入力は空�
   await page.evaluate(()=>{document.documentElement.classList.remove('dark');document.body.classList.remove('dark');});
   await expect(page.locator('#wasteSlashSavedE2E .sc-waste-row input').nth(1)).toHaveValue('4');
   await expect(page.locator('#wasteSlashInactiveE2E .sc-waste-row input').nth(1)).toHaveValue('／');
+  const excluded=page.locator('#excludedSavedReadOnlyE2E');
+  for(const [selector,value] of [['.sc-delivery-row','0'],['.sc-sales-row','15'],['.sc-waste-row','4']]){
+    const input=excluded.locator(selector+' input').nth(1);
+    await expect(input).toHaveValue(value);
+    await expect(input).toHaveAttribute('readonly','');
+    await expect(input).toHaveAttribute('aria-readonly','true');
+  }
+  await expect(excluded.locator('.sc-delivery-row input').nth(1)).toHaveAttribute('aria-label',/対象外.*保存済み・編集不可/);
+  await expect(excluded.locator('.sc-sales-row input').nth(1)).toHaveAttribute('aria-label',/対象外.*保存済み・編集不可/);
+  const partial=page.locator('#excludedPartialReadOnlyE2E');
+  await expect(partial.locator('.sc-delivery-row input').nth(1)).toHaveValue('8');
+  await expect(partial.locator('.sc-sales-row input').nth(1)).toHaveValue('／');
+  await expect(partial.locator('.sc-waste-row input').nth(1)).toHaveValue('／');
+  await expect(partial.locator('.sc-sales-row input').nth(1)).toHaveAttribute('readonly','');
+
   await expect(page.locator('#pageSalesCount .sc-legend')).not.toContainText('過去の対象便未確認');
   await expect(page.locator('#pageSalesCount .sc-legend')).not.toContainText('／');
   expect(await page.evaluate(()=>localStorage.getItem('insight_v11'))).toBe(baseline);
