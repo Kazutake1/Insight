@@ -293,10 +293,10 @@ test('トップページは外部shellと機能manifestの最新版確認をno-s
     fetch('/insight_payload_source_v1.html?e2e-shell-check=1',{cache:'no-store'}).then(r=>r.text())
   ]));
   const [source,boot,loader,payload]=sources;
-  expect(source).toContain('name="insight-shell-version" content="20261014-sales-waste-today-build-41"');
-  expect(source).toContain('insight_shell_boot_v1.js?v=20261014-sales-waste-today-build-41');
-  expect(source).toContain('insight_shell_loader_v1.js?v=20261014-sales-waste-today-build-41');
-  expect(source).toContain('insight_shell_v1.css?v=20261014-sales-waste-today-build-41');
+  expect(source).toContain('name="insight-shell-version" content="20261014-event-selected-border-build-42"');
+  expect(source).toContain('insight_shell_boot_v1.js?v=20261014-event-selected-border-build-42');
+  expect(source).toContain('insight_shell_loader_v1.js?v=20261014-event-selected-border-build-42');
+  expect(source).toContain('insight_shell_v1.css?v=20261014-event-selected-border-build-42');
   expect(source).not.toMatch(/<script(?![^>]*\bsrc=)[^>]*>/i);
   expect(source).not.toMatch(/<style\b/i);
   expect(source).not.toMatch(/script-src[^;]*'unsafe-inline'/);
@@ -304,12 +304,12 @@ test('トップページは外部shellと機能manifestの最新版確認をno-s
   expect(source).not.toMatch(/style-src[^;]*'unsafe-inline'/);
   expect(boot).toContain("fetch('./Index.html?insight_probe='+Date.now(),{cache:'no-store'})");
   expect(loader).toContain("fetch('./insight_shell_loader_v1.js?insight_manifest_probe='+Date.now(),{cache:'no-store'})");
-  expect(loader).toContain("fetch('./insight_payload_source_v1.html?v=20261006-static-styles-1',{cache:'no-store'})");
+  expect(loader).toContain("fetch('./insight_payload_source_v1.html?v=20261014-event-selected-border-1',{cache:'no-store'})");
   expect(loader).toContain('function featureSignature(entries)');
   expect(source).toContain('https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js');
   expect(source).toContain('integrity="sha512-CQBWl4fJHWbryGE+Pc7UAxWMUMNMWzWxF4SQo9CgkJIN1kx6djDQZjh3Y8SZ1d+6I+1zze6Z7kHXO7q3UyZAWw=="');
   expect(loader).not.toContain('stripPayloadChartScript');
-  expect(payload).toContain('insight_payload_core_v1.css?v=20261013-waste-blue-1');
+  expect(payload).toContain('insight_payload_core_v1.css?v=20261014-event-selected-border-1');
   expect(payload).toContain('insight_payload_core_v1.js?v=20261007-step4-ai-position-css-1');
   expect(payload).toContain('insight_payload_ai_legacy_v1.js?v=20261006-payload-assets-1');
   expect(payload).toContain('insight_payload_bindings_v1.js?v=20261006-inline-bindings-1');
@@ -2386,16 +2386,27 @@ test('イベント実績は過去開催→複数日→カテゴリー便別実�
   await expect(page.locator('.er-daily-summary')).toHaveCount(0);
   await expect(page.locator('.er-day-tab')).toHaveCount(2);
   await expect(page.locator('.er-day-tab').first()).toHaveClass(/active/);
-  const expectNoSelectedDayOutline=async()=>{
+  const expectSelectedDayBorder=async(selectedIndex)=>{
     const frames=await page.locator('.er-day-tab').evaluateAll(cards=>cards.map(card=>{
       const style=getComputedStyle(card);
-      return {borderColor:style.borderColor,boxShadow:style.boxShadow};
+      return {active:card.classList.contains('active'),borderColor:style.borderColor,
+        boxShadow:style.boxShadow,padding:style.padding};
     }));
     expect(frames).toHaveLength(2);
-    expect(frames[0].borderColor).toBe(frames[1].borderColor);
-    expect(frames.every(frame=>frame.boxShadow==='none')).toBe(true);
+    expect(frames.filter(frame=>frame.active)).toHaveLength(1);
+    frames.forEach((frame,index)=>{
+      expect(frame.active).toBe(index===selectedIndex);
+      if(frame.active){
+        expect(frame.borderColor).toBe('rgb(0, 0, 0)');
+        expect(frame.boxShadow).toContain('inset');
+      }else{
+        expect(frame.borderColor).not.toBe('rgb(0, 0, 0)');
+        expect(frame.boxShadow).toBe('none');
+      }
+      expect(frame.padding).toBe('13px 15px'); // Selection does not resize the card.
+    });
   };
-  await expectNoSelectedDayOutline();
+  await expectSelectedDayBorder(0);
   const dayCardStyle=await page.locator('.er-day-tab').first().evaluate(card=>({
     width:getComputedStyle(card).width,
     padding:getComputedStyle(card).padding,
@@ -2558,7 +2569,7 @@ test('イベント実績は過去開催→複数日→カテゴリー便別実�
 
   await page.locator('.er-day-tab').nth(1).click();
   await expect(page.locator('.er-day-tab').nth(1)).toHaveClass(/active/);
-  await expectNoSelectedDayOutline();
+  await expectSelectedDayBorder(1);
   await expect(page.locator('.er-hourly-section')).toHaveCount(0);
   await expect(page.locator('.er-sales-section')).toHaveCount(0);
   await expect(periodSection.locator('.er-period-category')).toHaveCount(2);
@@ -2697,6 +2708,8 @@ test('イベント実績の催事は場所選択なしで過去開催を参照�
   await page.locator('.er-occurrence').first().click();
   await expect(page.locator('.er-detail-title h2')).toHaveText('E2Eクリスマス');
   await expect(page.locator('.er-day-tab')).toHaveCount(2);
+  await expect(page.locator('.er-day-tab.active')).toHaveCount(1);
+  await expect(page.locator('.er-day-tab.active')).toHaveCSS('border-color','rgb(0, 0, 0)');
   await expect(page.locator('.er-sales-section')).toHaveCount(0);
   const period=page.locator('.er-period-section');
   const orderedSections=await page.locator('#erResults').evaluate(container=>{
