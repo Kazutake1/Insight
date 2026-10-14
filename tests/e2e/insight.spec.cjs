@@ -2385,6 +2385,8 @@ test('イベント実績は過去開催→複数日→カテゴリー便別実�
   await expect(page.locator('.er-overview-grid')).not.toContainText('買上点数');
   await expect(page.locator('.er-daily-summary')).toHaveCount(0);
   await expect(page.locator('.er-day-tab')).toHaveCount(2);
+  await expect(page.locator('.er-day-tabs')).not.toContainText('時間帯データあり');
+  await expect(page.locator('.er-day-tabs .er-day-tab small')).toHaveCount(0);
   await expect(page.locator('.er-day-tab').first()).toHaveClass(/active/);
   const expectSelectedDayBorder=async(selectedIndex)=>{
     const frames=await page.locator('.er-day-tab').evaluateAll(cards=>cards.map(card=>{
@@ -2570,6 +2572,7 @@ test('イベント実績は過去開催→複数日→カテゴリー便別実�
   await page.locator('.er-day-tab').nth(1).click();
   await expect(page.locator('.er-day-tab').nth(1)).toHaveClass(/active/);
   await expectSelectedDayBorder(1);
+  await expect(page.locator('.er-day-tabs')).not.toContainText('時間帯データあり');
   await expect(page.locator('.er-hourly-section')).toHaveCount(0);
   await expect(page.locator('.er-sales-section')).toHaveCount(0);
   await expect(periodSection.locator('.er-period-category')).toHaveCount(2);
@@ -2708,6 +2711,7 @@ test('イベント実績の催事は場所選択なしで過去開催を参照�
   await page.locator('.er-occurrence').first().click();
   await expect(page.locator('.er-detail-title h2')).toHaveText('E2Eクリスマス');
   await expect(page.locator('.er-day-tab')).toHaveCount(2);
+  await expect(page.locator('.er-day-tabs')).not.toContainText('時間帯データあり');
   await expect(page.locator('.er-day-tab.active')).toHaveCount(1);
   await expect(page.locator('.er-day-tab.active')).toHaveCSS('border-color','rgb(0, 0, 0)');
   await expect(page.locator('.er-sales-section')).toHaveCount(0);
