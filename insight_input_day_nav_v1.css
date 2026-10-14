@@ -1,0 +1,24 @@
+/* Match 今日の入力 date controls; preserve existing input-card styles. */
+.insight-shared-day-nav{display:flex;align-items:center;gap:4px;flex-wrap:nowrap;flex-shrink:0;margin:0 0 10px;max-width:100%;min-width:0}
+.insight-shared-day-nav .iqd-btn{height:42px;box-sizing:border-box;border:1px solid var(--border);border-radius:10px;background:var(--surface);color:var(--text);box-shadow:0 1px 4px var(--shadow2);font-family:inherit;cursor:pointer}
+.insight-shared-day-nav .iqd-arrow{display:flex;align-items:center;justify-content:center;width:42px;flex-shrink:0;padding:0;font-size:25px;font-weight:400}
+.insight-shared-day-nav .iqd-date{position:relative;display:flex;align-items:center;justify-content:center;gap:9px;width:218px;padding:3px 9px;overflow:hidden;flex-shrink:0}
+.insight-shared-day-nav .iqd-date-icon{width:20px;height:20px;flex-shrink:0;color:var(--text4)}
+.insight-shared-day-nav .iqd-date-text{display:flex;flex-direction:column;align-items:center;gap:1px;min-width:0}
+.insight-shared-day-nav .iqd-date-main{font-size:12px;line-height:1.25;font-weight:800;white-space:nowrap;color:var(--text)}
+.insight-shared-day-nav .iqd-date-sub{font-size:9px;line-height:1.2;font-weight:500;white-space:nowrap;color:var(--text4)}
+.insight-shared-day-nav .iqd-date-input{position:absolute;inset:0;width:100%;height:100%;opacity:0;cursor:pointer;z-index:1}
+.insight-shared-day-nav .iqd-today{padding:0 14px;font-size:12px;font-weight:800;white-space:nowrap;flex-shrink:0}
+.insight-shared-day-nav .iqd-btn:active{background:var(--surface2)}
+.insight-shared-day-nav .iqd-date:focus-within{outline:2px solid var(--text4);outline-offset:2px}
+#pageSales.insight-has-day-nav .insight-input-period-toolbar,
+#pageKyaku.insight-has-day-nav .insight-input-period-toolbar,
+#pageHaiki.insight-has-day-nav .insight-input-period-toolbar{display:none!important}
+#pageSalesCount.insight-has-day-nav #scPrev,
+#pageSalesCount.insight-has-day-nav #scNext,
+#pageSalesCount.insight-has-day-nav #scPeriod{display:none!important}
+#pageSalesCount .sc-toolbar .insight-shared-day-nav{margin-bottom:0;margin-right:4px}
+#pageKyaku .kyaku-day-card.insight-day-selected,
+#pageSalesCount .sc-calendar .sc-day.insight-day-selected{outline:2px solid var(--text4);outline-offset:-2px}
+@media(max-width:850px){.insight-shared-day-nav .iqd-date{width:195px}.insight-shared-day-nav .iqd-arrow{width:36px}.insight-shared-day-nav .iqd-today{padding:0 10px}}
+@media(max-width:450px){.insight-shared-day-nav .iqd-date{width:175px}.insight-shared-day-nav .iqd-arrow{width:32px}.insight-shared-day-nav .iqd-today{padding:0 8px;font-size:11px}.insight-shared-day-nav .iqd-date-main{font-size:10px}}

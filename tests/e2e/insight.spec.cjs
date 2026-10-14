@@ -19,60 +19,42 @@ async function selectDashboardSeptember(page){
   await expect.poll(()=>page.evaluate(()=>selMonth)).toBe('9月');
 }
 
-test('売上・客数・廃棄は販売数入力と同じ前月・年月・翌月の操作に統一される',async({page})=>{
+test('売上・客数・廃棄・販売数入力は今日の入力と同じ日付操作を使う',async({page})=>{
   const errors=await openInsight(page);
-  const legacyRenderer=await page.evaluate(()=>initInputPage.__insightOriginal.toString());
-  expect(legacyRenderer).toContain('salesYearRow');
-  expect(legacyRenderer).toContain('salesMonthTabs');
-  expect(legacyRenderer).toContain('renderTable(type)');
-  expect(await page.evaluate(()=>window.InsightInputPeriodControls.legacyCleanupMode)).toBe('runtime');
-  expect(await page.evaluate(()=>window.initInputPage.__insightInputPeriodControls===true)).toBe(true);
-
+  await expect.poll(()=>page.evaluate(()=>!!window.InsightInputDayNav)).toBe(true);
   const year=await page.evaluate(()=>Number(allStores.stores[allStores.current].years.map(Number).sort((a,b)=>a-b).slice(-1)[0]));
-
+  const iso=String(year)+'-09-14';
+  const next=String(year)+'-09-15';
   for(const spec of [
-    {nav:'#nav2',type:'sales',page:'#pageSales'},
-    {nav:'#nav3',type:'kyaku',page:'#pageKyaku'},
-    {nav:'#nav4',type:'haiki',page:'#pageHaiki'}
+    {nav:'#nav2',type:'sales',page:'#pageSales',month:'sales'},
+    {nav:'#nav3',type:'kyaku',page:'#pageKyaku',month:'kyaku'},
+    {nav:'#nav4',type:'haiki',page:'#pageHaiki',month:'haiki'},
+    {nav:'#navSalesCount',type:'salesCounts',page:'#pageSalesCount'}
   ]){
     await page.locator(spec.nav).click();
-    await page.evaluate(({type,year})=>{
-      InsightPagePeriodSync.setTarget({year,month:9,source:'e2eInputPeriod'});
-      InsightPagePeriodSync.syncCurrentPage();
-    },{type:spec.type,year});
-    const toolbar=page.locator(spec.page+' .insight-input-period-toolbar');
-    await expect(toolbar).toBeVisible();
-    await expect(toolbar.locator('button').nth(0)).toHaveText('‹ 前月');
-    await expect(toolbar.locator('[data-period-current]')).toHaveText(String(year)+'年 9月');
-    await expect(toolbar.locator('button').nth(1)).toHaveText('翌月 ›');
-    await expect(toolbar).toHaveClass(/sc-toolbar/);
-    await toolbar.locator('button').nth(1).click();
-    await expect.poll(()=>page.evaluate(type=>editMonth[type],spec.type)).toBe('10月');
-    await expect(toolbar.locator('[data-period-current]')).toHaveText(String(year)+'年 10月');
-
-    const legacyVisible=await page.evaluate(pageSelector=>{
-      const root=document.querySelector(pageSelector);
-      return Array.from(root.querySelectorAll('button,[role="button"]')).filter(node=>{
-        if(node.closest('.insight-input-period-toolbar'))return false;
-        const text=(node.textContent||'').trim();
-        return (/^\d{4}年$/.test(text)||/^(?:[1-9]|1[0-2])月$/.test(text))&&node.offsetParent!==null;
-      }).length;
-    },spec.page);
-    expect(legacyVisible).toBe(0);
-    const oldContainers=await page.evaluate(type=>{
-      const ids=type==='sales'?['salesYearRow','salesMonthTabs']:type==='kyaku'?['kyakuYearRow','kyakuMonthTabs']:['haikiYearRow','haikiMonthTabs'];
-      return ids.filter(id=>document.getElementById(id)).length;
-    },spec.type);
-    expect(oldContainers).toBe(0);
+    const dateNav=page.locator(spec.page+' .insight-shared-day-nav');
+    await expect(dateNav).toBeVisible();
+    await expect(dateNav.locator('[data-day-prev]')).toHaveAttribute('aria-label','前日へ');
+    await expect(dateNav.locator('[data-day-next]')).toHaveAttribute('aria-label','翌日へ');
+    await expect(dateNav.locator('[data-day-today]')).toHaveText('今日に戻る');
+    const picker=dateNav.locator('input[type="date"]');
+    await picker.evaluate((input,value)=>{input.value=value;input.dispatchEvent(new Event('change',{bubbles:true}));},iso);
+    await expect.poll(()=>page.evaluate(type=>InsightInputDayNav.getSelectedIso(type),spec.type)).toBe(iso);
+    await expect(dateNav.locator('.iqd-date-main')).toContainText(String(year)+'年9月14日');
+    await dateNav.locator('[data-day-next]').click();
+    await expect.poll(()=>page.evaluate(type=>InsightInputDayNav.getSelectedIso(type),spec.type)).toBe(next);
+    await dateNav.locator('[data-day-prev]').click();
+    await expect.poll(()=>page.evaluate(type=>InsightInputDayNav.getSelectedIso(type),spec.type)).toBe(iso);
+    if(spec.type==='sales')expect(await page.evaluate(()=>window.salesSelDay)).toBe(14);
+    if(spec.type==='haiki')expect(await page.evaluate(()=>window.haikiSelDay)).toBe(14);
+    if(spec.type==='kyaku')await expect(page.locator('#kyakuGrid .kyaku-day-card.insight-day-selected .kyaku-day-num')).toHaveText('14');
+    if(spec.type==='salesCounts')await expect(page.locator('#scCalendar .sc-day.insight-day-selected .sc-day-num')).toHaveText('14');
+    if(spec.month)await expect.poll(()=>page.evaluate(type=>editMonth[type],spec.month)).toBe('9月');
+    else await expect.poll(()=>page.evaluate(()=>InsightSalesCount.getPeriod().month)).toBe(9);
+    await dateNav.locator('[data-day-today]').click();
+    await expect.poll(()=>page.evaluate(type=>InsightInputDayNav.getSelectedIso(type),spec.type))
+      .toBe(await page.evaluate(()=>InsightDateContext.iso(new Date())));
   }
-
-  await page.locator('#navSalesCount').click();
-  const salesCountToolbar=page.locator('#pageSalesCount .sc-toolbar');
-  await expect(salesCountToolbar.locator('#scPrev')).toHaveText('‹ 前月');
-  await expect(salesCountToolbar.locator('#scNext')).toHaveText('翌月 ›');
-
-  await expect(page.locator('#insightSalesPeriodOverlay')).toHaveCount(0);
-  await expect(page.locator('#insightSalesPeriodToday')).toHaveCount(0);
   expect(errors).toEqual([]);
 });
 
@@ -280,10 +262,10 @@ test('トップページは外部shellと機能manifestの最新版確認をno-s
     fetch('/insight_payload_source_v1.html?e2e-shell-check=1',{cache:'no-store'}).then(r=>r.text())
   ]));
   const [source,boot,loader,payload]=sources;
-  expect(source).toContain('name="insight-shell-version" content="20261014-excluded-saved-build-39"');
-  expect(source).toContain('insight_shell_boot_v1.js?v=20261014-excluded-saved-build-39');
-  expect(source).toContain('insight_shell_loader_v1.js?v=20261014-excluded-saved-build-39');
-  expect(source).toContain('insight_shell_v1.css?v=20261014-excluded-saved-build-39');
+  expect(source).toContain('name="insight-shell-version" content="20261014-input-day-nav-build-40"');
+  expect(source).toContain('insight_shell_boot_v1.js?v=20261014-input-day-nav-build-40');
+  expect(source).toContain('insight_shell_loader_v1.js?v=20261014-input-day-nav-build-40');
+  expect(source).toContain('insight_shell_v1.css?v=20261014-input-day-nav-build-40');
   expect(source).not.toMatch(/<script(?![^>]*\bsrc=)[^>]*>/i);
   expect(source).not.toMatch(/<style\b/i);
   expect(source).not.toMatch(/script-src[^;]*'unsafe-inline'/);
@@ -1984,7 +1966,8 @@ test('販売数入力で未登録の過年度へ移動すると年度を正式�
   await page.evaluate(()=>window.InsightSalesCount.setPeriod(2025,1));
   let dialogMessage='';
   page.once('dialog',dialog=>{dialogMessage=dialog.message();dialog.accept();});
-  await page.locator('#scPrev').click();
+  await page.locator('#insightDayNav-salesCounts .iqd-date-input').evaluate(input=>{input.value='2025-01-01';input.dispatchEvent(new Event('change',{bubbles:true}));});
+  await page.locator('#insightDayNav-salesCounts [data-day-prev]').click();
   expect(dialogMessage).toContain('2024年度はダッシュボードに登録されていません');
   await expect.poll(()=>page.evaluate(()=>window.InsightSalesCount.getPeriod())).toEqual({year:'2024',month:12});
 
@@ -3404,7 +3387,9 @@ test('販売数入力の平日・日祝平均は保存済み通常日を分類�
   await page.screenshot({path:'test-results/day-type-averages-tablet.png',fullPage:true});
   await page.locator('#scCategory').selectOption('cat_sandwich');
   await expect(weekday.locator('tbody tr').nth(1).locator('td')).toHaveText(['','','','—']);
-  await page.locator('#scNext').click();
+  await page.locator('#insightDayNav-salesCounts .iqd-date-input').evaluate(input=>{input.value='2026-09-30';input.dispatchEvent(new Event('change',{bubbles:true}));});
+  await page.locator('#insightDayNav-salesCounts [data-day-next]').click();
+  await expect.poll(()=>page.evaluate(()=>InsightSalesCount.getPeriod().month)).toBe(10);
   await expect(holiday.locator('tbody tr').nth(1).locator('td')).toHaveText(['','','','—']);
   expect(errors).toEqual([]);
 });
