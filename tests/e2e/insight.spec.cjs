@@ -293,10 +293,10 @@ test('トップページは外部shellと機能manifestの最新版確認をno-s
     fetch('/insight_payload_source_v1.html?e2e-shell-check=1',{cache:'no-store'}).then(r=>r.text())
   ]));
   const [source,boot,loader,payload]=sources;
-  expect(source).toContain('name="insight-shell-version" content="20261014-sales-count-ipad-fit-build-44"');
-  expect(source).toContain('insight_shell_boot_v1.js?v=20261014-sales-count-ipad-fit-build-44');
-  expect(source).toContain('insight_shell_loader_v1.js?v=20261014-sales-count-ipad-fit-build-44');
-  expect(source).toContain('insight_shell_v1.css?v=20261014-sales-count-ipad-fit-build-44');
+  expect(source).toContain('name="insight-shell-version" content="20261014-sales-count-average-fit-build-45"');
+  expect(source).toContain('insight_shell_boot_v1.js?v=20261014-sales-count-average-fit-build-45');
+  expect(source).toContain('insight_shell_loader_v1.js?v=20261014-sales-count-average-fit-build-45');
+  expect(source).toContain('insight_shell_v1.css?v=20261014-sales-count-average-fit-build-45');
   expect(source).not.toMatch(/<script(?![^>]*\bsrc=)[^>]*>/i);
   expect(source).not.toMatch(/<style\b/i);
   expect(source).not.toMatch(/script-src[^;]*'unsafe-inline'/);
@@ -304,12 +304,12 @@ test('トップページは外部shellと機能manifestの最新版確認をno-s
   expect(source).not.toMatch(/style-src[^;]*'unsafe-inline'/);
   expect(boot).toContain("fetch('./Index.html?insight_probe='+Date.now(),{cache:'no-store'})");
   expect(loader).toContain("fetch('./insight_shell_loader_v1.js?insight_manifest_probe='+Date.now(),{cache:'no-store'})");
-  expect(loader).toContain("fetch('./insight_payload_source_v1.html?v=20261014-sales-count-ipad-fit-1',{cache:'no-store'})");
+  expect(loader).toContain("fetch('./insight_payload_source_v1.html?v=20261014-sales-count-average-fit-1',{cache:'no-store'})");
   expect(loader).toContain('function featureSignature(entries)');
   expect(source).toContain('https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js');
   expect(source).toContain('integrity="sha512-CQBWl4fJHWbryGE+Pc7UAxWMUMNMWzWxF4SQo9CgkJIN1kx6djDQZjh3Y8SZ1d+6I+1zze6Z7kHXO7q3UyZAWw=="');
   expect(loader).not.toContain('stripPayloadChartScript');
-  expect(payload).toContain('insight_payload_core_v1.css?v=20261014-sales-count-ipad-fit-1');
+  expect(payload).toContain('insight_payload_core_v1.css?v=20261014-sales-count-average-fit-1');
   expect(payload).toContain('insight_payload_core_v1.js?v=20261007-step4-ai-position-css-1');
   expect(payload).toContain('insight_payload_ai_legacy_v1.js?v=20261006-payload-assets-1');
   expect(payload).toContain('insight_payload_bindings_v1.js?v=20261006-inline-bindings-1');
@@ -608,10 +608,9 @@ test('STEP17の文字階層をダッシュボード・入力・販売数・分�
   expect(salesCountType.averageTitle).toBe('16px');
   expect(salesCountType.calendarGap).toBe('8px');
   expect(salesCountType.averageGap).toBe('8px');
-  // Daily input cards now shrink to fit the iPad viewport; averages retain their old width.
+  // Daily input and weekday-average cards now share the same responsive seven-column width.
   expect(salesCountType.dayWidth).toBeGreaterThan(120);
-  expect(salesCountType.dayWidth).toBeLessThanOrEqual(salesCountType.averageDayWidth);
-  expect(salesCountType.averageDayWidth).toBeGreaterThanOrEqual(160);
+  expect(salesCountType.averageDayWidth).toBeCloseTo(salesCountType.dayWidth,0);
 
   await page.locator('#aiAnalysisToggle').click();
   await expect(page.locator('body')).toHaveClass(/ai-analysis-open/);
@@ -720,6 +719,48 @@ test('販売数入力の土曜日カードと3便入力欄はiPad横幅で右端
     expect(geometry.cardMinLeft,'first card at '+width).toBeGreaterThanOrEqual(geometry.gridLeft-1);
     expect(geometry.cardMaxRight,'last Saturday card at '+width).toBeLessThanOrEqual(geometry.gridRight+1);
     expect(geometry.inputOverflow,'1-3便 input fields at '+width).toEqual([]);
+  }
+  expect(errors).toEqual([]);
+});
+
+test('販売数入力の曜日別平均7カードはiPad横向きで土曜日まで見切れない',async({page})=>{
+  await page.setViewportSize({width:1426,height:1056});
+  const errors=await openInsight(page);
+  await page.locator('#navSalesCount').click();
+  const average=page.locator('#pageSalesCount .sc-average-grid');
+  await expect(average.locator(':scope > .sc-average-day')).toHaveCount(7);
+  for(const width of [1024,1194,1280,1366,1426,1512]){
+    await page.setViewportSize({width,height:834});
+    const fit=await average.evaluate(grid=>{
+      const bounds=grid.getBoundingClientRect();
+      const days=Array.from(grid.querySelectorAll(':scope > .sc-average-day'));
+      const dayGrid=document.getElementById('scCalendar');
+      const dayCard=dayGrid.querySelector('.sc-day:not(.empty)');
+      const cardBounds=days.map(el=>el.getBoundingClientRect());
+      const inside=days.flatMap(day=>{
+        const card=day.getBoundingClientRect();
+        return Array.from(day.querySelectorAll('.sc-average-row b,.sc-average-head span,.sc-average-totals b')).map(el=>{
+          const rect=el.getBoundingClientRect();
+          return {left:rect.left,right:rect.right,cardLeft:card.left,cardRight:card.right};
+        });
+      });
+      return {
+        gridLeft:bounds.left,gridRight:bounds.right,
+        scrollWidth:grid.scrollWidth,clientWidth:grid.clientWidth,
+        cols:getComputedStyle(grid).gridTemplateColumns.split(' ').filter(Boolean).length,
+        cardCount:days.length,
+        firstLeft:cardBounds[0].left,lastRight:cardBounds[6].right,
+        averageWidth:cardBounds[0].width,dayWidth:dayCard.getBoundingClientRect().width,
+        overflowInputs:inside.filter(r=>r.left<r.cardLeft-1||r.right>r.cardRight+1)
+      };
+    });
+    expect(fit.cols,'average 7 columns at '+width).toBe(7);
+    expect(fit.cardCount).toBe(7);
+    expect(fit.scrollWidth,'no horizontal clipping at '+width).toBeLessThanOrEqual(fit.clientWidth+1);
+    expect(fit.firstLeft,'Sunday in view at '+width).toBeGreaterThanOrEqual(fit.gridLeft-1);
+    expect(fit.lastRight,'Saturday in view at '+width).toBeLessThanOrEqual(fit.gridRight+1);
+    expect(fit.averageWidth,'same card width as daily input at '+width).toBeCloseTo(fit.dayWidth,0);
+    expect(fit.overflowInputs,'averages and trip values inside cards at '+width).toEqual([]);
   }
   expect(errors).toEqual([]);
 });
