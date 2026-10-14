@@ -690,6 +690,38 @@ test('販売数入力カレンダーは11インチiPad横幅で親領域から�
   expect(errors).toEqual([]);
 });
 
+test('販売数入力の土曜日カードと3便入力欄はiPad横幅で右端が見切れない',async({page})=>{
+  await page.setViewportSize({width:1426,height:1056});
+  const errors=await openInsight(page);
+  await page.locator('#navSalesCount').click();
+  for(const width of [1024,1194,1280,1366,1426,1512]){
+    await page.setViewportSize({width,height:834});
+    const geometry=await page.locator('#pageSalesCount .sc-calendar').evaluate(grid=>{
+      const rect=grid.getBoundingClientRect();
+      const cards=Array.from(grid.querySelectorAll(':scope > .sc-day:not(.empty)'));
+      const inputBoxes=cards.flatMap(card=>Array.from(card.querySelectorAll('.sc-trip input')).map(input=>{
+        const r=input.getBoundingClientRect(),parent=card.getBoundingClientRect();
+        return {left:r.left,right:r.right,parentLeft:parent.left,parentRight:parent.right};
+      }));
+      return {
+        viewportWidth:window.innerWidth,
+        gridLeft:rect.left,gridRight:rect.right,
+        scrollWidth:grid.scrollWidth,clientWidth:grid.clientWidth,
+        columnCount:getComputedStyle(grid).gridTemplateColumns.split(' ').filter(Boolean).length,
+        cardMinLeft:Math.min(...cards.map(card=>card.getBoundingClientRect().left)),
+        cardMaxRight:Math.max(...cards.map(card=>card.getBoundingClientRect().right)),
+        inputOverflow:inputBoxes.filter(x=>x.left<x.parentLeft-1||x.right>x.parentRight+1)
+      };
+    });
+    expect(geometry.columnCount,'7-column layout at '+width).toBe(7);
+    expect(geometry.scrollWidth,'calendar horizontal scroll at '+width).toBeLessThanOrEqual(geometry.clientWidth+1);
+    expect(geometry.cardMinLeft,'first card at '+width).toBeGreaterThanOrEqual(geometry.gridLeft-1);
+    expect(geometry.cardMaxRight,'last Saturday card at '+width).toBeLessThanOrEqual(geometry.gridRight+1);
+    expect(geometry.inputOverflow,'1-3便 input fields at '+width).toEqual([]);
+  }
+  expect(errors).toEqual([]);
+});
+
 test('設定ボタンは他のサイドバーナビと文字・アイコン配置を揃える',async({page})=>{
   const errors=await openInsight(page);
   const styles=await page.evaluate(()=>{
