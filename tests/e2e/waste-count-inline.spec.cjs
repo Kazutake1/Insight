@@ -1,5 +1,73 @@
 const {test,expect}=require('@playwright/test');
 
+test('販売数入力の納品・販売・廃棄欄は先頭のゼロを除去し保存後も数値を維持する',async({page})=>{
+  const errors=[];
+  page.on('pageerror',error=>errors.push(error.message));
+  await page.route('**/Index.html*',async route=>{
+    const response=await route.fetch();
+    await route.fulfill({response,body:(await response.text()).replace(/;?\s*upgrade-insecure-requests/g,'')});
+  });
+  await page.goto('/Index.html');
+  await expect(page.locator('#navSalesCount')).toBeVisible();
+  await page.locator('#navSalesCount').click();
+  const card=page.locator('#scCalendar .sc-day:not(.empty)').first();
+  const delivery=card.locator('.sc-delivery-row input').first();
+  const sales=card.locator('.sc-sales-row input').first();
+  const waste=card.locator('.sc-waste-row input').first();
+  const blank=card.locator('.sc-delivery-row input').nth(1);
+  const zeroWaste=card.locator('.sc-waste-row input').nth(1);
+
+  await delivery.fill('00');
+  await expect(delivery).toHaveValue('0');
+  await sales.fill('010');
+  await expect(sales).toHaveValue('10');
+  await waste.fill('00025');
+  await expect(waste).toHaveValue('25');
+  await zeroWaste.fill('000');
+  await expect(zeroWaste).toHaveValue('0');
+  await blank.fill('00');
+  await expect(blank).toHaveValue('0');
+  await blank.fill('');
+  await expect(blank).toHaveValue('');
+  await expect(card.locator('.sc-total-delivery')).toHaveText('0');
+  await expect(card.locator('.sc-total-sales')).toHaveText('10');
+  await expect(card.locator('.sc-total-waste')).toHaveText('25※');
+
+  const key=await page.evaluate(()=>{
+    const period=InsightSalesCount.getPeriod();
+    return {
+      date:String(period.year)+'-'+String(period.month).padStart(2,'0')+'-01',
+      categoryId:document.querySelector('#scCategory').value,
+      storeId:allStores.current
+    };
+  });
+  await expect(page.locator('#scSave')).toBeEnabled();
+  await page.locator('#scSave').click();
+  await expect(page.locator('#scSave')).toBeDisabled();
+  const saved=await page.evaluate(({date,categoryId,storeId})=>{
+    const store=allStores.stores[storeId];
+    return {
+      delivery:store.salesCounts[date][categoryId].trips.map(v=>v.delivery),
+      sales:store.salesCounts[date][categoryId].trips.map(v=>v.sales),
+      waste:store.wasteCounts[date][categoryId].trips
+    };
+  },key);
+  expect(saved.delivery).toEqual([0,null,null]);
+  expect(saved.sales).toEqual([10,null,null]);
+  expect(saved.waste).toEqual([25,0,null]);
+
+  await page.reload();
+  await expect(page.locator('#navSalesCount')).toBeVisible();
+  await page.locator('#navSalesCount').click();
+  const again=page.locator('#scCalendar .sc-day:not(.empty)').first();
+  await expect(again.locator('.sc-delivery-row input').first()).toHaveValue('0');
+  await expect(again.locator('.sc-delivery-row input').nth(1)).toHaveValue('');
+  await expect(again.locator('.sc-sales-row input').first()).toHaveValue('10');
+  await expect(again.locator('.sc-waste-row input').first()).toHaveValue('25');
+  await expect(again.locator('.sc-waste-row input').nth(1)).toHaveValue('0');
+  expect(errors).toEqual([]);
+});
+
 test('納品・販売・廃棄を同じ日付カードから一括保存し再表示できる',async({page})=>{
   const errors=[];
   page.on('pageerror',error=>errors.push(error.message));
