@@ -57,6 +57,7 @@
       '<button type="button" class="iqd-btn iqd-today" data-day-today>今日に戻る</button>';
     if(spec.kind==='count')toolbar.insertBefore(element,toolbar.firstChild);
     else header.insertAdjacentElement('afterend',element);
+    page.classList.add('insight-has-day-nav');
     element.querySelector('[data-day-prev]').addEventListener('click',function(){var d=dateFor(spec);if(d)go(spec,new Date(d.getFullYear(),d.getMonth(),d.getDate()-1));});
     element.querySelector('[data-day-next]').addEventListener('click',function(){var d=dateFor(spec);if(d)go(spec,new Date(d.getFullYear(),d.getMonth(),d.getDate()+1));});
     element.querySelector('[data-day-today]').addEventListener('click',function(){go(spec,new Date());});
