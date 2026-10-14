@@ -167,7 +167,7 @@ test('廃棄分析の既存コンパクト表示スタイルは維持する',()=
 test('非圧縮payload読込はbootstrap文字列パッチと展開処理に依存しない',()=>{
   const index=shellSource();
   assert.doesNotMatch(index,/insight_bootstrap_patches_v1\.js|InsightBootstrapPatches/);
-  assert.match(index,/fetch\('\.\/insight_payload_source_v1\.html\?v=20261014-event-selected-border-1'/);
+  assert.match(index,/fetch\('\.\/insight_payload_source_v1\.html\?v=20261014-sales-count-ipad-fit-1'/);
   assert.doesNotMatch(index,/Promise\.all\(files\.map|pako\.ungzip|atob\(b64\)/);
   assert.match(index,/orderedFeatureLoads/);
 });
