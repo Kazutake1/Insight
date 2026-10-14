@@ -29,8 +29,10 @@
     var target=root.InsightPagePeriodSync&&root.InsightPagePeriodSync.getTarget?root.InsightPagePeriodSync.getTarget():null;
     var now=new Date(),day=1;
     if(target&&Number(target.year)===Number(p.year)&&Number(target.month)===Number(p.month)&&Number.isInteger(Number(target.day))&&Number(target.day)>0)day=Number(target.day);
-    else if(spec.dayKey&&Number.isInteger(Number(root[spec.dayKey]))&&Number(root[spec.dayKey])>0)day=Number(root[spec.dayKey]);
+    // For a newly opened current-month input page, prefer today over the legacy
+    // salesSelDay/haikiSelDay default (1). Explicit user selections are above.
     else if(now.getFullYear()===Number(p.year)&&now.getMonth()+1===Number(p.month))day=now.getDate();
+    else if(spec.dayKey&&Number.isInteger(Number(root[spec.dayKey]))&&Number(root[spec.dayKey])>0)day=Number(root[spec.dayKey]);
     return new Date(Number(p.year),Number(p.month)-1,Math.min(day,max));
   }
   function label(date){return date.getFullYear()+'年'+(date.getMonth()+1)+'月'+date.getDate()+'日（'+weekday[date.getDay()]+'）';}

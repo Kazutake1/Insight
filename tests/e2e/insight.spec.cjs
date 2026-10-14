@@ -58,6 +58,37 @@ test('売上・客数・廃棄・販売数入力は今日の入力と同じ日�
   expect(errors).toEqual([]);
 });
 
+
+test('売上・廃棄入力は当月の初回表示で旧選択日1日より今日を優先する',async({page})=>{
+  const errors=await openInsight(page);
+  const today=await page.evaluate(()=>InsightDateContext.iso(new Date()));
+  const day=Number(today.slice(8));
+  for(const spec of [
+    {nav:'#nav2',type:'sales',dayKey:'salesSelDay',list:'#salesDayList'},
+    {nav:'#nav4',type:'haiki',dayKey:'haikiSelDay',list:'#haikiDayList'}
+  ]){
+    await page.locator('#nav1').click();
+    await page.evaluate(key=>{
+      const d=new Date();
+      baseYear=String(d.getFullYear());
+      selMonth=MONTHS[d.getMonth()];
+      refreshDash();
+      window[key]=1; // Legacy state that formerly overrode today's date.
+      InsightPagePeriodSync.setTarget({
+        year:d.getFullYear(),month:d.getMonth()+1,source:'dashboard'
+      });
+    },spec.dayKey);
+    await page.locator(spec.nav).click();
+    await expect.poll(()=>page.evaluate(type=>InsightInputDayNav.getSelectedIso(type),spec.type)).toBe(today);
+    await expect(page.locator('#insightDayNav-'+spec.type+' .iqd-date-main'))
+      .toContainText(String(day)+'日');
+    await expect(page.locator(spec.list+' .haiki-day-btn.sel .hdb-num'))
+      .toContainText(String(day)+'日');
+    expect(await page.evaluate(key=>window[key],spec.dayKey)).toBe(day);
+  }
+  expect(errors).toEqual([]);
+});
+
 test('選択月は主要ページを横断しても維持される',async({page})=>{
   const errors=await openInsight(page);
   await selectDashboardSeptember(page);
@@ -262,10 +293,10 @@ test('トップページは外部shellと機能manifestの最新版確認をno-s
     fetch('/insight_payload_source_v1.html?e2e-shell-check=1',{cache:'no-store'}).then(r=>r.text())
   ]));
   const [source,boot,loader,payload]=sources;
-  expect(source).toContain('name="insight-shell-version" content="20261014-input-day-nav-build-40"');
-  expect(source).toContain('insight_shell_boot_v1.js?v=20261014-input-day-nav-build-40');
-  expect(source).toContain('insight_shell_loader_v1.js?v=20261014-input-day-nav-build-40');
-  expect(source).toContain('insight_shell_v1.css?v=20261014-input-day-nav-build-40');
+  expect(source).toContain('name="insight-shell-version" content="20261014-sales-waste-today-build-41"');
+  expect(source).toContain('insight_shell_boot_v1.js?v=20261014-sales-waste-today-build-41');
+  expect(source).toContain('insight_shell_loader_v1.js?v=20261014-sales-waste-today-build-41');
+  expect(source).toContain('insight_shell_v1.css?v=20261014-sales-waste-today-build-41');
   expect(source).not.toMatch(/<script(?![^>]*\bsrc=)[^>]*>/i);
   expect(source).not.toMatch(/<style\b/i);
   expect(source).not.toMatch(/script-src[^;]*'unsafe-inline'/);
