@@ -1279,8 +1279,10 @@ body.ai-analysis-open #main{margin-right:0!important}
    landscape widths where seven 160px minimum columns exceed the space remaining
    after the sidebar and page gutters. Keep small-screen scrolling unchanged. */
 @media (min-width:801px){
-  #pageSalesCount .sc-calendar{grid-template-columns:repeat(7,minmax(0,1fr))}
-  #pageSalesCount .sc-calendar>.sc-day{min-width:0;max-width:100%}
+  #pageSalesCount .sc-calendar,
+  #pageSalesCount .sc-average-grid{grid-template-columns:repeat(7,minmax(0,1fr))}
+  #pageSalesCount .sc-calendar>.sc-day,
+  #pageSalesCount .sc-average-grid>.sc-average-day{min-width:0;max-width:100%}
 }
 
 /* STEP5 CSP: dashboard year manager runtime CSS externalized. */
