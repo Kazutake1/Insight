@@ -399,7 +399,7 @@ test('納品販売廃棄の対象外は／・未確認はー・未入力は空�
   const partial=page.locator('#excludedPartialReadOnlyE2E');
   await expect(partial.locator('.sc-delivery-row input').nth(1)).toHaveValue('8');
   await expect(partial.locator('.sc-sales-row input').nth(1)).toHaveValue('／');
-  await expect(partial.locator('.sc-waste-row input').nth(1)).toHaveValue('／');
+  await expect(partial.locator('.sc-waste-row input').nth(1)).toHaveValue('ー');
   await expect(partial.locator('.sc-sales-row input').nth(1)).toHaveAttribute('readonly','');
 
   await expect(page.locator('#pageSalesCount .sc-legend')).not.toContainText('過去の対象便未確認');
