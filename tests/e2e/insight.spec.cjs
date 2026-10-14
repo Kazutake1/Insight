@@ -1966,7 +1966,8 @@ test('販売数入力で未登録の過年度へ移動すると年度を正式�
   await page.evaluate(()=>window.InsightSalesCount.setPeriod(2025,1));
   let dialogMessage='';
   page.once('dialog',dialog=>{dialogMessage=dialog.message();dialog.accept();});
-  await page.locator('#scPrev').click();
+  await page.locator('#insightDayNav-salesCounts .iqd-date-input').evaluate(input=>{input.value='2025-01-01';input.dispatchEvent(new Event('change',{bubbles:true}));});
+  await page.locator('#insightDayNav-salesCounts [data-day-prev]').click();
   expect(dialogMessage).toContain('2024年度はダッシュボードに登録されていません');
   await expect.poll(()=>page.evaluate(()=>window.InsightSalesCount.getPeriod())).toEqual({year:'2024',month:12});
 
@@ -3386,7 +3387,9 @@ test('販売数入力の平日・日祝平均は保存済み通常日を分類�
   await page.screenshot({path:'test-results/day-type-averages-tablet.png',fullPage:true});
   await page.locator('#scCategory').selectOption('cat_sandwich');
   await expect(weekday.locator('tbody tr').nth(1).locator('td')).toHaveText(['','','','—']);
-  await page.locator('#scNext').click();
+  await page.locator('#insightDayNav-salesCounts .iqd-date-input').evaluate(input=>{input.value='2026-09-30';input.dispatchEvent(new Event('change',{bubbles:true}));});
+  await page.locator('#insightDayNav-salesCounts [data-day-next]').click();
+  await expect.poll(()=>page.evaluate(()=>InsightSalesCount.getPeriod().month)).toBe(10);
   await expect(holiday.locator('tbody tr').nth(1).locator('td')).toHaveText(['','','','—']);
   expect(errors).toEqual([]);
 });
