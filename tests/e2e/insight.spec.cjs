@@ -48,7 +48,12 @@ test('売上・客数・廃棄・販売数入力は今日の入力と同じ日�
     if(spec.type==='sales')expect(await page.evaluate(()=>window.salesSelDay)).toBe(14);
     if(spec.type==='haiki')expect(await page.evaluate(()=>window.haikiSelDay)).toBe(14);
     if(spec.type==='kyaku')await expect(page.locator('#kyakuGrid .kyaku-day-card.insight-day-selected .kyaku-day-num')).toHaveText('14');
-    if(spec.type==='salesCounts')await expect(page.locator('#scCalendar .sc-day.insight-day-selected .sc-day-num')).toHaveText('14');
+    if(spec.type==='salesCounts'){
+      const today=await page.evaluate(()=>InsightDateContext.iso(new Date()));
+      const outlined=page.locator('#scCalendar .sc-day.insight-day-selected .sc-day-num');
+      if(today.startsWith(String(year)+'-09-'))await expect(outlined).toHaveText(String(Number(today.slice(8))));
+      else await expect(outlined).toHaveCount(0);
+    }
     if(spec.month)await expect.poll(()=>page.evaluate(type=>editMonth[type],spec.month)).toBe('9月');
     else await expect.poll(()=>page.evaluate(()=>InsightSalesCount.getPeriod().month)).toBe(9);
     await dateNav.locator('[data-day-today]').click();
@@ -58,6 +63,58 @@ test('売上・客数・廃棄・販売数入力は今日の入力と同じ日�
   expect(errors).toEqual([]);
 });
 
+
+test('販売数入力の黒枠は今日の日付だけに固定し選択日や表示月に連動しない',async({page})=>{
+  const errors=await openInsight(page);
+  await page.locator('#navSalesCount').click();
+  const dateNav=page.locator('#pageSalesCount .insight-shared-day-nav');
+  const picker=dateNav.locator('input[type="date"]');
+  const outlined=page.locator('#scCalendar .sc-day.insight-day-selected .sc-day-num');
+  const today=await page.evaluate(()=>InsightDateContext.iso(new Date()));
+  const year=Number(today.slice(0,4)),month=Number(today.slice(5,7)),day=Number(today.slice(8));
+  const iso=(y,m,d)=>String(y)+'-'+String(m).padStart(2,'0')+'-'+String(d).padStart(2,'0');
+  const pick=async value=>{
+    await picker.evaluate((input,date)=>{input.value=date;input.dispatchEvent(new Event('change',{bubbles:true}));},value);
+    await expect.poll(()=>page.evaluate(()=>InsightInputDayNav.getSelectedIso('salesCounts'))).toBe(value);
+  };
+  await dateNav.locator('[data-day-today]').click();
+  await expect(outlined).toHaveText(String(day));
+  await expect(outlined).toHaveCount(1);
+
+  // Choosing another input date must not move today's outline.
+  const otherDay=day<=2?3:day-1,chosenIso=iso(year,month,otherDay);
+  await pick(chosenIso);
+  await expect(outlined).toHaveText(String(day));
+  await expect(dateNav.locator('.iqd-date-main')).toContainText(String(otherDay)+'日');
+
+  // Prev/next controls still operate without moving today's outline.
+  await dateNav.locator(day<=2?'[data-day-next]':'[data-day-prev]').click();
+  await expect.poll(()=>page.evaluate(()=>InsightInputDayNav.getSelectedIso('salesCounts')))
+    .toBe(iso(year,month,day<=2?4:day-2));
+  await expect(outlined).toHaveText(String(day));
+
+  // A different month containing the same numeric day must have NO outline.
+  const otherMonth=month===1?2:month-1,monthIso=iso(year,otherMonth,14);
+  await pick(monthIso);
+  await expect(outlined).toHaveCount(0);
+  await dateNav.locator('[data-day-today]').click();
+  await expect.poll(()=>page.evaluate(()=>InsightInputDayNav.getSelectedIso('salesCounts'))).toBe(today);
+  await expect(outlined).toHaveText(String(day));
+
+  // The previous registered year (if available) also must not highlight this month's day.
+  const otherYear=await page.evaluate(current=>{
+    const store=allStores.stores[allStores.current];
+    return (store.years||[]).map(Number).find(y=>y!==current)||null;
+  },year);
+  if(otherYear){
+    await pick(iso(otherYear,month,14));
+    await expect(outlined).toHaveCount(0);
+    await dateNav.locator('[data-day-today]').click();
+    await expect.poll(()=>page.evaluate(()=>InsightInputDayNav.getSelectedIso('salesCounts'))).toBe(today);
+    await expect(outlined).toHaveText(String(day));
+  }
+  expect(errors).toEqual([]);
+});
 
 test('売上・廃棄入力は当月の初回表示で旧選択日1日より今日を優先する',async({page})=>{
   const errors=await openInsight(page);
@@ -293,10 +350,10 @@ test('トップページは外部shellと機能manifestの最新版確認をno-s
     fetch('/insight_payload_source_v1.html?e2e-shell-check=1',{cache:'no-store'}).then(r=>r.text())
   ]));
   const [source,boot,loader,payload]=sources;
-  expect(source).toContain('name="insight-shell-version" content="20261014-sales-count-leading-zero-build-46"');
-  expect(source).toContain('insight_shell_boot_v1.js?v=20261014-sales-count-leading-zero-build-46');
-  expect(source).toContain('insight_shell_loader_v1.js?v=20261014-sales-count-leading-zero-build-46');
-  expect(source).toContain('insight_shell_v1.css?v=20261014-sales-count-leading-zero-build-46');
+  expect(source).toContain('name="insight-shell-version" content="20261014-sales-count-today-outline-build-47"');
+  expect(source).toContain('insight_shell_boot_v1.js?v=20261014-sales-count-today-outline-build-47');
+  expect(source).toContain('insight_shell_loader_v1.js?v=20261014-sales-count-today-outline-build-47');
+  expect(source).toContain('insight_shell_v1.css?v=20261014-sales-count-today-outline-build-47');
   expect(source).not.toMatch(/<script(?![^>]*\bsrc=)[^>]*>/i);
   expect(source).not.toMatch(/<style\b/i);
   expect(source).not.toMatch(/script-src[^;]*'unsafe-inline'/);
