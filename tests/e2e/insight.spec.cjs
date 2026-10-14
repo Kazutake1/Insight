@@ -608,7 +608,9 @@ test('STEP17の文字階層をダッシュボード・入力・販売数・分�
   expect(salesCountType.averageTitle).toBe('16px');
   expect(salesCountType.calendarGap).toBe('8px');
   expect(salesCountType.averageGap).toBe('8px');
-  expect(salesCountType.dayWidth).toBeGreaterThanOrEqual(160);
+  // Daily input cards now shrink to fit the iPad viewport; averages retain their old width.
+  expect(salesCountType.dayWidth).toBeGreaterThan(120);
+  expect(salesCountType.dayWidth).toBeLessThanOrEqual(salesCountType.averageDayWidth);
   expect(salesCountType.averageDayWidth).toBeGreaterThanOrEqual(160);
 
   await page.locator('#aiAnalysisToggle').click();
