@@ -44,6 +44,46 @@ test('WebKitで起動し主要入力ページを移動できる',async({page})=>
   expect(errors).toEqual([]);
 });
 
+test.describe('iPad相当のタッチ操作',()=>{
+  test.use({hasTouch:true});
+  test('WebKitで数字入力後にカテゴリー管理を開きチェック・保存を指のタップ位置で操作できる',async({page})=>{
+    const errors=await openInsight(page);
+    await page.setViewportSize({width:1194,height:834});
+    await page.locator('#navSalesCount').click();
+    const number=page.locator('#scCalendar .sc-day:not(.empty) .sc-sales-row input[type="number"]').first();
+    await number.fill('19');
+    await expect(number).toBeFocused();
+    const tap=async locator=>{
+      const bounds=await locator.boundingBox();
+      expect(bounds).not.toBeNull();
+      await page.touchscreen.tap(bounds.x+bounds.width/2,bounds.y+bounds.height/2);
+    };
+    await tap(page.locator('#scManage'));
+    const dialog=page.locator('dialog.sc-dialog');
+    await expect(dialog).toBeVisible();
+    await expect(number).not.toBeFocused();
+
+    const label=dialog.locator('.sc-category-row').first().locator('.sc-category-trips label').first();
+    const checkbox=label.locator('input[type="checkbox"]');
+    const original=await checkbox.isChecked();
+    await tap(label);
+    if(original)await expect(checkbox).not.toBeChecked();
+    else await expect(checkbox).toBeChecked();
+    const save=dialog.locator('[data-save]');
+    await save.scrollIntoViewIfNeeded();
+    await tap(save);
+    await expect(dialog).toHaveCount(0);
+    await expect(number).toHaveValue('19');
+    await expect(page.locator('#scSave')).toBeEnabled();
+
+    await tap(page.locator('#scManage'));
+    await expect(dialog).toBeVisible();
+    await tap(dialog.locator('header button'));
+    await expect(dialog).toHaveCount(0);
+    expect(errors).toEqual([]);
+  });
+});
+
 test('WebKitでダッシュボード選択月の黒枠とページ間の月維持を確認する',async({page})=>{
   const errors=await openInsight(page);
   await page.locator('#nav1').click();
