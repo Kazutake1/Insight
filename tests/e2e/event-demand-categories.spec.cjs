@@ -412,7 +412,7 @@ test('イベント・催事は開催回ごとの指定カテゴリーだけを�
   const errors=[];page.on('pageerror',error=>errors.push(error.message));
   if(browserName==='webkit')await page.route('**/Index.html*',async route=>{
     const response=await route.fetch();
-    await route.fulfill({response,body:(await response.text()).replace(/;?\\s*upgrade-insecure-requests/g,'')});
+    await route.fulfill({response,body:(await response.text()).replace(/;?\s*upgrade-insecure-requests/g,'')});
   });
   await page.setViewportSize({width:1194,height:834});
   await page.goto('/Index.html',{waitUntil:'domcontentloaded'});
@@ -463,7 +463,7 @@ test('イベントと催事の登録画面で実績表示カテゴリーを選�
   const errors=[];page.on('pageerror',error=>errors.push(error.message));
   if(browserName==='webkit')await page.route('**/Index.html*',async route=>{
     const response=await route.fetch();
-    await route.fulfill({response,body:(await response.text()).replace(/;?\\s*upgrade-insecure-requests/g,'')});
+    await route.fulfill({response,body:(await response.text()).replace(/;?\s*upgrade-insecure-requests/g,'')});
   });
   await page.setViewportSize({width:1194,height:834});
   await page.goto('/Index.html',{waitUntil:'domcontentloaded'});
