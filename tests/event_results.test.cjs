@@ -148,3 +148,19 @@ test('同名・同会場の開催は補足が違っても集約し、保存済�
   assert.equal(JSON.stringify(all),saved);
   assert.notEqual(saved,before);
 });
+
+test('開催回ごとのカテゴリー表示選択は集計結果に引き継がれ未設定の過去開催は全表示扱い',()=>{
+  const all=data(),before=JSON.stringify(all);
+  all.stores.a.events[0].snapshot.resultCategoryIds=['cat_onigiri'];
+  all.stores.a.events.find(event=>event.id==='s1').snapshot.resultCategoryIds=['cat_noodles','cat_sweets'];
+  const nearby=results.collect(all,'a','文化フォーラム','秋まつり',analysis);
+  assert.deepEqual(nearby.occurrences[0].resultCategoryIds,['cat_onigiri']);
+  assert.equal(nearby.occurrences[1].resultCategoryIds,null);
+  nearby.occurrences[0].resultCategoryIds.push('changed');
+  assert.deepEqual(all.stores.a.events[0].snapshot.resultCategoryIds,['cat_onigiri']);
+  const special=results.collectSpecial(all,'a','クリスマス',analysis);
+  assert.deepEqual(special.occurrences[0].resultCategoryIds,['cat_noodles','cat_sweets']);
+  assert.equal(special.occurrences[1].resultCategoryIds,null);
+  assert.notEqual(JSON.stringify(all),before);
+  assert.equal(all.stores.a.events[1].snapshot.resultCategoryIds,undefined);
+});
