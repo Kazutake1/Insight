@@ -63,7 +63,8 @@ test.describe('iPad相当のタッチ操作',()=>{
     await expect(dialog).toBeVisible();
     await expect(number).not.toBeFocused();
 
-    const label=dialog.locator('.sc-category-row').first().locator('.sc-category-trips label').first();
+    // Keep the first trip active so the earlier sales value stays visible.
+    const label=dialog.locator('.sc-category-row').first().locator('.sc-category-trips label').nth(1);
     const checkbox=label.locator('input[type="checkbox"]');
     const original=await checkbox.isChecked();
     await tap(label);
