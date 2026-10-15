@@ -3384,9 +3384,10 @@ test('販売数を編集中にカテゴリー管理を開いても入力とチ�
   await expect(input).not.toBeFocused();
   const checks=dialog.locator('.sc-category-row').first().locator('.sc-category-trips input[type="checkbox"]');
   await expect(checks).toHaveCount(3);
-  const original=await checks.first().isChecked();
-  await checks.first().click();
-  expect(await checks.first().isChecked()).toBe(!original);
+  // Keep the first trip editable to verify its unsaved entry survives the dialog.
+  const original=await checks.nth(1).isChecked();
+  await checks.nth(1).click();
+  expect(await checks.nth(1).isChecked()).toBe(!original);
   await dialog.locator('[data-save]').click();
   await expect(dialog).toHaveCount(0);
   await expect(input).toHaveValue('37');
