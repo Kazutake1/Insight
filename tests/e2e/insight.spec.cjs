@@ -3368,6 +3368,38 @@ test('廃棄のプラス変化だけは分析要約でも赤表示にする',asy
   expect(errors).toEqual([]);
 });
 
+test('販売数を編集中にカテゴリー管理を開いても入力とチェック・保存操作を維持する',async({page})=>{
+  const errors=await openInsight(page);
+  await page.setViewportSize({width:1194,height:834});
+  await page.locator('#navSalesCount').click();
+  const input=page.locator('#scCalendar .sc-day:not(.empty) .sc-delivery-row input[type="number"]').first();
+  await input.fill('37');
+  await expect(input).toHaveValue('37');
+  await expect(page.locator('#scSave')).toBeEnabled();
+  await expect(input).toBeFocused();
+
+  await page.locator('#scManage').click();
+  const dialog=page.locator('dialog.sc-dialog');
+  await expect(dialog).toBeVisible();
+  await expect(input).not.toBeFocused();
+  const checks=dialog.locator('.sc-category-row').first().locator('.sc-category-trips input[type="checkbox"]');
+  await expect(checks).toHaveCount(3);
+  const original=await checks.first().isChecked();
+  await checks.first().click();
+  expect(await checks.first().isChecked()).toBe(!original);
+  await dialog.locator('[data-save]').click();
+  await expect(dialog).toHaveCount(0);
+  await expect(input).toHaveValue('37');
+  await expect(page.locator('#scSave')).toBeEnabled();
+
+  // Opening again without numeric keyboard focus should remain responsive.
+  await page.locator('#scManage').click();
+  await expect(dialog).toBeVisible();
+  await dialog.locator('header button').click();
+  await expect(dialog).toHaveCount(0);
+  expect(errors).toEqual([]);
+});
+
 test('カテゴリーごとの対象便設定で対象外便を入力漏れ扱いしない',async({page})=>{
   const errors=await openInsight(page);
   await page.locator('#navSalesCount').click();
