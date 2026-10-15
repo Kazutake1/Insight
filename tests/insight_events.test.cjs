@@ -299,3 +299,23 @@ test('販売数入力の既存カテゴリーはよく使うカテゴリーに�
   assert.equal(JSON.stringify(all.salesCountManagement),before);
   assert.doesNotThrow(()=>events.validate(all));
 });
+
+test('イベント・催事は開催記録ごとに実績表示カテゴリーIDを安全に保存できる',()=>{
+  const all=data();
+  events.add(all,'a',{type:'nearby',scope:'store',startDate:'2026-09-10',endDate:'2026-09-10',snapshot:{version:1,title:'文化祭',note:'',location:'文化フォーラム',resultCategoryIds:['cat_onigiri','cat_sweets']}});
+  events.add(all,'a',{type:'special',scope:'store',startDate:'2026-09-11',endDate:'2026-09-12',snapshot:{version:1,title:'催事',note:'',resultCategoryIds:['cat_noodles']}});
+  events.add(all,'b',{type:'nearby',scope:'store',startDate:'2026-09-10',endDate:'2026-09-10',snapshot:{version:1,title:'別店舗',note:''}});
+  const original=JSON.stringify(all),restored=JSON.parse(original);
+  events.validate(restored);
+  assert.equal(JSON.stringify(restored),original);
+  assert.deepEqual(restored.stores.a.events.map(e=>e.snapshot.resultCategoryIds),[['cat_onigiri','cat_sweets'],['cat_noodles']]);
+  assert.equal(restored.stores.b.events[0].snapshot.resultCategoryIds,undefined);
+  const testSnapshot={version:1,title:'不正',note:'',resultCategoryIds:['cat_onigiri','cat_onigiri']};
+  assert.throws(()=>events.validateSnapshot(testSnapshot),/重複/);
+  testSnapshot.resultCategoryIds=[];
+  assert.throws(()=>events.validateSnapshot(testSnapshot),/1件以上/);
+  testSnapshot.resultCategoryIds=[''];
+  assert.throws(()=>events.validateSnapshot(testSnapshot),/識別番号/);
+  testSnapshot.resultCategoryIds=['cat_onigiri'];
+  assert.doesNotThrow(()=>events.validateSnapshot(testSnapshot));
+});
