@@ -434,7 +434,16 @@
       occurrence.days.forEach(function(day){
         var button=el('button',undefined,'er-day-tab'+(day.date===state.selectedDate?' active':''));button.type='button';button.dataset.date=day.date;
         button.append(el('strong',dateLabel(day.date,false)),root.InsightSalesCount.createHistoricalWeatherRow(day.date,currentStoreId()),el('span','売上 '+salesYen(day.metrics.salesYen)),el('span','客数 '+people(day.metrics.customers)));
-        button.onclick=function(){state.selectedDate=day.date;render();};
+        button.onclick=function(){
+          var scrollLeft=wrap.scrollLeft;
+          state.selectedDate=day.date;render();
+          var next=doc.querySelector('#erResults .er-day-tabs');if(!next)return;
+          next.scrollLeft=scrollLeft;
+          var active=next.querySelector('.er-day-tab.active');if(!active)return;
+          var viewport=next.getBoundingClientRect(),card=active.getBoundingClientRect();
+          if(card.left<viewport.left)next.scrollLeft-=viewport.left-card.left;
+          else if(card.right>viewport.right)next.scrollLeft+=card.right-viewport.right;
+        };
         wrap.append(button);
       });
       return wrap;
