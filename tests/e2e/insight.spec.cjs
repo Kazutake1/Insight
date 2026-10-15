@@ -350,10 +350,10 @@ test('トップページは外部shellと機能manifestの最新版確認をno-s
     fetch('/insight_payload_source_v1.html?e2e-shell-check=1',{cache:'no-store'}).then(r=>r.text())
   ]));
   const [source,boot,loader,payload]=sources;
-  expect(source).toContain('name="insight-shell-version" content="20261014-sales-count-today-outline-build-47"');
-  expect(source).toContain('insight_shell_boot_v1.js?v=20261014-sales-count-today-outline-build-47');
-  expect(source).toContain('insight_shell_loader_v1.js?v=20261014-sales-count-today-outline-build-47');
-  expect(source).toContain('insight_shell_v1.css?v=20261014-sales-count-today-outline-build-47');
+  expect(source).toContain('name="insight-shell-version" content="20261015-sales-count-category-touch-build-48"');
+  expect(source).toContain('insight_shell_boot_v1.js?v=20261015-sales-count-category-touch-build-48');
+  expect(source).toContain('insight_shell_loader_v1.js?v=20261015-sales-count-category-touch-build-48');
+  expect(source).toContain('insight_shell_v1.css?v=20261015-sales-count-category-touch-build-48');
   expect(source).not.toMatch(/<script(?![^>]*\bsrc=)[^>]*>/i);
   expect(source).not.toMatch(/<style\b/i);
   expect(source).not.toMatch(/script-src[^;]*'unsafe-inline'/);
@@ -3365,6 +3365,39 @@ test('廃棄のプラス変化だけは分析要約でも赤表示にする',asy
     sales:getComputedStyle(document.querySelector('#aiAnalysisSummary .ai-insight-item:nth-child(2) .ai-insight-value')).color
   }));
   expect(colors.waste).not.toBe(colors.sales);
+  expect(errors).toEqual([]);
+});
+
+test('販売数を編集中にカテゴリー管理を開いても入力とチェック・保存操作を維持する',async({page})=>{
+  const errors=await openInsight(page);
+  await page.setViewportSize({width:1194,height:834});
+  await page.locator('#navSalesCount').click();
+  const input=page.locator('#scCalendar .sc-day:not(.empty) .sc-delivery-row input[type="number"]').first();
+  await input.fill('37');
+  await expect(input).toHaveValue('37');
+  await expect(page.locator('#scSave')).toBeEnabled();
+  await expect(input).toBeFocused();
+
+  await page.locator('#scManage').click();
+  const dialog=page.locator('dialog.sc-dialog');
+  await expect(dialog).toBeVisible();
+  await expect(input).not.toBeFocused();
+  const checks=dialog.locator('.sc-category-row').first().locator('.sc-category-trips input[type="checkbox"]');
+  await expect(checks).toHaveCount(3);
+  // Keep the first trip editable to verify its unsaved entry survives the dialog.
+  const original=await checks.nth(1).isChecked();
+  await checks.nth(1).click();
+  expect(await checks.nth(1).isChecked()).toBe(!original);
+  await dialog.locator('[data-save]').click();
+  await expect(dialog).toHaveCount(0);
+  await expect(input).toHaveValue('37');
+  await expect(page.locator('#scSave')).toBeEnabled();
+
+  // Opening again without numeric keyboard focus should remain responsive.
+  await page.locator('#scManage').click();
+  await expect(dialog).toBeVisible();
+  await dialog.locator('header button').click();
+  await expect(dialog).toHaveCount(0);
   expect(errors).toEqual([]);
 });
 
