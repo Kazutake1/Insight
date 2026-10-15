@@ -55,6 +55,15 @@
       }
       validateSaleCondition(sale.method,sale.params);
     }
+    if(s.resultCategoryIds!==undefined){
+      requireValue(Array.isArray(s.resultCategoryIds)&&s.resultCategoryIds.length>0,'表示する実績カテゴリーを1件以上選択してください。');
+      var resultIds=new Set();
+      s.resultCategoryIds.forEach(function(categoryId){
+        str(categoryId,'実績カテゴリー識別番号');
+        requireValue(!resultIds.has(categoryId),'表示する実績カテゴリーが重複しています。');
+        resultIds.add(categoryId);
+      });
+    }
     if(s.specialDemand!==undefined){
       requireValue(Array.isArray(s.specialDemand),'特需商品の形式が不正です。');
       var demandIds=new Set(),demandNames=new Set();
@@ -417,6 +426,42 @@
         });
       };
     }
+    function resultCategoryEditor(parent,snapshot){
+      var categories=allStores.salesCountManagement&&Array.isArray(allStores.salesCountManagement.categories)?
+        allStores.salesCountManagement.categories.filter(function(category){return !category.hidden;}):[];
+      var oldIds=Array.isArray(snapshot&&snapshot.resultCategoryIds)?snapshot.resultCategoryIds:null;
+      var selected=oldIds?new Set(oldIds):null;
+      var box=el('fieldset',undefined,'ie-result-category-options'),legend=el('legend','カテゴリー実績の表示');
+      box.append(legend);
+      var note=el('p','チェックしたカテゴリーの実績だけを表示します。販売・納品データは変更されません。','ie-muted');box.append(note);
+      if(!categories.length){
+        box.append(el('p','表示可能なカテゴリーがありません。','ie-muted'));
+        parent.append(box);
+        return function(){return oldIds?copy(oldIds):undefined;};
+      }
+      var actions=el('div',undefined,'ie-result-category-actions'),grid=el('div',undefined,'ie-result-category-grid'),rows=[];
+      actions.append(button('すべて選択',function(){rows.forEach(function(row){row.check.checked=true;});}),
+        button('すべて解除',function(){rows.forEach(function(row){row.check.checked=false;});}));
+      box.append(actions);
+      categories.forEach(function(category){
+        var label=el('label'),check=el('input');
+        check.type='checkbox';check.value=category.id;
+        check.checked=!selected||selected.has(category.id);
+        check.setAttribute('aria-label','実績表示 '+category.name);
+        label.append(check,el('span',category.name));grid.append(label);
+        rows.push({id:category.id,check:check});
+      });
+      box.append(grid);parent.append(box);
+      return function(){
+        var ids=rows.filter(function(row){return row.check.checked;}).map(function(row){return row.id;});
+        requireValue(ids.length>0,'表示する実績カテゴリーを1件以上選択してください。');
+        if(ids.length===rows.length)return undefined; // No filter; includes categories added in future.
+        // Retain IDs from an existing saved filter if their categories have since been hidden.
+        var activeIds=new Set(rows.map(function(row){return row.id;}));
+        if(oldIds)oldIds.forEach(function(id){if(!activeIds.has(id)&&ids.indexOf(id)<0)ids.push(id);});
+        return ids;
+      };
+    }
     function specialPresetEditor(parent,snapshot){
       var title=field(parent,'催事名','text',snapshot?snapshot.title:''),note=field(parent,'補足（任意）','textarea',snapshot?snapshot.note:'');title.required=true;
       var readDemand=specialDemandEditor(parent,snapshot,true);
@@ -616,7 +661,8 @@
           var readLocation=type.value==='nearby'?locationEditor(content,initialSnapshot):null;
           var title=field(content,type.value==='special'?'催事名':'イベント名','text',initialSnapshot?initialSnapshot.title:''),note=field(content,'補足（任意）','textarea',initialSnapshot?initialSnapshot.note:'');title.required=true;
           var readDemand=(type.value==='nearby'||type.value==='special')?specialDemandEditor(content,initialSnapshot,false):function(){return [];};
-          read=function(){var snapshot={version:1,title:title.value.trim(),note:note.value.trim()};if(readLocation)snapshot.location=readLocation();if(type.value==='nearby'||type.value==='special')snapshot.specialDemand=readDemand();validateSnapshot(snapshot);return snapshot;};
+          var readResultCategories=(type.value==='nearby'||type.value==='special')?resultCategoryEditor(content,initialSnapshot):null;
+          read=function(){var snapshot={version:1,title:title.value.trim(),note:note.value.trim()};if(readLocation)snapshot.location=readLocation();if(type.value==='nearby'||type.value==='special'){snapshot.specialDemand=readDemand();var resultIds=readResultCategories();if(resultIds!==undefined)snapshot.resultCategoryIds=resultIds;}validateSnapshot(snapshot);return snapshot;};
         }
       }
       type.onchange=function(){showAll=false;eventTemplate=null;templatePresetId=null;draw();};draw();

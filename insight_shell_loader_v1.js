@@ -2,7 +2,7 @@
 (function(){
 function fail(e){document.body.innerHTML='<div class="insight-load-failure">Insightの読み込みに失敗しました。<br><small>'+String(e&&e.message?e.message:e)+'</small></div>';}
 if(typeof Chart==='undefined'){fail(new Error('グラフライブラリを読み込めませんでした'));return;}
-fetch('./insight_payload_source_v1.html?v=20261014-sales-count-average-fit-1',{cache:'no-store'}).then(function(r){if(!r.ok)throw new Error('Insight payload の取得に失敗しました ('+r.status+')');return r.text();}).then(function(html){
+fetch('./insight_payload_source_v1.html?v=20261015-event-categories-1',{cache:'no-store'}).then(function(r){if(!r.ok)throw new Error('Insight payload の取得に失敗しました ('+r.status+')');return r.text();}).then(function(html){
 if(html.indexOf('<!DOCTYPE html>')!==0&&html.indexOf('<!doctype html>')!==0)throw new Error('HTMLデータの検証に失敗しました');
 // STEP5 complete: payload source is self-contained; feature modules are inserted before document.write().
 var orderedFeatureLoads=[
@@ -33,7 +33,7 @@ var orderedFeatureLoads=[
   './insight_annual_summary_v1.js?v=20261006-csp-style-annual-1',
   './insight_ai_presentation_v1.js?v=20261009-ai-left-scroll-js-1',
   './insight_ai_visual_v1.js?v=20261006-balanced-layout-1',
-  './insight_events_v1.js?v=20261007-step3-event-target-visibility-1',
+  './insight_events_v1.js?v=20261015-event-categories-1',
   './insight_hourly_customers_v1.js?v=20261006-remove-help',
   './insight_temperature_v1.js?v=20261007-csp-style-temperature-1',
   './insight_weather_compact_v1.js?v=20261007-csp-style-weather-compact-1',
@@ -57,7 +57,7 @@ var orderedFeatureLoads=[
   './insight_event_impact_v1.js?v=20261003-event-impact-1',
   './insight_seasonality_analysis_v1.js?v=20261003-seasonality-1',
   './insight_anomaly_explanation_v1.js?v=20261003-anomaly-context-1',
-  './insight_event_results_v1.js?v=20261014-no-hourly-label-1',
+  './insight_event_results_v1.js?v=20261015-event-categories-1',
   './insight_daily_anomaly_v1.js?v=20261003-anomaly-context-1',
   './insight_weekly_review_v1.js?v=20261001-step4',
   './insight_monthly_review_v1.js?v=20261001-step5',

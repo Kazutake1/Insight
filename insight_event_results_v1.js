@@ -143,6 +143,8 @@
       note:event.snapshot&&event.snapshot.note||'',
       metrics:metrics,
       specialDemand:normalizeDemand(event.snapshot&&event.snapshot.specialDemand),
+      resultCategoryIds:Array.isArray(event.snapshot&&event.snapshot.resultCategoryIds)?
+        event.snapshot.resultCategoryIds.slice():null,
       days:days
     };
   }
@@ -332,11 +334,12 @@
       return root.InsightSalesCount.createReadOnlyDayCard(date,record,category,
         root.InsightSalesCount.wasteRecordAt(allStores,currentStoreId(),date,category.id),mask);
     }
-    function salesCategoriesSection(date){
+    function salesCategoriesSection(date,occurrence){
       root.InsightSalesCount.ensure(allStores);
       var store=allStores.stores[currentStoreId()],saved=store&&store.salesCounts&&store.salesCounts[date]||{};
       var categories=(allStores.salesCountManagement&&allStores.salesCountManagement.categories||[]).filter(function(category){
-        if(category.hidden||!saved[category.id])return false;
+        if(category.hidden||!saved[category.id]||
+          occurrence&&Array.isArray(occurrence.resultCategoryIds)&&occurrence.resultCategoryIds.indexOf(category.id)<0)return false;
         var record=root.InsightSalesCount.normalizeRecord(saved[category.id]);
         return record.trips.some(function(trip){return trip.delivery!==null||trip.sales!==null;});
       });
@@ -355,7 +358,8 @@
       root.InsightSalesCount.ensure(allStores);
       var store=allStores.stores[currentStoreId()],records=store&&store.salesCounts||{};
       var categories=(allStores.salesCountManagement&&allStores.salesCountManagement.categories||[]).filter(function(category){
-        if(category.hidden)return false;
+        if(category.hidden||
+          Array.isArray(occurrence.resultCategoryIds)&&occurrence.resultCategoryIds.indexOf(category.id)<0)return false;
         return occurrence.days.some(function(day){
           var saved=records[day.date]&&records[day.date][category.id];
           if(!saved)return false;
@@ -458,7 +462,7 @@
 
       var hourly=hourlySection(selected.date);if(hourly)results.append(hourly);
       if(occurrence.days.length===1){
-        var sales=salesCategoriesSection(selected.date);if(sales)results.append(sales);
+        var sales=salesCategoriesSection(selected.date,occurrence);if(sales)results.append(sales);
       }else{
         var periodCategories=periodCategoriesSection(occurrence);
         if(periodCategories)results.append(periodCategories);

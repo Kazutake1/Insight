@@ -407,3 +407,104 @@ test('納品販売廃棄の対象外は／・未確認はー・未入力は空�
   expect(await page.evaluate(()=>localStorage.getItem('insight_v11'))).toBe(baseline);
   expect(errors).toEqual([]);
 });
+
+test('イベント・催事は開催回ごとの指定カテゴリーだけを表示し既存開催は従来どおり',async({page,browserName})=>{
+  const errors=[];page.on('pageerror',error=>errors.push(error.message));
+  if(browserName==='webkit')await page.route('**/Index.html*',async route=>{
+    const response=await route.fetch();
+    await route.fulfill({response,body:(await response.text()).replace(/;?\s*upgrade-insecure-requests/g,'')});
+  });
+  await page.setViewportSize({width:1194,height:834});
+  await page.goto('/Index.html',{waitUntil:'domcontentloaded'});
+  await expect(page.locator('#navEventResults')).toBeVisible();
+  const cats=await page.evaluate(()=>{
+    const categories=allStores.salesCountManagement.categories.filter(c=>!c.hidden).slice(0,2);
+    if(categories.length<2)throw new Error('テスト用のカテゴリーが2つ必要です');
+    const store=allStores.stores[allStores.current],ids=categories.map(c=>c.id);
+    store.events=store.events||[];
+    const events=[
+      {id:'e2e_filter_near_new',type:'nearby',scope:'store',startDate:'2026-09-10',endDate:'2026-09-10',snapshot:{version:1,title:'E2E実績表示イベント',note:'当年',location:'E2E選択会場',resultCategoryIds:[ids[0]]}},
+      {id:'e2e_filter_near_old',type:'nearby',scope:'store',startDate:'2025-09-10',endDate:'2025-09-10',snapshot:{version:1,title:'E2E実績表示イベント',note:'前年',location:'E2E選択会場'}},
+      {id:'e2e_filter_special_new',type:'special',scope:'store',startDate:'2026-09-11',endDate:'2026-09-12',snapshot:{version:1,title:'E2E実績表示催事',note:'2日間',resultCategoryIds:[ids[1]]}},
+      {id:'e2e_filter_special_old',type:'special',scope:'store',startDate:'2025-09-11',endDate:'2025-09-11',snapshot:{version:1,title:'E2E実績表示催事',note:'前年'}}
+    ];
+    store.events.push(...events);
+    store.salesCounts=store.salesCounts||{};
+    for(const date of ['2026-09-10','2025-09-10','2026-09-11','2026-09-12','2025-09-11']){
+      store.salesCounts[date]=store.salesCounts[date]||{};
+      categories.forEach((c,index)=>{store.salesCounts[date][c.id]={trips:[{delivery:index+10,sales:index+5},{delivery:null,sales:null},{delivery:null,sales:null}]};});
+    }
+    InsightEventResults.render();
+    return categories.map(c=>({id:c.id,name:c.name}));
+  });
+  const before=await page.evaluate(()=>JSON.stringify(allStores.stores[allStores.current].salesCounts));
+  await page.locator('#navEventResults').click();
+  await page.locator('#erLocation').selectOption({label:'E2E選択会場'});
+  await page.locator('#erEvent').selectOption({label:'E2E実績表示イベント'});
+  await expect(page.locator('.er-occurrence')).toHaveCount(2);
+  await page.locator('.er-occurrence').first().click();
+  await expect(page.locator('.er-category-card > h3')).toHaveText([cats[0].name]);
+  await page.locator('.er-back').click();
+  await page.locator('.er-occurrence').nth(1).click();
+  await expect(page.locator('.er-category-card > h3')).toHaveText(cats.map(c=>c.name));
+  await page.locator('.er-kind-btn[data-kind="special"]').click();
+  await page.locator('#erEvent').selectOption({label:'E2E実績表示催事'});
+  await page.locator('.er-occurrence').first().click();
+  await expect(page.locator('.er-period-category > h3')).toHaveText([cats[1].name]);
+  await expect(page.locator('.er-period-day-grid .sc-day')).toHaveCount(2);
+  await page.locator('.er-back').click();
+  await page.locator('.er-occurrence').nth(1).click();
+  await expect(page.locator('.er-category-card > h3')).toHaveText(cats.map(c=>c.name));
+  expect(await page.evaluate(()=>JSON.stringify(allStores.stores[allStores.current].salesCounts))).toBe(before);
+  expect(errors).toEqual([]);
+});
+
+test('イベントと催事の登録画面で実績表示カテゴリーを選択し保存後も維持する',async({page,browserName})=>{
+  const errors=[];page.on('pageerror',error=>errors.push(error.message));
+  if(browserName==='webkit')await page.route('**/Index.html*',async route=>{
+    const response=await route.fetch();
+    await route.fulfill({response,body:(await response.text()).replace(/;?\s*upgrade-insecure-requests/g,'')});
+  });
+  await page.setViewportSize({width:1194,height:834});
+  await page.goto('/Index.html',{waitUntil:'domcontentloaded'});
+  await expect(page.locator('#navSalesCount')).toBeVisible();
+  await page.locator('#nav0').click();
+  const master=await page.evaluate(()=>allStores.salesCountManagement.categories.filter(c=>!c.hidden).map(c=>({id:c.id,name:c.name})));
+  expect(master.length).toBeGreaterThan(1);
+  for(const spec of [
+    {type:'nearby',label:'イベント名',title:'E2E表示選択・近隣',location:true},
+    {type:'special',label:'催事名',title:'E2E表示選択・催事',location:false}
+  ]){
+    await page.getByRole('button',{name:'＋イベントを追加'}).click();
+    const dialog=page.locator('.ie-dialog.ie-event-add');
+    await dialog.getByLabel('イベント種別').selectOption(spec.type);
+    const fieldset=dialog.locator('.ie-result-category-options');
+    await expect(fieldset).toBeVisible();
+    await expect(fieldset.locator('input[type="checkbox"]')).toHaveCount(master.length);
+    await expect(fieldset.locator('input[type="checkbox"]:checked')).toHaveCount(master.length);
+    await fieldset.getByRole('button',{name:'すべて解除'}).click();
+    await dialog.getByLabel('実績表示 '+master[0].name).check();
+    await dialog.getByLabel(spec.label,{exact:true}).fill(spec.title);
+    if(spec.location)await dialog.getByLabel('イベント場所').first().fill('E2E選択登録会場');
+    await dialog.getByRole('button',{name:'登録する'}).click();
+    await expect(dialog).toHaveCount(0);
+    const saved=await page.evaluate(title=>{
+      const found=allStores.stores[allStores.current].events.find(e=>e.snapshot&&e.snapshot.title===title);
+      return found&&{type:found.type,ids:found.snapshot.resultCategoryIds,location:found.snapshot.location};
+    },spec.title);
+    expect(saved.type).toBe(spec.type);
+    expect(saved.ids).toEqual([master[0].id]);
+    if(spec.location)expect(saved.location).toBe('E2E選択登録会場');
+  }
+  const raw=await page.evaluate(()=>localStorage.getItem('insight_v11'));
+  expect(raw).toContain('E2E表示選択・近隣');
+  expect(raw).toContain('E2E表示選択・催事');
+  await page.reload({waitUntil:'domcontentloaded'});
+  await expect(page.locator('#navSalesCount')).toBeVisible();
+  const restored=await page.evaluate(()=>{
+    const evts=allStores.stores[allStores.current].events;
+    return ['E2E表示選択・近隣','E2E表示選択・催事'].map(title=>evts.find(e=>e.snapshot&&e.snapshot.title===title)?.snapshot.resultCategoryIds);
+  });
+  expect(restored).toEqual([[master[0].id],[master[0].id]]);
+  expect(errors).toEqual([]);
+});
