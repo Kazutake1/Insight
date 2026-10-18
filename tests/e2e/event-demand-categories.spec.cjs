@@ -565,3 +565,65 @@ test('特需カテゴリーの名前を変更しても開いている催事の�
   expect(await page.evaluate(id=>InsightEvents.demandCategories(allStores).find(c=>c.id===id)?.name,categoryId)).toBe(renamed);
   expect(errors).toEqual([]);
 });
+
+
+test('削除された特需カテゴリーは自由入力に退避し既存イベントを変更しない',async({page,browserName})=>{
+  const errors=[];page.on('pageerror',error=>errors.push(error.message));
+  if(browserName==='webkit')await page.route('**/Index.html*',async route=>{
+    const response=await route.fetch();
+    await route.fulfill({response,body:(await response.text()).replace(/;?\s*upgrade-insecure-requests/g,'')});
+  });
+  await page.setViewportSize({width:1194,height:834});
+  await page.goto('/Index.html',{waitUntil:'domcontentloaded'});
+  await expect(page.locator('#nav0')).toBeVisible();
+  await page.locator('#nav0').click();
+  await page.getByRole('button',{name:'＋イベントを追加'}).click();
+  const editor=page.locator('dialog.ie-event-add');
+  await editor.getByLabel('イベント種別').selectOption('special');
+  await editor.getByRole('button',{name:'カテゴリー管理'}).click();
+  const manager=page.locator('dialog.ie-preset-editor').filter({has:page.locator('.ie-demand-category-manager')});
+  await manager.getByRole('button',{name:'＋ カテゴリーを追加'}).click();
+  await manager.getByLabel('カテゴリー名').first().fill('E2E削除対象');
+  await manager.getByRole('button',{name:'＋ カテゴリーを追加'}).click();
+  await manager.getByLabel('カテゴリー名').nth(1).fill('E2E残す対象');
+  await manager.getByRole('button',{name:'保存する'}).click();
+  await expect(manager).toHaveCount(0);
+  const ids=await page.evaluate(()=>InsightEvents.demandCategories(allStores).map(c=>({id:c.id,name:c.name})));
+  expect(ids.map(c=>c.name)).toEqual(['E2E削除対象','E2E残す対象']);
+
+  await editor.getByLabel('催事名').fill('E2E過去イベント保持');
+  await editor.locator('.ie-demand-editor').getByRole('button',{name:'＋追加'}).click();
+  await editor.locator('.ie-demand-row input[aria-label="名称"]').fill('保存済み特需商品');
+  await editor.locator('.ie-demand-row select[aria-label="カテゴリー"]').selectOption('favorite:'+ids[0].id);
+  await editor.getByRole('button',{name:'登録する'}).click();
+  await expect(editor).toHaveCount(0);
+  const storedEventsBefore=await page.evaluate(()=>JSON.stringify(allStores.stores[allStores.current].events));
+
+  await page.getByRole('button',{name:'＋イベントを追加'}).click();
+  await editor.getByLabel('イベント種別').selectOption('nearby');
+  await editor.getByLabel('イベント名').fill('E2E編集中の近隣イベント');
+  await editor.getByLabel('イベント場所').first().fill('E2E会場');
+  await editor.locator('.ie-demand-editor').getByRole('button',{name:'＋追加'}).click();
+  await editor.locator('.ie-demand-row input[aria-label="名称"]').fill('編集中の特需商品');
+  const selector=editor.locator('.ie-demand-row select[aria-label="カテゴリー"]');
+  await selector.selectOption('favorite:'+ids[0].id);
+
+  await editor.getByRole('button',{name:'カテゴリー管理'}).click();
+  await expect(manager).toBeVisible();
+  await manager.locator('.ie-demand-favorite-row').first().getByRole('button',{name:'削除',exact:true}).click();
+  await expect(manager.locator('.ie-demand-favorite-row')).toHaveCount(1);
+  await manager.getByRole('button',{name:'保存する'}).click();
+  await expect(manager).toHaveCount(0);
+  await expect(selector).toHaveValue('custom');
+  await expect(editor.locator('.ie-demand-row input[aria-label="独自カテゴリー名"]')).toHaveValue('E2E削除対象');
+  await expect(editor.getByLabel('イベント名')).toHaveValue('E2E編集中の近隣イベント');
+  expect(await page.evaluate(()=>InsightEvents.demandCategories(allStores))).toEqual([ids[1]]);
+  expect(await page.evaluate(()=>JSON.stringify(allStores.stores[allStores.current].events))).toBe(storedEventsBefore);
+  await editor.getByRole('button',{name:'キャンセル'}).click();
+
+  await page.reload({waitUntil:'domcontentloaded'});
+  await page.waitForFunction(()=>window.InsightEvents&&typeof allStores==='object');
+  expect(await page.evaluate(()=>InsightEvents.demandCategories(allStores))).toEqual([ids[1]]);
+  expect(await page.evaluate(()=>JSON.stringify(allStores.stores[allStores.current].events))).toBe(storedEventsBefore);
+  expect(errors).toEqual([]);
+});
