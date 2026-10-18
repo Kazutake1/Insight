@@ -3591,8 +3591,13 @@ test('販売数入力の平日・日祝平均は保存済み通常日を分類�
   await expect(weekday).toBeVisible();
   await page.screenshot({path:'test-results/day-type-averages-desktop.png',fullPage:true});
   await page.getByLabel('2026-09-01 1便 販売数',{exact:true}).fill('100');
+  await expect(page.getByLabel('2026-09-01 1便 販売数',{exact:true})).toHaveValue('100');
+  await expect(page.locator('#scSave')).toBeEnabled();
+  const invalidFields=await page.locator('#pageSalesCount input:invalid').evaluateAll(inputs=>inputs.map(i=>({label:i.getAttribute('aria-label'),value:i.value,reason:i.validationMessage})));
+  expect(invalidFields).toEqual([]);
   await expect(weekday.locator('tbody tr').nth(1).locator('td')).toHaveText(['5','10','5','30']);
   await page.locator('#scSave').click();
+  await expect(page.locator('#scSave')).toBeDisabled();
   await expect(weekday.locator('tbody tr').nth(1).locator('td')).toHaveText(['50','10','5','120']);
   await page.evaluate(()=>{
     const category=allStores.salesCountManagement.categories.find(c=>!c.hidden);
