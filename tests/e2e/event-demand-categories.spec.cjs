@@ -561,7 +561,7 @@ test('特需カテゴリーの名前を変更しても開いている催事の�
   expect(shared.matching).toEqual([{id:categoryId,name:renamed}]);
   await editor.getByRole('button',{name:'キャンセル'}).click();
   await page.reload({waitUntil:'domcontentloaded'});
-  await page.waitForFunction(()=>window.InsightEvents&&window.allStores);
+  await page.waitForFunction(()=>window.InsightEvents&&typeof allStores==='object');
   expect(await page.evaluate(id=>InsightEvents.demandCategories(allStores).find(c=>c.id===id)?.name,categoryId)).toBe(renamed);
   expect(errors).toEqual([]);
 });
