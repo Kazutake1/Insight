@@ -610,7 +610,7 @@ test('削除された特需カテゴリーは自由入力に退避し既存イ�
 
   await editor.getByRole('button',{name:'カテゴリー管理'}).click();
   await expect(manager).toBeVisible();
-  await manager.locator('.ie-demand-favorite-row').first().getByRole('button',{name:'削除'}).click();
+  await manager.locator('.ie-demand-favorite-row').first().getByRole('button',{name:'削除',exact:true}).click();
   await expect(manager.locator('.ie-demand-favorite-row')).toHaveCount(1);
   await manager.getByRole('button',{name:'保存する'}).click();
   await expect(manager).toHaveCount(0);
