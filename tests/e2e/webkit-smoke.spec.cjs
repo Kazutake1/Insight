@@ -50,7 +50,7 @@ test.describe('iPad相当のタッチ操作',()=>{
     const errors=await openInsight(page);
     await page.setViewportSize({width:1194,height:834});
     await page.locator('#navSalesCount').click();
-    const number=page.locator('#scCalendar .sc-day:not(.empty) .sc-sales-row input[type="number"]').first();
+    const number=page.locator('#scCalendar .sc-day:not(.empty) .sc-sales-row input[inputmode="numeric"]:not([readonly])').first();
     await number.fill('19');
     await expect(number).toBeFocused();
     const tap=async locator=>{
@@ -154,7 +154,7 @@ test('WebKitで販売数を保存し再読込後も保持する',async({page})=>
   await page.locator('#navSalesCount').click();
   await expect(page.locator('#pageSalesCount')).toHaveClass(/show/);
 
-  const input=page.locator('#scCalendar input[type="number"]:not([readonly])').first();
+  const input=page.locator('#scCalendar input[inputmode="numeric"]:not([readonly])').first();
   await expect(input).toBeVisible();
   const label=await input.getAttribute('aria-label');
   expect(label).toBeTruthy();
