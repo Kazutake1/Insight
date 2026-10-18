@@ -25,9 +25,9 @@ test('Index shellはinline script/styleを持たず外部assetへ分離する',(
   const boot=read('insight_shell_boot_v1.js');
   const loader=read('insight_shell_loader_v1.js');
   const css=read('insight_shell_v1.css');
-  assert.match(index,/insight_shell_boot_v1\.js\?v=20261018-event-basic-build-51/);
-  assert.match(index,/insight_shell_loader_v1\.js\?v=20261018-event-basic-build-51/);
-  assert.match(index,/insight_shell_v1\.css\?v=20261018-event-basic-build-51/);
+  assert.match(index,/insight_shell_boot_v1\.js\?v=20261018-demand-picker-build-52/);
+  assert.match(index,/insight_shell_loader_v1\.js\?v=20261018-demand-picker-build-52/);
+  assert.match(index,/insight_shell_v1\.css\?v=20261018-demand-picker-build-52/);
   assert.doesNotMatch(index,/<script(?![^>]*\bsrc=)[^>]*>/i);
   assert.doesNotMatch(index,/<style\b/i);
   assert.doesNotMatch(index,/script-src[^;]*'unsafe-inline'/);
@@ -36,7 +36,7 @@ test('Index shellはinline script/styleを持たず外部assetへ分離する',(
   assert.match(boot,/fetch\('\.\/Index\.html\?insight_probe='/);
   assert.match(loader,/fetch\('\.\/insight_shell_loader_v1\.js\?insight_manifest_probe='/);
   assert.match(loader,/document\.open\(\);document\.write\(html\);document\.close\(\)/);
-  assert.match(loader,/fetch\('\.\/insight_payload_source_v1\.html\?v=20261018-event-basic-1'/);
+  assert.match(loader,/fetch\('\.\/insight_payload_source_v1\.html\?v=20261018-demand-picker-1'/);
   assert.doesNotMatch(index+loader,/pako|insight_payload_v1_part0/);
   assert.match(css,/#loading\{/);
 });
@@ -48,7 +48,7 @@ test('canonical payloadはinline script/styleを持たず外部assetを順序固
   const aiPresentation=read('insight_ai_presentation_v1.js');
   const readability=read('insight_readability_v1.js');
   const css=read('insight_payload_core_v1.css');
-  assert.match(payload,/insight_payload_core_v1\.css\?v=20261018-event-basic-1/);
+  assert.match(payload,/insight_payload_core_v1\.css\?v=20261018-demand-picker-1/);
   assert.match(payload,/insight_payload_core_v1\.js\?v=20261007-step4-ai-position-css-1/);
   assert.doesNotMatch(core,/label\.style\.color/);
   assert.doesNotMatch(core,/msg\.style\.display/);
@@ -185,8 +185,8 @@ test('canonical payloadはinline script/styleを持たず外部assetを順序固
 
 test('トップページはキャッシュ抑止とシェル・機能manifestの自己更新を持つ',()=>{
   const index=readShell();
-  assert.match(index,/insight-shell-version" content="20261018-event-basic-build-51/);
-  assert.match(index,/var BUILD="20261018-event-basic-build-51"/);
+  assert.match(index,/insight-shell-version" content="20261018-demand-picker-build-52/);
+  assert.match(index,/var BUILD="20261018-demand-picker-build-52"/);
   assert.match(index,/Shell rule: bump BUILD whenever the loader/);
   assert.match(index,/Cache-Control" content="no-cache, no-store, must-revalidate/);
   assert.match(index,/insight_probe=/);
@@ -936,7 +936,7 @@ test('イベント実績は過去開催・日付カード・時間帯グラフ�
   const index=readShell();
   const eventResults=read('insight_event_results_v1.js');
   const events=read('insight_events_v1.js');
-  assert.match(index,/insight_events_v1\.js\?v=20261018-event-basic-1/);
+  assert.match(index,/insight_events_v1\.js\?v=20261018-demand-picker-1/);
   assert.match(index,/insight_event_results_v1\.js\?v=20261015-event-scroll-1/);
   assert.ok(index.indexOf('insight_analysis_context_v1.js')<index.indexOf('insight_event_results_v1.js'));
   assert.ok(index.indexOf('insight_event_results_v1.js')<index.indexOf('insight_daily_anomaly_v1.js'));
@@ -944,7 +944,7 @@ test('イベント実績は過去開催・日付カード・時間帯グラフ�
   assert.doesNotMatch(events,/row\.body\.style\.display/);
   assert.match(events,/row\.body\.classList\.toggle\('ie-sale-target-body-hidden',!row\.check\.checked\)/);
   assert.match(css,/\.ie-sale-target-body\.ie-sale-target-body-hidden\{display:none\}/);
-  assert.match(events,/scopeText\.hidden=hideScopeText/);
+  assert.match(events,/content\.replaceChildren\(\);/);
   assert.doesNotMatch(events,/全店舗共通・指定期間の各日に表示します。/);
   assert.doesNotMatch(events,/選ぶと上記の期間で登録します。個別の条件は下で入力できます。/);
   assert.doesNotMatch(events,/同じカテゴリー内に複数の値引きパターンがある場合は/);
@@ -1017,7 +1017,9 @@ test('イベント実績は過去開催・日付カード・時間帯グラフ�
   assert.match(events,/function nearbyPresetEditor\(/);
   assert.match(events,/function manageNearbyPresets\(/);
   assert.match(events,/syncDemandPreset/);
-  assert.match(events,/カテゴリーを選択するか、自由に入力できます/);
+  assert.doesNotMatch(events,/カテゴリーを選択するか、自由に入力できます/);
+  assert.doesNotMatch(events,/現在の店舗：|選ぶと名称・補足|チェックしたカテゴリーの実績だけ/);
+  assert.match(events,/ie-demand-picker-panel/);
   assert.match(events,/よく使うカテゴリーを管理/);
   assert.match(events,/takeDemandFavorites/);
   assert.match(events,/var unsetOption=el\('option','未分類'\)/);

@@ -334,25 +334,74 @@
     function specialDemandEditor(parent,snapshot,templateOnly){
       var section=el('section',undefined,'ie-demand-editor'),head=el('div',undefined,'ie-demand-head'),listBox=el('div',undefined,'ie-demand-list'),rows=[];
       function refreshAll(){rows.forEach(function(row){row.refreshCategoryOptions();});}
+      function closeAllPickers(except){rows.forEach(function(row){if(row!==except)row.closePicker();});}
+      function onOutsidePointer(e){if(!section.contains(e.target))closeAllPickers();else rows.forEach(function(row){if(!row.el.contains(e.target))row.closePicker();});}
+      doc.addEventListener('pointerdown',onOutsidePointer);
+      var ownerDialog=parent.closest('dialog');if(ownerDialog)ownerDialog.addEventListener('close',function(){doc.removeEventListener('pointerdown',onOutsidePointer);},{once:true});
       var controls=el('div',undefined,'ie-demand-head-actions');
       controls.append(button('カテゴリー管理',function(){manageDemandCategories(refreshAll);}),button('＋追加',function(){addRow(null);}));
       head.append(el('strong','特需商品'),controls);
-      section.append(head,el('p',templateOnly?'商品名とカテゴリーを登録します。用意数と販売数は開催ごとに入力します。':'カテゴリーを選択するか、自由に入力できます。','ie-muted'),listBox);parent.append(section);
+      section.append(head);if(templateOnly)section.append(el('p','商品名とカテゴリーを登録します。用意数と販売数は開催ごとに入力します。','ie-muted'));section.append(listBox);parent.append(section);
       function addRow(seed){
         seed=seed||{};
         var rowEl=el('div',undefined,'ie-demand-row'),categoryField=el('div',undefined,'ie-demand-category-field'),categorySelect=el('select'),customCategory=el('input');
         categoryField.append(el('span','カテゴリー'));
-        categorySelect.setAttribute('aria-label','カテゴリー');
+        categorySelect.setAttribute('aria-label','カテゴリー');categorySelect.hidden=true;
+        var pickerPanel=el('div',undefined,'ie-demand-picker-panel');pickerPanel.hidden=true;pickerPanel.id=id();
+        function closePicker(){pickerPanel.hidden=true;picker.setAttribute('aria-expanded','false');}
+        var picker=button('未分類',function(){
+          var opening=pickerPanel.hidden;closeAllPickers();
+          if(opening){pickerPanel.hidden=false;picker.setAttribute('aria-expanded','true');}else closePicker();
+        });
+        picker.className='ie-demand-picker-trigger';
+        picker.setAttribute('aria-label','カテゴリーを選択');
+        picker.setAttribute('aria-expanded','false');picker.setAttribute('aria-controls',pickerPanel.id);
         customCategory.type='text';customCategory.placeholder='独自カテゴリー名';
         customCategory.setAttribute('aria-label','独自カテゴリー名');customCategory.maxLength=2000;
         var favoriteLabel=el('label',undefined,'ie-demand-favorite-check'),saveFavorite=el('input');
         saveFavorite.type='checkbox';saveFavorite.setAttribute('aria-label','よく使うカテゴリーに追加する');
         favoriteLabel.append(saveFavorite,el('span','よく使うカテゴリーに追加する'));
-        categoryField.append(categorySelect,customCategory,favoriteLabel);rowEl.append(categoryField);
+        categoryField.append(picker,pickerPanel,categorySelect,customCategory,favoriteLabel);rowEl.append(categoryField);
         var master=allStores.salesCountManagement&&Array.isArray(allStores.salesCountManagement.categories)?allStores.salesCountManagement.categories:[],knownFavorites=[];
         function updateCategoryInput(){
           var isCustom=categorySelect.value==='custom';
           customCategory.hidden=!isCustom;favoriteLabel.hidden=!isCustom;
+        }
+        function refreshPicker(){
+          var selectedOption=Array.from(categorySelect.options).find(function(option){return option.selected;});
+          picker.textContent=selectedOption?selectedOption.textContent:'未分類';picker.title=picker.textContent;
+          pickerPanel.replaceChildren();
+          function choice(value,name,parent){
+            var item=button(name,function(){
+              categorySelect.value=value;
+              categorySelect.dispatchEvent(new Event('change',{bubbles:true}));
+              closePicker();picker.focus();
+            });
+            item.className='ie-demand-picker-choice';
+            if(categorySelect.value===value)item.classList.add('is-selected');
+            parent.append(item);
+          }
+          var favorites=demandCategories(allStores);
+          if(favorites.length){
+            pickerPanel.append(el('strong','よく使うカテゴリー','ie-demand-picker-heading'));
+            var favoriteGrid=el('div',undefined,'ie-demand-picker-options');
+            favorites.forEach(function(item){choice('favorite:'+item.id,item.name,favoriteGrid);});
+            pickerPanel.append(favoriteGrid);
+          }
+          var others=el('div',undefined,'ie-demand-picker-others');others.hidden=true;
+          var more=button('その他のカテゴリーを表示  ›',function(){
+            others.hidden=!others.hidden;
+            more.textContent=others.hidden?'その他のカテゴリーを表示  ›':'その他のカテゴリーを閉じる  ⌃';
+          });
+          more.className='ie-demand-picker-more';pickerPanel.append(more);
+          var otherGrid=el('div',undefined,'ie-demand-picker-options');
+          Array.from(categorySelect.options).filter(function(option){return option.value.indexOf('master:')===0;}).forEach(function(option){choice(option.value,option.textContent,otherGrid);});
+          if(otherGrid.childElementCount)others.append(otherGrid);
+          else others.append(el('span','選択できるカテゴリーはありません','ie-muted'));
+          pickerPanel.append(others);
+          var aux=el('div',undefined,'ie-demand-picker-aux');
+          choice('custom','自由入力',aux);choice('','未分類',aux);
+          pickerPanel.append(aux);
         }
         function refreshCategoryOptions(){
           var oldChoice=categorySelect.options.length?categorySelect.value:(seed.categoryId?'master:'+seed.categoryId:seed.category&&demandCategories(allStores).find(function(c){return c.name===seed.category;})?'favorite:'+demandCategories(allStores).find(function(c){return c.name===seed.category;}).id:seed.category?'custom':''),oldFavorite=oldChoice.indexOf('favorite:')===0?knownFavorites.find(function(c){return c.id===oldChoice.slice(9);}):null;
@@ -385,14 +434,14 @@
           }else{
             categorySelect.value='custom';customCategory.value=currentCustom||seed.category||'';
           }
-          updateCategoryInput();
+          updateCategoryInput();refreshPicker();
         }
         var favorites=demandCategories(allStores),favoriteSeed=!seed.categoryId&&seed.category&&favorites.find(function(c){return c.name===seed.category;});
         var initialChoice=seed.categoryId?'master:'+seed.categoryId:favoriteSeed?'favorite:'+favoriteSeed.id:seed.category?'custom':'';
         categorySelect.value=initialChoice;
         customCategory.value=seed.category||'';
         refreshCategoryOptions();
-        categorySelect.onchange=function(){if(categorySelect.value!=='custom')saveFavorite.checked=false;updateCategoryInput();};
+        categorySelect.onchange=function(){if(categorySelect.value!=='custom')saveFavorite.checked=false;updateCategoryInput();refreshPicker();};
         var name=field(rowEl,'名称','text',seed.name||''),prepared=null,sold=null;
         name.required=true;
         if(!templateOnly){
@@ -400,7 +449,7 @@
           sold=field(rowEl,'販売数','number',seed.sold==null?'':seed.sold);sold.min='0';sold.step='1';
         }
         var remove=button('削除',function(){var at=rows.findIndex(function(row){return row.el===rowEl;});if(at>=0)rows.splice(at,1);rowEl.remove();});remove.className='ie-demand-remove';rowEl.append(remove);listBox.append(rowEl);
-        rows.push({id:seed.id||demandId(),el:rowEl,categorySelect:categorySelect,customCategory:customCategory,saveFavorite:saveFavorite,master:master,refreshCategoryOptions:refreshCategoryOptions,name:name,prepared:prepared,sold:sold});
+        rows.push({id:seed.id||demandId(),el:rowEl,categorySelect:categorySelect,customCategory:customCategory,saveFavorite:saveFavorite,master:master,refreshCategoryOptions:refreshCategoryOptions,closePicker:closePicker,name:name,prepared:prepared,sold:sold});
       }
       (Array.isArray(snapshot&&snapshot.specialDemand)?snapshot.specialDemand:[]).forEach(function(item){addRow(item);});
       return function(){
@@ -432,7 +481,6 @@
       var selected=oldIds?new Set(oldIds):null;
       var box=el('details',undefined,'ie-result-category-options'),heading=el('summary'),state=el('span',undefined,'ie-result-category-state');
       heading.append(el('strong','カテゴリー実績の表示'),state);box.append(heading);
-      var note=el('p','チェックしたカテゴリーの実績だけを表示します。販売・納品データは変更されません。','ie-muted');box.append(note);
       if(!categories.length){
         state.textContent='表示可能なカテゴリーがありません';
         box.append(el('p','表示可能なカテゴリーがありません。','ie-muted'));
@@ -601,7 +649,6 @@
       var d=dialog(editing?'店舗イベントを編集':'店舗イベントを追加');d.classList.add('ie-event-add');activeDialog=d;
       var form=el('form');d.append(form);
       var type=select(form,'イベント種別',TYPES,editing?source.type:'sale');
-      var scopeText=el('p',undefined,'ie-muted');form.append(scopeText);
       var dates=el('div',undefined,'ie-dates');form.append(dates);
       var start=field(dates,'開始日','date',editing?source.startDate:selectedDate()),end=field(dates,'終了日','date',editing?source.endDate:selectedDate());start.required=end.required=true;
       start.onchange=function(){if(validDate(start.value))end.value=start.value;};
@@ -640,7 +687,7 @@
       }
       function draw(){
         if(dates.parentNode!==form)form.insertBefore(dates,content);
-        content.replaceChildren();var hideScopeText=type.value==='sale'||type.value==='campaign';scopeText.hidden=hideScopeText;scopeText.textContent=hideScopeText?'':'現在の店舗：'+allStores.stores[storeId].name;
+        content.replaceChildren();
         if(type.value==='sale'){
           var h=el('div',undefined,'ie-head');h.append(el('strong','よく使うセール'),button('編集',function(){managePresets(draw);}));content.append(h);
           var ps=el('div',undefined,'ie-presets'),items=presets(allStores);items.slice(0,showAll?items.length:6).forEach(function(p){ps.append(button(summary(p.snapshot),function(){save(copy(p.snapshot),p.id);}));});
@@ -658,7 +705,7 @@
             });
             if(!presetItems.length)presetBox.append(el('span','「編集」から'+(isNearby?'よく使うイベント':'よく使う催事')+'を追加できます。','ie-muted'));
             if(presetItems.length>6)presetBox.append(button(showAll?'折りたたむ':'すべて表示（'+presetItems.length+'件）',function(){showAll=!showAll;draw();}));
-            content.append(presetBox,el('p','選ぶと名称・補足'+(isNearby?'・場所':'')+'と特需商品を入力欄へ反映します。特需商品の用意数・販売数は開催ごとに入力します。','ie-muted'));
+            content.append(presetBox);
           }
           var initialSnapshot=eventTemplate||(editing&&source.snapshot?source.snapshot:null);
           var basic=el('div',undefined,'ie-event-basic');
