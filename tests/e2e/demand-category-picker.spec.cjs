@@ -3,7 +3,7 @@ const {test,expect}=require('@playwright/test');
 async function openEditor(page,browserName){
   if(browserName==='webkit')await page.route('**/Index.html*',async route=>{
     const response=await route.fetch();
-    await route.fulfill({response,body:(await response.text()).replace(/;?\\s*upgrade-insecure-requests/g,'')});
+    await route.fulfill({response,body:(await response.text()).replace(/;?\s*upgrade-insecure-requests/g,'')});
   });
   await page.setViewportSize({width:1194,height:834});
   const errors=[];page.on('pageerror',e=>errors.push(e.message));
