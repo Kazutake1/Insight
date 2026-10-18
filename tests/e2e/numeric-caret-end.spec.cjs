@@ -36,10 +36,10 @@ test('販売数入力の納品・販売・廃棄は左側タップでもカー�
   }
   const delivery=card.locator('.sc-delivery-row input[inputmode="numeric"]:not([readonly])').first();
   await delivery.fill('15x');
-  await expect(delivery).not.toBeValid();
+  expect(await delivery.evaluate(input=>input.validity.valid)).toBe(false);
   await delivery.fill('027');
   await expect(delivery).toHaveValue('27');
-  await expect(delivery).toBeValid();
+  expect(await delivery.evaluate(input=>input.validity.valid)).toBe(true);
   await page.locator('#scSave').click();
   await expect(page.locator('#scSave')).toBeDisabled();
   const values=await page.evaluate(()=>{
