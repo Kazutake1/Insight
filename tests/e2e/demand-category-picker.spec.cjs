@@ -18,6 +18,7 @@ async function openEditor(page,browserName){
 test('よく使うカテゴリが先頭で、通常は選択欄1つ・他カテゴリは展開時のみ表示',async({page,browserName})=>{
   const {editor,errors}=await openEditor(page,browserName);
   await page.evaluate(()=>{
+    allStores.eventManagement=allStores.eventManagement||{version:1,events:[],presets:[]};
     allStores.eventManagement.demandCategories=[{id:'fav_ui_a',name:'お弁当'},{id:'fav_ui_b',name:'パン'}];
     for(let i=0;i<24;i++)allStores.salesCountManagement.categories.push({id:'ui_other_'+i,name:'大量カテゴリ'+i,activeTrips:[true,true,true]});
   });
