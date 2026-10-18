@@ -445,8 +445,8 @@
         var name=field(rowEl,'名称','text',seed.name||''),prepared=null,sold=null;
         name.required=true;
         if(!templateOnly){
-          prepared=field(rowEl,'用意数','number',seed.prepared==null?'':seed.prepared);prepared.min='0';prepared.step='1';
-          sold=field(rowEl,'販売数','number',seed.sold==null?'':seed.sold);sold.min='0';sold.step='1';
+          prepared=field(rowEl,'用意数','text',seed.prepared==null?'':seed.prepared);prepared.inputMode='numeric';prepared.pattern='[0-9]*';
+          sold=field(rowEl,'販売数','text',seed.sold==null?'':seed.sold);sold.inputMode='numeric';sold.pattern='[0-9]*';
         }
         var remove=button('削除',function(){var at=rows.findIndex(function(row){return row.el===rowEl;});if(at>=0)rows.splice(at,1);rowEl.remove();});remove.className='ie-demand-remove';rowEl.append(remove);listBox.append(rowEl);
         rows.push({id:seed.id||demandId(),el:rowEl,categorySelect:categorySelect,customCategory:customCategory,saveFavorite:saveFavorite,master:master,refreshCategoryOptions:refreshCategoryOptions,closePicker:closePicker,name:name,prepared:prepared,sold:sold});
@@ -467,7 +467,7 @@
             requireValue(!!selected,'選択したカテゴリーが見つかりません。');item.category=selected.name;item.categoryId=selected.id;
           }
           if(!templateOnly){
-            function num(input,label){var raw=input.value.trim();if(raw==='')return null;var value=Number(raw);requireValue(Number.isSafeInteger(value)&&value>=0,label+'を確認してください。');return value;}
+            function num(input,label){var raw=input.value.trim();if(raw==='')return null;var value=Number(raw);requireValue(/^[0-9]+$/.test(raw)&&Number.isSafeInteger(value),label+'を確認してください。');return value;}
             item.prepared=num(row.prepared,'用意数');item.sold=num(row.sold,'販売数');if(item.prepared!==null&&item.sold!==null)requireValue(item.sold<=item.prepared,'販売数は用意数以下にしてください。');
           }
           return item;
