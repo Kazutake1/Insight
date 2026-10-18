@@ -49,7 +49,7 @@ test('canonical payloadはinline script/styleを持たず外部assetを順序固
   const readability=read('insight_readability_v1.js');
   const css=read('insight_payload_core_v1.css');
   assert.match(payload,/insight_payload_core_v1\.css\?v=20261018-event-modal-1/);
-  assert.match(payload,/insight_payload_core_v1\.js\?v=20261007-step4-ai-position-css-1/);
+  assert.match(payload,/insight_payload_core_v1\.js\?v=20261018-caret-end-1/);
   assert.doesNotMatch(core,/label\.style\.color/);
   assert.doesNotMatch(core,/msg\.style\.display/);
   assert.doesNotMatch(core,/badge\.style\.display/);
