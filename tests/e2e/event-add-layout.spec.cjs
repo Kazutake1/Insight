@@ -34,6 +34,22 @@ test('イベント基本情報は横向き2列・狭い画面1列で、種別切
   expect(desktop.placeRight).toBe(true);
   expect(desktop.datesBelow).toBe(true);
   expect(desktop.overflow).toBeLessThanOrEqual(1);
+  const aligned=await dialog.evaluate(node=>{
+    const presets=node.querySelector('.ie-presets').getBoundingClientRect();
+    const fields=node.querySelector('.ie-event-basic').getBoundingClientRect();
+    const place=node.querySelector('.ie-event-basic-place').getBoundingClientRect();
+    const addLocation=node.querySelector('.ie-location-editor > button').getBoundingClientRect();
+    return {presetGap:fields.top-presets.bottom,locationRight:Math.abs(addLocation.right-place.right)};
+  });
+  expect(aligned.presetGap).toBeGreaterThanOrEqual(15);
+  expect(aligned.locationRight).toBeLessThanOrEqual(1);
+  await dialog.locator('.ie-demand-head-actions').getByRole('button',{name:'＋追加'}).click();
+  const demandGap=await dialog.evaluate(node=>{
+    const head=node.querySelector('.ie-demand-head').getBoundingClientRect();
+    const row=node.querySelector('.ie-demand-row').getBoundingClientRect();
+    return row.top-head.bottom;
+  });
+  expect(demandGap).toBeGreaterThanOrEqual(11);
   await basic.getByRole('button',{name:'＋場所を追加'}).click();
   await expect(basic.getByLabel('イベント場所')).toHaveCount(2);
   await dialog.getByLabel('イベント種別').selectOption('special');
@@ -65,11 +81,13 @@ test('カテゴリー実績は初期折りたたみ・選択件数表示・保�
   await expect(details.locator('summary')).toContainText('すべて表示');
   await expect(details.getByRole('button',{name:'すべて解除'})).toBeHidden();
   await details.locator('summary').click();
+  await expect(details.locator('summary')).toContainText('閉じる（すべて選択中）');
   await details.getByRole('button',{name:'すべて解除'}).click();
-  await expect(details.locator('summary')).toContainText('0 / '+master.length+'件を表示');
+  await expect(details.locator('summary')).toContainText('閉じる（0 / '+master.length+'件選択中）');
   await details.getByLabel('実績表示 '+master[0].name).check();
-  await expect(details.locator('summary')).toContainText('1 / '+master.length+'件を表示');
+  await expect(details.locator('summary')).toContainText('閉じる（1 / '+master.length+'件選択中）');
   await details.locator('summary').click();
+  await expect(details.locator('summary')).toContainText('1 / '+master.length+'件を表示');
   await expect(details).not.toHaveAttribute('open',/.*/);
   await dialog.getByLabel('イベント名',{exact:true}).fill('E2E登録フォーム折りたたみ確認');
   await dialog.getByLabel('イベント場所',{exact:true}).fill('E2Eレイアウト会場');
@@ -89,6 +107,7 @@ test('カテゴリー実績は初期折りたたみ・選択件数表示・保�
   await expect(restored).not.toHaveAttribute('open',/.*/);
   await expect(restored.locator('summary')).toContainText('1 / '+master.length+'件を表示');
   await restored.locator('summary').click();
+  await expect(restored.locator('summary')).toContainText('閉じる（1 / '+master.length+'件選択中）');
   await expect(restored.getByLabel('実績表示 '+master[0].name)).toBeChecked();
   await expect(restored.locator('input[type="checkbox"]:checked')).toHaveCount(1);
   await page.locator('.ie-event-add').getByRole('button',{name:'閉じる'}).click();
