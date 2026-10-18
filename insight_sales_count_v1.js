@@ -168,7 +168,7 @@
         if(Number.isSafeInteger(count))input.value=String(count);
       }
     }
-    function buildInput(date,r,trip,key){var i=el('input');if(!tripActive(selectedCategory(),trip)){var saved=r.trips[trip][key];i.type='text';i.value=saved===null?'／':String(saved);i.readOnly=true;i.tabIndex=-1;i.className='sc-not-applicable';i.setAttribute('aria-readonly','true');i.setAttribute('aria-label',date+' '+(trip+1)+'便 '+(key==='delivery'?'納品数':'販売数')+' 対象外'+(saved===null?'':'（保存済み・編集不可）'));return i;}i.type='number';i.min='0';i.step='1';i.inputMode='numeric';i.value=r.trips[trip][key]===null?'':String(r.trips[trip][key]);i.classList.toggle('has-val',i.value!=='');i.setAttribute('aria-label',date+' '+(trip+1)+'便 '+(key==='delivery'?'納品数':'販売数'));i.oninput=function(){normalizeEditableCountInput(i);if(!state.draft[date])state.draft[date]=r;i.setCustomValidity('');if(i.value===''){r.trips[trip][key]=null;}else{var n=Number(i.value);if(!Number.isSafeInteger(n)||n<0){i.setCustomValidity('0以上の整数を入力してください');setDirty(true);return;}r.trips[trip][key]=n;}i.classList.toggle('has-val',i.value!=='');setDirty(true);updateTotals(i.closest('.sc-day'),r);renderAverages();};return i;}
+    function buildInput(date,r,trip,key){var i=el('input');if(!tripActive(selectedCategory(),trip)){var saved=r.trips[trip][key];i.type='text';i.value=saved===null?'／':String(saved);i.readOnly=true;i.tabIndex=-1;i.className='sc-not-applicable';i.setAttribute('aria-readonly','true');i.setAttribute('aria-label',date+' '+(trip+1)+'便 '+(key==='delivery'?'納品数':'販売数')+' 対象外'+(saved===null?'':'（保存済み・編集不可）'));return i;}i.type='text';i.inputMode='numeric';i.pattern='[0-9]*';i.value=r.trips[trip][key]===null?'':String(r.trips[trip][key]);i.classList.toggle('has-val',i.value!=='');i.setAttribute('aria-label',date+' '+(trip+1)+'便 '+(key==='delivery'?'納品数':'販売数'));i.oninput=function(){normalizeEditableCountInput(i);if(!state.draft[date])state.draft[date]=r;i.setCustomValidity('');if(i.value===''){r.trips[trip][key]=null;}else{var n=Number(i.value);if(!/^[0-9]+$/.test(i.value)||!Number.isSafeInteger(n)){i.setCustomValidity('0以上の整数を入力してください');setDirty(true);return;}r.trips[trip][key]=n;}i.classList.toggle('has-val',i.value!=='');setDirty(true);updateTotals(i.closest('.sc-day'),r);renderAverages();};return i;}
     function updateTotals(card,r,mask){var vals=card.querySelectorAll('[data-total]');vals.forEach(function(n){var v=total(r,n.dataset.total,mask);n.textContent=v===null?'—':String(v);});}
     function buildReadOnlyInput(date,r,trip,key,category,historyMask){
       var i=el('input'),hasHistory=Array.isArray(historyMask)&&historyMask.length===3,
@@ -266,7 +266,7 @@
         input.type='text';input.value=value===null?'／':String(value);input.readOnly=true;input.tabIndex=-1;input.className='sc-not-applicable';
         input.setAttribute('aria-readonly','true');input.setAttribute('aria-label',date+' '+(index+1)+'便 廃棄 対象外'+(value===null?'':'（保存済み・編集不可）'));return input;
       }
-      input.type='number';input.min='0';input.step='1';input.inputMode='numeric';
+      input.type='text';input.inputMode='numeric';input.pattern='[0-9]*';
       input.value=value===null?'':String(value);input.classList.toggle('has-val',value!==null);
       input.setAttribute('aria-label',date+' '+(index+1)+'便 廃棄数');
       input.oninput=function(){
@@ -275,7 +275,7 @@
         var nextValue=null;
         if(input.value!==''){
           nextValue=Number(input.value);
-          if(!Number.isSafeInteger(nextValue)||nextValue<0){
+          if(!/^[0-9]+$/.test(input.value)||!Number.isSafeInteger(nextValue)){
             input.setCustomValidity('0以上の整数を入力してください');setDirty(true);return;
           }
         }
@@ -426,7 +426,7 @@
     var lastCountInputBlurAt=0,categoryDialogOpening=false;
     function blurSalesCountInput(){
       var active=doc.activeElement;
-      if(active&&active.matches&&active.matches('#pageSalesCount .sc-calendar .sc-trip input[type="number"]:not([readonly])'))active.blur();
+      if(active&&active.matches&&active.matches('#pageSalesCount .sc-calendar .sc-trip input[inputmode="numeric"]:not([readonly])'))active.blur();
     }
     function waitForCategoryViewport(callback){
       var start=Date.now(),lastChange=start,previous=null;
@@ -459,7 +459,7 @@
     }
     function buildPage(){var nav4=doc.getElementById('nav4'),nav=el('button',undefined,'nav-btn');nav.id='navSalesCount';nav.type='button';nav.innerHTML='<svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 4h18v16H3z"/><path d="M3 9h18M8 4v16M13 4v16M18 4v16"/></svg>販売数入力';nav.onclick=function(){root.gotoNav('salesCounts');};nav4.insertAdjacentElement('afterend',nav);var page=el('div',undefined,'page sc-page');page.id='pageSalesCount';page.innerHTML='<div class="page-header"><div class="page-title">販売数入力</div><div class="header-right"><span id="scDirty" class="sc-status saved">保存済み</span><button id="scSave" class="save-btn" disabled>保存する</button></div></div><div class="sc-toolbar"><button id="scPrev" type="button">‹ 前月</button><strong id="scPeriod"></strong><button id="scNext" type="button">翌月 ›</button><label>カテゴリー <select id="scCategory"></select></label><button id="scManage" type="button">カテゴリー管理</button></div><div class="sc-legend" aria-label="色分けの案内"><span><i class="sc-legend-delivery"></i>納品＝緑</span><span><i class="sc-legend-sales"></i>販売＝オレンジ</span><span><i class="sc-legend-waste"></i>廃棄＝赤</span><span>※一部未入力</span></div><div id="scCalendar" class="sc-calendar"></div><div id="scAverages" class="sc-averages"></div><div id="scAnalysis"></div>';doc.getElementById('main').append(page);doc.getElementById('scSave').onclick=save;doc.getElementById('scPrev').onclick=function(){changePeriod(-1);};doc.getElementById('scNext').onclick=function(){changePeriod(1);};doc.getElementById('scCategory').onchange=function(e){changeCategory(e.target.value);};var manageButton=doc.getElementById('scManage');
       doc.getElementById('pageSalesCount').addEventListener('focusout',function(e){
-        if(e.target.matches&&e.target.matches('.sc-calendar .sc-trip input[type="number"]:not([readonly])'))lastCountInputBlurAt=Date.now();
+        if(e.target.matches&&e.target.matches('.sc-calendar .sc-trip input[inputmode="numeric"]:not([readonly])'))lastCountInputBlurAt=Date.now();
       },true);
       // Blur on pointerdown, before the tap moves focus to the management button.
       manageButton.addEventListener('pointerdown',blurSalesCountInput);
