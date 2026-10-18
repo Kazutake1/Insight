@@ -747,7 +747,7 @@ function renderQuickPage(){
       </div></div>
     <div class="qs-field"><span class="qs-label">買上点数</span>
       <div class="qs-input-unit-row">
-        <input class="qs-input" id="qi_買上点数" type="number" inputmode="numeric"
+        <input class="qs-input" id="qi_買上点数" type="text" inputmode="decimal" pattern="[0-9]*[.]?[0-9]*"
           value="${existingRow.買上点数>0?existingRow.買上点数:""}"
           placeholder="0">
         <span class="qs-unit">点</span>
@@ -765,7 +765,7 @@ function renderQuickPage(){
   secKyaku.innerHTML=`<div class="qs-title">客数</div>
     <div class="qs-field"><span class="qs-label">客数</span>
       <div class="qs-input-unit-row">
-        <input class="qs-input" id="qi_客数" type="number" inputmode="numeric"
+        <input class="qs-input" id="qi_客数" type="text" inputmode="numeric" pattern="[0-9]*"
           value="${existingRow.客数>0?existingRow.客数:""}"
           placeholder="0">
         <span class="qs-unit">人</span>
@@ -1666,7 +1666,7 @@ function renderKyakuGrid(fy,mi){
     card.innerHTML=`
       <div class="kyaku-day-num${isRedDay?" sun":isSat?" sat":""}">${d}</div>
       <div class="kyaku-wx">${WX_ICONS[wx]||"　"}</div>
-      <input class="kyaku-input${kyaku>0?" has-val":""}" type="number"
+      <input class="kyaku-input${kyaku>0?" has-val":""}" type="text" pattern="[0-9]*"
         inputmode="numeric" value="${kyaku||""}" placeholder="0"
         data-ri="${ri}">
     `;
