@@ -488,7 +488,12 @@
         return function(){return oldIds?copy(oldIds):undefined;};
       }
       var actions=el('div',undefined,'ie-result-category-actions'),grid=el('div',undefined,'ie-result-category-grid'),rows=[];
-      function refreshSummary(){var count=rows.filter(function(row){return row.check.checked;}).length;state.textContent=count===rows.length?'すべて表示':count+' / '+rows.length+'件を表示';}
+      function refreshSummary(){
+        var count=rows.filter(function(row){return row.check.checked;}).length;
+        if(box.open)state.textContent=count===rows.length?'閉じる（すべて選択中）':'閉じる（'+count+' / '+rows.length+'件選択中）';
+        else state.textContent=count===rows.length?'すべて表示':count+' / '+rows.length+'件を表示';
+      }
+      box.addEventListener('toggle',refreshSummary);
       actions.append(button('すべて選択',function(){rows.forEach(function(row){row.check.checked=true;});refreshSummary();}),
         button('すべて解除',function(){rows.forEach(function(row){row.check.checked=false;});refreshSummary();}));
       box.append(actions);
