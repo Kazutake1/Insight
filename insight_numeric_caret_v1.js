@@ -1,4 +1,4 @@
-/* Editable numeric fields: place the insertion caret after the current value on focus/tap.
+/* Editable numeric fields: place the insertion caret after the current value on a tap.
    Keep typing, selection by keyboard, formatting and storage handling in their owner modules. */
 (function(doc){
   'use strict';
@@ -22,6 +22,6 @@
     if(input.value!==value)input.value=value;
   }
   doc.addEventListener('input',keepNativeNumericInput,true);
-  doc.addEventListener('focusin',toEnd);
+  // Pointer clicks reposition the caret; do not override select-all / replacement on focus.
   doc.addEventListener('click',toEnd);
 })(document);
