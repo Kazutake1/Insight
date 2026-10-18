@@ -3091,7 +3091,9 @@ test('よく使うイベントの特需商品は自由名で登録・編集で�
   await presetDialog.locator('.ie-demand-editor').getByRole('button',{name:'＋追加'}).click();
   await presetDialog.locator('.ie-demand-row').first().getByLabel('名称').fill('低価格アイス');
   const sharedCategory=await page.evaluate(()=>allStores.salesCountManagement.categories.find(category=>!category.hidden));
-  await presetDialog.locator('.ie-demand-row').first().getByLabel('カテゴリー',{exact:true}).selectOption('master:'+sharedCategory.id);
+  await presetDialog.locator('.ie-demand-row .ie-demand-picker-trigger').first().click();
+  await presetDialog.locator('.ie-demand-row .ie-demand-picker-panel').first().getByRole('button',{name:/その他のカテゴリーを表示/}).click();
+  await presetDialog.locator('.ie-demand-row .ie-demand-picker-others').first().getByRole('button',{name:sharedCategory.name,exact:true}).click();
   await presetDialog.getByRole('button',{name:'保存する'}).click();
   await expect(presetDialog.getByText('E2E夏祭り（E2E文化フォーラム・E2E駅前広場）',{exact:true})).toBeVisible();
   await presetDialog.getByRole('button',{name:'閉じる'}).click();
@@ -3113,7 +3115,8 @@ test('よく使うイベントの特需商品は自由名で登録・編集で�
   await eventDialog.locator('.ie-demand-row').first().getByLabel('販売数').fill('52');
   await eventDialog.locator('.ie-demand-editor').getByRole('button',{name:'＋追加'}).click();
   await eventDialog.locator('.ie-demand-row').nth(1).getByLabel('名称').fill('氷');
-  await eventDialog.locator('.ie-demand-row').nth(1).getByLabel('カテゴリー',{exact:true}).selectOption('custom');
+  await eventDialog.locator('.ie-demand-row').nth(1).locator('.ie-demand-picker-trigger').click();
+  await eventDialog.locator('.ie-demand-row').nth(1).locator('.ie-demand-picker-panel').getByRole('button',{name:'自由入力',exact:true}).click();
   await eventDialog.locator('.ie-demand-row').nth(1).getByLabel('独自カテゴリー名').fill('祭り限定');
   await eventDialog.locator('.ie-demand-row').nth(1).getByLabel('用意数').fill('30');
   await eventDialog.locator('.ie-demand-row').nth(1).getByLabel('販売数').fill('27');
@@ -3179,7 +3182,8 @@ test('特需商品のよく使うカテゴリーは管理・並べ替え・共�
   await eventDialog.locator('.ie-demand-editor').getByRole('button',{name:'＋追加'}).click();
   const demandRow=eventDialog.locator('.ie-demand-row').first();
   await demandRow.getByLabel('名称').fill('試食セット');
-  await demandRow.getByLabel('カテゴリー',{exact:true}).selectOption({label:'催事グッズ'});
+  await demandRow.locator('.ie-demand-picker-trigger').click();
+  await demandRow.locator('.ie-demand-picker-panel').getByRole('button',{name:'催事グッズ',exact:true}).click();
   await expect(demandRow.getByLabel('カテゴリー',{exact:true})).toHaveValue(/favorite:/);
 
   // Rename and reorder favorites; the editor's other fields stay in place.
@@ -3193,7 +3197,8 @@ test('特需商品のよく使うカテゴリーは管理・並べ替え・共�
   await expect(demandRow.getByLabel('カテゴリー',{exact:true})).toHaveValue(/favorite:/);
   await expect(demandRow.getByLabel('カテゴリー',{exact:true}).locator('option:checked')).toHaveText('イベント用品');
   // Switching explicitly to free input still allows adding another favorite.
-  await demandRow.getByLabel('カテゴリー',{exact:true}).selectOption('custom');
+  await demandRow.locator('.ie-demand-picker-trigger').click();
+  await demandRow.locator('.ie-demand-picker-panel').getByRole('button',{name:'自由入力',exact:true}).click();
   await demandRow.getByLabel('独自カテゴリー名').fill('お祝い商品');
   await demandRow.getByLabel('よく使うカテゴリーに追加する').check();
   await eventDialog.getByLabel('催事名').fill('E2Eカテゴリー検証');
@@ -3212,7 +3217,8 @@ test('特需商品のよく使うカテゴリーは管理・並べ替え・共�
   eventDialog=page.locator('.ie-dialog.ie-event-add');
   await eventDialog.getByLabel('イベント種別').selectOption('special');
   await eventDialog.locator('.ie-demand-editor').getByRole('button',{name:'＋追加'}).click();
-  await eventDialog.locator('.ie-demand-row').first().getByLabel('カテゴリー',{exact:true}).selectOption({label:'お祝い商品'});
+  await eventDialog.locator('.ie-demand-row').first().locator('.ie-demand-picker-trigger').click();
+  await eventDialog.locator('.ie-demand-row').first().locator('.ie-demand-picker-panel').getByRole('button',{name:'お祝い商品',exact:true}).click();
   await eventDialog.getByRole('button',{name:'キャンセル'}).click();
   expect(errors).toEqual([]);
 });
