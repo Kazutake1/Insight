@@ -1380,7 +1380,8 @@ body.ai-analysis-open #main{margin-right:0!important}
 
 /* Event / special-occurrence display categories (not the special-demand category master). */
 .ie-dialog .ie-result-category-options{border:1px solid var(--border);border-radius:11px;padding:10px 12px;margin:12px 0;min-width:0}
-.ie-dialog .ie-result-category-options legend{font-size:13px;font-weight:800;padding:0 4px}
+.ie-dialog .ie-result-category-options summary{font-size:13px;line-height:1.55;cursor:pointer;user-select:none}
+.ie-dialog .ie-result-category-state{margin-left:12px;font-size:12px;font-weight:500;color:var(--text3)}
 .ie-dialog .ie-result-category-actions{display:flex;gap:8px;flex-wrap:wrap;margin:8px 0}
 .ie-dialog .ie-result-category-actions button{font-size:12px;padding:7px 10px}
 .ie-dialog .ie-result-category-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:4px 8px}
@@ -1388,6 +1389,16 @@ body.ai-analysis-open #main{margin-right:0!important}
 .ie-dialog .ie-result-category-grid input[type="checkbox"]{width:18px;height:18px;flex:0 0 18px;margin:0;padding:0;accent-color:var(--text)}
 .ie-dialog .ie-result-category-grid span{min-width:0;overflow-wrap:anywhere}
 @media(max-width:420px){.ie-dialog .ie-result-category-grid{grid-template-columns:1fr}}
+
+
+/* Event editor: two-column basic information, with one-column fallback. */
+.ie-dialog.ie-event-add{width:min(780px,calc(100vw - 24px))}
+.ie-dialog.ie-event-add .ie-event-basic{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));column-gap:14px;align-items:start}
+.ie-dialog.ie-event-add .ie-event-basic>label,.ie-dialog.ie-event-add .ie-event-basic-place{min-width:0}
+.ie-dialog.ie-event-add .ie-event-basic>.ie-dates,.ie-dialog.ie-event-add .ie-event-basic-full{grid-column:1/-1}
+.ie-dialog.ie-event-add .ie-event-basic-place .ie-location-row:first-child{margin-top:0}
+@media(max-width:620px){.ie-dialog.ie-event-add .ie-event-basic{grid-template-columns:minmax(0,1fr)}}
+@media(max-width:420px){.ie-dialog.ie-event-add .ie-event-basic .ie-dates{grid-template-columns:minmax(0,1fr)}}
 
 /* Special-demand shared favorite category selector and manager. */
 .ie-dialog .ie-demand-head-actions{display:flex;gap:7px;align-items:center}

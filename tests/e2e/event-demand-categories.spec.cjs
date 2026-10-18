@@ -480,6 +480,10 @@ test('イベントと催事の登録画面で実績表示カテゴリーを選�
     await dialog.getByLabel('イベント種別').selectOption(spec.type);
     const fieldset=dialog.locator('.ie-result-category-options');
     await expect(fieldset).toBeVisible();
+    await expect(fieldset).not.toHaveAttribute('open',/.*/);
+    await expect(fieldset.locator('summary')).toContainText('すべて表示');
+    await fieldset.locator('summary').click();
+    await expect(fieldset).toHaveAttribute('open','');
     await expect(fieldset.locator('input[type="checkbox"]')).toHaveCount(master.length);
     await expect(fieldset.locator('input[type="checkbox"]:checked')).toHaveCount(master.length);
     await fieldset.getByRole('button',{name:'すべて解除'}).click();
