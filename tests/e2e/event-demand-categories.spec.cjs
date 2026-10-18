@@ -508,3 +508,60 @@ test('イベントと催事の登録画面で実績表示カテゴリーを選�
   expect(restored).toEqual([[master[0].id],[master[0].id]]);
   expect(errors).toEqual([]);
 });
+
+
+test('特需カテゴリーの名前を変更しても開いている催事のカテゴリーID選択を維持する',async({page,browserName})=>{
+  const errors=[];page.on('pageerror',error=>errors.push(error.message));
+  if(browserName==='webkit')await page.route('**/Index.html*',async route=>{
+    const response=await route.fetch();
+    await route.fulfill({response,body:(await response.text()).replace(/;?\s*upgrade-insecure-requests/g,'')});
+  });
+  await page.setViewportSize({width:1194,height:834});
+  await page.goto('/Index.html',{waitUntil:'domcontentloaded'});
+  await expect(page.locator('#nav0')).toBeVisible();
+  await page.locator('#nav0').click();
+  await page.getByRole('button',{name:'＋イベントを追加'}).click();
+  const editor=page.locator('dialog.ie-event-add');
+  await editor.locator('select[aria-label="イベント種別"]').selectOption('special');
+  await editor.locator('input[aria-label="催事名"]').fill('E2E未保存の催事');
+  await editor.locator('.ie-demand-head-actions').getByRole('button',{name:'＋追加'}).click();
+  await editor.locator('.ie-demand-row input[aria-label="名称"]').fill('E2E未保存の商品');
+
+  const manager=page.locator('dialog.ie-preset-editor').filter({has:page.locator('.ie-demand-category-manager')});
+  await editor.getByRole('button',{name:'カテゴリー管理'}).click();
+  await expect(manager).toBeVisible();
+  await manager.getByRole('button',{name:'＋ カテゴリーを追加'}).click();
+  const originalName='E2E特需カテゴリー名称変更前';
+  await manager.locator('.ie-demand-favorite-row input').last().fill(originalName);
+  await manager.getByRole('button',{name:'保存する'}).click();
+  await expect(manager).toHaveCount(0);
+  const categoryId=await page.evaluate(name=>{
+    const category=InsightEvents.demandCategories(allStores).find(item=>item.name===name);
+    return category&&category.id;
+  },originalName);
+  expect(categoryId).toBeTruthy();
+  const selector=editor.locator('.ie-demand-row select[aria-label="カテゴリー"]');
+  await selector.selectOption('favorite:'+categoryId);
+  await expect(selector).toHaveValue('favorite:'+categoryId);
+
+  await editor.getByRole('button',{name:'カテゴリー管理'}).click();
+  await expect(manager).toBeVisible();
+  const renamed='E2E特需カテゴリー名称変更後';
+  await manager.locator('.ie-demand-favorite-row input').last().fill(renamed);
+  await manager.getByRole('button',{name:'保存する'}).click();
+  await expect(manager).toHaveCount(0);
+  await expect(selector).toHaveValue('favorite:'+categoryId);
+  await expect(selector.locator('option:checked')).toHaveText(renamed);
+  await expect(editor.locator('input[aria-label="催事名"]')).toHaveValue('E2E未保存の催事');
+  await expect(editor.locator('.ie-demand-row input[aria-label="名称"]')).toHaveValue('E2E未保存の商品');
+  const shared=await page.evaluate(id=>({
+    matching:InsightEvents.demandCategories(allStores).filter(c=>c.id===id),
+    originalStore:allStores.current
+  }),categoryId);
+  expect(shared.matching).toEqual([{id:categoryId,name:renamed}]);
+  await editor.getByRole('button',{name:'キャンセル'}).click();
+  await page.reload({waitUntil:'domcontentloaded'});
+  await page.waitForFunction(()=>window.InsightEvents&&window.allStores);
+  expect(await page.evaluate(id=>InsightEvents.demandCategories(allStores).find(c=>c.id===id)?.name,categoryId)).toBe(renamed);
+  expect(errors).toEqual([]);
+});
