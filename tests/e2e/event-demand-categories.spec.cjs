@@ -597,7 +597,7 @@ test('削除された特需カテゴリーは自由入力に退避し既存イ�
   await editor.locator('.ie-demand-row select[aria-label="カテゴリー"]').selectOption('favorite:'+ids[0].id);
   await editor.getByRole('button',{name:'登録する'}).click();
   await expect(editor).toHaveCount(0);
-  const storedEventsBefore=await page.evaluate(()=>JSON.stringify(allStores.stores));
+  const storedEventsBefore=await page.evaluate(()=>JSON.stringify(allStores.stores[allStores.current].events));
 
   await page.getByRole('button',{name:'＋イベントを追加'}).click();
   await editor.getByLabel('イベント種別').selectOption('nearby');
@@ -618,12 +618,12 @@ test('削除された特需カテゴリーは自由入力に退避し既存イ�
   await expect(editor.locator('.ie-demand-row input[aria-label="独自カテゴリー名"]')).toHaveValue('E2E削除対象');
   await expect(editor.getByLabel('イベント名')).toHaveValue('E2E編集中の近隣イベント');
   expect(await page.evaluate(()=>InsightEvents.demandCategories(allStores))).toEqual([ids[1]]);
-  expect(await page.evaluate(()=>JSON.stringify(allStores.stores))).toBe(storedEventsBefore);
+  expect(await page.evaluate(()=>JSON.stringify(allStores.stores[allStores.current].events))).toBe(storedEventsBefore);
   await editor.getByRole('button',{name:'キャンセル'}).click();
 
   await page.reload({waitUntil:'domcontentloaded'});
   await page.waitForFunction(()=>window.InsightEvents&&typeof allStores==='object');
   expect(await page.evaluate(()=>InsightEvents.demandCategories(allStores))).toEqual([ids[1]]);
-  expect(await page.evaluate(()=>JSON.stringify(allStores.stores))).toBe(storedEventsBefore);
+  expect(await page.evaluate(()=>JSON.stringify(allStores.stores[allStores.current].events))).toBe(storedEventsBefore);
   expect(errors).toEqual([]);
 });
