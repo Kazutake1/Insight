@@ -513,7 +513,7 @@ test('分析AIの対象年月をサイドバー切替後も固定し各ページ
   assert.doesNotThrow(()=>new vm.Script(tripInference),'trip inference module should parse as JavaScript');
   assert.match(index,/insight_analysis_period_lock_v1\.js\?v=20261001-sync-owner/);
   assert.match(index,/insight_sales_count_v1\.js\?v=20261018-caret-end-1/);
-  assert.match(index,/insight_numeric_caret_v1\\.js\\?v=20261018-caret-end-1/);
+  assert.match(index,/insight_numeric_caret_v1\.js\?v=20261018-caret-end-1/);
   assert.match(presentation,/aiAnalysisTarget/);
   assert.match(css,/\.ai-workspace-period-label\{display:none!important\}/);
   assert.match(css,/\.ai-workspace-brand\{min-width:0;display:grid;align-content:center;gap:2px\}/);
