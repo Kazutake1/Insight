@@ -1419,6 +1419,12 @@ body.ai-analysis-open #main{margin-right:0!important}
 .ie-dialog .ie-demand-picker-aux button{flex:1;min-width:0;font-size:12px}
 @media(max-width:520px){.ie-dialog .ie-demand-picker-options{grid-template-columns:1fr}}
 
+/* Event modal: space preset chips from basic fields; align location action on the right. */
+.ie-dialog.ie-event-add .ie-presets+.ie-event-basic{margin-top:16px}
+.ie-dialog.ie-event-add .ie-event-basic-place .ie-location-editor>button{display:block;margin-left:auto}
+/* Keep a clear gap below the special-demand add action only when rows exist. */
+.ie-dialog.ie-event-add .ie-demand-list:not(:empty){margin-top:12px}
+
 /* Special-demand shared favorite category selector and manager. */
 .ie-dialog .ie-demand-head-actions{display:flex;gap:7px;align-items:center}
 .ie-dialog .ie-demand-category-field{display:flex;flex-direction:column;gap:4px;min-width:0}
