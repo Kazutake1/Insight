@@ -430,27 +430,30 @@
         allStores.salesCountManagement.categories.filter(function(category){return !category.hidden;}):[];
       var oldIds=Array.isArray(snapshot&&snapshot.resultCategoryIds)?snapshot.resultCategoryIds:null;
       var selected=oldIds?new Set(oldIds):null;
-      var box=el('fieldset',undefined,'ie-result-category-options'),legend=el('legend','カテゴリー実績の表示');
-      box.append(legend);
+      var box=el('details',undefined,'ie-result-category-options'),heading=el('summary'),state=el('span',undefined,'ie-result-category-state');
+      heading.append(el('strong','カテゴリー実績の表示'),state);box.append(heading);
       var note=el('p','チェックしたカテゴリーの実績だけを表示します。販売・納品データは変更されません。','ie-muted');box.append(note);
       if(!categories.length){
+        state.textContent='表示可能なカテゴリーがありません';
         box.append(el('p','表示可能なカテゴリーがありません。','ie-muted'));
         parent.append(box);
         return function(){return oldIds?copy(oldIds):undefined;};
       }
       var actions=el('div',undefined,'ie-result-category-actions'),grid=el('div',undefined,'ie-result-category-grid'),rows=[];
-      actions.append(button('すべて選択',function(){rows.forEach(function(row){row.check.checked=true;});}),
-        button('すべて解除',function(){rows.forEach(function(row){row.check.checked=false;});}));
+      function refreshSummary(){var count=rows.filter(function(row){return row.check.checked;}).length;state.textContent=count===rows.length?'すべて表示':count+' / '+rows.length+'件を表示';}
+      actions.append(button('すべて選択',function(){rows.forEach(function(row){row.check.checked=true;});refreshSummary();}),
+        button('すべて解除',function(){rows.forEach(function(row){row.check.checked=false;});refreshSummary();}));
       box.append(actions);
       categories.forEach(function(category){
         var label=el('label'),check=el('input');
         check.type='checkbox';check.value=category.id;
         check.checked=!selected||selected.has(category.id);
         check.setAttribute('aria-label','実績表示 '+category.name);
+        check.addEventListener('change',refreshSummary);
         label.append(check,el('span',category.name));grid.append(label);
         rows.push({id:category.id,check:check});
       });
-      box.append(grid);parent.append(box);
+      refreshSummary();box.append(grid);parent.append(box);
       return function(){
         var ids=rows.filter(function(row){return row.check.checked;}).map(function(row){return row.id;});
         requireValue(ids.length>0,'表示する実績カテゴリーを1件以上選択してください。');
@@ -636,6 +639,7 @@
         }catch(err){alert(err.message);}
       }
       function draw(){
+        if(dates.parentNode!==form)form.insertBefore(dates,content);
         content.replaceChildren();var hideScopeText=type.value==='sale'||type.value==='campaign';scopeText.hidden=hideScopeText;scopeText.textContent=hideScopeText?'':'現在の店舗：'+allStores.stores[storeId].name;
         if(type.value==='sale'){
           var h=el('div',undefined,'ie-head');h.append(el('strong','よく使うセール'),button('編集',function(){managePresets(draw);}));content.append(h);
@@ -657,8 +661,15 @@
             content.append(presetBox,el('p','選ぶと名称・補足'+(isNearby?'・場所':'')+'と特需商品を入力欄へ反映します。特需商品の用意数・販売数は開催ごとに入力します。','ie-muted'));
           }
           var initialSnapshot=eventTemplate||(editing&&source.snapshot?source.snapshot:null);
-          var readLocation=type.value==='nearby'?locationEditor(content,initialSnapshot):null;
-          var title=field(content,type.value==='special'?'催事名':'イベント名','text',initialSnapshot?initialSnapshot.title:''),note=field(content,'補足（任意）','textarea',initialSnapshot?initialSnapshot.note:'');title.required=true;
+          var basic=el('div',undefined,'ie-event-basic');
+          var title=field(basic,type.value==='special'?'催事名':'イベント名','text',initialSnapshot?initialSnapshot.title:'');title.required=true;
+          var readLocation=null;
+          if(type.value==='nearby'){
+            var place=el('div',undefined,'ie-event-basic-place');basic.append(place);readLocation=locationEditor(place,initialSnapshot);
+          }else title.parentNode.classList.add('ie-event-basic-full');
+          basic.append(dates);
+          var note=field(basic,'補足（任意）','textarea',initialSnapshot?initialSnapshot.note:'');note.parentNode.classList.add('ie-event-basic-full');
+          content.append(basic);
           var readDemand=(type.value==='nearby'||type.value==='special')?specialDemandEditor(content,initialSnapshot,false):function(){return [];};
           var readResultCategories=(type.value==='nearby'||type.value==='special')?resultCategoryEditor(content,initialSnapshot):null;
           read=function(){var snapshot={version:1,title:title.value.trim(),note:note.value.trim()};if(readLocation)snapshot.location=readLocation();if(type.value==='nearby'||type.value==='special'){snapshot.specialDemand=readDemand();var resultIds=readResultCategories();if(resultIds!==undefined)snapshot.resultCategoryIds=resultIds;}validateSnapshot(snapshot);return snapshot;};
