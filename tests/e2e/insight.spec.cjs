@@ -350,10 +350,10 @@ test('トップページは外部shellと機能manifestの最新版確認をno-s
     fetch('/insight_payload_source_v1.html?e2e-shell-check=1',{cache:'no-store'}).then(r=>r.text())
   ]));
   const [source,boot,loader,payload]=sources;
-  expect(source).toContain('name="insight-shell-version" content="20261015-event-categories-build-49"');
-  expect(source).toContain('insight_shell_boot_v1.js?v=20261015-event-categories-build-49');
-  expect(source).toContain('insight_shell_loader_v1.js?v=20261015-event-categories-build-49');
-  expect(source).toContain('insight_shell_v1.css?v=20261015-event-categories-build-49');
+  expect(source).toContain('name="insight-shell-version" content="20261018-demand-favorite-build-50"');
+  expect(source).toContain('insight_shell_boot_v1.js?v=20261018-demand-favorite-build-50');
+  expect(source).toContain('insight_shell_loader_v1.js?v=20261018-demand-favorite-build-50');
+  expect(source).toContain('insight_shell_v1.css?v=20261018-demand-favorite-build-50');
   expect(source).not.toMatch(/<script(?![^>]*\bsrc=)[^>]*>/i);
   expect(source).not.toMatch(/<style\b/i);
   expect(source).not.toMatch(/script-src[^;]*'unsafe-inline'/);
@@ -3190,9 +3190,10 @@ test('特需商品のよく使うカテゴリーは管理・並べ替え・共�
   await manager.getByRole('button',{name:'保存する'}).click();
   expect(await page.evaluate(()=>allStores.eventManagement.demandCategories.map(c=>c.name))).toEqual(['デザート','イベント用品']);
   await expect(demandRow.getByLabel('名称')).toHaveValue('試食セット');
-  await expect(demandRow.getByLabel('カテゴリー',{exact:true})).toHaveValue('custom');
-  await expect(demandRow.getByLabel('独自カテゴリー名')).toHaveValue('催事グッズ');
-
+  await expect(demandRow.getByLabel('カテゴリー',{exact:true})).toHaveValue(/favorite:/);
+  await expect(demandRow.getByLabel('カテゴリー',{exact:true}).locator('option:checked')).toHaveText('イベント用品');
+  // Switching explicitly to free input still allows adding another favorite.
+  await demandRow.getByLabel('カテゴリー',{exact:true}).selectOption('custom');
   await demandRow.getByLabel('独自カテゴリー名').fill('お祝い商品');
   await demandRow.getByLabel('よく使うカテゴリーに追加する').check();
   await eventDialog.getByLabel('催事名').fill('E2Eカテゴリー検証');
