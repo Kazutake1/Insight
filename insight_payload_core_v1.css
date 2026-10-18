@@ -1395,6 +1395,7 @@ body.ai-analysis-open #main{margin-right:0!important}
 .ie-dialog.ie-event-add{width:min(780px,calc(100vw - 24px))}
 .ie-dialog.ie-event-add .ie-event-basic{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));column-gap:14px;align-items:start}
 .ie-dialog.ie-event-add .ie-event-basic>label,.ie-dialog.ie-event-add .ie-event-basic-place{min-width:0}
+.ie-dialog.ie-event-add .ie-event-basic>label{margin-top:0}
 .ie-dialog.ie-event-add .ie-event-basic>.ie-dates,.ie-dialog.ie-event-add .ie-event-basic-full{grid-column:1/-1}
 .ie-dialog.ie-event-add .ie-event-basic-place .ie-location-row:first-child{margin-top:0}
 @media(max-width:620px){.ie-dialog.ie-event-add .ie-event-basic{grid-template-columns:minmax(0,1fr)}}
