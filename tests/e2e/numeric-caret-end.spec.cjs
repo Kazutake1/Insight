@@ -55,7 +55,7 @@ test('販売数入力の納品・販売・廃棄は左側タップでもカー�
 
 test('客数と特需商品の数量入力も左タップ時に末尾へ移動する',async({page,browserName})=>{
   const errors=await openInsight(page,browserName);
-  await page.locator('#nav2').click();
+  await page.locator('#nav3').click();
   const visitor=page.locator('#kyakuGrid input.kyaku-input').first();
   await expect(visitor).toBeVisible();
   await checkTapAtLeftMovesCaretToRight(visitor,'125');
