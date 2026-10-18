@@ -944,7 +944,7 @@ test('イベント実績は過去開催・日付カード・時間帯グラフ�
   assert.doesNotMatch(events,/row\.body\.style\.display/);
   assert.match(events,/row\.body\.classList\.toggle\('ie-sale-target-body-hidden',!row\.check\.checked\)/);
   assert.match(css,/\.ie-sale-target-body\.ie-sale-target-body-hidden\{display:none\}/);
-  assert.match(events,/scopeText\.hidden=hideScopeText/);
+  assert.match(events,/content\.replaceChildren\(\);/);
   assert.doesNotMatch(events,/全店舗共通・指定期間の各日に表示します。/);
   assert.doesNotMatch(events,/選ぶと上記の期間で登録します。個別の条件は下で入力できます。/);
   assert.doesNotMatch(events,/同じカテゴリー内に複数の値引きパターンがある場合は/);
