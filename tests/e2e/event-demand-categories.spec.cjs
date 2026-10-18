@@ -545,7 +545,8 @@ test('特需カテゴリーの名前を変更しても開いている催事の�
   },originalName);
   expect(categoryId).toBeTruthy();
   const selector=editor.locator('.ie-demand-row select[aria-label="カテゴリー"]');
-  await selector.selectOption('favorite:'+categoryId);
+  await editor.locator('.ie-demand-row').first().locator('.ie-demand-picker-trigger').click();
+  await editor.locator('.ie-demand-row').first().locator('.ie-demand-picker-panel').getByRole('button',{name:originalName,exact:true}).click();
   await expect(selector).toHaveValue('favorite:'+categoryId);
 
   await editor.getByRole('button',{name:'カテゴリー管理'}).click();
@@ -598,7 +599,8 @@ test('削除された特需カテゴリーは自由入力に退避し既存イ�
   await editor.getByLabel('催事名').fill('E2E過去イベント保持');
   await editor.locator('.ie-demand-editor').getByRole('button',{name:'＋追加'}).click();
   await editor.locator('.ie-demand-row input[aria-label="名称"]').fill('保存済み特需商品');
-  await editor.locator('.ie-demand-row select[aria-label="カテゴリー"]').selectOption('favorite:'+ids[0].id);
+  await editor.locator('.ie-demand-row .ie-demand-picker-trigger').click();
+  await editor.locator('.ie-demand-row .ie-demand-picker-panel').getByRole('button',{name:'E2E削除対象',exact:true}).click();
   await editor.getByRole('button',{name:'登録する'}).click();
   await expect(editor).toHaveCount(0);
   const storedEventsBefore=await page.evaluate(()=>JSON.stringify(allStores.stores[allStores.current].events));
@@ -610,7 +612,8 @@ test('削除された特需カテゴリーは自由入力に退避し既存イ�
   await editor.locator('.ie-demand-editor').getByRole('button',{name:'＋追加'}).click();
   await editor.locator('.ie-demand-row input[aria-label="名称"]').fill('編集中の特需商品');
   const selector=editor.locator('.ie-demand-row select[aria-label="カテゴリー"]');
-  await selector.selectOption('favorite:'+ids[0].id);
+  await editor.locator('.ie-demand-row .ie-demand-picker-trigger').click();
+  await editor.locator('.ie-demand-row .ie-demand-picker-panel').getByRole('button',{name:'E2E削除対象',exact:true}).click();
 
   await editor.getByRole('button',{name:'カテゴリー管理'}).click();
   await expect(manager).toBeVisible();
