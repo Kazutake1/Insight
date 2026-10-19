@@ -585,7 +585,7 @@ test('入力ページの天気・気温表示スタイルは外部CSSで維持�
   const index=readShell();
   const inputWeather=read('insight_input_weather_temp_v1.js');
   const css=read('insight_payload_core_v1.css');
-  assert.match(index,/insight_input_weather_temp_v1\.js\?v=20261006-csp-style-input-weather-1/);
+  assert.match(index,/insight_input_weather_temp_v1\.js\?v=20261019-input-weather-svg-1/);
   assert.match(css,/\.iwt-date-weather\{display:inline-flex;align-items:center;gap:5px/);
   assert.match(css,/\.iwt-kyaku-corner\{position:absolute;top:9px;right:8px/);
   assert.match(css,/@media\(max-width:700px\)\{\.iwt-sales-list\{font-size:9px\}/);
