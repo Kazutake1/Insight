@@ -21,13 +21,25 @@ test('選択肢から霧・凍雨を外し、大雪を追加（保存済みラ�
   assert.equal(WX_ICONS['霧'],'🌫️');
   assert.equal(WX_ICONS['凍雨'],'🧊');
   const icon=window.InsightWeatherIconCompat;
-  const svg=['大雨','雷雨','雪','大雪'].map(wx=>icon.markup(wx));
-  assert.equal(new Set(svg).size,4);
-  assert.ok(svg.every(markup=>markup.includes('<svg')));
-  assert.doesNotMatch(svg[0],/l-6 7/);
-  assert.match(svg[1],/l-6 7/);
-  assert.ok((svg[3].match(/<path/g)||[]).length>(svg[2].match(/<path/g)||[]).length);
-  assert.equal(icon.markup('霧'),'🌫️');
+  const choices=['快晴','晴','晴曇','曇','小雨','雨','大雨','雷雨','みぞれ','雪','大雪'];
+  const svg=choices.map(wx=>icon.markup(wx));
+  assert.equal(new Set(svg).size,11,'all 11 icon drawings must be visually distinguishable');
+  assert.ok(svg.every(markup=>markup.startsWith('<svg')&&markup.includes('viewBox="0 0 40 40"')));
+  assert.ok(svg.every(markup=>markup.includes('stroke="currentColor"')),'light/dark theme compatibility');
+  assert.ok(svg.every(markup=>markup.includes('aria-label=')),'each icon has its label');
+  assert.match(icon.markup('快晴'),/<circle/);
+  assert.match(icon.markup('晴'),/<circle/);
+  assert.match(icon.markup('晴曇'),/<circle/);
+  assert.doesNotMatch(icon.markup('曇'),/<circle/);
+  assert.doesNotMatch(icon.markup('大雨'),/l-6 7/);
+  assert.match(icon.markup('雷雨'),/l-6 7/);
+  assert.ok((icon.markup('大雪').match(/<path/g)||[]).length>
+    (icon.markup('雪').match(/<path/g)||[]).length);
+  assert.equal(icon.markup('霧'),'🌫️','legacy weather remains renderable');
+  assert.equal(icon.markup('凍雨'),'🧊','legacy weather remains renderable');
+  const target={innerHTML:'',textContent:''};
+  icon.render(target,'晴');
+  assert.ok(target.innerHTML.includes('<svg'),'compact selector renders SVG rather than emoji');
 });
 
 function autoWeather(){

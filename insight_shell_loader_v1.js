@@ -7,7 +7,7 @@ if(html.indexOf('<!DOCTYPE html>')!==0&&html.indexOf('<!doctype html>')!==0)thro
 // STEP5 complete: payload source is self-contained; feature modules are inserted before document.write().
 var orderedFeatureLoads=[
   './insight_legacy_style_compat_v1.js?v=20261006-core-contrast-runtime-1',
-  './insight_weather_icon_compat_v1.js?v=20261019-weather-icons-svg-1',
+  './insight_weather_icon_compat_v1.js?v=20261019-weather-all-svg-1',
   './insight_weather_keys_compat_v1.js?v=20261019-weather-keys-1',
   './insight_yoy_policy_v1.js?v=20260930-1',
   './insight_ai_compat_core_v1.js?v=20261003-ai-pipeline-1',
@@ -36,7 +36,7 @@ var orderedFeatureLoads=[
   './insight_events_v1.js?v=20261018-caret-end-1',
   './insight_hourly_customers_v1.js?v=20261006-remove-help',
   './insight_temperature_v1.js?v=20261007-csp-style-temperature-1',
-  './insight_weather_compact_v1.js?v=20261019-weather-compact-1',
+  './insight_weather_compact_v1.js?v=20261019-weather-compact-svg-1',
   './insight_weather_temperature_auto_v1.js?v=20261019-weather-auto-1',
   './insight_weather_location_v1.js?v=20260930-security1',
   './insight_input_weather_temp_v1.js?v=20261019-input-weather-svg-1',
