@@ -25,9 +25,9 @@ test('Index shellはinline script/styleを持たず外部assetへ分離する',(
   const boot=read('insight_shell_boot_v1.js');
   const loader=read('insight_shell_loader_v1.js');
   const css=read('insight_shell_v1.css');
-  assert.match(index,/insight_shell_boot_v1\.js\?v=20261018-caret-end-build-54/);
-  assert.match(index,/insight_shell_loader_v1\.js\?v=20261018-caret-end-build-54/);
-  assert.match(index,/insight_shell_v1\.css\?v=20261018-caret-end-build-54/);
+  assert.match(index,/insight_shell_boot_v1\.js\?v=20261019-weather-icons-build-55/);
+  assert.match(index,/insight_shell_loader_v1\.js\?v=20261019-weather-icons-build-55/);
+  assert.match(index,/insight_shell_v1\.css\?v=20261019-weather-icons-build-55/);
   assert.doesNotMatch(index,/<script(?![^>]*\bsrc=)[^>]*>/i);
   assert.doesNotMatch(index,/<style\b/i);
   assert.doesNotMatch(index,/script-src[^;]*'unsafe-inline'/);
@@ -36,7 +36,7 @@ test('Index shellはinline script/styleを持たず外部assetへ分離する',(
   assert.match(boot,/fetch\('\.\/Index\.html\?insight_probe='/);
   assert.match(loader,/fetch\('\.\/insight_shell_loader_v1\.js\?insight_manifest_probe='/);
   assert.match(loader,/document\.open\(\);document\.write\(html\);document\.close\(\)/);
-  assert.match(loader,/fetch\('\.\/insight_payload_source_v1\.html\?v=20261018-caret-end-1'/);
+  assert.match(loader,/fetch\('\.\/insight_payload_source_v1\.html\?v=20261019-weather-1'/);
   assert.doesNotMatch(index+loader,/pako|insight_payload_v1_part0/);
   assert.match(css,/#loading\{/);
 });
@@ -48,8 +48,8 @@ test('canonical payloadはinline script/styleを持たず外部assetを順序固
   const aiPresentation=read('insight_ai_presentation_v1.js');
   const readability=read('insight_readability_v1.js');
   const css=read('insight_payload_core_v1.css');
-  assert.match(payload,/insight_payload_core_v1\.css\?v=20261018-event-modal-1/);
-  assert.match(payload,/insight_payload_core_v1\.js\?v=20261018-caret-end-1/);
+  assert.match(payload,/insight_payload_core_v1\.css\?v=20261019-weather-svg-1/);
+  assert.match(payload,/insight_payload_core_v1\.js\?v=20261019-weather-1/);
   assert.doesNotMatch(core,/label\.style\.color/);
   assert.doesNotMatch(core,/msg\.style\.display/);
   assert.doesNotMatch(core,/badge\.style\.display/);
@@ -185,8 +185,8 @@ test('canonical payloadはinline script/styleを持たず外部assetを順序固
 
 test('トップページはキャッシュ抑止とシェル・機能manifestの自己更新を持つ',()=>{
   const index=readShell();
-  assert.match(index,/insight-shell-version" content="20261018-caret-end-build-54/);
-  assert.match(index,/var BUILD="20261018-caret-end-build-54"/);
+  assert.match(index,/insight-shell-version" content="20261019-weather-icons-build-55/);
+  assert.match(index,/var BUILD="20261019-weather-icons-build-55"/);
   assert.match(index,/Shell rule: bump BUILD whenever the loader/);
   assert.match(index,/Cache-Control" content="no-cache, no-store, must-revalidate/);
   assert.match(index,/insight_probe=/);
@@ -224,7 +224,7 @@ test('クイック入力の天気セレクタは固定スタイルを外部CSS�
   const index=readShell();
   const weather=read('insight_weather_compact_v1.js');
   const css=read('insight_payload_core_v1.css');
-  assert.match(index,/insight_weather_compact_v1\.js\?v=20261007-csp-style-weather-compact-1/);
+  assert.match(index,/insight_weather_compact_v1\.js\?v=20261019-weather-compact-1/);
   assert.match(weather,/function selectedWeather\(/);
   assert.match(weather,/function choose\(wx\)/);
   assert.match(weather,/root\.setWeather\(wx\)/);
@@ -244,7 +244,7 @@ test('天気アイコン拡張はruntime moduleが所有しbootstrap patch件数
   const index=readShell();
   const bootstrap=read('insight_bootstrap_patches_v1.js');
   const runtime=read('insight_weather_icon_compat_v1.js');
-  assert.match(index,/insight_weather_icon_compat_v1\.js\?v=20261006-weather-icons-runtime-1/);
+  assert.match(index,/insight_weather_icon_compat_v1\.js\?v=20261019-weather-icons-svg-1/);
   assert.ok(index.indexOf('insight_weather_icon_compat_v1.js')<index.indexOf('insight_weather_compact_v1.js'));
   assert.doesNotMatch(bootstrap,/🌫️|🧊|🌩️/);
   assert.match(runtime,/typeof WX_ICONS==='undefined'/);
@@ -256,7 +256,7 @@ test('天気キー拡張はruntime moduleが所有しbootstrap patch件数に含
   const index=readShell();
   const bootstrap=read('insight_bootstrap_patches_v1.js');
   const runtime=read('insight_weather_keys_compat_v1.js');
-  assert.match(index,/insight_weather_keys_compat_v1\.js\?v=20261006-weather-keys-runtime-1/);
+  assert.match(index,/insight_weather_keys_compat_v1\.js\?v=20261019-weather-keys-1/);
   assert.ok(index.indexOf('insight_weather_icon_compat_v1.js')<index.indexOf('insight_weather_keys_compat_v1.js'));
   assert.ok(index.indexOf('insight_weather_keys_compat_v1.js')<index.indexOf('insight_weather_compact_v1.js'));
   assert.doesNotMatch(bootstrap,/patch\("const WX_KEYS=/);
