@@ -13,7 +13,7 @@
   function fmtTemp(value){
     var n=finite(value);
     if(n===null)return '—';
-    return String(Math.round(n));
+    return String(Math.trunc(n));
   }
 
   function iconFor(row){
