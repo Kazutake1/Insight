@@ -77,15 +77,16 @@
     return Number.isFinite(lat)&&Number.isFinite(lon)?'coord|'+lat.toFixed(4)+'|'+lon.toFixed(4):'';
   }
 
-  function ensureDailyRow(targetStore,fy,month,day){
-    if(!targetStore.data||typeof targetStore.data!=='object')targetStore.data={};
-    if(!targetStore.data[fy]||typeof targetStore.data[fy]!=='object')targetStore.data[fy]={};
-    if(!Array.isArray(targetStore.data[fy][month]))targetStore.data[fy][month]=[];
-    var rows=targetStore.data[fy][month],ri=day-1;
-    if(!rows[ri]){
-      rows[ri]=typeof blankRow==='function'?blankRow(day):{d:day,weather:''};
-    }
-    return rows[ri];
+  // A shared municipality does not imply the same registered years.
+  // Skip incomplete/retired years instead of manufacturing orphan daily rows.
+  function registeredDailyRow(targetStore,fy,month,day){
+    if(!Array.isArray(targetStore.years)||!targetStore.years.some(function(y){return String(y)===String(fy);}))return null;
+    if(!Number.isInteger(day)||day<1||day>31)return null;
+    var yearData=targetStore.data&&targetStore.data[fy];
+    var rows=yearData&&yearData[month];
+    if(!Array.isArray(rows))return null;
+    var row=rows[day-1];
+    return row&&typeof row==='object'&&!Array.isArray(row)?row:null;
   }
 
   function syncWeatherAndTemperatureForMunicipality(fy,month,day,sourceRow){
@@ -95,7 +96,8 @@
     Object.keys(allStores.stores).forEach(function(storeId){
       var targetStore=allStores.stores[storeId];
       if(!targetStore||targetStore===store||municipalityKey(targetStore)!==key)return;
-      var targetRow=ensureDailyRow(targetStore,fy,month,day);
+      var targetRow=registeredDailyRow(targetStore,fy,month,day);
+      if(!targetRow)return;
       targetRow.weather=sourceRow.weather==null?'':sourceRow.weather;
       if(sourceRow.tempMaxC===undefined)delete targetRow.tempMaxC;
       else targetRow.tempMaxC=sourceRow.tempMaxC;
