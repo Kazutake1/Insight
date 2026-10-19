@@ -101,15 +101,15 @@ test('天気キー拡張はbootstrap文字列パッチではなくruntime module
   const bootstrap=fs.readFileSync(path.join(root,'insight_bootstrap_patches_v1.js'),'utf8');
   const runtime=fs.readFileSync(path.join(root,'insight_weather_keys_compat_v1.js'),'utf8');
   assert.doesNotMatch(bootstrap,/patch\("const WX_KEYS=/);
-  assert.match(runtime,/REQUIRED=\['霧','凍雨','雷雨'\]/);
+  assert.ok(runtime.includes("var REQUIRED=['大雪','雷雨'];"));
   assert.match(runtime,/if\(WX_KEYS\.indexOf\(wx\)<0\)WX_KEYS\.push\(wx\)/);
   assert.doesNotMatch(runtime,/localStorage|InsightStorage|\bfetch\s*\(|XMLHttpRequest|WebSocket/);
   const context={};context.window=context;context.globalThis=context;vm.createContext(context);
   vm.runInContext('const WX_KEYS=["快晴","晴","晴曇","曇","小雨","雨","大雨","みぞれ","雪"];',context);
   vm.runInContext(runtime,context);
-  assert.deepEqual(Array.from(vm.runInContext('WX_KEYS',context)),['快晴','晴','晴曇','曇','小雨','雨','大雨','みぞれ','雪','霧','凍雨','雷雨']);
+  assert.deepEqual(Array.from(vm.runInContext('WX_KEYS',context)),['快晴','晴','晴曇','曇','小雨','雨','大雨','みぞれ','雪','大雪','雷雨']);
   vm.runInContext('InsightWeatherKeysCompat.apply()',context);
-  assert.equal(vm.runInContext('WX_KEYS.length',context),12);
+  assert.equal(vm.runInContext('WX_KEYS.length',context),11);
 });
 
 test('Chart.jsの安全属性はbootstrap文字列パッチではなくshellが所有する',()=>{
