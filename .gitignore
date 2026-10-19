@@ -1,3 +1,29 @@
 node_modules/
 playwright-report/
 test-results/
+
+# Never include local secrets or private credentials in GitHub Pages assets.
+.env
+.env.*
+.npmrc
+.pypirc
+.netrc
+*.pem
+*.key
+*.p12
+*.pfx
+id_rsa
+id_ed25519
+
+# Browser data backups and debug/database artifacts are private.
+Insight_backup_*.json
+Insight_pre_restore_*.json
+*.sqlite
+*.sqlite3
+*.db
+*.bak
+*.dump
+*.log
+*.zip
+*.tar
+*.tgz
