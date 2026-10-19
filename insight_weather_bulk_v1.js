@@ -131,13 +131,14 @@ function codeToWeather(code){
   if(n===1)return '晴';
   if(n===2)return '晴曇';
   if(n===3)return '曇';
-  if(n===45||n===48)return '霧';
+  if(n===45||n===48)return '曇';
   if([51,53,55,61,80].includes(n))return '小雨';
-  if([56,57,66,67].includes(n))return '凍雨';
+  if([56,57,66,67].includes(n))return '雨';
   if([63,81].includes(n))return '雨';
   if([65,82].includes(n))return '大雨';
   if([95,96,97,99].includes(n))return '雷雨';
-  if([71,73,75,77,85,86].includes(n))return '雪';
+  if([75,86].includes(n))return '大雪';
+  if([71,73,77,85].includes(n))return '雪';
   return null;
 }
 function finiteTemperature(v){
