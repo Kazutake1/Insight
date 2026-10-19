@@ -350,10 +350,10 @@ test('トップページは外部shellと機能manifestの最新版確認をno-s
     fetch('/insight_payload_source_v1.html?e2e-shell-check=1',{cache:'no-store'}).then(r=>r.text())
   ]));
   const [source,boot,loader,payload]=sources;
-  expect(source).toContain('name="insight-shell-version" content="20261018-caret-end-build-54"');
-  expect(source).toContain('insight_shell_boot_v1.js?v=20261018-caret-end-build-54');
-  expect(source).toContain('insight_shell_loader_v1.js?v=20261018-caret-end-build-54');
-  expect(source).toContain('insight_shell_v1.css?v=20261018-caret-end-build-54');
+  expect(source).toContain('name="insight-shell-version" content="20261019-weather-icons-build-55"');
+  expect(source).toContain('insight_shell_boot_v1.js?v=20261019-weather-icons-build-55');
+  expect(source).toContain('insight_shell_loader_v1.js?v=20261019-weather-icons-build-55');
+  expect(source).toContain('insight_shell_v1.css?v=20261019-weather-icons-build-55');
   expect(source).not.toMatch(/<script(?![^>]*\bsrc=)[^>]*>/i);
   expect(source).not.toMatch(/<style\b/i);
   expect(source).not.toMatch(/script-src[^;]*'unsafe-inline'/);
@@ -361,13 +361,13 @@ test('トップページは外部shellと機能manifestの最新版確認をno-s
   expect(source).not.toMatch(/style-src[^;]*'unsafe-inline'/);
   expect(boot).toContain("fetch('./Index.html?insight_probe='+Date.now(),{cache:'no-store'})");
   expect(loader).toContain("fetch('./insight_shell_loader_v1.js?insight_manifest_probe='+Date.now(),{cache:'no-store'})");
-  expect(loader).toContain("fetch('./insight_payload_source_v1.html?v=20261018-caret-end-1',{cache:'no-store'})");
+  expect(loader).toContain("fetch('./insight_payload_source_v1.html?v=20261019-weather-1',{cache:'no-store'})");
   expect(loader).toContain('function featureSignature(entries)');
   expect(source).toContain('https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js');
   expect(source).toContain('integrity="sha512-CQBWl4fJHWbryGE+Pc7UAxWMUMNMWzWxF4SQo9CgkJIN1kx6djDQZjh3Y8SZ1d+6I+1zze6Z7kHXO7q3UyZAWw=="');
   expect(loader).not.toContain('stripPayloadChartScript');
-  expect(payload).toContain('insight_payload_core_v1.css?v=20261018-event-modal-1');
-  expect(payload).toContain('insight_payload_core_v1.js?v=20261018-caret-end-1');
+  expect(payload).toContain('insight_payload_core_v1.css?v=20261019-weather-svg-1');
+  expect(payload).toContain('insight_payload_core_v1.js?v=20261019-weather-1');
   expect(payload).toContain('insight_payload_ai_legacy_v1.js?v=20261006-payload-assets-1');
   expect(payload).toContain('insight_payload_bindings_v1.js?v=20261006-inline-bindings-1');
   expect(payload).not.toMatch(/\son(?:click|change)\s*=/i);
@@ -387,7 +387,7 @@ test('トップページは外部shellと機能manifestの最新版確認をno-s
   expect(await page.evaluate(()=>({
     keys:Array.from(WX_KEYS),
     runtime:!!window.InsightWeatherKeysCompat
-  }))).toEqual({keys:['快晴','晴','晴曇','曇','小雨','雨','大雨','みぞれ','雪','霧','凍雨','雷雨'],runtime:true});
+  }))).toEqual({keys:['快晴','晴','晴曇','曇','小雨','雨','大雨','みぞれ','雪','大雪','雷雨'],runtime:true});
   expect(boot).toContain("location.replace('./Index.html?insight_build='+encodeURIComponent(m[1]))");
   expect(loader).toContain("'&insight_manifest='+encodeURIComponent(remoteFeatureSignature)");
   const storeMenu=page.locator('#storeMenu');

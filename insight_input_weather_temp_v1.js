@@ -21,6 +21,11 @@
     try{return (WX_ICONS&&WX_ICONS[wx])||'';}catch(_){return '';}
   }
 
+  function iconMarkupFor(row){
+    var wx=row&&row.weather?String(row.weather):'';
+    return root.InsightWeatherIconCompat?root.InsightWeatherIconCompat.markup(wx):iconFor(row);
+  }
+
   function tempPair(row,spaced){
     var max=fmtTemp(row&&row.tempMaxC);
     var min=fmtTemp(row&&row.tempMinC);
@@ -58,7 +63,7 @@
     titleEl.classList.add('iwt-title-row');
     titleEl.insertAdjacentHTML('beforeend',
       '<span class="iwt-date-weather" aria-label="天気と最高最低気温">'+
-        (icon?'<span class="iwt-icon">'+icon+'</span>':'')+
+        (icon?'<span class="iwt-icon">'+iconMarkupFor(row)+'</span>':'')+
         '<span class="iwt-temp">'+tempPair(row,true)+'</span>'+
       '</span>');
     if(section)section.remove();
@@ -84,7 +89,7 @@
       corner.setAttribute('aria-label','最高最低気温と天気');
       corner.innerHTML=
         '<span class="iwt-temp">'+tempPair(row,false)+'</span>'+
-        (icon?'<span class="iwt-icon">'+icon+'</span>':'');
+        (icon?'<span class="iwt-icon">'+iconMarkupFor(row)+'</span>':'');
       card.appendChild(corner);
     });
   }

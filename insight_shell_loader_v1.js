@@ -2,13 +2,13 @@
 (function(){
 function fail(e){document.body.innerHTML='<div class="insight-load-failure">Insightの読み込みに失敗しました。<br><small>'+String(e&&e.message?e.message:e)+'</small></div>';}
 if(typeof Chart==='undefined'){fail(new Error('グラフライブラリを読み込めませんでした'));return;}
-fetch('./insight_payload_source_v1.html?v=20261018-caret-end-1',{cache:'no-store'}).then(function(r){if(!r.ok)throw new Error('Insight payload の取得に失敗しました ('+r.status+')');return r.text();}).then(function(html){
+fetch('./insight_payload_source_v1.html?v=20261019-weather-1',{cache:'no-store'}).then(function(r){if(!r.ok)throw new Error('Insight payload の取得に失敗しました ('+r.status+')');return r.text();}).then(function(html){
 if(html.indexOf('<!DOCTYPE html>')!==0&&html.indexOf('<!doctype html>')!==0)throw new Error('HTMLデータの検証に失敗しました');
 // STEP5 complete: payload source is self-contained; feature modules are inserted before document.write().
 var orderedFeatureLoads=[
   './insight_legacy_style_compat_v1.js?v=20261006-core-contrast-runtime-1',
-  './insight_weather_icon_compat_v1.js?v=20261006-weather-icons-runtime-1',
-  './insight_weather_keys_compat_v1.js?v=20261006-weather-keys-runtime-1',
+  './insight_weather_icon_compat_v1.js?v=20261019-weather-icons-svg-1',
+  './insight_weather_keys_compat_v1.js?v=20261019-weather-keys-1',
   './insight_yoy_policy_v1.js?v=20260930-1',
   './insight_ai_compat_core_v1.js?v=20261003-ai-pipeline-1',
   './insight_date_context_v1.js?v=20260930-1',
@@ -36,10 +36,10 @@ var orderedFeatureLoads=[
   './insight_events_v1.js?v=20261018-caret-end-1',
   './insight_hourly_customers_v1.js?v=20261006-remove-help',
   './insight_temperature_v1.js?v=20261007-csp-style-temperature-1',
-  './insight_weather_compact_v1.js?v=20261007-csp-style-weather-compact-1',
-  './insight_weather_temperature_auto_v1.js?v=20260930-hooks1',
+  './insight_weather_compact_v1.js?v=20261019-weather-compact-1',
+  './insight_weather_temperature_auto_v1.js?v=20261019-weather-auto-1',
   './insight_weather_location_v1.js?v=20260930-security1',
-  './insight_input_weather_temp_v1.js?v=20261006-csp-style-input-weather-1',
+  './insight_input_weather_temp_v1.js?v=20261019-input-weather-svg-1',
   './insight_sales_count_v1.js?v=20261018-caret-end-1',
   './insight_numeric_caret_v1.js?v=20261018-caret-end-1',
   './insight_trip_inference_v1.js?v=20261011-month-infer-1',
@@ -69,7 +69,7 @@ var orderedFeatureLoads=[
   './insight_ai_page_comments_v1.js?v=20261001-decision-analysis',
   './insight_settings_v1.js?v=20261007-step3-settings-hidden-class-1',
   './insight_trip_inference_view_v1.js?v=20261011-trip-manual-1',
-  './insight_weather_bulk_v1.js?v=20261009-weather-bulk-today-1',
+  './insight_weather_bulk_v1.js?v=20261019-weather-bulk-1',
   './insight_year_controls_layout_v1.js?v=20261006-csp-style-year-controls-1',
   './insight_dark_theme_v1.js?v=20261007-csp-style-dark-theme-1',
   './insight_readability_v1.js?v=20261007-csp-style-readability-global-containers-1',

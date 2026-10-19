@@ -67,7 +67,7 @@ test('STEP5互換処理の元anchorはpayload内に残して破壊していな�
   const anchors=[
     'const WX_KEYS=["快晴","晴","晴曇","曇","小雨","雨","大雨","みぞれ","雪"];',
     '"雪":"❄️","":""',
-    'const wxGroups={"晴れ":["快晴","晴","晴曇"],"曇り":["曇"],"雨":["小雨","雨","大雨"],"雪":["みぞれ","雪"]};',
+    'const wxGroups={"晴れ":["快晴","晴","晴曇"],"曇り":["曇","霧"],"雨":["小雨","雨","大雨","凍雨","雷雨"],"雪":["みぞれ","雪","大雪"]};',
     originalPersist,
     'background:var(--surface);color:var(--text);box-shadow:0 6px 24px var(--shadow);',
     '<div class="modal-bg" id="modalBg">',

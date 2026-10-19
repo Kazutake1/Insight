@@ -1620,3 +1620,9 @@ body.ai-analysis-open #main{margin-right:0!important}
 #insightTripHistorySection .insight-trip-history-save:disabled{opacity:.45;cursor:default}
 #insightTripHistorySection .insight-trip-history-choice:focus-visible,#insightTripHistorySection .insight-trip-history-save:focus-visible{outline:2px solid var(--text3);outline-offset:2px}
 @media(max-width:960px){#insightTripHistorySection .insight-trip-history-edit{flex-wrap:wrap}#insightTripHistorySection .insight-trip-history-save{width:100%}}
+
+/* Weather intensity SVG: readable on iPad in light and dark themes.
+   Inline SVGs use currentColor; do not add remote icons or font files. */
+.iwx-weather-svg{display:inline-block;width:1.25em;height:1.25em;vertical-align:-.18em;flex-shrink:0;color:currentColor;pointer-events:none}
+.qwc-icon .iwx-weather-svg,.qwc-option-icon .iwx-weather-svg{width:1.45em;height:1.45em}
+.iwt-icon .iwx-weather-svg,.hdb-num .iwx-weather-svg,.kyaku-wx .iwx-weather-svg{width:1.1em;height:1.1em}

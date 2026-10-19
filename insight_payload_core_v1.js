@@ -807,6 +807,7 @@ function setWeather(wx){
 /* JMAコードを天気種別にマッピング */
 function jmaCodeToWx(code){
   const c=parseInt(code)||0;
+  if(c===405||c===425)return "大雪";
   if(c>=400) return "雪";
   if(c>=300){
     if(c===304||c===307||c===308)return"大雨";
@@ -986,7 +987,7 @@ function yoy(cur,prev){
 /* ══ Correlation data ══ */
 function getCorrData(year,months){
   const wdSales=Array(7).fill(0),wdCount=Array(7).fill(0);
-  const wxGroups={"晴れ":["快晴","晴","晴曇"],"曇り":["曇"],"雨":["小雨","雨","大雨"],"雪":["みぞれ","雪"]};
+  const wxGroups={"晴れ":["快晴","晴","晴曇"],"曇り":["曇","霧"],"雨":["小雨","雨","大雨","凍雨","雷雨"],"雪":["みぞれ","雪","大雪"]};
   const wxSales={},wxCount={};
   Object.keys(wxGroups).forEach(g=>{wxSales[g]=0;wxCount[g]=0;});
 
@@ -1665,7 +1666,7 @@ function renderKyakuGrid(fy,mi){
     card.className=`kyaku-day-card${isRedDay?" sun-card":isSat?" sat-card":""}`;
     card.innerHTML=`
       <div class="kyaku-day-num${isRedDay?" sun":isSat?" sat":""}">${d}</div>
-      <div class="kyaku-wx">${WX_ICONS[wx]||"　"}</div>
+      <div class="kyaku-wx">${window.InsightWeatherIconCompat?window.InsightWeatherIconCompat.markup(wx):(WX_ICONS[wx]||"　")}</div>
       <input class="kyaku-input${kyaku>0?" has-val":""}" type="text" pattern="[0-9]*"
         inputmode="numeric" value="${kyaku||""}" placeholder="0"
         data-ri="${ri}">
@@ -1724,7 +1725,7 @@ function renderSalesDayList(fy,mi){
     const btn=document.createElement("button");
     btn.className=`haiki-day-btn${d===window.salesSelDay?" sel":""}${hasData?" has-data":""}`;
     const wx=row.weather||"";
-    btn.innerHTML=`<div class="hdb-num">${d}日 ${WX_ICONS[wx]||""}</div>
+    btn.innerHTML=`<div class="hdb-num">${d}日 ${window.InsightWeatherIconCompat?window.InsightWeatherIconCompat.markup(wx):(WX_ICONS[wx]||"")}</div>
       <div class="hdb-wd ${wdc}">${wdLabel}曜</div>
       <div class="hdb-tot">${hasData?"¥"+(Number(row.売上)||0).toLocaleString()+"千":"未入力"}</div>`;
     btn.onclick=()=>{window.salesSelDay=d;renderSalesDayList(fy,mi);renderSalesForm(fy,mi,d);};
@@ -1746,7 +1747,7 @@ function renderSalesForm(fy,mi,day){
     <div class="sales-weather-field">
       <div class="sales-weather-label">天気</div>
       <div class="sales-weather-options">
-        ${WX_KEYS.map(w=>`<button onclick="setSalesWeather(${ri},'${w}')" class="sales-weather-btn${row.weather===w?" active":""}" id="swx_${ri}_${w}">${WX_ICONS[w]}</button>`).join("")}
+        ${WX_KEYS.map(w=>`<button onclick="setSalesWeather(${ri},'${w}')" class="sales-weather-btn${row.weather===w?" active":""}" id="swx_${ri}_${w}">${window.InsightWeatherIconCompat?window.InsightWeatherIconCompat.markup(w):WX_ICONS[w]}</button>`).join("")}
       </div>
     </div>
 
@@ -1817,7 +1818,7 @@ function setSalesWeather(ri,wx){
   });
   // 日付リストのアイコン更新
   const btnEl=document.querySelector(`#salesDayList .haiki-day-btn:nth-child(${ri+1})`);
-  if(btnEl){const num=btnEl.querySelector(".hdb-num");if(num)num.textContent=`${ri+1}日 ${WX_ICONS[wx]||""}`;}
+  if(btnEl){const num=btnEl.querySelector(".hdb-num");if(num)num.innerHTML=`${ri+1}日 ${window.InsightWeatherIconCompat?window.InsightWeatherIconCompat.markup(wx):(WX_ICONS[wx]||"")}`;}
 }
 
 function refreshHaikiBarChart(fy,mi){
