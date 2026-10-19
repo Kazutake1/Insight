@@ -64,7 +64,7 @@
       trigger.className='qwc-trigger';
       trigger.setAttribute('aria-haspopup','true');
       trigger.setAttribute('aria-expanded','false');
-      trigger.innerHTML='<span class="qwc-icon">☀️</span><span class="qwc-label">快晴</span><span class="qwc-arrow">▼</span>';
+      trigger.innerHTML='<span class="qwc-icon">'+iconMarkup('快晴')+'</span><span class="qwc-label">快晴</span><span class="qwc-arrow">▼</span>';
 
       var menu=document.createElement('div');
       menu.id='qWeatherCompactMenu';
