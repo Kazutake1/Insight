@@ -76,6 +76,7 @@ jobs:
           - storage_layer.test.cjs
           - weather_future_guard.test.cjs
           - weather_municipality_sync.test.cjs
+          - temperature_truncation.test.cjs
           - weather_bulk.test.cjs
           - weather_classification.test.cjs
           - weekly_review.test.cjs

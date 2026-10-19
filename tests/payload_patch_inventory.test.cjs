@@ -25,9 +25,9 @@ test('Index shellはinline script/styleを持たず外部assetへ分離する',(
   const boot=read('insight_shell_boot_v1.js');
   const loader=read('insight_shell_loader_v1.js');
   const css=read('insight_shell_v1.css');
-  assert.match(index,/insight_shell_boot_v1\.js\?v=20261019-weather-sync-build-57/);
-  assert.match(index,/insight_shell_loader_v1\.js\?v=20261019-weather-sync-build-57/);
-  assert.match(index,/insight_shell_v1\.css\?v=20261019-weather-sync-build-57/);
+  assert.match(index,/insight_shell_boot_v1\.js\?v=20261019-temperature-trunc-build-58/);
+  assert.match(index,/insight_shell_loader_v1\.js\?v=20261019-temperature-trunc-build-58/);
+  assert.match(index,/insight_shell_v1\.css\?v=20261019-temperature-trunc-build-58/);
   assert.doesNotMatch(index,/<script(?![^>]*\bsrc=)[^>]*>/i);
   assert.doesNotMatch(index,/<style\b/i);
   assert.doesNotMatch(index,/script-src[^;]*'unsafe-inline'/);
@@ -185,8 +185,8 @@ test('canonical payloadはinline script/styleを持たず外部assetを順序固
 
 test('トップページはキャッシュ抑止とシェル・機能manifestの自己更新を持つ',()=>{
   const index=readShell();
-  assert.match(index,/insight-shell-version" content="20261019-weather-sync-build-57/);
-  assert.match(index,/var BUILD="20261019-weather-sync-build-57"/);
+  assert.match(index,/insight-shell-version" content="20261019-temperature-trunc-build-58/);
+  assert.match(index,/var BUILD="20261019-temperature-trunc-build-58"/);
   assert.match(index,/Shell rule: bump BUILD whenever the loader/);
   assert.match(index,/Cache-Control" content="no-cache, no-store, must-revalidate/);
   assert.match(index,/insight_probe=/);
@@ -205,7 +205,7 @@ test('クイック入力の気温UIは固定スタイルを外部CSSで維持し
   const index=readShell();
   const temperature=read('insight_temperature_v1.js');
   const css=read('insight_payload_core_v1.css');
-  assert.match(index,/insight_temperature_v1\.js\?v=20261019-weather-sync-registered-years-1/);
+  assert.match(index,/insight_temperature_v1\.js\?v=20261019-temperature-trunc-1/);
   assert.match(temperature,/function renderTemperature\(/);
   assert.match(temperature,/function updateAverage\(/);
   assert.match(temperature,/function readAndValidate\(/);
@@ -585,7 +585,7 @@ test('入力ページの天気・気温表示スタイルは外部CSSで維持�
   const index=readShell();
   const inputWeather=read('insight_input_weather_temp_v1.js');
   const css=read('insight_payload_core_v1.css');
-  assert.match(index,/insight_input_weather_temp_v1\.js\?v=20261019-input-weather-svg-1/);
+  assert.match(index,/insight_input_weather_temp_v1\.js\?v=20261019-input-temperature-trunc-1/);
   assert.match(css,/\.iwt-date-weather\{display:inline-flex;align-items:center;gap:5px/);
   assert.match(css,/\.iwt-kyaku-corner\{position:absolute;top:9px;right:8px/);
   assert.match(css,/@media\(max-width:700px\)\{\.iwt-sales-list\{font-size:9px\}/);

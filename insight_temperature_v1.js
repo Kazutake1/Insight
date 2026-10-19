@@ -45,7 +45,7 @@
 
   function showTemperature(input,value){
     var raw=displayTemperature(value);
-    var display=document.activeElement===input?raw:(raw===''?'':String(Math.round(Number(raw))));
+    var display=document.activeElement===input?raw:(raw===''?'':String(Math.trunc(Number(raw))));
     temperatureDisplayValues.set(input,{raw:raw,display:display});
     input.value=display;
   }
