@@ -4,8 +4,9 @@
   if(root.__insightWeatherCompactV1)return;
   root.__insightWeatherCompactV1=true;
 
-  var ORDER=['快晴','晴','晴曇','曇','小雨','雨','大雨','みぞれ','雪','霧','凍雨','雷雨'];
-  var ICONS={快晴:'☀️',晴:'🌤️',晴曇:'⛅',曇:'☁️',小雨:'🌦️',雨:'🌧️',大雨:'⛈️',みぞれ:'🌨️',雪:'❄️',霧:'🌫️',凍雨:'🧊',雷雨:'🌩️'};
+  var ORDER=['快晴','晴','晴曇','曇','小雨','雨','大雨','みぞれ','雪','大雪','雷雨'];
+  var ICONS={快晴:'☀️',晴:'🌤️',晴曇:'⛅',曇:'☁️',小雨:'🌦️',雨:'🌧️',大雨:'🌧️',みぞれ:'🌨️',雪:'❄️',大雪:'🌨️',雷雨:'🌩️',霧:'🌫️',凍雨:'🧊'};
+  function iconMarkup(wx){return root.InsightWeatherIconCompat?root.InsightWeatherIconCompat.markup(wx):(ICONS[wx]||'');}
 
   function selectedWeather(){
     var active=document.querySelector('#qWeatherSel .wx-btn.active');
@@ -20,7 +21,10 @@
     var wx=selectedWeather();
     var icon=trigger.querySelector('.qwc-icon');
     var label=trigger.querySelector('.qwc-label');
-    if(icon)icon.textContent=ICONS[wx]||'☀️';
+    if(icon){
+      if(root.InsightWeatherIconCompat)root.InsightWeatherIconCompat.render(icon,wx);
+      else icon.textContent=ICONS[wx]||'☀️';
+    }
     if(label)label.textContent=wx;
     var menu=document.getElementById('qWeatherCompactMenu');
     if(menu){
@@ -74,7 +78,7 @@
         btn.className='qwc-option';
         btn.dataset.wx=wx;
         btn.setAttribute('role','menuitem');
-        btn.innerHTML='<span class="qwc-option-icon">'+ICONS[wx]+'</span><span>'+wx+'</span>';
+        btn.innerHTML='<span class="qwc-option-icon">'+iconMarkup(wx)+'</span><span>'+wx+'</span>';
         btn.addEventListener('click',function(e){e.stopPropagation();choose(wx);});
         menu.appendChild(btn);
       });
