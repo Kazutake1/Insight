@@ -238,7 +238,7 @@ test('waste KPI keeps 16px important font size without shadowed normal sizes',()
     'preserve original waste KPI CSS order');
   assert.equal(css.includes('#iwcRow .iwc-kpi-value{font-size:13px;'),false);
   assert.equal(css.includes('#pageHaiki #iwcRow .iwc-kpi-value{font-size:15px;'),false);
-  const declarations=[...css.matchAll(/#(?:pageHaiki #)?iwcRow \\.iwc-kpi-value\\{([^}]*)\\}/g)].map(match=>match[1]);
+  const declarations=[...css.matchAll(/#(?:pageHaiki #)?iwcRow \.iwc-kpi-value\{([^}]*)\}/g)].map(match=>match[1]);
   assert.equal(declarations.length,4,'keep all waste KPI declarations');
   assert.deepEqual(declarations.filter(value=>/font-size:/.test(value)),['font-size:16px!important']);
 });
