@@ -133,7 +133,7 @@
     function selectedCategory(){return categories().find(function(c){return c.id===state.categoryId;})||null;}
     function setDirty(v){state.dirty=!!v;var mark=doc.getElementById('scDirty'),save=doc.getElementById('scSave');if(mark){mark.textContent=v?'未保存の変更があります':'保存済み';mark.className='sc-status '+(v?'dirty':'saved');}if(save)save.disabled=!v;}
     function confirmLeave(){return !state.dirty||confirm('販売数入力に未保存の変更があります。\n保存せずに移動しますか？');}
-    function yearRegistered(year){return !!(root.InsightYearManager&&typeof root.InsightYearManager.isRegistered==='function'&&root.InsightYearManager.isRegistered(store,String(year)));}
+    function yearRegistered(year){return !!(store&&Array.isArray(store.years)&&/^\d{4}$/.test(String(year))&&store.years.some(function(value){return String(value)===String(year);}));}
     function ensureRegisteredYear(year){var y=String(year);if(yearRegistered(y))return true;if(!root.InsightYearManager||typeof root.InsightYearManager.promoteCurrent!=='function'){alert('この年度を追加する機能を使用できません。');return false;}if(!confirm(y+'年度はダッシュボードに登録されていません。\n年度を追加して販売数を入力しますか？\n\n既にある過去データは保持したまま、未入力日を正常な空データで補完します。'))return false;try{root.InsightYearManager.promoteCurrent(y);store=allStores.stores[allStores.current];if(typeof renderYearPills==='function')renderYearPills();if(typeof showToast==='function')showToast('✓ '+y+'年度を追加しました','#15803d','#f0fdf4');return true;}catch(error){alert('年度を追加できませんでした。\n'+(error&&error.message?error.message:error));return false;}}
     function readMonth(){state.draft={};var prefix=monthPrefix(),data=store.salesCounts||{};Object.keys(data).forEach(function(date){if(date.slice(0,7)===prefix&&data[date][state.categoryId])state.draft[date]=normalizeRecord(data[date][state.categoryId]);});var waste=store.wasteCounts||{};state.wasteDraft={};state.wasteTouched={};Object.keys(waste).forEach(function(date){if(date.slice(0,7)===prefix&&waste[date][state.categoryId])state.wasteDraft[date]=normalizeWasteRecord(waste[date][state.categoryId]);});setDirty(false);}
     function record(date){return state.draft[date]||(state.draft[date]=emptyRecord());}
@@ -153,7 +153,8 @@
     function setPeriod(year,month){
       var y=Number(year),m=Number(month);
       if(!Number.isInteger(y)||y<1000||!Number.isInteger(m)||m<1||m>12)return false;
-      if(String(y)===state.year&&m===state.month)return ensureRegisteredYear(y);
+      // A no-op route sync only displays the period; it must not attempt year registration.
+      if(String(y)===state.year&&m===state.month)return true;
       if(!confirmLeave())return false;
       if(!ensureRegisteredYear(y))return false;
       state.year=String(y);state.month=m;readMonth();render();notifyPeriodChange();return true;
