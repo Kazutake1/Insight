@@ -281,7 +281,7 @@ test('waste KPI cards inherit effective important typography without shadowed no
   const start=css.indexOf('/* STEP5 CSP: waste insights CSS externalized. */');
   const end=css.indexOf('/* STEP5 CSP: sales insights and input period selector CSS externalized. */');
   assert.ok(start>=0 && end>=0 && end<start,'waste CSS section boundaries must remain');
-  const waste=css.slice(end,start);
+  const waste=css.slice(start).split('#iwcRow.iwc-height-tall{')[0];
   for(const selector of [
     '.iwc-title','.iwc-sub','.iwc-total','.iwc-total strong','.iwc-kpi-label',
     '.iwc-rank-title','.iwc-rank-line','.iwc-increase-percent','.iwc-empty'
