@@ -1001,7 +1001,7 @@ test('イベント実績は過去開催・日付カード・時間帯グラフ�
   assert.match(eventResults,/er-demand-scroll/);
   assert.match(css,/\.er-demand-category-scroll\{max-height:400px;overflow-y:auto/);
   assert.match(eventResults,/前回：用意 /);
-  assert.match(css,/grid-template-columns:repeat\(4,minmax\(0,1fr\)\)/);
+  assert.equal(css.includes('.er-category-grid{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:10px}'),false);
   assert.equal(css.includes('@media(max-width:1000px){.er-category-grid{grid-template-columns:repeat(2,minmax(0,1fr))}}'),false);
   assert.equal(css.includes('.er-category-grid,.er-period-day-grid{display:grid;grid-template-columns:repeat(7,minmax(0,1fr));gap:9px'),true);
   assert.equal(css.includes('.er-category-grid,.er-period-day-grid{grid-template-columns:repeat(3,minmax(0,1fr))}'),true);
