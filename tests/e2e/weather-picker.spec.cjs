@@ -5,6 +5,9 @@ test('天気選択肢の全11種類は独立したSVGで表示され選択も維
     const response=await route.fetch();
     await route.fulfill({response,body:(await response.text()).replace(/;?\s*upgrade-insecure-requests/g,'')});
   });
+  // Manual picker checks must not depend on live external weather API timing.
+  // The deferred-response behavior is tested in weather_fetch_race.test.cjs.
+  await page.route(/^https:\/\/(?:www\.jma\.go\.jp|api\.open-meteo\.com|historical-forecast-api\.open-meteo\.com)\//,route=>route.abort());
   await page.setViewportSize({width:1194,height:834});
   const errors=[];
   page.on('pageerror',err=>errors.push(err.message));

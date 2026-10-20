@@ -198,11 +198,22 @@
       weatherText:wx&&wx.text||'',max:temp&&temp.max,min:temp&&temp.min,tempSource:temp&&temp.source,source:'legacy'};
   }
 
+  var latestFetchRequest=0;
+  function manualRevision(){
+    var compact=root.InsightWeatherCompact;
+    return compact&&typeof compact.manualSelectionRevision==='function'?compact.manualSelectionRevision():0;
+  }
   root.fetchWeather=async function(){
+    var requestId=++latestFetchRequest;
+    var date=targetDate(),dateKey=localYmd(date),originStore=store,revision=manualRevision();
+    function sameTarget(){
+      return requestId===latestFetchRequest&&store===originStore&&localYmd(targetDate())===dateKey;
+    }
+    function manualOverride(){return manualRevision()!==revision;}
     var btn=document.getElementById('autoWxBtn');if(btn)btn.disabled=true;
     label('取得中…');
     try{
-      var date=targetDate(),result;
+      var result;
       if(isFutureDate(date)){
         label('自動');
         title('未来日の天気・気温は取得・保存しません。');
@@ -214,6 +225,14 @@
         result=await fetchLegacy(date);
       }
 
+      // Network replies can arrive after a date/store switch or a manual selection.
+      // Never apply a stale result to the currently edited day.
+      if(!sameTarget())return;
+      if(manualOverride()){
+        label('自動');
+        title('手動で選択した天気を優先しました。');
+        return;
+      }
       var gotWeather=false,gotTemp=false;
       if(result&&result.wx&&typeof root.setWeather==='function'){
         root.setWeather(result.wx);syncWeatherControl();gotWeather=true;
@@ -240,12 +259,18 @@
 
       compactIdleLabel();
     }catch(e){
+      if(!sameTarget())return;
+      if(manualOverride()){
+        label('自動');
+        title('手動で選択した天気を優先しました。');
+        return;
+      }
       label('取得失敗');
       var loc=store&&store.weatherLocation;
       title(validLocation(loc)?'設定した天気地点のデータ取得に失敗しました。地点設定を確認するか、手動で入力してください。':
         '気象庁データへの接続または対象日のデータ取得に失敗しました。手動で入力してください。');
       compactIdleLabel();
-    }finally{if(btn)btn.disabled=isFutureDate(targetDate());}
+    }finally{if(sameTarget()&&btn)btn.disabled=isFutureDate(targetDate());}
   };
 
   function applyFutureWeatherState(){
