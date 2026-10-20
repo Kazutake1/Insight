@@ -1249,7 +1249,7 @@ body.ai-analysis-open #main{margin-right:0!important}
 .er-demand-previous{display:block;margin-top:3px;color:var(--text4);font-weight:400;font-size:11px;line-height:1.4}
 .er-demand-value{text-align:right;font-weight:700;color:var(--text)}
 .er-demand-table tbody:last-child tr:last-child>*{border-bottom:0}
-@media(max-width:1000px){.er-category-grid{grid-template-columns:repeat(2,minmax(0,1fr))}}@media(max-width:800px){.er-toolbar{align-items:stretch}.er-toolbar label{min-width:0;width:100%}.er-arrow{display:none}.er-occurrence{grid-template-columns:1fr}.er-occurrence-metrics{justify-content:flex-start}.er-overview-grid{grid-template-columns:repeat(2,minmax(0,1fr));width:100%}.er-category-grid{grid-template-columns:1fr}}
+@media(max-width:800px){.er-toolbar{align-items:stretch}.er-toolbar label{min-width:0;width:100%}.er-arrow{display:none}.er-occurrence{grid-template-columns:1fr}.er-occurrence-metrics{justify-content:flex-start}.er-overview-grid{grid-template-columns:repeat(2,minmax(0,1fr));width:100%}}
 
 /* Event-results: single-day and period cards share a fixed seven-column reference width.
    Empty tracks stay reserved so one-to-six cards never stretch to fill a row. */

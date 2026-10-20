@@ -25,9 +25,9 @@ test('Index shellはinline script/styleを持たず外部assetへ分離する',(
   const boot=read('insight_shell_boot_v1.js');
   const loader=read('insight_shell_loader_v1.js');
   const css=read('insight_shell_v1.css');
-  assert.match(index,/insight_shell_boot_v1\.js\?v=20261020-css-important-build-63/);
-  assert.match(index,/insight_shell_loader_v1\.js\?v=20261020-css-important-build-63/);
-  assert.match(index,/insight_shell_v1\.css\?v=20261020-css-important-build-63/);
+  assert.match(index,/insight_shell_boot_v1\.js\?v=20261020-css-event-grid-build-64/);
+  assert.match(index,/insight_shell_loader_v1\.js\?v=20261020-css-event-grid-build-64/);
+  assert.match(index,/insight_shell_v1\.css\?v=20261020-css-event-grid-build-64/);
   assert.doesNotMatch(index,/<script(?![^>]*\bsrc=)[^>]*>/i);
   assert.doesNotMatch(index,/<style\b/i);
   assert.doesNotMatch(index,/script-src[^;]*'unsafe-inline'/);
@@ -48,7 +48,7 @@ test('canonical payloadはinline script/styleを持たず外部assetを順序固
   const aiPresentation=read('insight_ai_presentation_v1.js');
   const readability=read('insight_readability_v1.js');
   const css=read('insight_payload_core_v1.css');
-  assert.match(payload,/insight_payload_core_v1\.css\?v=20261020-css-important-dedup-4/);
+  assert.match(payload,/insight_payload_core_v1\.css\?v=20261020-css-event-grid-dedup-5/);
   assert.match(payload,/insight_payload_core_v1\.js\?v=20261019-weather-1/);
   assert.doesNotMatch(core,/label\.style\.color/);
   assert.doesNotMatch(core,/msg\.style\.display/);
@@ -185,8 +185,8 @@ test('canonical payloadはinline script/styleを持たず外部assetを順序固
 
 test('トップページはキャッシュ抑止とシェル・機能manifestの自己更新を持つ',()=>{
   const index=readShell();
-  assert.match(index,/insight-shell-version" content="20261020-css-important-build-63/);
-  assert.match(index,/var BUILD="20261020-css-important-build-63"/);
+  assert.match(index,/insight-shell-version" content="20261020-css-event-grid-build-64/);
+  assert.match(index,/var BUILD="20261020-css-event-grid-build-64"/);
   assert.match(index,/Shell rule: bump BUILD whenever the loader/);
   assert.match(index,/Cache-Control" content="no-cache, no-store, must-revalidate/);
   assert.match(index,/insight_probe=/);
@@ -1002,7 +1002,9 @@ test('イベント実績は過去開催・日付カード・時間帯グラフ�
   assert.match(css,/\.er-demand-category-scroll\{max-height:400px;overflow-y:auto/);
   assert.match(eventResults,/前回：用意 /);
   assert.match(css,/grid-template-columns:repeat\(4,minmax\(0,1fr\)\)/);
-  assert.match(css,/@media\(max-width:1000px\)\{\.er-category-grid\{grid-template-columns:repeat\(2,minmax\(0,1fr\)\)\}\}/);
+  assert.equal(css.includes('@media(max-width:1000px){.er-category-grid{grid-template-columns:repeat(2,minmax(0,1fr))}}'),false);
+  assert.equal(css.includes('.er-category-grid,.er-period-day-grid{display:grid;grid-template-columns:repeat(7,minmax(0,1fr));gap:9px'),true);
+  assert.equal(css.includes('.er-category-grid,.er-period-day-grid{grid-template-columns:repeat(3,minmax(0,1fr))}'),true);
   assert.doesNotMatch(eventResults,/max-width:280px/);
   assert.doesNotMatch(eventResults,/カテゴリー別・便別実績/);
   assert.match(eventResults,/hourly\.complete/);
