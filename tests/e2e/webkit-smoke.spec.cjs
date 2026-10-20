@@ -303,7 +303,7 @@ test('WebKit 11インチiPadの縦横とライト・ダークで主要ページ�
 });
 
 
-test('分析AIの開閉フレームをページ別に計測（iPad WebKit診断）',async({page})=>{
+test('分析AIの開閉はページ別に滑らかで重い月次分析はスライド後に更新する',async({page})=>{
   test.setTimeout(90000);
   const errors=await openInsight(page);
   await page.setViewportSize({width:1194,height:834});
@@ -323,7 +323,12 @@ test('分析AIの開閉フレームをページ別に計測（iPad WebKit診断�
       const toggle=document.getElementById('aiAnalysisToggle');
       const close=document.querySelector('.ai-workspace-close');
       async function trace(button){
-        const started=performance.now(),events=[],samples=[];
+        const started=performance.now(),events=[],samples=[],renders=[];
+        const originalRender=window.renderAIAnalysisPanel;
+        window.renderAIAnalysisPanel=function(){
+          renders.push(Math.round(performance.now()-started));
+          return originalRender.apply(this,arguments);
+        };
         const listen=e=>{
           if(e.target===panel&&e.propertyName==='transform'){
             events.push({type:e.type,time:Math.round(performance.now()-started)});
@@ -341,9 +346,10 @@ test('分析AIの開閉フレームをページ別に計測（iPad WebKit診断�
         const clickMs=Math.round(performance.now()-started);
         await new Promise(resolve=>setTimeout(resolve,490));
         running=false;
+        window.renderAIAnalysisPanel=originalRender;
         for(const kind of ['transitionrun','transitionstart','transitionend'])panel.removeEventListener(kind,listen);
         const uniqueXs=[...new Set(samples.map(x=>x.x))];
-        return {clickMs,events,frames:samples.length,distinctX:uniqueXs.length,
+        return {clickMs,events,renders,frames:samples.length,distinctX:uniqueXs.length,
           firstXs:samples.slice(0,5),lastXs:samples.slice(-3),
           state:document.body.classList.contains('ai-analysis-open')};
       }
@@ -352,6 +358,26 @@ test('分析AIの開閉フレームをページ別に計測（iPad WebKit診断�
     console.log('AI_ANIMATION_DIAGNOSTIC '+JSON.stringify({page:label,...result}));
     expect(result.open.state,label+' opens').toBe(true);
     expect(result.close.state,label+' closes').toBe(false);
+    expect(result.open.events.some(e=>e.type==='transitionend'),label+' slide finishes').toBe(true);
+    expect(result.open.renders.length,label+' analysis renders').toBeGreaterThan(0);
+    if(label!=='今日の入力'&&label!=='販売数入力'){
+      const finish=result.open.events.find(e=>e.type==='transitionend');
+      expect(result.open.renders[0],label+' must not block opening frames').toBeGreaterThanOrEqual(finish.time);
+      expect(result.open.distinctX,label+' has intermediate slide frames').toBeGreaterThanOrEqual(4);
+    }
   }
+  // A rapid close must cancel a delayed report; it must never update closed content.
+  await page.locator('#nav2').click();
+  const cancelled=await page.evaluate(async()=>{
+    const original=window.renderAIAnalysisPanel;
+    let calls=0;
+    window.renderAIAnalysisPanel=function(){calls++;return original.apply(this,arguments);};
+    window.openAIAnalysisPanel();
+    window.closeAIAnalysisPanel();
+    await new Promise(resolve=>setTimeout(resolve,480));
+    window.renderAIAnalysisPanel=original;
+    return {calls,open:document.body.classList.contains('ai-analysis-open')};
+  });
+  expect(cancelled).toEqual({calls:0,open:false});
   expect(errors).toEqual([]);
 });
