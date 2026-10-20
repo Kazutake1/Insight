@@ -238,3 +238,66 @@ test('WebKitで対象外便の廃棄入力はロックされ保存済み値が�
     allStores.stores[storeId].wasteCounts[date][categoryId].trips,before)).toEqual([3,7,null]);
   expect(errors).toEqual([]);
 });
+
+
+test('WebKit 11インチiPadの縦横とライト・ダークで主要ページの枠とタイトルを維持する',async({page})=>{
+  test.setTimeout(90000);
+  const errors=await openInsight(page);
+  const toggle=page.locator('.insight-theme-switch-track');
+  const pages=[
+    ['#nav1','#pageDash'],
+    ['#nav2','#pageSales'],
+    ['#nav3','#pageKyaku'],
+    ['#nav4','#pageHaiki'],
+    ['#navSalesCount','#pageSalesCount'],
+    ['#navSaleResults','#pageSaleResults'],
+    ['#navEventResults','#pageEventResults'],
+    ['#navSettings','#pageSettings']
+  ];
+  const surfaces=[];
+  for(const dark of [false,true]){
+    const initial=await page.evaluate(()=>document.documentElement.classList.contains('dark')||document.body.classList.contains('dark'));
+    if(initial!==dark){
+      await toggle.click();
+      await page.waitForFunction(expected=>(
+        document.documentElement.classList.contains('dark')||document.body.classList.contains('dark')
+      )===expected,dark);
+    }
+    surfaces.push(await page.evaluate(()=>getComputedStyle(document.body).getPropertyValue('--surface').trim()));
+    for(const viewport of [{width:1194,height:834},{width:834,height:1194}]){
+      await page.setViewportSize(viewport);
+      for(const [nav,rootSelector] of pages){
+        await page.locator(nav).click();
+        const root=page.locator(rootSelector);
+        await expect(root).toHaveClass(/show/);
+        const layout=await root.evaluate(node=>{
+          const rect=node.getBoundingClientRect();
+          const main=document.getElementById('main').getBoundingClientRect();
+          const heading=node.querySelector(':scope > .page-header > .page-title');
+          const h=heading?heading.getBoundingClientRect():null;
+          return {
+            left:rect.left,right:rect.right,width:rect.width,display:getComputedStyle(node).display,
+            mainLeft:main.left,mainRight:main.right,
+            heading:h?{left:h.left,right:h.right,width:h.width}:null,
+            viewportWidth:window.innerWidth,
+            dark:document.documentElement.classList.contains('dark')||document.body.classList.contains('dark')
+          };
+        });
+        const context=nav+' / '+viewport.width+'x'+viewport.height+' / dark='+dark;
+        expect(layout.dark,context+' theme').toBe(dark);
+        expect(layout.display,context+' display').not.toBe('none');
+        expect(layout.width,context+' page width').toBeGreaterThan(0);
+        expect(layout.left,context+' left edge').toBeGreaterThanOrEqual(layout.mainLeft-1);
+        expect(layout.right,context+' right edge').toBeLessThanOrEqual(layout.mainRight+1);
+        if(layout.heading){
+          expect(layout.heading.width,context+' heading width').toBeGreaterThan(0);
+          expect(layout.heading.left,context+' heading left').toBeGreaterThanOrEqual(layout.left-1);
+          expect(layout.heading.right,context+' heading right').toBeLessThanOrEqual(layout.right+1);
+        }
+      }
+    }
+  }
+  expect(surfaces.every(Boolean)).toBe(true);
+  expect(surfaces[0]).not.toBe(surfaces[1]);
+  expect(errors).toEqual([]);
+});
