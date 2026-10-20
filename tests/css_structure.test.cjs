@@ -131,6 +131,42 @@ test('AI legacy main margin and typography are shadowed by preserved important w
     '920px AI workspace positioning must remain');
 });
 
+
+test('readability important cascade wins over inactive sale/customer and AI typography at all breakpoints',()=>{
+  const winners=[
+    '#pageSales #issRow .iss-title,#pageKyaku #ikyRow .iky-title{font-size:15px!important}',
+    '#pageSales #issRow .iss-stat,#pageKyaku #ikyRow .iky-stat{font-size:13px!important}',
+    '#pageSales #issRow .iss-stat strong,#pageKyaku #ikyRow .iky-stat strong{font-size:20px!important}',
+    '.ai-analysis-workspace .ai-analysis-card-title{font-size:13px!important}'
+  ];
+  for(const rule of winners){
+    assert.equal(css.split(rule).length-1,1,'keep the effective !important declaration: '+rule);
+  }
+  const superseded=[
+    '.ai-analysis-workspace .ai-analysis-card-title{margin:0 0 9px;font-size:11px!important;',
+    '#pageSales #issRow .iss-title{font-size:13px;',
+    '#pageKyaku #ikyRow .iky-title{font-size:13px;',
+    '#pageSales #issRow .iss-stat strong{font-size:19px;',
+    '#pageKyaku #ikyRow .iky-stat strong{font-size:19px;',
+    'padding:2px 12px;font-size:11px;color:var(--text3)}#pageSales #issRow .iss-stat:first-child',
+    'padding:2px 12px;font-size:11px;color:var(--text3)}#pageKyaku #ikyRow .iky-stat:first-child',
+    '#pageSales #issRow .iss-stat{padding:2px 6px;font-size:10px}',
+    '#pageKyaku #ikyRow .iky-stat{padding:2px 6px;font-size:10px}',
+    '#pageSales #issRow .iss-stat strong{font-size:15px}',
+    '#pageKyaku #ikyRow .iky-stat strong{font-size:15px}'
+  ];
+  for(const old of superseded){
+    assert.equal(css.includes(old),false,'obsolete overridden declaration must not return: '+old);
+  }
+  for(const rule of [
+    '@media(max-width:600px){#pageSales #issRow .iss-stat{padding:2px 6px}}',
+    '@media(max-width:600px){#pageKyaku #ikyRow .iky-stat{padding:2px 6px}}'
+  ]){
+    assert.equal(css.split(rule).length-1,1,'the distinct 600px padding must remain: '+rule);
+  }
+  assert.equal(css.split('@media(max-width:920px)').length-1,1,'AI responsive positioning must be preserved');
+});
+
 test('AI workspace grid ratio is inherited from base across responsive breakpoints',()=>{
   const grid='.ai-workspace-grid{grid-template-columns:minmax(0,3fr) minmax(0,2fr)}';
   const baseGrid='.ai-workspace-grid{height:calc(100% - 68px);display:grid;grid-template-columns:minmax(0,3fr) minmax(0,2fr);gap:0;min-height:0}';
