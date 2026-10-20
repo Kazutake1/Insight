@@ -301,3 +301,85 @@ test('WebKit 11インチiPadの縦横とライト・ダークで主要ページ�
   expect(surfaces[0]).not.toBe(surfaces[1]);
   expect(errors).toEqual([]);
 });
+
+
+test('分析AIの開閉はページ別に滑らかで重い月次分析はスライド後に更新する',async({page})=>{
+  test.setTimeout(90000);
+  const errors=await openInsight(page);
+  await page.setViewportSize({width:1194,height:834});
+  const cases=[
+    ['今日の入力','#nav0'],
+    ['販売数入力','#navSalesCount'],
+    ['ダッシュボード','#nav1'],
+    ['売上入力','#nav2'],
+    ['客数入力','#nav3'],
+    ['廃棄入力','#nav4'],
+    ['イベント・催事','#navEventResults']
+  ];
+  for(const [label,nav] of cases){
+    await page.locator(nav).click();
+    const result=await page.evaluate(async()=>{
+      const panel=document.getElementById('aiAnalysisPanel');
+      const toggle=document.getElementById('aiAnalysisToggle');
+      const close=document.querySelector('.ai-workspace-close');
+      async function trace(button){
+        const started=performance.now(),events=[],samples=[],renders=[];
+        const originalRender=window.renderAIAnalysisPanel;
+        window.renderAIAnalysisPanel=function(){
+          renders.push(Math.round(performance.now()-started));
+          return originalRender.apply(this,arguments);
+        };
+        const listen=e=>{
+          if(e.target===panel&&e.propertyName==='transform'){
+            events.push({type:e.type,time:Math.round(performance.now()-started)});
+          }
+        };
+        for(const kind of ['transitionrun','transitionstart','transitionend'])panel.addEventListener(kind,listen);
+        let running=true;
+        function frame(){
+          if(!running)return;
+          samples.push({t:Math.round(performance.now()-started),x:Math.round(panel.getBoundingClientRect().x)});
+          requestAnimationFrame(frame);
+        }
+        requestAnimationFrame(frame);
+        button.click();
+        const clickMs=Math.round(performance.now()-started);
+        await new Promise(resolve=>setTimeout(resolve,490));
+        running=false;
+        window.renderAIAnalysisPanel=originalRender;
+        for(const kind of ['transitionrun','transitionstart','transitionend'])panel.removeEventListener(kind,listen);
+        const uniqueXs=[...new Set(samples.map(x=>x.x))];
+        return {clickMs,events,renders,frames:samples.length,distinctX:uniqueXs.length,
+          firstXs:samples.slice(0,5),lastXs:samples.slice(-3),
+          state:document.body.classList.contains('ai-analysis-open')};
+      }
+      return {open:await trace(toggle),close:await trace(close)};
+    });
+    console.log('AI_ANIMATION_DIAGNOSTIC '+JSON.stringify({page:label,...result}));
+    expect(result.open.state,label+' opens').toBe(true);
+    expect(result.close.state,label+' closes').toBe(false);
+    expect(result.open.events.some(e=>e.type==='transitionend'),label+' slide finishes').toBe(true);
+    expect(result.open.renders.length,label+' analysis renders').toBeGreaterThan(0);
+    if(label!=='今日の入力'&&label!=='販売数入力'){
+      const finish=result.open.events.find(e=>e.type==='transitionend');
+      expect(result.open.renders[0],label+' must not block opening frames').toBeGreaterThanOrEqual(finish.time);
+      // Headless WebKit frame sampling is variable even on known-smooth pages.
+      // Require actual movement, but verify the deterministic render/transition ordering.
+      expect(result.open.distinctX,label+' moves across the screen').toBeGreaterThanOrEqual(2);
+    }
+  }
+  // A rapid close must cancel a delayed report; it must never update closed content.
+  await page.locator('#nav2').click();
+  const cancelled=await page.evaluate(async()=>{
+    const original=window.renderAIAnalysisPanel;
+    let calls=0;
+    window.renderAIAnalysisPanel=function(){calls++;return original.apply(this,arguments);};
+    window.openAIAnalysisPanel();
+    window.closeAIAnalysisPanel();
+    await new Promise(resolve=>setTimeout(resolve,480));
+    window.renderAIAnalysisPanel=original;
+    return {calls,open:document.body.classList.contains('ai-analysis-open')};
+  });
+  expect(cancelled).toEqual({calls:0,open:false});
+  expect(errors).toEqual([]);
+});
