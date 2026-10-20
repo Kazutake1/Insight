@@ -160,4 +160,35 @@ jobs:
           if-no-files-found: ignore
           retention-days: 3
 
-
+  regression-gate:
+    name: required / all regression checks
+    # Run even when a prerequisite fails or is skipped, so the required check
+    # never reports success unless every test family has passed.
+    if: ${{ always() }}
+    needs:
+      - security-prepublish
+      - test
+      - e2e
+      - e2e-webkit
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Require every regression test family to succeed
+        shell: bash
+        env:
+          SECURITY_STATUS: ${{ needs.security-prepublish.result }}
+          UNIT_STATUS: ${{ needs.test.result }}
+          CHROMIUM_STATUS: ${{ needs.e2e.result }}
+          WEBKIT_STATUS: ${{ needs.e2e-webkit.result }}
+        run: |
+          failed=0
+          for name in SECURITY UNIT CHROMIUM WEBKIT; do
+            variable="${name}_STATUS"
+            result="${!variable}"
+            echo "${name}: ${result}"
+            if [[ "${result}" != "success" ]]; then
+              echo "::error title=Regression gate::${name} concluded ${result}; all test jobs must pass."
+              failed=1
+            fi
+          done
+          exit "${failed}"
