@@ -242,3 +242,23 @@ test('waste KPI keeps 16px important font size without shadowed normal sizes',()
   assert.equal(declarations.length,4,'keep all waste KPI declarations');
   assert.deepEqual(declarations.filter(value=>/font-size:/.test(value)),['font-size:16px!important']);
 });
+
+test('sales results 1200px rules preserve inherited base layout values',()=>{
+  const base=[
+    '.sr-day-grid{display:grid;grid-template-columns:repeat(7,minmax(0,1fr));gap:9px;width:100%;box-sizing:border-box}',
+    '.sr-group-head{display:flex;align-items:flex-start;justify-content:space-between;gap:14px;margin-bottom:10px}',
+    '.sr-group-stats{display:grid;grid-template-columns:repeat(3,minmax(88px,1fr));gap:8px;justify-content:end}'
+  ];
+  const media='@media(max-width:1200px){.sr-day-grid{gap:7px}.sr-group{padding:12px}.sr-group-head{flex-direction:column}.sr-group-stats{width:100%}}';
+  assert.equal(css.split(media).length-1,1,'retain responsive gap/padding/direction/width');
+  for(const selector of base){
+    assert.equal(css.split(selector).length-1,1,'retain shared base layout: '+selector);
+    assert.ok(css.indexOf(selector)<css.indexOf(media),'base remains before responsive override');
+  }
+  assert.ok(!css.includes('@media(max-width:1200px){.sr-day-grid{grid-template-columns:'),
+    'no redundant seven-column declaration in sales results 1200px media');
+  assert.ok(!css.includes('.sr-group-head{align-items:flex-start;flex-direction:column}'),
+    'no redundant flex-start alignment in sales results media');
+  assert.ok(!css.includes('.sr-group-stats{width:100%;grid-template-columns:'),
+    'no redundant 3-column declaration in sales results media');
+});
