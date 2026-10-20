@@ -206,8 +206,8 @@ test('IWC cards retain the winning spacing, flex layout and ranking dimensions',
     '#iwcRow .iwc-kpis{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:6px;margin-bottom:3px;flex:0 0 auto;}',
     '#iwcRow .iwc-rank-grid{display:flex;flex-direction:column;gap:3px;flex:1;min-height:0;}',
     '#iwcRow .iwc-rank{display:flex;flex-direction:column;flex:1;min-width:0;min-height:0;overflow:hidden;border:1px solid var(--border);border-radius:8px;padding:4px 6px;}',
-    '#iwcRow .iwc-rank-title{font-size:9px;font-weight:750;white-space:nowrap;color:var(--text);margin-bottom:2px;flex-shrink:0;}',
-    '#iwcRow .iwc-rank-line{display:flex;align-items:center;gap:4px;justify-content:space-between;font-size:9px;line-height:1.25;min-width:0;padding:1px 0;border-top:1px solid var(--border2);flex:1;min-height:0;}'
+    '#iwcRow .iwc-rank-title{font-weight:750;white-space:nowrap;color:var(--text);margin-bottom:2px;flex-shrink:0;}',
+    '#iwcRow .iwc-rank-line{display:flex;align-items:center;gap:4px;justify-content:space-between;min-width:0;padding:1px 0;border-top:1px solid var(--border2);flex:1;min-height:0;}'
   ];
   for(const item of [...early,...final])assert.equal(css.split(item).length-1,1,'preserve the specific IWC declaration: '+item.slice(0,65));
   const old=[
@@ -263,6 +263,35 @@ test('inactive sales-count styles use only the later full-module !important rule
     'sales-count 1200px override must remain');
 });
 
+
+
+test('waste KPI cards inherit effective important typography without shadowed normal values',()=>{
+  const winners=[
+    '#iwcRow .iwc-title{font-size:14px!important}',
+    '#iwcRow .iwc-sub{font-size:11.5px!important;line-height:1.35}',
+    '#iwcRow .iwc-total{font-size:11.5px!important}',
+    '#iwcRow .iwc-total strong{font-size:13px!important}',
+    '#iwcRow .iwc-kpi-label{font-size:11.5px!important;line-height:1.2!important}',
+    '#iwcRow .iwc-rank-title{font-size:11px!important}',
+    '#iwcRow .iwc-rank-line{font-size:11px!important;line-height:1.35!important}',
+    '#iwcRow .iwc-increase-percent{font-size:10.5px!important}',
+    '#iwcRow .iwc-empty{font-size:11.5px!important}'
+  ];
+  for(const rule of winners)assert.equal(css.split(rule).length-1,1,'must preserve winning waste KPI typography: '+rule);
+  const start=css.indexOf('/* STEP5 CSP: waste insights CSS externalized. */');
+  const end=css.indexOf('/* STEP5 CSP: sales insights and input period selector CSS externalized. */');
+  assert.ok(start>=0 && end>=0 && end<start,'waste CSS section boundaries must remain');
+  const waste=css.slice(end,start);
+  for(const selector of [
+    '.iwc-title','.iwc-sub','.iwc-total','.iwc-total strong','.iwc-kpi-label',
+    '.iwc-rank-title','.iwc-rank-line','.iwc-increase-percent','.iwc-empty'
+  ]){
+    const declaration=waste.split('#iwcRow '+selector+'{')[1]?.split('}')[0];
+    assert.ok(declaration,'waste KPI base rule must remain: '+selector);
+    assert.doesNotMatch(declaration,/font-size:|line-height:/,'inactive normal typography must not return: '+selector);
+  }
+  assert.ok(css.indexOf(winners[0])<start,'important readability typography must precede waste section');
+});
 
 test('waste KPI keeps 16px important font size without shadowed normal sizes',()=>{
   const winning='#iwcRow .iwc-kpi-value{font-size:16px!important}';
