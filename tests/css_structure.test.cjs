@@ -203,7 +203,7 @@ test('event cards have only their active grid and width rules',()=>{
   assert.ok(css.indexOf(card)<css.indexOf(grid)&&css.indexOf(grid)<css.indexOf(width),
     'event cards and later effective declarations must keep their cascade order');
   assert.equal(css.split('.er-category-grid{').length-1,0,'no separate obsolete base grid');
-  assert.ok(css.includes('@media(max-width:1000px){\\n  .er-category-grid,.er-period-day-grid{grid-template-columns:repeat(3,minmax(0,1fr))}'));
-  assert.ok(css.includes('@media(max-width:600px){\\n  .er-category-grid,.er-period-day-grid{grid-template-columns:repeat(2,minmax(0,1fr))}'));
-  assert.ok(css.includes('@media(max-width:420px){\\n  .er-category-grid,.er-period-day-grid{grid-template-columns:minmax(0,1fr)}'));
+  assert.ok(css.includes('@media(max-width:1000px){\n  .er-category-grid,.er-period-day-grid{grid-template-columns:repeat(3,minmax(0,1fr))}'));
+  assert.ok(css.includes('@media(max-width:600px){\n  .er-category-grid,.er-period-day-grid{grid-template-columns:repeat(2,minmax(0,1fr))}'));
+  assert.ok(css.includes('@media(max-width:420px){\n  .er-category-grid,.er-period-day-grid{grid-template-columns:minmax(0,1fr)}'));
 });
