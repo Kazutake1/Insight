@@ -137,3 +137,22 @@ test('sales and average calendars have one effective base rule each without obso
   assert.ok(css.includes('/* STEP5 CSP: externalized sales-count runtime CSS. */\n.sc-totals b'),
     'externalized sales-count runtime styles must retain the remaining total-label and inactive-trip rules');
 });
+
+test('dark KPI rules rely on the same themed variables as the base cards',()=>{
+  const card='.kpi-card{background:var(--surface);border-radius:15px;width:160px;flex-shrink:0;padding:13px 15px;\n  box-shadow:0 2px 12px var(--shadow2);cursor:pointer;position:relative;\n  overflow:hidden;transition:transform .15s,outline .1s;}';
+  const preserved=[
+    card,
+    '.kpi-label{font-size:10px;font-weight:700;letter-spacing:0.08em;text-transform:uppercase;color:var(--text4);margin-bottom:5px;}',
+    '.kpi-value{font-size:19px;font-weight:800;color:var(--text);letter-spacing:-0.02em;margin-bottom:5px;}',
+    '.kpi-prev{font-size:10px;color:var(--text4);}',
+    '#pageDash .kpi-card{height:110px!important;min-height:110px!important;max-height:110px!important;',
+    '#pageDash .kpi-value.insight-kpi-value-normal{color:#1a1a1a}',
+    '#pageDash .kpi-value.insight-kpi-value-alert{color:#dc2626}'
+  ];
+  for(const rule of preserved)assert.ok(css.includes(rule),'preserve the active KPI layout and color: '+rule.slice(0,65));
+  for(const selector of ['.dark .kpi-card{','.dark .kpi-label{','.dark .kpi-value{','.dark .kpi-prev{']){
+    assert.equal(css.includes(selector),false,'remove redundant dark KPI duplicate: '+selector);
+  }
+  assert.ok(css.includes('--surface:#2f2942') && css.includes('--text:#e2e2ea') && css.includes('--text4:#9793a1'),
+    'retain final dark-mode theme variable values');
+});

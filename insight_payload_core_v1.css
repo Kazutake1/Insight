@@ -468,10 +468,6 @@ input[type=number]{-moz-appearance:textfield;}
 .dark .user-row{border-top-color:var(--border);}
 .dark #main{background:var(--bg);}
 .dark .card{background:var(--surface);}
-.dark .kpi-card{background:var(--surface);box-shadow:0 2px 12px var(--shadow2);}
-.dark .kpi-label{color:var(--text4);}
-.dark .kpi-value{color:var(--text);}
-.dark .kpi-prev{color:var(--text4);}
 .dark .derived-card{background:var(--surface);box-shadow:0 1px 8px var(--shadow2);}
 .dark .derived-label{color:var(--text4);}
 .dark .derived-value{color:var(--text);}
