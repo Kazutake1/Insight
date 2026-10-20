@@ -1,0 +1,18 @@
+/* Scoped saved-report dialog; no existing panel overrides. */
+.irp-dialog{box-sizing:border-box;width:min(820px,calc(100vw - 32px));max-height:90vh;padding:24px;border:1px solid #ccc;border-radius:14px;background:#fff;color:#222;overflow:auto}
+.irp-dialog::backdrop{background:rgba(0,0,0,.35)}
+.irp-head{display:flex;align-items:center;justify-content:space-between;gap:24px;margin-bottom:16px}
+.irp-head h2{font-size:20px;margin:0}
+.irp-dialog button,.irp-dialog input,.irp-dialog select{font:inherit;box-sizing:border-box;min-height:44px;border:1px solid #bbb;border-radius:8px;background:#fff;color:inherit;padding:8px 12px;max-width:100%}
+.irp-dialog button{cursor:pointer;flex-shrink:0}
+.irp-dialog button:focus-visible,.irp-dialog input:focus-visible,.irp-dialog select:focus-visible{outline:2px solid currentColor;outline-offset:2px}
+.irp-note,.irp-message{font-size:13px;line-height:1.7;margin:12px 0 20px;overflow-wrap:anywhere}
+.irp-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:18px 20px}
+.irp-field{display:flex;flex-direction:column;gap:7px;font-size:13px;min-width:0}
+.irp-field input,.irp-field select{width:100%;min-width:0}
+.irp-actions{grid-column:1/-1;display:flex;justify-content:flex-end;margin-top:6px}
+.irp-output{white-space:pre-wrap;overflow-wrap:anywhere;font:14px/1.9 sans-serif;margin:20px 0 0}
+.irp-output:empty{display:none}
+html.dark .irp-dialog,body.dark .irp-dialog{background:#252525;color:#eee;border-color:#666}
+html.dark .irp-dialog button,html.dark .irp-dialog input,html.dark .irp-dialog select,body.dark .irp-dialog button,body.dark .irp-dialog input,body.dark .irp-dialog select{background:#333;border-color:#777}
+@media(max-width:600px){.irp-dialog{padding:18px}.irp-grid{grid-template-columns:minmax(0,1fr)}}

@@ -4,6 +4,28 @@
   if(root.InsightStorage)return;
 
   var CURRENT_SCHEMA_VERSION=1;
+  // Report-only observation. No saved schema fields and no effect on save results.
+  var reportRevision=0,reportPending=0,reportHeld=false,reportConflict=false;
+  function notifyReport(event){
+    try{
+      var preview=root.InsightReportPreview;
+      if(preview&&typeof preview.onStorageUpdate==='function')preview.onStorageUpdate(event);
+    }catch(_){ /* Optional reporting must never break existing saves. */ }
+  }
+  function withReportUpdate(operation){
+    var ticket=Object.freeze({}),outcome='failed';
+    reportRevision++;reportPending++;
+    notifyReport({phase:'begin',ticket:ticket});
+    try{var result=operation();outcome='committed';return result;}
+    finally{
+      reportPending--;if(outcome==='failed')reportHeld=true;
+      notifyReport({phase:'finish',ticket:ticket,outcome:outcome});
+    }
+  }
+  function reportState(){
+    return Object.freeze({revision:reportRevision,pending:reportPending,held:reportHeld,
+      conflict:reportConflict||externalChangeSeen||root.localStorage.getItem(storageKey())!==lastSavedRaw});
+  }
 
   function storageKey(){
     var key=(typeof SK!=='undefined'&&SK)?SK:root.SK;
@@ -20,6 +42,9 @@
     root.addEventListener('storage',function(event){
       if(event&&(event.key===null||event.key===storageKey())&&event.newValue!==lastSavedRaw)
         externalChangeSeen=true;
+      if(event&&(event.key===null||event.key===storageKey())){
+        reportConflict=true;reportRevision++;notifyReport({phase:'external'});
+      }
     });
   }
 
@@ -64,12 +89,14 @@
   }
 
   function writeSnapshot(snapshot){
+    return withReportUpdate(function(){
     var serialized=serialize(snapshot);
     assertNotStale();
     root.localStorage.setItem(storageKey(),serialized);
     // Update the observed baseline only after a successful write.
     lastSavedRaw=serialized;
     return serialized;
+      });
   }
 
   function readSnapshot(){
@@ -82,11 +109,12 @@
 
   function writeMetadata(key,value){
     if(typeof key!=='string'||!key)throw new Error('Insight metadata key is invalid.');
-    root.localStorage.setItem(key,String(value));
-    return true;
+    var write=function(){root.localStorage.setItem(key,String(value));return true;};
+    return key===storageKey()?withReportUpdate(write):write();
   }
 
   function persistCurrent(snapshot){
+    return withReportUpdate(function(){
     var target=snapshot;
     if(target===undefined){
       try{if(typeof allStores!=='undefined')target=allStores;}catch(_){}
@@ -96,9 +124,11 @@
     target.schemaVersion=CURRENT_SCHEMA_VERSION;
     writeSnapshot(target);
     return true;
+      });
   }
 
   function transaction(source,mutate,validate,apply){
+    return withReportUpdate(function(){
     if(typeof mutate!=='function')throw new Error('Storage transaction mutate callback is required.');
     var next=migrateSnapshot(source);
     mutate(next);
@@ -107,6 +137,7 @@
     writeSnapshot(next);
     if(typeof apply==='function')apply(next);
     return next;
+      });
   }
 
   // Existing local data had no top-level schemaVersion. Stamp only in memory;
@@ -123,6 +154,7 @@
 
   root.InsightStorage={
     CURRENT_SCHEMA_VERSION:CURRENT_SCHEMA_VERSION,
+    reportState:reportState,
     clone:clone,
     schemaVersion:schemaVersion,
     migrateSnapshot:migrateSnapshot,
