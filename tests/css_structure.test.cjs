@@ -97,6 +97,40 @@ test('event result grids preserve seven-column reference and deliberate 1000/600
   assert.equal(css.includes('.er-overview-grid{grid-template-columns:repeat(2,minmax(0,1fr));width:100%}}'),true);
 });
 
+
+test('AI legacy main margin and typography are shadowed by preserved important winners',()=>{
+  const inactive=[
+    'body.ai-analysis-open #main{margin-right:390px;}',
+    'body.ai-analysis-open #main{margin-right:0;}',
+    '.ai-workspace-target-label{margin:0;font-size:10px;',
+    '.ai-workspace-side-title{margin:0 8px 10px;font-size:10px;',
+    '.ai-workspace-section-title{font-size:16px;',
+    '.ai-workspace-section-hint{font-size:9px;',
+    '.ai-insight-title{min-width:0;font-size:11px;',
+    '.ai-insight-state{flex:0 0 auto;border:1px solid var(--border);border-radius:999px;padding:2px 6px;font-size:9px;'
+  ];
+  for(const old of inactive){
+    assert.equal(css.includes(old),false,'obsolete AI style must not return: '+old);
+  }
+  const effective=[
+    'body.ai-analysis-open #main{margin-right:0!important}',
+    '.ai-workspace-target-label{font-size:12px!important}',
+    '.ai-workspace-side-title{font-size:12px!important}',
+    '.ai-workspace-section-title{font-size:17px!important}',
+    '.ai-workspace-section-hint{font-size:11.5px!important}',
+    '.ai-insight-title{font-size:13px!important}',
+    '.ai-insight-state{font-size:11.5px!important}'
+  ];
+  for(const rule of effective){
+    assert.equal(css.split(rule).length-1,1,'effective AI style must remain: '+rule);
+  }
+  const aiResponsive=css.split('@media(max-width:980px){')[1]?.split('@media(max-width:600px){')[0];
+  assert.ok(aiResponsive && aiResponsive.includes('.ai-analysis-panel{width:min(390px,88vw);max-width:none;}'),
+    '980px panel width override must remain while obsolete margin is removed');
+  assert.ok(css.includes('@media(max-width:920px){.ai-analysis-panel.ai-analysis-workspace{left:8px!important;right:8px!important}'),
+    '920px AI workspace positioning must remain');
+});
+
 test('AI workspace grid ratio is inherited from base across responsive breakpoints',()=>{
   const grid='.ai-workspace-grid{grid-template-columns:minmax(0,3fr) minmax(0,2fr)}';
   const baseGrid='.ai-workspace-grid{height:calc(100% - 68px);display:grid;grid-template-columns:minmax(0,3fr) minmax(0,2fr);gap:0;min-height:0}';
