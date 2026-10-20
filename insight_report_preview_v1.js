@@ -111,9 +111,9 @@
     }
   }
   function init(){
-    var nav=doc.querySelector('#sidebar .nav-list');if(!nav||!root.InsightReport)return;
-    button=node('button','保存時点の定型報告','nav-btn');button.id='insightReportOpen';button.type='button';
-    button.addEventListener('click',open);nav.append(button);
+    var nav=doc.querySelector('#sidebar .sidebar-btns');if(!nav||!root.InsightReport)return;
+    button=node('button','保存時点の定型報告','sidebar-btn');button.id='insightReportOpen';button.type='button';
+    button.addEventListener('click',open);nav.prepend(button);
     dialog=node('dialog',undefined,'irp-dialog');dialog.id='insightReportDialog';dialog.setAttribute('aria-labelledby','irp-title');
     var top=node('header',undefined,'irp-head'),title=node('h2','保存時点の定型報告'),close=node('button','閉じる');
     title.id='irp-title';close.type='button';close.addEventListener('click',function(){dialog.close();});

@@ -118,7 +118,7 @@ test('通常の保存で旧報告を消し、閉じると既存分析AIを操作
   await expect(page.locator('#insightReportText')).toBeEmpty();
   await page.locator('#aiAnalysisToggle').click();
   await expect(page.locator('#aiAnalysisToggle')).toHaveAttribute('aria-expanded','true');
-  await page.locator('#aiAnalysisClose').click();
+  await page.locator('#aiAnalysisToggle').click();
   await expect(page.locator('#aiAnalysisToggle')).toHaveAttribute('aria-expanded','false');
   expect(errors).toEqual([]);
 });
