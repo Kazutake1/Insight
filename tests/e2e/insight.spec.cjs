@@ -638,10 +638,10 @@ test('STEP17の文字階層をダッシュボード・入力・販売数・分�
     return {
       salesLabel:read('#pageSales #issRow .iss-stat').fontSize,
       salesValue:read('#pageSales #issRow .iss-stat strong').fontSize,
-      salesPadding:read('#pageSales #issRow .iss-stat').paddingLeft,
+      salesPadding:read('#pageSales #issRow .iss-stat').paddingRight,
       customerLabel:read('#pageKyaku #ikyRow .iky-stat').fontSize,
       customerValue:read('#pageKyaku #ikyRow .iky-stat strong').fontSize,
-      customerPadding:read('#pageKyaku #ikyRow .iky-stat').paddingLeft
+      customerPadding:read('#pageKyaku #ikyRow .iky-stat').paddingRight
     };
   });
   expect(narrowType).toEqual({
