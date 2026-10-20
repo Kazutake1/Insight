@@ -135,7 +135,7 @@ test('sales and average calendars have one effective base rule each without obso
   assert.ok(origin>=0 && origin<grid && grid<averageGrid && averageGrid<compact1200 && compact1200<compact800,
     'sales and average base grids must keep their source order and both narrow-width overrides');
   assert.ok(css.includes('/* STEP5 CSP: externalized sales-count runtime CSS. */\n.sc-totals b'),
-    'externalized sales-count runtime styles must retain the remaining total-label and inactive-trip rules');
+    'externalized sales-count runtime must retain its total-label rule');
 });
 
 test('dark KPI rules rely on the same themed variables as the base cards',()=>{
@@ -206,4 +206,23 @@ test('event cards have only their active grid and width rules',()=>{
   assert.ok(css.includes('@media(max-width:1000px){\n  .er-category-grid,.er-period-day-grid{grid-template-columns:repeat(3,minmax(0,1fr))}'));
   assert.ok(css.includes('@media(max-width:600px){\n  .er-category-grid,.er-period-day-grid{grid-template-columns:repeat(2,minmax(0,1fr))}'));
   assert.ok(css.includes('@media(max-width:420px){\n  .er-category-grid,.er-period-day-grid{grid-template-columns:minmax(0,1fr)}'));
+});
+
+
+test('inactive sales-count styles use only the later full-module !important rules',()=>{
+  const early=css.split('/* STEP5 CSP: externalized sales-count runtime CSS. */')[1]?.split('/* STEP5 CSP: sale-results module CSS externalized. */')[0];
+  const full=css.split('/* STEP5 CSP: full sales-count module CSS externalized. */')[1];
+  assert.ok(early && full,'sales-count module boundaries must remain');
+  assert.ok(early.includes('.sc-totals b,.sc-average-totals b{font-size:14px}'));
+  assert.equal(early.includes('sc-not-applicable'),false,'old identical inactive styling must be removed');
+  const trip='.sc-trip input.sc-not-applicable{background:var(--surface2)!important;border-color:var(--border)!important;color:var(--text4)!important;font-size:10px!important;font-weight:700!important}';
+  const average='.sc-average-row b.sc-not-applicable{background:var(--surface2)!important;border-color:var(--border)!important;color:var(--text4)!important}';
+  assert.equal(full.split(trip).length-1,1,'retain winning trip colors and typography');
+  assert.equal(full.split(average).length-1,1,'retain winning average colors');
+  assert.ok(css.includes('#pageSalesCount .sc-trip input.sc-not-applicable{font-size:11.5px!important}'),
+    'page-specific important font size must remain');
+  assert.ok(css.includes('.sc-totals b,.sc-average-totals b{font-size:14px}'),
+    'shared totals typography must remain');
+  assert.ok(css.includes('@media(max-width:1200px){.sc-calendar,.sc-average-grid{grid-template-columns:repeat(7,minmax(0,1fr));gap:6px}'),
+    'sales-count 1200px override must remain');
 });
