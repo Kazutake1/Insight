@@ -54,3 +54,15 @@ test('AI 920px responsive rules share one media query without losing precedence'
   }
   assert.match(section,/\.ai-insight-value\{font-size:19px\}\}/);
 });
+
+test('superseded AI important declarations are removed without changing winning values',()=>{
+  const commentBase='.ai-analysis-workspace .ai-analysis-comment,.ai-analysis-workspace .ai-analysis-empty{margin:5px 0!important;color:var(--text2)!important}';
+  const commentWinner='.ai-analysis-workspace .ai-analysis-comment,.ai-analysis-workspace .ai-analysis-empty{font-size:14px!important;line-height:1.6!important}';
+  const statusWinner='.ai-workspace-status-card{position:relative;padding-left:16px!important}';
+  assert.equal(css.split(commentBase).length-1,1);
+  assert.equal(css.split(commentWinner).length-1,1);
+  assert.ok(css.indexOf(commentBase)<css.indexOf(commentWinner),'later text style must remain the cascade winner');
+  assert.equal(css.split(statusWinner).length-1,1);
+  assert.equal(css.includes('.ai-workspace-status-card{padding-left:14px!important}'),false);
+  assert.equal(css.includes('font-size:12px!important;line-height:1.55!important;color:var(--text2)!important'),false);
+});
