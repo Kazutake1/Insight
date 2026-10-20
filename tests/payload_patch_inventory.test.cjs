@@ -512,7 +512,7 @@ test('分析AIの対象年月をサイドバー切替後も固定し各ページ
   assert.ok(!tripInference.includes('localStorage.setItem')&&!tripInference.includes('InsightStorage.writeSnapshot')&&!tripInference.includes('persist('));
   assert.doesNotThrow(()=>new vm.Script(tripInference),'trip inference module should parse as JavaScript');
   assert.match(index,/insight_analysis_period_lock_v1\.js\?v=20261001-sync-owner/);
-  assert.match(index,/insight_sales_count_v1\.js\?v=20261020-historical-weather-svg-1/);
+  assert.match(index,/insight_sales_count_v1\.js\?v=20261020-year-nav-guard-2/);
   assert.match(index,/insight_numeric_caret_v1\.js\?v=20261018-caret-end-1/);
   assert.match(presentation,/aiAnalysisTarget/);
   assert.match(css,/\.ai-workspace-period-label\{display:none!important\}/);
@@ -1052,7 +1052,7 @@ test('セール実績ページは販売数入力直後に読み込み同一日�
   const index=readShell();
   const saleResults=read('insight_sale_results_v1.js');
   const sales=read('insight_sales_count_v1.js');
-  assert.match(index,/insight_sales_count_v1\.js\?v=20261020-historical-weather-svg-1/);
+  assert.match(index,/insight_sales_count_v1\.js\?v=20261020-year-nav-guard-2/);
   assert.match(index,/insight_sale_results_v1\.js\?v=20261011-sale-normal-days-1/);
   assert.ok(index.indexOf('insight_sales_count_v1.js')<index.indexOf('insight_sale_results_v1.js'));
   assert.ok(index.indexOf('insight_sale_results_v1.js')<index.indexOf('insight_page_period_sync_v1.js'));
@@ -1244,7 +1244,7 @@ test('販売数カテゴリーの対象便設定を全関連層で共有する',
   const analysis=read('insight_analysis_context_v1.js');
   const saleResults=read('insight_sale_results_v1.js');
   const pageAI=read('insight_ai_page_comments_v1.js');
-  assert.match(index,/insight_sales_count_v1\.js\?v=20261020-historical-weather-svg-1/);
+  assert.match(index,/insight_sales_count_v1\.js\?v=20261020-year-nav-guard-2/);
   assert.match(index,/insight_sale_results_v1\.js\?v=20261011-sale-normal-days-1/);
   assert.match(index,/insight_analysis_context_v1\.js\?v=20261004-special-demand/);
   assert.match(index,/insight_ai_page_comments_v1\.js\?v=20261001-decision-analysis/);
