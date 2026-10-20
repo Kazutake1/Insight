@@ -70,8 +70,8 @@ test('superseded AI important declarations are removed without changing winning 
 test('event result grids preserve seven-column reference and deliberate 1000/600/420 breakpoints',()=>{
   // Earlier 1000px two-column and 800px one-column declarations were
   // shadowed by the later equal-specificity seven-column layout and breakpoints.
-  assert.doesNotMatch(css,/@media\\(max-width:1000px\\)\\{\\.er-category-grid\\{grid-template-columns:repeat\\(2,minmax\\(0,1fr\\)\\)\\}\\}/);
-  assert.doesNotMatch(css,/\\.er-overview-grid\\{grid-template-columns:repeat\\(2,minmax\\(0,1fr\\)\\);width:100%\\}\\.er-category-grid\\{grid-template-columns:1fr\\}/);
+  assert.equal(css.includes('@media(max-width:1000px){.er-category-grid{grid-template-columns:repeat(2,minmax(0,1fr))}}'),false);
+  assert.equal(css.includes('.er-overview-grid{grid-template-columns:repeat(2,minmax(0,1fr));width:100%}.er-category-grid{grid-template-columns:1fr}'),false);
   const base='.er-category-grid,.er-period-day-grid{display:grid;grid-template-columns:repeat(7,minmax(0,1fr));gap:9px;width:100%;box-sizing:border-box}';
   const b1000='@media(max-width:1000px){\n  .er-category-grid,.er-period-day-grid{grid-template-columns:repeat(3,minmax(0,1fr))}\n}';
   const b600='@media(max-width:600px){\n  .er-category-grid,.er-period-day-grid{grid-template-columns:repeat(2,minmax(0,1fr))}\n}';
@@ -94,6 +94,6 @@ test('event result grids preserve seven-column reference and deliberate 1000/600
     assert.equal(resolved,columns,'unexpected event card grid breakpoint at '+width+'px');
   }
   // Other 800px event-result rules (toolbar, overview and controls) are retained.
-  assert.match(css,/@media\\(max-width:800px\\)\\{\\.er-toolbar\\{align-items:stretch\\}/);
-  assert.match(css,/\\.er-overview-grid\\{grid-template-columns:repeat\\(2,minmax\\(0,1fr\\)\\);width:100%\\}\\}/);
+  assert.equal(css.includes('@media(max-width:800px){.er-toolbar{align-items:stretch}'),true);
+  assert.equal(css.includes('.er-overview-grid{grid-template-columns:repeat(2,minmax(0,1fr));width:100%}}'),true);
 });
