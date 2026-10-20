@@ -567,7 +567,7 @@ input[type=number]{-moz-appearance:textfield;}
   position:fixed;top:0;right:0;bottom:0;z-index:10010;
   width:390px;max-width:42vw;background:var(--surface);color:var(--text);
   border-left:1px solid var(--border);box-shadow:-8px 0 28px var(--shadow);
-  transform:translateX(102%);transition:transform .24s ease;
+  transform:translateX(102%);transition:transform .24s ease;will-change:transform;
   display:flex;flex-direction:column;overflow:hidden;
   padding-top:env(safe-area-inset-top);padding-bottom:env(safe-area-inset-bottom);
 }
