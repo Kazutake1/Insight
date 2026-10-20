@@ -228,7 +228,6 @@ input[type=number]{-moz-appearance:textfield;}
 .m-btn.active{background:var(--c-primary);color:#fff;}
 .legend-row{display:flex;gap:12px;margin-bottom:7px;flex-shrink:0;flex-wrap:wrap;}
 .legend-item{display:flex;align-items:center;gap:5px;font-size:10.5px;color:var(--text3);}
-.legend-line{width:14px;height:2.5px;border-radius:2px;}
 .legend-dash{width:14px;height:0;border-top:2px dashed var(--text5);}
 .chart-wrap{flex:1;min-height:0;position:relative;}
 

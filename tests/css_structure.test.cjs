@@ -111,3 +111,11 @@ test('AI grid 920px rule does not repeat unchanged layout from 1180px',()=>{
   assert.ok(narrow.includes('.ai-workspace-header{padding:0 14px;gap:10px}'),'920px distinct padding remains');
   assert.ok(narrow.includes('.ai-analysis-panel.ai-analysis-workspace{left:8px!important;right:8px!important}'),'920px panel margins remain');
 });
+
+test('legend line keeps only its effective size, without a shadowed duplicate',()=>{
+  const effective='.legend-line{width:18px;height:2.5px;border-radius:2px;}';
+  const superseded='.legend-line{width:14px;height:2.5px;border-radius:2px;}';
+  assert.equal(css.includes(superseded),false,'obsolete legend width should not be restored');
+  assert.equal(css.split(effective).length-1,1,'effective legend width, height and radius must be preserved');
+  assert.equal(css.split('.legend-line{').length-1,1,'there should be exactly one base legend size rule');
+});
