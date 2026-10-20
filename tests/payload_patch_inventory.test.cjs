@@ -158,7 +158,7 @@ test('canonical payloadはinline script/styleを持たず外部assetを順序固
   assert.match(core,/btn\.classList\.add\("is-saved-feedback"\)/);
   assert.match(core,/btn\.classList\.remove\("is-saved-feedback"\)/);
   assert.match(css,/\.quick-save\.is-saved-feedback\{background:#16a34a;\}/);
-  assert.match(payload,/insight_payload_ai_legacy_v1\.js\?v=20261006-payload-assets-1/);
+  assert.match(payload,/insight_payload_ai_legacy_v1\.js\?v=20261020-ai-panel-smooth-1/);
   assert.match(payload,/insight_payload_bindings_v1\.js\?v=20261006-inline-bindings-1/);
   assert.doesNotMatch(payload,/\son(?:click|change)\s*=/i);
   assert.match(read('insight_payload_bindings_v1.js'),/InsightPayloadBindings/);
