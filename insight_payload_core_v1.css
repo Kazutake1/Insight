@@ -1001,7 +1001,7 @@ body.ai-analysis-open #main{margin-right:0!important}
 .ai-analysis-question-send{height:38px;flex:0 0 auto;border:0;border-radius:9px;background:var(--navy);color:#fff;padding:0 15px;font:800 11px/1 -apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;cursor:pointer}
 .ai-analysis-question-answer{margin-top:9px;padding:9px 10px;border-radius:9px;background:#f8f9fb;border:1px solid var(--border);font-size:11px;line-height:1.55;color:var(--text2);white-space:pre-wrap;max-height:126px;overflow:auto}
 .ai-analysis-question-help{display:none}
-@media(max-width:1180px){.ai-workspace-grid{grid-template-columns:minmax(0,3fr) minmax(0,2fr)}.ai-workspace-main-scroll{padding-left:16px;padding-right:16px}.ai-workspace-question-dock{margin-left:16px!important;margin-right:16px!important}.ai-workspace-period-btn{padding-left:10px;padding-right:10px}}
+@media(max-width:1180px){.ai-workspace-main-scroll{padding-left:16px;padding-right:16px}.ai-workspace-question-dock{margin-left:16px!important;margin-right:16px!important}.ai-workspace-period-btn{padding-left:10px;padding-right:10px}}
 @media(max-width:920px){.ai-analysis-panel.ai-analysis-workspace{left:8px!important;right:8px!important}.ai-workspace-header{padding:0 14px;gap:10px}.ai-workspace-period-btn{padding:7px 8px}.ai-workspace-section-hint{display:none}.ai-history-toolbar{gap:7px;padding:8px}.ai-history-mode-btn,.ai-history-period-btn{padding:6px 8px}
 .ai-insight-list.is-summary{grid-template-columns:1fr}.ai-insight-item.is-primary{grid-column:auto}.ai-insight-value{font-size:19px}}
 
