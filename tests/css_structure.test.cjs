@@ -39,7 +39,6 @@ test('AI 920px responsive rules share one media query without losing precedence'
   assert.ok(section,'AI responsive rules must be present');
   const rules=[
     '.ai-analysis-panel.ai-analysis-workspace{left:8px!important;right:8px!important}',
-    '.ai-workspace-grid{grid-template-columns:minmax(0,3fr) minmax(0,2fr)}',
     '.ai-workspace-header{padding:0 14px;gap:10px}',
     '.ai-history-mode-btn,.ai-history-period-btn{padding:6px 8px}',
     '.ai-insight-list.is-summary{grid-template-columns:1fr}',
@@ -96,4 +95,19 @@ test('event result grids preserve seven-column reference and deliberate 1000/600
   // Other 800px event-result rules (toolbar, overview and controls) are retained.
   assert.equal(css.includes('@media(max-width:800px){.er-toolbar{align-items:stretch}'),true);
   assert.equal(css.includes('.er-overview-grid{grid-template-columns:repeat(2,minmax(0,1fr));width:100%}}'),true);
+});
+
+test('AI grid 920px rule does not repeat unchanged layout from 1180px',()=>{
+  const grid='.ai-workspace-grid{grid-template-columns:minmax(0,3fr) minmax(0,2fr)}';
+  const baseGrid='.ai-workspace-grid{height:calc(100% - 68px);display:grid;grid-template-columns:minmax(0,3fr) minmax(0,2fr);gap:0;min-height:0}';
+  assert.equal(css.split(baseGrid).length-1,1,'AI grid base ratio must be retained');
+  const wide=css.split('@media(max-width:1180px){')[1]?.split('@media(max-width:920px){')[0];
+  const narrow=css.split('@media(max-width:920px){')[1]?.split('/* Readability overrides')[0];
+  assert.ok(wide && narrow,'AI 1180px and 920px media queries must exist');
+  assert.equal(wide.split(grid).length-1,1,'1180px grid ratio must be preserved');
+  assert.equal(narrow.includes(grid),false,'920px grid ratio is fully shadowed by unchanged 1180px declaration');
+  assert.ok(wide.indexOf(grid)>-1 && css.indexOf('@media(max-width:1180px)')<css.indexOf('@media(max-width:920px)'));
+  assert.equal(css.split('@media(max-width:920px)').length-1,1);
+  assert.ok(narrow.includes('.ai-workspace-header{padding:0 14px;gap:10px}'),'920px distinct padding remains');
+  assert.ok(narrow.includes('.ai-analysis-panel.ai-analysis-workspace{left:8px!important;right:8px!important}'),'920px panel margins remain');
 });
