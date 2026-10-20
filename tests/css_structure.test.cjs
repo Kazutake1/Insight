@@ -66,3 +66,34 @@ test('superseded AI important declarations are removed without changing winning 
   assert.equal(css.includes('.ai-workspace-status-card{padding-left:14px!important}'),false);
   assert.equal(css.includes('font-size:12px!important;line-height:1.55!important;color:var(--text2)!important'),false);
 });
+
+test('event result grids preserve seven-column reference and deliberate 1000/600/420 breakpoints',()=>{
+  // Earlier 1000px two-column and 800px one-column declarations were
+  // shadowed by the later equal-specificity seven-column layout and breakpoints.
+  assert.doesNotMatch(css,/@media\\(max-width:1000px\\)\\{\\.er-category-grid\\{grid-template-columns:repeat\\(2,minmax\\(0,1fr\\)\\)\\}\\}/);
+  assert.doesNotMatch(css,/\\.er-overview-grid\\{grid-template-columns:repeat\\(2,minmax\\(0,1fr\\)\\);width:100%\\}\\.er-category-grid\\{grid-template-columns:1fr\\}/);
+  const base='.er-category-grid,.er-period-day-grid{display:grid;grid-template-columns:repeat(7,minmax(0,1fr));gap:9px;width:100%;box-sizing:border-box}';
+  const b1000='@media(max-width:1000px){\n  .er-category-grid,.er-period-day-grid{grid-template-columns:repeat(3,minmax(0,1fr))}\n}';
+  const b600='@media(max-width:600px){\n  .er-category-grid,.er-period-day-grid{grid-template-columns:repeat(2,minmax(0,1fr))}\n}';
+  const b420='@media(max-width:420px){\n  .er-category-grid,.er-period-day-grid{grid-template-columns:minmax(0,1fr)}\n}';
+  const preserved=[base,b1000,b600,b420];
+  let previous=-1;
+  for(const rule of preserved){
+    assert.equal(css.split(rule).length-1,1,'preserved layout declaration must occur exactly once');
+    const position=css.indexOf(rule);
+    assert.ok(position>previous,'layout cascade order must be unchanged');
+    previous=position;
+  }
+  const expected=[
+    [1194,7],[1024,7],[1001,7],[1000,3],[834,3],
+    [820,3],[801,3],[800,3],[768,3],[601,3],
+    [600,2],[421,2],[420,1],[375,1]
+  ];
+  for(const [width,columns] of expected){
+    const resolved=width<=420?1:width<=600?2:width<=1000?3:7;
+    assert.equal(resolved,columns,'unexpected event card grid breakpoint at '+width+'px');
+  }
+  // Other 800px event-result rules (toolbar, overview and controls) are retained.
+  assert.match(css,/@media\\(max-width:800px\\)\\{\\.er-toolbar\\{align-items:stretch\\}/);
+  assert.match(css,/\\.er-overview-grid\\{grid-template-columns:repeat\\(2,minmax\\(0,1fr\\)\\);width:100%\\}\\}/);
+});
