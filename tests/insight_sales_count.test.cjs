@@ -296,6 +296,24 @@ test('セール・イベント・発注予測の実績カードだけ廃棄数�
   assert.match(css,/\.sc-day\.sc-readonly-waste \.sc-totals\{grid-template-columns:repeat\(3,minmax\(0,1fr\)\)\}/);
 });
 
+test('過去天気の取得値と保存形式を保ち、共通SVG rendererで安全に表示する',()=>{
+  const source=fs.readFileSync(path.join(__dirname,'..','insight_sales_count_v1.js'),'utf8');
+  const row=source.slice(source.indexOf('function createHistoricalWeatherRow('),source.indexOf('function createReadOnlyDayCard('));
+  const all=base();sales.ensure(all);
+  all.stores.a.data={'2026':{'10月':[]}};
+  all.stores.a.data['2026']['10月'][10]={d:'11',weather:'大雨',tempMaxC:26,tempMinC:14};
+  const before=JSON.stringify(all);
+  assert.deepEqual(sales.historicalWeather(all,'a','2026-10-11'),{weather:'大雨',icon:'⛈️',max:'26',min:'14'});
+  assert.deepEqual(sales.historicalWeather(all,'a','2026-10-12'),{weather:'—',icon:'—',max:'—',min:'—'});
+  assert.equal(JSON.stringify(all),before,'reading historical weather must not mutate saved data');
+  assert.match(row,/InsightWeatherIconCompat\.render\(icon,info\.weather\)/);
+  assert.match(row,/if\(!icon\.firstChild&&!icon\.textContent\)icon\.textContent=info\.icon/);
+  assert.doesNotMatch(row,/innerHTML/,'stored labels are never inserted as HTML');
+  for(const consumer of ['insight_event_results_v1.js','insight_sale_results_v1.js','insight_order_forecast_v1.js']){
+    assert.match(fs.readFileSync(path.join(__dirname,'..',consumer),'utf8'),/createHistoricalWeatherRow|createReadOnlyDayCard/);
+  }
+});
+
 test('過去の日種別平均は既存の通常日判定を維持したまま日付情報を返せる',()=>{
   const rec=value=>({trips:[{delivery:value,sales:value},{delivery:value,sales:value},{delivery:null,sales:null}]});
   const records={

@@ -206,7 +206,12 @@
       var info=historicalWeather(allStores,storeId||allStores.current,date);
       var line=el('div',undefined,'sc-history-weather');
       line.setAttribute('aria-label','天気 '+info.weather+'、最高気温 '+info.max+'℃、最低気温 '+info.min+'℃');
-      line.append(el('span',info.icon,'sc-history-icon'),el('span',info.max+'°','sc-history-high'),
+      var icon=el('span',undefined,'sc-history-icon');
+      if(root.InsightWeatherIconCompat&&typeof root.InsightWeatherIconCompat.render==='function'){
+        root.InsightWeatherIconCompat.render(icon,info.weather);
+      }
+      if(!icon.firstChild&&!icon.textContent)icon.textContent=info.icon;
+      line.append(icon,el('span',info.max+'°','sc-history-high'),
         el('span',' / ','sc-history-divider'),el('span',info.min+'°','sc-history-low'));
       return line;
     }

@@ -40,7 +40,7 @@ var orderedFeatureLoads=[
   './insight_weather_temperature_auto_v1.js?v=20261020-weather-fetch-stale-guard-1',
   './insight_weather_location_v1.js?v=20260930-security1',
   './insight_input_weather_temp_v1.js?v=20261019-input-temperature-trunc-1',
-  './insight_sales_count_v1.js?v=20261018-caret-end-1',
+  './insight_sales_count_v1.js?v=20261020-historical-weather-svg-1',
   './insight_numeric_caret_v1.js?v=20261018-caret-end-1',
   './insight_trip_inference_v1.js?v=20261011-month-infer-1',
   './insight_trip_overrides_v1.js?v=20261011-trip-manual-1',
@@ -106,4 +106,3 @@ html=html.replace('</body>',orderedFeatureHtml+'</body>');
 document.open();document.write(html);document.close();
 }).catch(fail);
 })();
-
