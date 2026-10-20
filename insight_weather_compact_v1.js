@@ -5,6 +5,8 @@
   root.__insightWeatherCompactV1=true;
 
   var ORDER=['快晴','晴','晴曇','曇','小雨','雨','大雨','みぞれ','雪','大雪','雷雨'];
+  // A manual choice always takes priority over an earlier in-flight auto-fetch.
+  var manualSelectionRevision=0;
   var ICONS={快晴:'☀️',晴:'🌤️',晴曇:'⛅',曇:'☁️',小雨:'🌦️',雨:'🌧️',大雨:'🌧️',みぞれ:'🌨️',雪:'❄️',大雪:'🌨️',雷雨:'🌩️',霧:'🌫️',凍雨:'🧊'};
   function iconMarkup(wx){return root.InsightWeatherIconCompat?root.InsightWeatherIconCompat.markup(wx):(ICONS[wx]||'');}
 
@@ -44,6 +46,7 @@
   }
 
   function choose(wx){
+    manualSelectionRevision++;
     if(typeof root.setWeather==='function')root.setWeather(wx);
     sync();
     close();
@@ -123,6 +126,6 @@
     root.InsightHooks.on('quick:render:after','weather-compact-render',function(){ensureControl();},50);
   }
 
-  root.InsightWeatherCompact={sync:sync,close:close};
+  root.InsightWeatherCompact={sync:sync,close:close,manualSelectionRevision:function(){return manualSelectionRevision;}};
   if(typeof currentNav!=='undefined'&&currentNav===0)ensureControl();
 })(typeof window!=='undefined'?window:globalThis);
