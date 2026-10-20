@@ -368,7 +368,7 @@ test('トップページは外部shellと機能manifestの最新版確認をno-s
   expect(loader).not.toContain('stripPayloadChartScript');
   expect(payload).toContain('insight_payload_core_v1.css?v=20261020-css-cascade-winners-dedup-19');
   expect(payload).toContain('insight_payload_core_v1.js?v=20261019-weather-1');
-  expect(payload).toContain('insight_payload_ai_legacy_v1.js?v=20261006-payload-assets-1');
+  expect(payload).toContain('insight_payload_ai_legacy_v1.js?v=20261020-ai-panel-smooth-1');
   expect(payload).toContain('insight_payload_bindings_v1.js?v=20261006-inline-bindings-1');
   expect(payload).not.toMatch(/\son(?:click|change)\s*=/i);
   expect(await page.evaluate(()=>!!window.InsightPayloadBindings)).toBe(true);
