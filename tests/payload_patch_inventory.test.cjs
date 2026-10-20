@@ -25,9 +25,9 @@ test('Index shellはinline script/styleを持たず外部assetへ分離する',(
   const boot=read('insight_shell_boot_v1.js');
   const loader=read('insight_shell_loader_v1.js');
   const css=read('insight_shell_v1.css');
-  assert.match(index,/insight_shell_boot_v1\.js\?v=20261019-temperature-trunc-build-58/);
-  assert.match(index,/insight_shell_loader_v1\.js\?v=20261019-temperature-trunc-build-58/);
-  assert.match(index,/insight_shell_v1\.css\?v=20261019-temperature-trunc-build-58/);
+  assert.match(index,/insight_shell_boot_v1\.js\?v=20261020-weather-race-build-59/);
+  assert.match(index,/insight_shell_loader_v1\.js\?v=20261020-weather-race-build-59/);
+  assert.match(index,/insight_shell_v1\.css\?v=20261020-weather-race-build-59/);
   assert.doesNotMatch(index,/<script(?![^>]*\bsrc=)[^>]*>/i);
   assert.doesNotMatch(index,/<style\b/i);
   assert.doesNotMatch(index,/script-src[^;]*'unsafe-inline'/);
@@ -185,8 +185,8 @@ test('canonical payloadはinline script/styleを持たず外部assetを順序固
 
 test('トップページはキャッシュ抑止とシェル・機能manifestの自己更新を持つ',()=>{
   const index=readShell();
-  assert.match(index,/insight-shell-version" content="20261019-temperature-trunc-build-58/);
-  assert.match(index,/var BUILD="20261019-temperature-trunc-build-58"/);
+  assert.match(index,/insight-shell-version" content="20261020-weather-race-build-59/);
+  assert.match(index,/var BUILD="20261020-weather-race-build-59"/);
   assert.match(index,/Shell rule: bump BUILD whenever the loader/);
   assert.match(index,/Cache-Control" content="no-cache, no-store, must-revalidate/);
   assert.match(index,/insight_probe=/);
@@ -224,7 +224,7 @@ test('クイック入力の天気セレクタは固定スタイルを外部CSS�
   const index=readShell();
   const weather=read('insight_weather_compact_v1.js');
   const css=read('insight_payload_core_v1.css');
-  assert.match(index,/insight_weather_compact_v1\.js\?v=20261019-weather-compact-svg-1/);
+  assert.match(index,/insight_weather_compact_v1\.js\?v=20261020-weather-manual-revision-1/);
   assert.match(weather,/function selectedWeather\(/);
   assert.match(weather,/function choose\(wx\)/);
   assert.match(weather,/root\.setWeather\(wx\)/);
