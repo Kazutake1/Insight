@@ -4,7 +4,7 @@ test('販売数入力への反復移動で年度追加の誤警告を表示せ�
   // Local HTTP and WebKit: disable only the production HTTPS-upgrade directive.
   await page.route('**/Index.html*',async route=>{
     const response=await route.fetch();
-    const body=(await response.text()).replace(/;?\\s*upgrade-insecure-requests/g,'');
+    const body=(await response.text()).replace(/;?\s*upgrade-insecure-requests/g,'');
     await route.fulfill({response,body});
   });
   const errors=[];
