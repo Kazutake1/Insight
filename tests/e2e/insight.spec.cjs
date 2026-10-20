@@ -403,11 +403,12 @@ test('トップページは外部shellと機能manifestの最新版確認をno-s
   expect(errors).toEqual([]);
 });
 
-test('サイドバー下部は設定だけを表示し管理項目は設定ページへ集約する',async({page})=>{
+test('サイドバー下部は設定と定型報告を表示し管理項目は設定ページへ集約する',async({page})=>{
   const errors=await openInsight(page);
   const sidebar=page.locator('.sidebar-btns');
   await expect(sidebar.locator('#navSettings')).toBeVisible();
-  await expect(sidebar.locator('button')).toHaveCount(1);
+  await expect(sidebar.locator('button')).toHaveCount(2);
+  await expect(sidebar.locator('#insightReportOpen')).toHaveText('保存時点の定型報告');
   await expect(sidebar.locator('#backupBtn')).toHaveCount(0);
   await expect(sidebar.locator('#darkModeBtn')).toHaveCount(0);
   await expect(sidebar.locator('#insightDataHealthButton')).toHaveCount(0);
