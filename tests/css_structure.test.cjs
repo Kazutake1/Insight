@@ -188,3 +188,22 @@ test('IWC cards retain the winning spacing, flex layout and ranking dimensions',
   assert.ok(css.includes('#pageHaiki #iwcRow .iwc-card{height:calc(var(--iwc-height) + 50px)}'));
   assert.ok(css.includes('#iwcRow .iwc-kpi-label{font-size:11.5px!important;line-height:1.2!important}'));
 });
+
+test('event cards have only their active grid and width rules',()=>{
+  const obsoleteGrid='.er-category-grid{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:10px}';
+  const obsoleteCard='.er-category-card{min-width:0;width:100%;border:1px solid var(--border);border-radius:12px;background:var(--surface2);padding:9px;box-sizing:border-box}';
+  const card='.er-category-card{border:1px solid var(--border);border-radius:12px;background:var(--surface2);padding:9px}';
+  const grid='.er-category-grid,.er-period-day-grid{display:grid;grid-template-columns:repeat(7,minmax(0,1fr));gap:9px;width:100%;box-sizing:border-box}';
+  const width='.er-category-card,.er-period-day-grid>.sc-day{min-width:0;width:100%;box-sizing:border-box}';
+  assert.equal(css.includes(obsoleteGrid),false,'earlier unused 4-column grid must not return');
+  assert.equal(css.includes(obsoleteCard),false,'earlier repeated card sizing must not return');
+  assert.equal(css.split(card).length-1,1,'retain category card border, color, radius, and padding');
+  assert.equal(css.split(grid).length-1,1,'retain the winning 7-column grid and 9px gap');
+  assert.equal(css.split(width).length-1,1,'retain category card width, min-width and border-box');
+  assert.ok(css.indexOf(card)<css.indexOf(grid)&&css.indexOf(grid)<css.indexOf(width),
+    'event cards and later effective declarations must keep their cascade order');
+  assert.equal(css.split('.er-category-grid{').length-1,0,'no separate obsolete base grid');
+  assert.ok(css.includes('@media(max-width:1000px){\n  .er-category-grid,.er-period-day-grid{grid-template-columns:repeat(3,minmax(0,1fr))}'));
+  assert.ok(css.includes('@media(max-width:600px){\n  .er-category-grid,.er-period-day-grid{grid-template-columns:repeat(2,minmax(0,1fr))}'));
+  assert.ok(css.includes('@media(max-width:420px){\n  .er-category-grid,.er-period-day-grid{grid-template-columns:minmax(0,1fr)}'));
+});
