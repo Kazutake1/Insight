@@ -1208,7 +1208,6 @@ body.ai-analysis-open #main{margin-right:0!important}
 
 /* STEP5 CSP: externalized sales-count runtime CSS. */
 .sc-totals b,.sc-average-totals b{font-size:14px}
-.sc-trip input.sc-not-applicable,.sc-average-row b.sc-not-applicable{background:var(--surface2)!important;border-color:var(--border)!important;color:var(--text4)!important}
 
 
 /* STEP5 CSP: sale-results module CSS externalized. */
