@@ -1824,6 +1824,8 @@ test('セール実績は内容別に表示し開催回ごとに行を分けて7�
       }
     );
     const store=allStores.stores[storeId];
+    store.data=store.data||{};store.data['2026']=store.data['2026']||{};store.data['2026']['9月']=store.data['2026']['9月']||[];
+    store.data['2026']['9月'][0]=Object.assign({},store.data['2026']['9月'][0],{d:'1',weather:'大雨',tempMaxC:28,tempMinC:18});
     if(!store.salesCounts)store.salesCounts={};
     for(let day=1;day<=8;day++){
       const date='2026-09-'+String(day).padStart(2,'0');
