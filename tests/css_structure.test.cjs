@@ -119,3 +119,21 @@ test('legend line keeps only its effective size, without a shadowed duplicate',(
   assert.equal(css.split(effective).length-1,1,'effective legend width, height and radius must be preserved');
   assert.equal(css.split('.legend-line{').length-1,1,'there should be exactly one base legend size rule');
 });
+
+test('sales and average calendars have one effective base rule each without obsolete STEP5 duplicates',()=>{
+  const calendar='.sc-calendar{display:grid;grid-template-columns:repeat(7,minmax(160px,1fr));gap:8px;overflow-x:auto;flex-shrink:0;min-width:0;width:100%;max-width:100%;box-sizing:border-box}';
+  const average='.sc-average-grid{display:grid;grid-template-columns:repeat(7,minmax(160px,1fr));gap:8px;overflow-x:auto;min-width:0;width:100%;max-width:100%;box-sizing:border-box}';
+  const obsoleteAverage='.sc-average-grid{display:grid;grid-template-columns:repeat(7,minmax(160px,1fr));gap:8px;overflow-x:auto;width:100%;max-width:100%;box-sizing:border-box}';
+  assert.equal(css.split(calendar).length-1,1,'calendar base style must be unique and unchanged');
+  assert.equal(css.split(average).length-1,1,'average base style must retain its winning min-width:0');
+  assert.equal(css.includes(obsoleteAverage),false,'earlier shadowed average declaration must be removed');
+  const origin=css.indexOf('/* STEP5 CSP: full sales-count module CSS externalized. */');
+  const grid=css.indexOf(calendar);
+  const averageGrid=css.indexOf(average);
+  const compact1200=css.indexOf('@media(max-width:1200px){.sc-calendar,.sc-average-grid{grid-template-columns:repeat(7,minmax(0,1fr));gap:6px}');
+  const compact800=css.indexOf('@media(max-width:800px){.sc-calendar,.sc-average-grid{grid-template-columns:repeat(7,minmax(102px,1fr));gap:7px}');
+  assert.ok(origin>=0 && origin<grid && grid<averageGrid && averageGrid<compact1200 && compact1200<compact800,
+    'sales and average base grids must keep their source order and both narrow-width overrides');
+  assert.ok(css.includes('/* STEP5 CSP: externalized sales-count runtime CSS. */\\n.sc-totals b'),
+    'externalized sales-count runtime styles must retain the remaining total-label and inactive-trip rules');
+});
