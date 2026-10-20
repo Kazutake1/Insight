@@ -1917,6 +1917,7 @@ test('セール実績は内容別に表示し開催回ごとに行を分けて7�
   expect(layout.saleChildren).toContain('sc-trip sc-waste-row');
   expect(layout.saleChildren.filter(name=>name!=='sc-history-weather'&&name!=='sc-trip sc-waste-row')).toEqual(layout.inputChildren.filter(name=>name!=='sc-trip sc-waste-row'));
   await expect(page.locator('.sr-group .sc-history-weather')).toHaveCount(11);
+  await expect(page.locator('.sr-group .sc-history-weather svg.iwx-weather-svg').first()).toBeVisible();
   expect(layout.allReadOnly).toBe(true);
 
   const order=await page.evaluate(()=>({
@@ -2497,6 +2498,7 @@ test('イベント実績は過去開催→複数日→カテゴリー便別実�
   await expect(periodGrids.first().locator('.sc-history-weather')).toHaveCount(2);
   await expect(page.locator('.er-day-tabs .sc-history-weather')).toHaveCount(2);
   await expect(page.locator('.er-day-tabs .sc-history-weather').first()).toContainText('26°');
+  await expect(page.locator('.er-day-tabs .sc-history-weather svg.iwx-weather-svg').first()).toBeVisible();
   await expect(periodGrids.first().locator('.sc-day-num')).toHaveText(['9/12（土）','9/13（日）']);
   await expect(periodGrids.first().getByLabel('2026-09-12 1便 納品数')).toHaveValue('40');
   await expect(periodGrids.first().getByLabel('2026-09-12 1便 販売数')).toHaveValue('36');

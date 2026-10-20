@@ -40,6 +40,13 @@ test('選択肢から霧・凍雨を外し、大雪を追加（保存済みラ�
   const target={innerHTML:'',textContent:''};
   icon.render(target,'晴');
   assert.ok(target.innerHTML.includes('<svg'),'compact selector renders SVG rather than emoji');
+  const legacy={innerHTML:'',textContent:''};
+  icon.render(legacy,'霧');
+  assert.equal(legacy.textContent,'🌫️','historical legacy label remains renderable');
+  const unknown={innerHTML:'',textContent:''};
+  assert.doesNotThrow(()=>icon.render(unknown,'<img src=x onerror=alert(1)>'));
+  assert.equal(unknown.innerHTML,'','unknown saved labels never become markup');
+  assert.equal(unknown.textContent,'');
 });
 
 function autoWeather(){
