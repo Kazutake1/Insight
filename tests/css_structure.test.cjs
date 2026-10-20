@@ -31,3 +31,26 @@ test('seven-column grids use one breakpoint declaration at each width',()=>{
   assert.match(css,/@media\(max-width:1200px\)\{\.sc-calendar,\.sc-average-grid\{grid-template-columns:repeat\(7,minmax\(0,1fr\)\);gap:6px\}/);
   assert.match(css,/@media\(max-width:800px\)\{\.sc-calendar,\.sc-average-grid\{grid-template-columns:repeat\(7,minmax\(102px,1fr\)\);gap:7px\}/);
 });
+
+test('AI 920px responsive rules share one media query without losing precedence',()=>{
+  assert.equal(css.split('@media(max-width:920px)').length-1,1,
+    'separate adjacent 920px media queries should be combined without changing rule order');
+  const section=css.split('@media(max-width:920px){')[1]?.split('/* Readability overrides')[0];
+  assert.ok(section,'AI responsive rules must be present');
+  const rules=[
+    '.ai-analysis-panel.ai-analysis-workspace{left:8px!important;right:8px!important}',
+    '.ai-workspace-grid{grid-template-columns:minmax(0,3fr) minmax(0,2fr)}',
+    '.ai-workspace-header{padding:0 14px;gap:10px}',
+    '.ai-history-mode-btn,.ai-history-period-btn{padding:6px 8px}',
+    '.ai-insight-list.is-summary{grid-template-columns:1fr}',
+    '.ai-insight-item.is-primary{grid-column:auto}',
+    '.ai-insight-value{font-size:19px}'
+  ];
+  let previous=-1;
+  for(const rule of rules){
+    const index=section.indexOf(rule);
+    assert.ok(index>previous,'AI responsive rule missing or reordered: '+rule);
+    previous=index;
+  }
+  assert.match(section,/\.ai-insight-value\{font-size:19px\}\}/);
+});
