@@ -350,10 +350,10 @@ test('トップページは外部shellと機能manifestの最新版確認をno-s
     fetch('/insight_payload_source_v1.html?e2e-shell-check=1',{cache:'no-store'}).then(r=>r.text())
   ]));
   const [source,boot,loader,payload]=sources;
-  expect(source).toContain('name="insight-shell-version" content="20261020-sales-count-year-guard-build-81"');
-  expect(source).toContain('insight_shell_boot_v1.js?v=20261020-sales-count-year-guard-build-81');
-  expect(source).toContain('insight_shell_loader_v1.js?v=20261020-sales-count-year-guard-build-81');
-  expect(source).toContain('insight_shell_v1.css?v=20261020-sales-count-year-guard-build-81');
+  expect(source).toContain('name="insight-shell-version" content="20261021-saved-report-build-82"');
+  expect(source).toContain('insight_shell_boot_v1.js?v=20261021-saved-report-build-82');
+  expect(source).toContain('insight_shell_loader_v1.js?v=20261021-saved-report-build-82');
+  expect(source).toContain('insight_shell_v1.css?v=20261021-saved-report-build-82');
   expect(source).not.toMatch(/<script(?![^>]*\bsrc=)[^>]*>/i);
   expect(source).not.toMatch(/<style\b/i);
   expect(source).not.toMatch(/script-src[^;]*'unsafe-inline'/);
@@ -361,7 +361,7 @@ test('トップページは外部shellと機能manifestの最新版確認をno-s
   expect(source).not.toMatch(/style-src[^;]*'unsafe-inline'/);
   expect(boot).toContain("fetch('./Index.html?insight_probe='+Date.now(),{cache:'no-store'})");
   expect(loader).toContain("fetch('./insight_shell_loader_v1.js?insight_manifest_probe='+Date.now(),{cache:'no-store'})");
-  expect(loader).toContain("fetch('./insight_payload_source_v1.html?v=20261019-weather-1',{cache:'no-store'})");
+  expect(loader).toContain("fetch('./insight_payload_source_v1.html?v=20261021-saved-report-1',{cache:'no-store'})");
   expect(loader).toContain('function featureSignature(entries)');
   expect(source).toContain('https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js');
   expect(source).toContain('integrity="sha512-CQBWl4fJHWbryGE+Pc7UAxWMUMNMWzWxF4SQo9CgkJIN1kx6djDQZjh3Y8SZ1d+6I+1zze6Z7kHXO7q3UyZAWw=="');
@@ -403,11 +403,12 @@ test('トップページは外部shellと機能manifestの最新版確認をno-s
   expect(errors).toEqual([]);
 });
 
-test('サイドバー下部は設定だけを表示し管理項目は設定ページへ集約する',async({page})=>{
+test('サイドバー下部は設定と定型報告を表示し管理項目は設定ページへ集約する',async({page})=>{
   const errors=await openInsight(page);
   const sidebar=page.locator('.sidebar-btns');
   await expect(sidebar.locator('#navSettings')).toBeVisible();
-  await expect(sidebar.locator('button')).toHaveCount(1);
+  await expect(sidebar.locator('button')).toHaveCount(2);
+  await expect(sidebar.locator('#insightReportOpen')).toHaveText('保存時点の定型報告');
   await expect(sidebar.locator('#backupBtn')).toHaveCount(0);
   await expect(sidebar.locator('#darkModeBtn')).toHaveCount(0);
   await expect(sidebar.locator('#insightDataHealthButton')).toHaveCount(0);

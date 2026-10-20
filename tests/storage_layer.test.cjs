@@ -197,7 +197,7 @@ test('runtime persist guardはStorage直後に読み込まれ共有保存層へ�
   assert.doesNotMatch(bootstrap,/originalPersist|safePersist|InsightPersistError/);
   assert.match(guard,/InsightStorage\.persistCurrent\(currentSnapshot\(\)\)/);
   assert.doesNotMatch(guard,/localStorage\.setItem/);
-  assert.match(index,/insight_storage_v1\.js\?v=20261011-stale-tab-1/);
+  assert.match(index,/insight_storage_v1\.js\?v=20261021-saved-report-1/);
   assert.match(index,/insight_persist_guard_v1\.js\?v=20261011-stale-tab-1/);
   assert.ok(index.indexOf('insight_storage_v1.js')<index.indexOf('insight_persist_guard_v1.js'));
   assert.ok(index.indexOf('insight_persist_guard_v1.js')<index.indexOf('insight_year_manager_v1.js'));
