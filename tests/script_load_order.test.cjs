@@ -88,7 +88,7 @@ test('機能スクリプトの読み込み順はshell loaderのmanifestで明示
 
 test('Indexはshell loaderを外部scriptとして読み込む',()=>{
   const index=read('Index.html');
-  assert.match(index,/insight_shell_loader_v1\.js\?v=20261020-css-dark-kpi-build-68/);
+  assert.match(index,/insight_shell_loader_v1\.js\?v=20261020-css-iwc-decl-build-69/);
   assert.doesNotMatch(index,/var orderedFeatureLoads=/);
   assert.match(read('insight_shell_loader_v1.js'),/var orderedFeatureLoads=/);
 });
@@ -160,7 +160,8 @@ test('廃棄分析の既存コンパクト表示スタイルは維持する',()=
   const source=read('insight_ops_kpifix_v1.js');
   const css=read('insight_payload_core_v1.css');
   assert.match(css,/#iwcRow \.iwc-card\{padding:7px 10px\}/);
-  assert.match(css,/#iwcRow \.iwc-kpis\{gap:5px;margin-bottom:3px\}/);
+  assert.match(css,/#iwcRow \.iwc-kpis\{gap:5px\}/);
+  assert.match(css,/#iwcRow \.iwc-kpis\{display:grid;grid-template-columns:repeat\(3,minmax\(0,1fr\)\);gap:6px;margin-bottom:3px;flex:0 0 auto;\}/);
   assert.doesNotMatch(source,/createElement\(['"]style['"]\)|\.style\.|cssText/);
   assert.doesNotMatch(source,/insightWasteInsightsV1Script/);
 });

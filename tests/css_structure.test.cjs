@@ -156,3 +156,35 @@ test('dark KPI rules rely on the same themed variables as the base cards',()=>{
   assert.ok(css.includes('--surface:#2f2942') && css.includes('--text:#e2e2ea') && css.includes('--text4:#9793a1'),
     'retain final dark-mode theme variable values');
 });
+
+// The early summary CSS is followed by equal-specificity full-module rules.
+// Deleting only identical predecessor declarations must not affect the cascade.
+test('IWC cards retain the winning spacing, flex layout and ranking dimensions',()=>{
+  const early=[
+    '#iwcRow .iwc-kpis{gap:5px}',
+    '#iwcRow .iwc-rank{padding:3px 5px}',
+    '#iwcRow .iwc-rank-title{font-size:8px;line-height:1.1}',
+    '#iwcRow .iwc-rank-line{font-size:8px;line-height:1.1}'
+  ];
+  const final=[
+    '#iwcRow .iwc-kpis{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:6px;margin-bottom:3px;flex:0 0 auto;}',
+    '#iwcRow .iwc-rank-grid{display:flex;flex-direction:column;gap:3px;flex:1;min-height:0;}',
+    '#iwcRow .iwc-rank{display:flex;flex-direction:column;flex:1;min-width:0;min-height:0;overflow:hidden;border:1px solid var(--border);border-radius:8px;padding:4px 6px;}',
+    '#iwcRow .iwc-rank-title{font-size:9px;font-weight:750;white-space:nowrap;color:var(--text);margin-bottom:2px;flex-shrink:0;}',
+    '#iwcRow .iwc-rank-line{display:flex;align-items:center;gap:4px;justify-content:space-between;font-size:9px;line-height:1.25;min-width:0;padding:1px 0;border-top:1px solid var(--border2);flex:1;min-height:0;}'
+  ];
+  for(const item of [...early,...final])assert.equal(css.split(item).length-1,1,'preserve the specific IWC declaration: '+item.slice(0,65));
+  const old=[
+    '#iwcRow .iwc-kpis{gap:5px;margin-bottom:3px}',
+    '#iwcRow .iwc-rank-grid{gap:3px}',
+    '#iwcRow .iwc-rank{padding:3px 5px;display:flex;flex-direction:column}',
+    '#iwcRow .iwc-rank-title{font-size:8px;line-height:1.1;margin-bottom:2px;flex-shrink:0}',
+    '#iwcRow .iwc-rank-line{font-size:8px;line-height:1.1;padding:1px 0;flex:1;min-height:0}'
+  ];
+  for(const item of old)assert.equal(css.includes(item),false,'old redundant declarations must not reappear: '+item);
+  const first=css.indexOf(early[0]),last=css.indexOf(final[0]);
+  assert.ok(first>=0 && last>first,'IWC base/override precedence must stay the same');
+  // Page-specific waste adjustment and readability typography remain untouched.
+  assert.ok(css.includes('#pageHaiki #iwcRow .iwc-card{height:calc(var(--iwc-height) + 50px)}'));
+  assert.ok(css.includes('#iwcRow .iwc-kpi-label{font-size:11.5px!important;line-height:1.2!important}'));
+});
