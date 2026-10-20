@@ -134,6 +134,6 @@ test('sales and average calendars have one effective base rule each without obso
   const compact800=css.indexOf('@media(max-width:800px){.sc-calendar,.sc-average-grid{grid-template-columns:repeat(7,minmax(102px,1fr));gap:7px}');
   assert.ok(origin>=0 && origin<grid && grid<averageGrid && averageGrid<compact1200 && compact1200<compact800,
     'sales and average base grids must keep their source order and both narrow-width overrides');
-  assert.ok(css.includes('/* STEP5 CSP: externalized sales-count runtime CSS. */\\n.sc-totals b'),
+  assert.ok(css.includes('/* STEP5 CSP: externalized sales-count runtime CSS. */\n.sc-totals b'),
     'externalized sales-count runtime styles must retain the remaining total-label and inactive-trip rules');
 });
