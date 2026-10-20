@@ -74,6 +74,7 @@ jobs:
           - sale_results.test.cjs
           - script_load_order.test.cjs
           - security_storage_regression.test.cjs
+          - backup_restore_runtime.test.cjs
           - storage_layer.test.cjs
           - weather_future_guard.test.cjs
           - weather_municipality_sync.test.cjs
