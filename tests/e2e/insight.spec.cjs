@@ -350,10 +350,10 @@ test('トップページは外部shellと機能manifestの最新版確認をno-s
     fetch('/insight_payload_source_v1.html?e2e-shell-check=1',{cache:'no-store'}).then(r=>r.text())
   ]));
   const [source,boot,loader,payload]=sources;
-  expect(source).toContain('name="insight-shell-version" content="20261020-css-iwc-kpi-shadowed-build-77"');
-  expect(source).toContain('insight_shell_boot_v1.js?v=20261020-css-iwc-kpi-shadowed-build-77');
-  expect(source).toContain('insight_shell_loader_v1.js?v=20261020-css-iwc-kpi-shadowed-build-77');
-  expect(source).toContain('insight_shell_v1.css?v=20261020-css-iwc-kpi-shadowed-build-77');
+  expect(source).toContain('name="insight-shell-version" content="20261020-css-cascade-winners-build-78"');
+  expect(source).toContain('insight_shell_boot_v1.js?v=20261020-css-cascade-winners-build-78');
+  expect(source).toContain('insight_shell_loader_v1.js?v=20261020-css-cascade-winners-build-78');
+  expect(source).toContain('insight_shell_v1.css?v=20261020-css-cascade-winners-build-78');
   expect(source).not.toMatch(/<script(?![^>]*\bsrc=)[^>]*>/i);
   expect(source).not.toMatch(/<style\b/i);
   expect(source).not.toMatch(/script-src[^;]*'unsafe-inline'/);
@@ -366,7 +366,7 @@ test('トップページは外部shellと機能manifestの最新版確認をno-s
   expect(source).toContain('https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js');
   expect(source).toContain('integrity="sha512-CQBWl4fJHWbryGE+Pc7UAxWMUMNMWzWxF4SQo9CgkJIN1kx6djDQZjh3Y8SZ1d+6I+1zze6Z7kHXO7q3UyZAWw=="');
   expect(loader).not.toContain('stripPayloadChartScript');
-  expect(payload).toContain('insight_payload_core_v1.css?v=20261020-css-iwc-kpi-shadowed-dedup-18');
+  expect(payload).toContain('insight_payload_core_v1.css?v=20261020-css-cascade-winners-dedup-19');
   expect(payload).toContain('insight_payload_core_v1.js?v=20261019-weather-1');
   expect(payload).toContain('insight_payload_ai_legacy_v1.js?v=20261006-payload-assets-1');
   expect(payload).toContain('insight_payload_bindings_v1.js?v=20261006-inline-bindings-1');
@@ -628,6 +628,28 @@ test('STEP17の文字階層をダッシュボード・入力・販売数・分�
     dailyAverage:getComputedStyle(document.querySelector('#pageKyaku #ikyDailyAverage')).fontSize
   }));
   expect(customerType).toEqual({title:'15px',label:'13px',value:'20px',note:'12px',dailyAverage:'12.5px'});
+
+  // The 600px media rules change spacing, not readability font sizes:
+  // the base !important typography wins at both iPad and narrow widths.
+  const priorViewport=page.viewportSize();
+  await page.setViewportSize({width:600,height:834});
+  const narrowType=await page.evaluate(()=>{
+    const read=selector=>getComputedStyle(document.querySelector(selector));
+    return {
+      salesLabel:read('#pageSales #issRow .iss-stat').fontSize,
+      salesValue:read('#pageSales #issRow .iss-stat strong').fontSize,
+      salesPadding:read('#pageSales #issRow .iss-stat').paddingLeft,
+      customerLabel:read('#pageKyaku #ikyRow .iky-stat').fontSize,
+      customerValue:read('#pageKyaku #ikyRow .iky-stat strong').fontSize,
+      customerPadding:read('#pageKyaku #ikyRow .iky-stat').paddingLeft
+    };
+  });
+  expect(narrowType).toEqual({
+    salesLabel:'13px',salesValue:'20px',salesPadding:'6px',
+    customerLabel:'13px',customerValue:'20px',customerPadding:'6px'
+  });
+  await page.setViewportSize(priorViewport);
+
 
   await page.locator('#nav4').click();
   await expect(page.locator('#iwcRow .iwc-card')).toHaveCount(2);
