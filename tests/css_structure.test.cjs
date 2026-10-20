@@ -264,3 +264,21 @@ test('sales results 1200px rules preserve inherited base layout values',()=>{
   assert.ok(!css.includes('.sr-group-stats{width:100%;grid-template-columns:'),
     'no redundant 3-column declaration in sales results media');
 });
+
+test('sales count 1200px inherits identical base number font sizes',()=>{
+  const baseTotals='.sc-totals b,.sc-average-totals b{font-size:14px}';
+  const baseAverage='.sc-average-row b{font-size:12px;border:1px solid;border-radius:7px;padding:5px 2px}';
+  const media='@media(max-width:1200px){.sc-calendar,.sc-average-grid{grid-template-columns:repeat(7,minmax(0,1fr));gap:6px}';
+  const smaller='@media(max-width:800px){.sc-calendar,.sc-average-grid{grid-template-columns:repeat(7,minmax(102px,1fr));gap:7px}';
+  for(const base of [baseTotals,baseAverage]){
+    assert.equal(css.split(base).length-1,1,'keep base typography: '+base);
+    assert.ok(css.indexOf(base)<css.indexOf(media),'base font size precedes 1200px override');
+  }
+  const scoped=css.slice(css.indexOf(media),css.indexOf(smaller));
+  assert.ok(scoped.length>200&&scoped.includes('.sc-totals,.sc-average-totals{font-size:10px;gap:3px}'),
+    'retain responsive totals layout');
+  assert.ok(!scoped.includes('.sc-totals b,.sc-average-totals b{font-size:'),
+    'totals inherit 14px base');
+  assert.ok(!scoped.includes('.sc-average-row b{font-size:'),
+    'average row inherits 12px base (subject to existing page-specific important rule)');
+});
