@@ -226,3 +226,19 @@ test('inactive sales-count styles use only the later full-module !important rule
   assert.ok(css.includes('@media(max-width:1200px){.sc-calendar,.sc-average-grid{grid-template-columns:repeat(7,minmax(0,1fr));gap:6px}'),
     'sales-count 1200px override must remain');
 });
+
+
+test('waste KPI keeps 16px important font size without shadowed normal sizes',()=>{
+  const winning='#iwcRow .iwc-kpi-value{font-size:16px!important}';
+  const normal='#iwcRow .iwc-kpi-value{line-height:1.1}';
+  const page='#pageHaiki #iwcRow .iwc-kpi-value{line-height:1.3}';
+  const final='#iwcRow .iwc-kpi-value{font-weight:800;white-space:nowrap;color:var(--text);line-height:1.2;}';
+  for(const rule of [winning,normal,page,final])assert.equal(css.split(rule).length-1,1,'preserve waste KPI cascade rule: '+rule);
+  assert.ok(css.indexOf(winning)<css.indexOf(normal)&&css.indexOf(normal)<css.indexOf(page)&&css.indexOf(page)<css.indexOf(final),
+    'preserve original waste KPI CSS order');
+  assert.equal(css.includes('#iwcRow .iwc-kpi-value{font-size:13px;'),false);
+  assert.equal(css.includes('#pageHaiki #iwcRow .iwc-kpi-value{font-size:15px;'),false);
+  const declarations=[...css.matchAll(/#(?:pageHaiki #)?iwcRow \.iwc-kpi-value\{([^}]*)\}/g)].map(match=>match[1]);
+  assert.equal(declarations.length,4,'keep all waste KPI declarations');
+  assert.deepEqual(declarations.filter(value=>/font-size:/.test(value)),['font-size:16px!important']);
+});
