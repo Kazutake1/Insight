@@ -350,10 +350,10 @@ test('トップページは外部shellと機能manifestの最新版確認をno-s
     fetch('/insight_payload_source_v1.html?e2e-shell-check=1',{cache:'no-store'}).then(r=>r.text())
   ]));
   const [source,boot,loader,payload]=sources;
-  expect(source).toContain('name="insight-shell-version" content="20261021-cutoff-11am-build-88"');
-  expect(source).toContain('insight_shell_boot_v1.js?v=20261021-cutoff-11am-build-88');
-  expect(source).toContain('insight_shell_loader_v1.js?v=20261021-cutoff-11am-build-88');
-  expect(source).toContain('insight_shell_v1.css?v=20261021-cutoff-11am-build-88');
+  expect(source).toContain('name="insight-shell-version" content="20261021-history-restore-build-89"');
+  expect(source).toContain('insight_shell_boot_v1.js?v=20261021-history-restore-build-89');
+  expect(source).toContain('insight_shell_loader_v1.js?v=20261021-history-restore-build-89');
+  expect(source).toContain('insight_shell_v1.css?v=20261021-history-restore-build-89');
   expect(source).not.toMatch(/<script(?![^>]*\bsrc=)[^>]*>/i);
   expect(source).not.toMatch(/<style\b/i);
   expect(source).not.toMatch(/script-src[^;]*'unsafe-inline'/);
@@ -3798,7 +3798,7 @@ test('発注予測の天気7日間と前年実績7日間は曜日で揃い、納
   await page.locator('#navOrderForecast').click();
   await expect(page.locator('#ofWeather .of-weather-card')).toHaveCount(7);
   await expect(page.locator('#ofYearCards .sc-day')).toHaveCount(7);
-  await expect(page.locator('#ofWeather .of-weather-card .of-weather-text').first()).toHaveText('予報対象外');
+  await expect(page.locator('#ofWeather .of-weather-card .of-weather-text').first()).toHaveText('実績未登録');
   await expect(page.locator('#ofWeather .of-weather-card .of-weather-text').nth(1)).toHaveText('晴れ');
   const weekCards=page.locator('#ofWeekCards > .sc-day');
   await expect(weekCards).toHaveCount(7);

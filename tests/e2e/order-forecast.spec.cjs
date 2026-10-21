@@ -62,7 +62,7 @@ test('発注予測は閲覧専用・実績と平均・店舗カテゴリー切�
   expect(aligned.selected).toBe(3);
   const dayBefore=await page.evaluate(()=>InsightOrderForecast.addDays(InsightOrderForecast.today(),-1));
   expect(aligned.columns[0].weather).toBe(dayBefore);
-  await expect(page.locator('#ofWeather .of-weather-card').first()).toContainText('予報対象外');
+  await expect(page.locator('#ofWeather .of-weather-card').first()).toContainText('実績未登録');
   await expect(page.locator('#ofWeather .of-weather-card').first().locator('.of-weather-placeholder')).toHaveText('—');
   expect(await page.locator('#ofWeather .of-weather-card').first().locator('svg').count()).toBe(0);
   expect(aligned.targetDate).toBe(initial);
@@ -189,14 +189,26 @@ test('発注予測は閲覧専用・実績と平均・店舗カテゴリー切�
 });
 test('日本時間の11:00を境に納品日を+1日から+2日へ切り替え、常に4列目に表示する',async({page})=>{
   await page.clock.install({time:new Date('2026-10-21T01:59:59Z')}); // 10:59:59 JST
+  await page.clock.setFixedTime(new Date('2026-10-21T01:59:59Z')); // Prevent page load from advancing past the cutoff
   const result=await open(page,false,'2026-10-21');
+  // Restore the saved historical weather for each of the two days before the forecast.
+  await page.evaluate(()=>{
+    const rows=allStores.stores[allStores.current].data['2026']['10月'];
+    rows[18]={d:'19',weather:'雨',tempMaxC:24.9,tempMinC:15.2};
+    rows[19]={d:'20',weather:'雪',tempMaxC:1,tempMinC:-2};
+  });
   await page.locator('#navOrderForecast').click();
   await expect(page.locator('#ofDelivery')).toHaveValue('2026-10-22');
   await expect(page.locator('#ofWeather .of-weather-card')).toHaveCount(7);
   await expect(page.locator('#ofYearCards .sc-day')).toHaveCount(7);
   await expect(page.locator('#ofWeather .of-weather-card').nth(3)).toHaveClass(/of-selected/);
-  await expect(page.locator('#ofWeather .of-weather-card').nth(0)).toContainText('予報対象外');
-  await expect(page.locator('#ofWeather .of-weather-card').nth(1)).toContainText('予報対象外');
+  await expect(page.locator('#ofWeather .of-weather-card').nth(0).locator('.of-weather-text')).toHaveText('雨');
+  await expect(page.locator('#ofWeather .of-weather-card').nth(1).locator('.of-weather-text')).toHaveText('雪');
+  await expect(page.locator('#ofWeather .of-weather-card').nth(0).locator('svg.iwx-weather-svg')).toHaveAttribute('aria-label','雨');
+  await expect(page.locator('#ofWeather .of-weather-card').nth(1).locator('svg.iwx-weather-svg')).toHaveAttribute('aria-label','雪');
+  await expect(page.locator('#ofWeather .of-weather-card').nth(0).locator('.of-temp-max')).toHaveText('24°');
+  await expect(page.locator('#ofWeather .of-weather-card').nth(1).locator('.of-temp-min')).toHaveText('-2°');
+  await expect(page.locator('#ofWeather .of-weather-card').nth(0).locator('small')).toHaveText('実績');
   const before=await page.locator('#ofWeather .of-weather-card').evaluateAll(cards=>cards.map(card=>card.dataset.date));
   expect(before[0]).toBe('2026-10-19');
   expect(before[3]).toBe('2026-10-22');
@@ -208,8 +220,9 @@ test('日本時間の11:00を境に納品日を+1日から+2日へ切り替え�
   await expect(page.locator('#ofDelivery')).toHaveValue('2026-10-23');
   await expect(page.locator('#ofWeather .of-weather-card').nth(3)).toHaveAttribute('data-date','2026-10-23');
   await expect(page.locator('#ofWeather .of-weather-card').nth(3)).toHaveClass(/of-selected/);
-  await expect(page.locator('#ofWeather .of-weather-card').nth(0)).toContainText('予報対象外');
-  await expect(page.locator('#ofWeather .of-weather-card').nth(1)).not.toContainText('予報対象外');
+  await expect(page.locator('#ofWeather .of-weather-card').nth(0).locator('.of-weather-text')).toHaveText('雪');
+  await expect(page.locator('#ofWeather .of-weather-card').nth(0).locator('svg.iwx-weather-svg')).toHaveAttribute('aria-label','雪');
+  await expect(page.locator('#ofWeather .of-weather-card').nth(1).locator('.of-weather-text')).toHaveText('晴れ');
   await expect(page.locator('#ofYearCards .sc-day').nth(3)).toHaveAttribute('data-date','2025-10-24');
   const after=await page.locator('#ofWeather .of-weather-card').evaluateAll(cards=>cards.map(card=>card.dataset.date));
   expect(after[0]).toBe('2026-10-20');

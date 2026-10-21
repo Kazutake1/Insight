@@ -118,7 +118,7 @@ test('11時前・11時以降のどちらも納品日と前年同曜日実績を4
       assert.equal(visible.length,7);
       assert.equal(visible[0].date,model.addDays(today,offset-3));
       for(let i=0;i<3-offset;i++){
-        assert.equal(visible[i].weather,'予報対象外');
+        assert.equal(visible[i].weather,'実績未登録');
         assert.equal(visible[i].weatherCode,null);
       }
       assert.equal(visible[3].date,delivery,'納品日が4列目');
@@ -131,6 +131,37 @@ test('11時前・11時以降のどちらも納品日と前年同曜日実績を4
     }
   }
   assert.deepEqual(model.displayWeatherDays([]),[]);
+});
+
+test('過去の天気カードは店舗の日別保存実績を読み取り、未登録は推測せず、保存値を変更しない',()=>{
+  const snapshot={data:{'2026':{'10月':[
+    {d:'19',weather:'雨',tempMaxC:24.9,tempMinC:15.5},
+    {d:'20',weather:'雪',tempMaxC:0,tempMinC:-2},
+    {d:'21',weather:''}
+  ]}}};
+  const before=JSON.stringify(snapshot),jma=[0,1,2,3,4,5,6].map(i=>({date:model.addDays('2026-10-21',i),weather:'晴れ',weatherCode:'100',max:25,min:17,pop:10}));
+  assert.deepEqual(model.savedWeatherDay(snapshot,'2026-10-19'),{
+    date:'2026-10-19',weather:'雨',historicalWeather:'雨',weatherCode:null,max:24.9,min:15.5,pop:null
+  });
+  assert.deepEqual(model.savedWeatherDay(snapshot,'2026-10-20'),{
+    date:'2026-10-20',weather:'雪',historicalWeather:'雪',weatherCode:null,max:0,min:-2,pop:null
+  });
+  assert.equal(model.savedWeatherDay(snapshot,'2026-10-18'),null);
+  assert.equal(model.savedWeatherDay(snapshot,'2026-10-21'),null);
+  assert.equal(model.savedWeatherDay({},'2026-10-19'),null);
+  for(const lead of [1,2]){
+    const visible=model.displayWeatherDays(jma,lead,date=>model.savedWeatherDay(snapshot,date));
+    assert.equal(visible.length,7);
+    assert.equal(visible[3].date,model.addDays('2026-10-21',lead));
+    assert.equal(visible[0].weather,lead===1?'雨':'雪');
+    assert.equal(visible[0].pop,null,'実績に降水確率を捏造しない');
+    if(lead===1)assert.equal(visible[1].weather,'雪');
+    assert.equal(visible[3].weather,'晴れ','今日以降の予報を上書きしない');
+    const previous=model.dates(visible[3].date,visible[0].date).previousYear;
+    assert.equal(previous[3],model.addDays(visible[3].date,-364));
+  }
+  assert.equal(JSON.stringify(snapshot),before,'保存済み店舗実績を変更しない');
+  assert.equal(jma.length,7,'取得した気象庁予報を変更しない');
 });
 
 test('前年7日間は上段天気の表示開始日に52週間前を対応させ、曜日と列を一致させる',()=>{
