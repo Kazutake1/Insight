@@ -4,6 +4,181 @@
   if(root.InsightReportPreview||!root.document)return;
   var doc=root.document,dialog,button,form,message,body,heading,host=null,sequence=0,tickets=new Map(),lastDay=null;
   var fields={};
+  // Reviewed public calendar from insight-ai-lab d732aa5; no runtime fetch.
+  var CALENDAR_VERSION="cao-table-2026-2027-20261021-0b2cdf75cf19";
+  var calendarPackage=/* reviewed-calendar:start */{
+  "format": "jp-holiday-package-v1",
+  "version": "cao-table-2026-2027-20261021-0b2cdf75cf19",
+  "converter_version": "calendar-build-v1",
+  "verified": true,
+  "checked_at": "2026-10-21",
+  "source": {
+    "url": "https://www8.cao.go.jp/chosei/shukujitsu/gaiyou.html",
+    "representation": "reviewed-page-table-transcription",
+    "original_bytes_sha256": null,
+    "capture_sha256": "0b2cdf75cf19e3318a4a972c30c79e7c8362dfc7cb13fc0ae49c8d949e6e1761",
+    "retrieved_at": "2026-10-21",
+    "reviewer": "Codex-page-table-cross-check"
+  },
+  "coverage": [
+    {
+      "start": "2026-01-01",
+      "end": "2026-12-31"
+    },
+    {
+      "start": "2027-01-01",
+      "end": "2027-12-31"
+    }
+  ],
+  "holidays": [
+    {
+      "day": "2026-01-01",
+      "name": "元日"
+    },
+    {
+      "day": "2026-01-12",
+      "name": "成人の日"
+    },
+    {
+      "day": "2026-02-11",
+      "name": "建国記念の日"
+    },
+    {
+      "day": "2026-02-23",
+      "name": "天皇誕生日"
+    },
+    {
+      "day": "2026-03-20",
+      "name": "春分の日"
+    },
+    {
+      "day": "2026-04-29",
+      "name": "昭和の日"
+    },
+    {
+      "day": "2026-05-03",
+      "name": "憲法記念日"
+    },
+    {
+      "day": "2026-05-04",
+      "name": "みどりの日"
+    },
+    {
+      "day": "2026-05-05",
+      "name": "こどもの日"
+    },
+    {
+      "day": "2026-05-06",
+      "name": "休日"
+    },
+    {
+      "day": "2026-07-20",
+      "name": "海の日"
+    },
+    {
+      "day": "2026-08-11",
+      "name": "山の日"
+    },
+    {
+      "day": "2026-09-21",
+      "name": "敬老の日"
+    },
+    {
+      "day": "2026-09-22",
+      "name": "休日"
+    },
+    {
+      "day": "2026-09-23",
+      "name": "秋分の日"
+    },
+    {
+      "day": "2026-10-12",
+      "name": "スポーツの日"
+    },
+    {
+      "day": "2026-11-03",
+      "name": "文化の日"
+    },
+    {
+      "day": "2026-11-23",
+      "name": "勤労感謝の日"
+    },
+    {
+      "day": "2027-01-01",
+      "name": "元日"
+    },
+    {
+      "day": "2027-01-11",
+      "name": "成人の日"
+    },
+    {
+      "day": "2027-02-11",
+      "name": "建国記念の日"
+    },
+    {
+      "day": "2027-02-23",
+      "name": "天皇誕生日"
+    },
+    {
+      "day": "2027-03-21",
+      "name": "春分の日"
+    },
+    {
+      "day": "2027-03-22",
+      "name": "休日"
+    },
+    {
+      "day": "2027-04-29",
+      "name": "昭和の日"
+    },
+    {
+      "day": "2027-05-03",
+      "name": "憲法記念日"
+    },
+    {
+      "day": "2027-05-04",
+      "name": "みどりの日"
+    },
+    {
+      "day": "2027-05-05",
+      "name": "こどもの日"
+    },
+    {
+      "day": "2027-07-19",
+      "name": "海の日"
+    },
+    {
+      "day": "2027-08-11",
+      "name": "山の日"
+    },
+    {
+      "day": "2027-09-20",
+      "name": "敬老の日"
+    },
+    {
+      "day": "2027-09-23",
+      "name": "秋分の日"
+    },
+    {
+      "day": "2027-10-11",
+      "name": "スポーツの日"
+    },
+    {
+      "day": "2027-11-03",
+      "name": "文化の日"
+    },
+    {
+      "day": "2027-11-23",
+      "name": "勤労感謝の日"
+    }
+  ],
+  "content_sha256": "6c66c7253f57d8af7e6ff5d66a633044df3629e357f968d7a7cff4153d2517bc"
+}/* reviewed-calendar:end */;
+  function calendarFor(requestText){
+    var requested=JSON.parse(requestText);
+    return root.InsightReport.selectCalendar(calendarPackage,{start:requested.quantity_reference.start,
+      end:requested.quantity_reference.end,as_of:requested.as_of},CALENDAR_VERSION);
+  }
   function node(tag,text,className){
     var n=doc.createElement(tag);if(text!==undefined)n.textContent=text;if(className)n.className=className;return n;
   }
@@ -70,7 +245,7 @@
       if(!host||!form.reportValidity())throw Error('report_conditions_required');
       var id='preview-'+(++sequence),captured=request(id);
       var resolver=root.InsightTripHistoryResolver;
-      var dependencies={source_revision:'insight-saved-preview-v1'};
+      var dependencies={source_revision:'insight-saved-calendar-v1',calendar_book:calendarFor(captured).calendar};
       if(resolver&&typeof resolver.resolveDate==='function')
         dependencies.resolver=function(snapshot,store,category,iso,options){return resolver.resolveDate(snapshot,store,category,iso,options);};
       if(!host.capture(saved,function(){return request(id);},dependencies,{focus_limit:3,min_days:2,
@@ -80,7 +255,7 @@
       paint();
       heading.textContent=fields.category.options[fields.category.selectedIndex].textContent+' ／ 取得日時：'+
         new Date().toLocaleString('ja-JP',{timeZone:'Asia/Tokyo'});
-      message.textContent='保存済みの値から作成しました。比較条件と祝日確認が未確認の項目は判定を保留しています。';
+      message.textContent='保存済みの値から作成しました。比較条件は未確認のため保留しています。参考平日平均の祝日は同梱資料で確認し、資料対象外の期間やその他の未確認条件は保留しています。';
     }catch(_){
       invalidate('報告を生成できません。店舗・期間・カテゴリーと保存状態を確認してください。保存失敗や別タブ更新後は、未保存の入力を控えてから再読み込みしてください。');
     }finally{paint();}
