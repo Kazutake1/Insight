@@ -1,11 +1,16 @@
 const {test,expect}=require('@playwright/test');
+const fs=require('node:fs');
+const path=require('node:path');
 
 test('CSP-safe generated controls work on Chromium and WebKit without saving data',async({page})=>{
   const errors=[];
   page.on('pageerror',error=>errors.push(error.message));
-  await page.goto('/Index.html',{waitUntil:'domcontentloaded'});
-  await expect(page.locator('#nav1')).toBeVisible();
-  await page.waitForFunction(()=>!!window.InsightPayloadBindings);
+  // Test the real bindings in an isolated browser document. The main app already
+  // has separate WebKit smoke coverage; this avoids external Chart.js/CDN startup.
+  await page.goto('about:blank');
+  await page.setContent('<!doctype html><html><body><div id="addYearInlineWrap"></div></body></html>');
+  await page.addScriptTag({content:fs.readFileSync(path.join(__dirname,'..','..','insight_payload_bindings_v1.js'),'utf8')});
+  await expect.poll(()=>page.evaluate(()=>!!window.InsightPayloadBindings)).toBe(true);
 
   const result=await page.evaluate(()=>{
     const calls=[];
