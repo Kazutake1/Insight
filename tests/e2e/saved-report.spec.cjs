@@ -14,6 +14,9 @@ async function boot(page){
 }
 async function open(page){
   await page.locator('#insightReportOpen').click();await expect(page.locator('#insightReportDialog')).toBeVisible();
+  await expect.poll(()=>page.locator('#insightReportDialog').evaluate(dialog=>{
+    const r=dialog.getBoundingClientRect();return Math.max(Math.abs(r.left+r.width/2-innerWidth/2),Math.abs(r.top+r.height/2-innerHeight/2));
+  })).toBeLessThanOrEqual(1);
 }
 async function conditions(page,store='store_a'){
   await page.locator('#irp-store').selectOption(store);await page.locator('#irp-category').selectOption('food');
@@ -122,7 +125,7 @@ test('通常の保存で旧報告を消し、閉じると既存分析AIを操作
   await expect(page.locator('#aiAnalysisToggle')).toHaveAttribute('aria-expanded','false');
   expect(errors).toEqual([]);
 });
-test('HTML風店舗名を文字として表示し、iPad横向きのライトとダークで横にはみ出さない',async({page})=>{
+test('HTML風店舗名を文字として表示し、iPad相当のライトとダークで中央に収まり見切れない',async({page})=>{
   await page.setViewportSize({width:1194,height:834});const errors=await boot(page);
   await page.evaluate(()=>{
     const next=InsightStorage.readSnapshot();next.stores.store_a.name='<img src=x onerror=alert(1)>架空店舗A';
@@ -134,14 +137,16 @@ test('HTML風店舗名を文字として表示し、iPad横向きのライトと
   await expect(output.locator('img,script,iframe')).toHaveCount(0);
   for(const dark of [false,true]){
     await page.evaluate(value=>document.documentElement.classList.toggle('dark',value),dark);
-    for(const width of [1194,834]){
-      await page.setViewportSize({width,height:834});
+    for(const viewport of [{width:1194,height:834},{width:834,height:1194}]){
+      await page.setViewportSize(viewport);
       const bounds=await page.locator('#insightReportDialog').evaluate(dialog=>{
         const rect=dialog.getBoundingClientRect(),style=getComputedStyle(dialog);
-        return {inside:rect.left>=0&&rect.right<=innerWidth,overflow:dialog.scrollWidth>dialog.clientWidth,
+        return {centerX:Math.abs(rect.left+rect.width/2-innerWidth/2),centerY:Math.abs(rect.top+rect.height/2-innerHeight/2),
+          inside:rect.left>=0&&rect.right<=innerWidth&&rect.top>=0&&rect.bottom<=innerHeight,overflow:dialog.scrollWidth>dialog.clientWidth,
           background:style.backgroundColor,color:style.color,
           inputs:[...dialog.querySelectorAll('input,select,button')].every(n=>n.getBoundingClientRect().height>=44)};
       });
+      expect(bounds.centerX).toBeLessThanOrEqual(1);expect(bounds.centerY).toBeLessThanOrEqual(1);
       expect(bounds.inside).toBe(true);expect(bounds.overflow).toBe(false);expect(bounds.inputs).toBe(true);
       expect(bounds.background).toBe(dark?'rgb(37, 37, 37)':'rgb(255, 255, 255)');
       expect(bounds.color).toBe(dark?'rgb(238, 238, 238)':'rgb(34, 34, 34)');
