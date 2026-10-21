@@ -128,7 +128,7 @@
     return {value:entered.length===expected?sum:null,entered:entered.length,expected,evidence_ids:rows.sort((a,b)=>a.day<b.day?-1:1).map(r=>r.evidence),unknown_zero:rows.filter(r=>r.zero_unverified).length};
   }
   const REASONS={current_zero_unverified:'当期の保存値0が入力済みか未入力か確認できない',reference_zero_unverified:'比較期間の保存値0が入力済みか未入力か確認できない',current_incomplete:'当期の対象日が全て入力済みではない',reference_incomplete:'比較期間の対象日が全て入力済みではない',scope_mismatch:'当期と比較期間の集計範囲が違う',duration_mismatch:'当期と比較期間の対象日数が違う',insufficient_sample:'入力済み日数が実験ルールの最低件数に満たない',conditions_unconfirmed:'曜日構成などの比較条件が確認済みではない'};
-  const reports=new WeakSet(),normalizedInputs=new WeakSet();
+  const reports=new WeakSet(),normalizedInputs=new WeakSet(),normalizedCalendars=new WeakMap();
   function build(normalized, supplied={}){
     if(CONFIGURED)need(normalizedInputs.has(normalized),'normalized_not_from_this_engine');
     const data=copy(normalized.data),rules=Object.assign({focus_limit:3,min_days:1,relative_threshold:fraction(1,10)},copy(supplied));validate(data,rules);rules.relative_threshold=validFraction(rules.relative_threshold);
@@ -168,6 +168,11 @@
     for(const k of report.focus_keys){const l=report.lines.find(l=>l.key===k),r=l.kind==='GAP'?'不足情報を優先':l.selection_reason==='adverse_change'?'悪化方向の変化を優先':'改善方向の変化を表示';out.push(`・${l.text}（選択理由：${r}）`);}
     if(!report.focus_keys.length)out.push('注目候補なし。数合わせの項目は作成していません。');
     for(const [title,kind] of [['確認情報（非選択も全件保持）','FACT'],['不足情報（非選択も全件保持）','GAP']]){out.push(title);const rows=report.lines.filter(l=>l.kind===kind);out.push(...(rows.length?rows.map(l=>'・'+l.text):['該当なし。']));}
+    if(report.context){
+      const labels={CONFIRMED:'比較条件の根拠を照合済み。',UNCONFIRMED:'比較条件が未確認のため保留。',MISMATCH:'比較条件に不一致があるため保留。'};
+      out.push('比較条件の確認');
+      for(const item of report.context.verification.comparisons)out.push(`・${NAMES[item.metric]}：${labels[item.state]}`);
+    }
     out.push('閾値・最低件数・優先順位は架空試験用。本番精度・原因・最適発注量は未判定です。');return out.join('\n');
   }
   function eventRecords(snapshot,store){
@@ -277,7 +282,251 @@
     const identity={request_id:o.request_id,data_revision:o.data_revision,code_version:VERSION,source_revision:sourceRevision,store_id:o.store_id,category_id:o.category_id,period:o.period,reference:o.reference,quantity_reference:o.quantity_reference,as_of:o.as_of};
     if(CONFIGURED)identity.profile_revision=profileRevision;
     const normalized=freeze({data,sources,diagnostics,waste_records,request:identity});
-    normalizedInputs.add(normalized);return normalized;
+    normalizedInputs.add(normalized);normalizedCalendars.set(normalized,book!==null);return normalized;
+  }
+
+  // Context evidence matching only. It never enables comparison or rewrites a report.
+  // A supplied source/verified flag is an assertion, not authentication of that source.
+  function verifyContext(normalized, supplied, suppliedPolicy=null){
+    need(normalizedInputs.has(normalized),'normalized_not_from_this_engine');
+    const context=copy(supplied),policy=copy(suppliedPolicy),data=normalized.data;
+    const exact=(v,keys)=>object(v)&&Object.keys(v).length===keys.length&&keys.every(k=>own(v,k));
+    const id=v=>text(v)&&/^[A-Za-z0-9._-]+$/.test(v);
+    const same=(a,b)=>object(b)?exact(a,Object.keys(b))&&Object.keys(b).every(k=>same(a[k],b[k])):a===b;
+    need(exact(context,['revision','comparisons','calendar'])&&id(context.revision)&&
+      Array.isArray(context.comparisons)&&context.comparisons.length<=3,'invalid_context_evidence');
+    if(policy!==null)need(exact(policy,['version','required_checks'])&&id(policy.version)&&
+      Array.isArray(policy.required_checks)&&policy.required_checks.length>=1&&policy.required_checks.length<=16&&
+      policy.required_checks.every(id)&&unique(policy.required_checks).length===policy.required_checks.length,'invalid_context_policy');
+    const binding=Object.assign({},copy(normalized.request),{quantity_day:data.quantity_day,context_revision:context.revision,
+      calendar_version:context.calendar===null?null:context.calendar.version});
+    const recordKeys=['id','metric','binding','policy_version','unit','current_scope','reference_scope','aggregation','checks'];
+    const seenMetrics=new Set(),seenIds=new Set();
+    for(const record of context.comparisons){
+      need(exact(record,recordKeys)&&id(record.id)&&METRICS.includes(record.metric)&&object(record.binding)&&
+        id(record.policy_version)&&text(record.unit)&&text(record.current_scope)&&text(record.reference_scope)&&
+        text(record.aggregation)&&Array.isArray(record.checks)&&record.checks.length<=16&&
+        !seenMetrics.has(record.metric)&&!seenIds.has(record.id),'invalid_context_evidence');
+      seenMetrics.add(record.metric);seenIds.add(record.id);
+      const seenChecks=new Set();
+      for(const check of record.checks){
+        need(exact(check,['criterion','state','source','checked_at'])&&id(check.criterion)&&
+          ['CONFIRMED','UNCONFIRMED','MISMATCH'].includes(check.state)&&!seenChecks.has(check.criterion), 'invalid_context_evidence');
+        seenChecks.add(check.criterion);
+        if(check.state==='CONFIRMED'||check.state==='MISMATCH'){
+          need(text(check.source),'invalid_context_evidence');iso(check.checked_at);
+          need(check.checked_at<=binding.as_of,'future_context_evidence');
+        }else{
+          need(check.source===null&&check.checked_at===null,'invalid_context_evidence');
+        }
+      }
+    }
+    const book=context.calendar;
+    if(book!==null){
+      need(exact(book,['version','verified','start','end','holidays','source','checked_at'])&&id(book.version)&&bool(book.verified)&&
+        Array.isArray(book.holidays)&&unique(book.holidays).length===book.holidays.length,'invalid_context_calendar');
+      // Calendar coverage may exceed a report period; apply the existing bounded-period contract.
+      days(book);need(book.holidays.every(d=>{iso(d);return within(d,book); }),'invalid_context_calendar');
+      if(book.verified){need(text(book.source),'invalid_context_calendar');iso(book.checked_at);
+        need(book.checked_at<=binding.as_of,'future_context_evidence');}
+      else need(book.source===null&&book.checked_at===null,'invalid_context_calendar');
+    }
+    const comparisons=METRICS.map(metric=>{
+      const spec=data.specs.find(s=>s.metric===metric),record=context.comparisons.find(r=>r.metric===metric);
+      const reasons=[],checks=record?record.checks:[];let mismatch=false,unconfirmed=false;
+      const missing=reason=>{unconfirmed=true;reasons.push(reason);},wrong=reason=>{mismatch=true;reasons.push(reason);};
+      if(policy===null)missing('policy_unprovided');
+      if(!record)missing('evidence_unprovided');
+      else {
+        if(!same(record.binding,binding))wrong('request_binding_mismatch');
+        if(policy!==null&&record.policy_version!==policy.version)wrong('policy_version_mismatch');
+        if(record.unit!==UNITS[metric])wrong('unit_mismatch');
+        if(record.current_scope!==spec.current_scope||record.reference_scope!==spec.reference_scope)wrong('scope_mismatch');
+        if(record.aggregation!=='sum_daily')wrong('aggregation_mismatch');
+        if(policy!==null){
+          if(checks.some(c=>!policy.required_checks.includes(c.criterion)))wrong('unexpected_check');
+          for(const key of policy.required_checks){
+            const check=checks.find(c=>c.criterion===key);
+            if(!check||check.state==='UNCONFIRMED')missing('check_unconfirmed:'+key);
+            else if(check.state==='MISMATCH')wrong('check_mismatch:'+key);
+          }
+        }
+      }
+      const current=total(data,metric,spec.current_scope,data.period),reference=total(data,metric,spec.reference_scope,spec.reference);
+      const blockers=[];
+      if(current.unknown_zero)blockers.push('current_zero_unverified');
+      if(reference.unknown_zero)blockers.push('reference_zero_unverified');
+      if(current.value===null)blockers.push('current_incomplete');
+      if(reference.value===null)blockers.push('reference_incomplete');
+      if(spec.current_scope!==spec.reference_scope)blockers.push('scope_mismatch');
+      if(current.expected!==reference.expected)blockers.push('duration_mismatch');
+      return {metric,state:mismatch?'MISMATCH':unconfirmed?'UNCONFIRMED':'CONFIRMED',reasons,checks,
+        evidence_id:record?record.id:null,policy_version:policy?policy.version:null,
+        current:{days:current.expected,entered:current.entered},reference:{days:reference.expected,entered:reference.entered},
+        data_blockers:blockers};
+    });
+    const calendarDays=sorted(unique(days(data.quantity_reference).concat(data.quantity_day))).map(day=>{
+      const reason=book===null?'calendar_unprovided':!book.verified?'calendar_unverified':!within(day,book)?'calendar_out_of_range':null;
+      return {day,holiday:reason===null?book.holidays.includes(day):null,reason,
+        version:book?book.version:null,source:reason===null?book.source:null,checked_at:reason===null?book.checked_at:null};
+    });
+    return freeze({version:'context-evidence-v1',binding,policy,
+      calendar_version:book?book.version:null,
+      calendar_coverage:book?{start:book.start,end:book.end,verified:book.verified,source:book.source,checked_at:book.checked_at}:null,
+      comparisons,calendar:calendarDays});
+  }
+
+  // Select a bounded calendar from a build-checked, caller-supplied package. No fetch or writes.
+  // SHA fields are provenance metadata here; byte integrity is checked by the offline builder.
+  function selectCalendar(supplied,requested,expectedVersion){
+    const bundle=copy(supplied),range=copy(requested);
+    const exact=(v,keys)=>object(v)&&Object.keys(v).length===keys.length&&keys.every(k=>own(v,k));
+    const hash=v=>typeof v==='string'&&/^[a-f0-9]{64}$/.test(v);
+    need(exact(bundle,['format','version','converter_version','verified','checked_at','source','coverage','holidays','content_sha256'])&&
+      bundle.format==='jp-holiday-package-v1'&&bundle.converter_version==='calendar-build-v1'&&
+      typeof bundle.version==='string'&&/^[A-Za-z0-9._-]{1,60}$/.test(bundle.version)&&bool(bundle.verified)&&
+      hash(bundle.content_sha256),'invalid_calendar_package');
+    need(typeof expectedVersion==='string'&&expectedVersion===bundle.version,'calendar_package_version_mismatch');
+    const source=bundle.source;
+    need(exact(source,['url','representation','original_bytes_sha256','capture_sha256','retrieved_at','reviewer'])&&
+      source.url==='https://www8.cao.go.jp/chosei/shukujitsu/gaiyou.html'&&source.representation==='reviewed-page-table-transcription'&&
+      source.original_bytes_sha256===null&&hash(source.capture_sha256)&&typeof source.reviewer==='string'&&
+      /^[A-Za-z0-9._-]{1,80}$/.test(source.reviewer),'invalid_calendar_package');
+    iso(source.retrieved_at);
+    if(bundle.verified){iso(bundle.checked_at);need(source.retrieved_at<=bundle.checked_at,'invalid_calendar_package');}
+    else need(bundle.checked_at===null,'invalid_calendar_package');
+    need(Array.isArray(bundle.coverage)&&bundle.coverage.length>=1&&bundle.coverage.length<=8&&
+      Array.isArray(bundle.holidays)&&bundle.holidays.length>=1&&bundle.holidays.length<=256,'invalid_calendar_package');
+    let previous='';
+    for(const span of bundle.coverage){
+      need(exact(span,['start','end']),'invalid_calendar_package');days(span);
+      const year=Number(span.start.slice(0,4));
+      need(year>=1900&&year<=2099&&span.start===year+'-01-01'&&span.end===year+'-12-31'&&span.start>previous,'invalid_calendar_package');
+      previous=span.end;
+    }
+    previous='';
+    for(const item of bundle.holidays){
+      need(exact(item,['day','name']),'invalid_calendar_package');iso(item.day);
+      need(item.day>previous&&bundle.coverage.some(p=>within(item.day,p))&&typeof item.name==='string'&&
+        item.name.length>=1&&item.name.length<=80&&item.name===item.name.trim()&&!/[\p{C}\p{Zl}\p{Zp}]/u.test(item.name),'invalid_calendar_package');
+      previous=item.day;
+    }
+    need(bundle.coverage.every(span=>bundle.holidays.some(h=>within(h.day,span))),'invalid_calendar_package');
+    need(exact(range,['start','end','as_of']),'invalid_calendar_range');iso(range.start);iso(range.end);iso(range.as_of);
+    need(range.start<=range.end,'invalid_calendar_range');
+    const length=(Date.parse(range.end+'T00:00:00Z')-Date.parse(range.start+'T00:00:00Z'))/86400000+1;
+    const reason=!bundle.verified?'calendar_unverified':bundle.checked_at>range.as_of?'calendar_after_as_of':
+      length>366?'calendar_range_too_large':days(range).some(d=>!bundle.coverage.some(p=>within(d,p)))?'calendar_out_of_range':null;
+    const calendar=reason===null?{version:bundle.version,verified:true,start:range.start,end:range.end,
+      holidays:bundle.holidays.filter(h=>within(h.day,range)).map(h=>h.day),source:'calendar-package.'+bundle.version,checked_at:bundle.checked_at}:null;
+    return freeze({version:'calendar-selection-v1',package_version:bundle.version,content_sha256:bundle.content_sha256,verified:bundle.verified,checked_at:bundle.checked_at,
+      requested:range,source,coverage:bundle.coverage,calendar,reason});
+  }
+
+  // Fixture-only provider: deterministic assertions from request-bound material, not authentication.
+  // The caller must explicitly select this trial policy; no production policy is implied.
+  function prepareContext(normalized,supplied,suppliedPolicy=null){
+    need(normalizedInputs.has(normalized),'normalized_not_from_this_engine');
+    need(normalized.data.specs.every(s=>s.conditions_confirmed===false),'comparison_confirmation_not_supported');
+    need(normalizedCalendars.get(normalized)===false,'context_calendar_conflict');
+    const material=copy(supplied),selected=copy(suppliedPolicy);
+    const exact=(v,keys)=>object(v)&&Object.keys(v).length===keys.length&&keys.every(k=>own(v,k));
+    const id=v=>text(v)&&/^[A-Za-z0-9._-]+$/.test(v);
+    const same=(a,b)=>object(b)?exact(a,Object.keys(b))&&Object.keys(b).every(k=>same(a[k],b[k])):a===b;
+    const criteria=['definition','weekday','holiday','event_registry'];
+    need(exact(material,['revision','binding','definitions','calendar'])&&id(material.revision)&&
+      Array.isArray(material.definitions)&&material.definitions.length<=3,'invalid_provider_material');
+    if(selected!==null)need(exact(selected,['version','required_checks'])&&selected.version==='fixture-comparison-v1'&&
+      Array.isArray(selected.required_checks)&&selected.required_checks.length===criteria.length&&
+      unique(selected.required_checks).length===criteria.length&&criteria.every(k=>selected.required_checks.includes(k)),'unsupported_provider_policy');
+    const rawBook=material.calendar;
+    if(rawBook!==null){
+      need(exact(rawBook,['version','verified','start','end','holidays','source','checked_at'])&&id(rawBook.version)&&
+        bool(rawBook.verified)&&Array.isArray(rawBook.holidays)&&unique(rawBook.holidays).length===rawBook.holidays.length,'invalid_provider_calendar');
+      days(rawBook);need(rawBook.holidays.every(d=>{iso(d);return within(d,rawBook); }),'invalid_provider_calendar');
+      if(rawBook.verified){need(text(rawBook.source),'invalid_provider_calendar');iso(rawBook.checked_at);}
+      else need(rawBook.source===null&&rawBook.checked_at===null,'invalid_provider_calendar');
+    }
+    // Bind to the supplied material version even if a future calendar is subsequently withheld.
+    const expected=Object.assign({},copy(normalized.request),{quantity_day:normalized.data.quantity_day,
+      context_revision:material.revision,calendar_version:rawBook===null?null:rawBook.version});
+    need(same(material.binding,expected),'provider_binding_mismatch');
+    const seen=new Set();
+    for(const entry of material.definitions){
+      need(exact(entry,['metric','current','reference','source','checked_at'])&&METRICS.includes(entry.metric)&&
+        !seen.has(entry.metric)&&text(entry.source),'invalid_provider_definition');seen.add(entry.metric);iso(entry.checked_at);
+      for(const part of [entry.current,entry.reference])need(exact(part,['version','unit','scope','aggregation'])&&
+        id(part.version)&&text(part.unit)&&text(part.scope)&&text(part.aggregation),'invalid_provider_definition');
+    }
+    const asOf=normalized.request.as_of,lateBook=rawBook!==null&&rawBook.verified&&rawBook.checked_at>asOf;
+    const context={revision:material.revision,comparisons:[],calendar:lateBook?null:rawBook};
+    const policy=selected===null?null:{version:'fixture-comparison-v1',required_checks:criteria.slice()};
+    const binding=Object.assign({},copy(normalized.request),{quantity_day:normalized.data.quantity_day,
+      context_revision:context.revision,calendar_version:context.calendar===null?null:context.calendar.version});
+    const currentDays=days(normalized.data.period),referenceDays=days(normalized.request.reference);
+    const weekCounts=list=>Array.from({length:7},(_,i)=>list.filter(d=>weekday(d)===i).length);
+    const currentWeek=weekCounts(currentDays),referenceWeek=weekCounts(referenceDays);
+    const equalList=(a,b)=>JSON.stringify(a)===JSON.stringify(b);
+    const book=context.calendar;
+    const holidayCounts=list=>!book||!book.verified||list.some(d=>!within(d,book))?null:
+      Array.from({length:7},(_,i)=>[false,true].map(h=>list.filter(d=>weekday(d)===i&&book.holidays.includes(d)===h).length));
+    const currentHoliday=holidayCounts(currentDays),referenceHoliday=holidayCounts(referenceDays);
+    const registry=normalized.sources.find(s=>s.evidence_id===normalized.request.store_id+'/event-registry');
+    const knownEvents=registry&&['CONFIRMED_PRESENT','CONFIRMED_NONE'].includes(registry.state)&&Array.isArray(registry.raw);
+    const eventsIn=period=>knownEvents?sorted(registry.raw.filter(e=>e[0]<=period.end&&e[1]>=period.start).map(e=>e[2])):null;
+    const currentEvents=eventsIn(normalized.data.period),referenceEvents=eventsIn(normalized.request.reference);
+    const details=[];
+    for(const metric of METRICS){
+      const spec=normalized.data.specs.find(s=>s.metric===metric),definition=material.definitions.find(d=>d.metric===metric),checks=[],evaluations=[];
+      function add(criterion,state,reason,current,reference,source=null,checked_at=null){
+        if(policy===null){state='UNCONFIRMED';reason='policy_unprovided';source=null;checked_at=null;}
+        checks.push({criterion,state,source:state==='UNCONFIRMED'?null:source,checked_at:state==='UNCONFIRMED'?null:checked_at});
+        evaluations.push({criterion,state,reason,current,reference});
+      }
+      const definitionKnown=definition&&definition.checked_at<=asOf;
+      const fits=(part,scope)=>part.unit===UNITS[metric]&&part.scope===scope&&part.aggregation==='sum_daily';
+      const definitionMatches=definitionKnown&&definition.current.version===definition.reference.version&&
+        fits(definition.current,spec.current_scope)&&fits(definition.reference,spec.reference_scope)&&spec.current_scope===spec.reference_scope;
+      add('definition',!definitionKnown?'UNCONFIRMED':definitionMatches?'CONFIRMED':'MISMATCH',
+        !definition?'definition_unprovided':!definitionKnown?'definition_after_as_of':definitionMatches?'definition_matches':'definition_mismatch',
+        definition?definition.current:null,definition?definition.reference:null,definition?.source,definition?.checked_at);
+      add('weekday',equalList(currentWeek,referenceWeek)?'CONFIRMED':'MISMATCH',
+        equalList(currentWeek,referenceWeek)?'weekday_matches':'weekday_mismatch',currentWeek,referenceWeek,'provider.request',asOf);
+      const holidayKnown=currentHoliday!==null&&referenceHoliday!==null;
+      const holidayMatches=holidayKnown&&equalList(currentHoliday,referenceHoliday);
+      add('holiday',!holidayKnown?'UNCONFIRMED':holidayMatches?'CONFIRMED':'MISMATCH',
+        !holidayKnown?'calendar_incomplete':holidayMatches?'holiday_matches':'holiday_mismatch',currentHoliday,referenceHoliday,book?.source,book?.checked_at);
+      const noEvents=knownEvents&&currentEvents.length===0&&referenceEvents.length===0;
+      add('event_registry',!knownEvents?'UNCONFIRMED':noEvents?'CONFIRMED':'MISMATCH',
+        !knownEvents?'event_registry_unprovided':noEvents?'no_registered_events':'registered_events_present',currentEvents,referenceEvents,
+        knownEvents?'provider.event-registry':null,asOf);
+      context.comparisons.push({id:'provider-'+metric,metric,binding:copy(binding),policy_version:policy?policy.version:'fixture-comparison-v1',
+        unit:UNITS[metric],current_scope:spec.current_scope,reference_scope:spec.reference_scope,aggregation:'sum_daily',checks});
+      details.push({metric,definition:definition||null,evaluations});
+    }
+    // Reuse the strict consumer contract before returning anything usable by the report path.
+    const verification=verifyContext(normalized,context,policy);
+    return freeze({version:'context-provider-v1',context,policy,details:{binding:material.binding,
+      event_source:registry?{evidence_id:registry.evidence_id,path:registry.path,state:registry.state}:null,
+      calendar:{provided:rawBook,reason:lateBook?'calendar_after_as_of':rawBook===null?'calendar_unprovided':
+        !rawBook.verified?'calendar_unverified':null},comparisons:details},verification});
+  }
+
+  // Reverify raw context in this engine; a serialized verification result is not authority.
+  function buildWithContext(normalized,context,policy=null,suppliedRules={}){
+    need(normalizedInputs.has(normalized),'normalized_not_from_this_engine');
+    need(normalized.data.specs.every(s=>s.conditions_confirmed===false),'comparison_confirmation_not_supported');
+    need(normalizedCalendars.get(normalized)===false,'context_calendar_conflict');
+    const rules=freeze(copy(suppliedRules)),verification=verifyContext(normalized,context,policy),prepared=copy(normalized);
+    for(const spec of prepared.data.specs)spec.conditions_confirmed=verification.comparisons.find(c=>c.metric===spec.metric).state==='CONFIRMED';
+    const calendar=new Map(verification.calendar.map(row=>[row.day,row.holiday]));
+    for(const row of prepared.data.quantities)row.holiday=calendar.has(row.day)?calendar.get(row.day):null;
+    freeze(prepared);normalizedInputs.add(prepared);
+    const core=build(prepared,rules);
+    const report=freeze(Object.assign({},core,{context:{version:'context-report-v1',verification,
+      origin:{sources:normalized.sources,diagnostics:normalized.diagnostics},
+      applied_comparisons:prepared.data.specs.map(s=>({metric:s.metric,conditions_confirmed:s.conditions_confirmed}))}}));
+    reports.add(report);return report;
   }
 
   // Request-local lifecycle. The host must repaint getState().text after every transition.
@@ -455,7 +704,40 @@
         return false;
       }
     }
-    return Object.freeze({capture,getState:()=>view,
+    function captureWithContext(readSavedText,readRequestText,readContextText,readPolicyText,dependencies={},rules={}){
+      if(closed)return false;
+      clear('reading');const mine=generation,current=()=>!closed&&mine===generation;
+      try{
+        const readers=[readSavedText,readRequestText,readContextText,readPolicyText];
+        need(readers.every(r=>typeof r==='function'),'invalid_saved_readers');
+        const capturedRules=freeze(copy(rules)),capturedDependencies=Object.create(null);
+        need(object(dependencies)&&(Object.getPrototypeOf(dependencies)===Object.prototype||Object.getPrototypeOf(dependencies)===null),'invalid_dependencies');
+        need(Object.getOwnPropertySymbols(dependencies).length===0,'invalid_context_dependencies');
+        for(const key of Object.getOwnPropertyNames(dependencies)){
+          need(['source_revision','resolver','event_reader'].includes(key),'invalid_context_dependencies');
+          const descriptor=Object.getOwnPropertyDescriptor(dependencies,key);need(descriptor&&own(descriptor,'value'),'accessor_input');
+          const value=descriptor.value;
+          need(key==='source_revision'?text(value):value===null||typeof value==='function','invalid_dependencies');capturedDependencies[key]=value;
+        }
+        Object.freeze(capturedDependencies);
+        const texts=[];
+        for(const read of readers){texts.push(read());if(!current())return false;}
+        const [snapshot,request,context,policy]=texts.map(parseSaved);
+        need(request!==null&&request.comparison_confirmed===false,'comparison_confirmation_not_supported');
+        const engine=createConfiguredEngine(capturedProfile),normalized=engine.normalize(snapshot,request,capturedDependencies);
+        if(!current())return false;
+        const report=engine.buildWithContext(normalized,context,policy,capturedRules),result=engine.renderText(report);
+        for(let i=0;i<readers.length;i++){
+          const latest=readers[i]();if(!current())return false;
+          need(texts[i]===latest,'saved_capture_changed');
+        }
+        view=freeze({status:'ready',generation,text:result,report,error:null});return true;
+      }catch(error){
+        if(current())view=freeze({status:'error',generation,text:'',report:null,error:'saved_report_unavailable'});
+        return false;
+      }
+    }
+    return Object.freeze({capture,captureWithContext,getState:()=>view,
       invalidate:()=>closed?view:clear('idle'),
       close:()=>{if(!closed){closed=true;clear('closed');}return view;}});
   }
@@ -475,11 +757,16 @@
       host.invalidate();
       return reader.capture(readSavedText,readRequestText,dependencies,rules);
     }
+    function captureWithContext(readSavedText,readRequestText,readContextText,readPolicyText,dependencies={},rules={}){
+      if(blocked())return false;
+      host.invalidate();
+      return reader.captureWithContext(readSavedText,readRequestText,readContextText,readPolicyText,dependencies,rules);
+    }
     function beginUpdate(kind='change'){
       reader.invalidate();
       return host.beginUpdate(kind);
     }
-    return Object.freeze({getState,capture,beginUpdate,
+    return Object.freeze({getState,capture,captureWithContext,beginUpdate,
       finishUpdate:(ticket,outcome)=>host.finishUpdate(ticket,outcome),
       invalidate:()=>{reader.invalidate();host.invalidate();return getState();},
       externalChange:()=>{reader.invalidate();host.externalChange();return getState();},
@@ -487,5 +774,6 @@
   }
 
   // Public exports contain no test/runtime I/O.
-  return Object.freeze({VERSION,normalize,build,renderText,createSession,createHost,createConfiguredEngine,createSavedReader,createSavedHost});
+  return Object.freeze({VERSION,normalize,build,renderText,verifyContext,selectCalendar,prepareContext,buildWithContext,createSession,createHost,createConfiguredEngine,createSavedReader,createSavedHost});
 });
+

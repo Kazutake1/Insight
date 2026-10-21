@@ -1,12 +1,13 @@
 'use strict';
 const {test,expect}=require('@playwright/test');
 const {reportFixture}=require('../report_fixture.cjs');
-async function boot(page){
+async function boot(page,snapshot=reportFixture(),now='2026-10-21T03:00:00Z'){
+  await page.clock.setFixedTime(new Date(now));
   const errors=[];page.on('pageerror',e=>errors.push(e.message));
   await page.route('**/Index.html*',async route=>{
     const response=await route.fetch();await route.fulfill({response,body:(await response.text()).replace(/;?\s*upgrade-insecure-requests/g,'')});
   });
-  await page.addInitScript(snapshot=>localStorage.setItem('insight_v11',JSON.stringify(snapshot)),reportFixture());
+  await page.addInitScript(snapshot=>localStorage.setItem('insight_v11',JSON.stringify(snapshot)),snapshot);
   await page.goto('/Index.html',{waitUntil:'domcontentloaded'});
   await expect(page.locator('#insightReportOpen')).toBeAttached();
   await page.waitForFunction(()=>window.InsightTripHistoryResolver&&window.InsightStorage&&window.InsightReportPreview);
@@ -213,3 +214,54 @@ test('初回表示でも既存イベント画面のデザインに揃い、期�
   }
   expect(errors).toEqual([]);
 });
+
+
+function confirmedHistoryFixture(){
+  const snapshot=reportFixture();
+  snapshot.stores.store_a.tripHistoryOverrides={version:1,categories:{food:{'2026-09':{'1':'active','2':'inactive','3':'inactive'}}}};
+  return snapshot;
+}
+test('同梱暦で参考平日平均を確定し、比較と状態不明0は保留する',async({page})=>{
+  const errors=await boot(page,confirmedHistoryFixture());await open(page);await conditions(page);await generate(page);
+  const output=page.locator('#insightReportText');
+  await expect(output).toContainText('平日平均は15個');await expect(output).toContainText('確定日数2日');
+  await expect(output).toContainText('比較条件が確認済みではない');await expect(output).toContainText('保存値0');
+  await expect(output).toContainText('日合計0個で確定');expect(errors).toEqual([]);
+});
+test('祝日と土日を除外し、報告時に通信も保存も追加しない',async({page})=>{
+  const snapshot=confirmedHistoryFixture();
+  for(const [i,n]of [90,50,70,10,20,900,800].entries()){
+    const record=JSON.parse(JSON.stringify(snapshot.stores.store_a.salesCounts['2026-10-19']));
+    record.food.trips[0]={sales:n,delivery:n};snapshot.stores.store_a.salesCounts['2026-09-'+(21+i)]=record;
+  }
+  const errors=await boot(page,snapshot);await open(page);await conditions(page);
+  await page.locator('#irp-quantityStart').fill('2026-09-21');await page.locator('#irp-quantityEnd').fill('2026-09-27');
+  const before=await page.evaluate(()=>localStorage.getItem('insight_v11'));
+  const counts=await page.evaluate(()=>{
+    const write=Storage.prototype.setItem,fetch=window.fetch;let writes=0,requests=0;
+    Storage.prototype.setItem=()=>{writes++;throw Error('report_must_not_write');};
+    window.fetch=()=>{requests++;throw Error('report_must_not_fetch');};
+    try{document.getElementById('insightReportConditions').requestSubmit();return {writes,requests};}
+    finally{Storage.prototype.setItem=write;window.fetch=fetch;}
+  });
+  expect(counts).toEqual({writes:0,requests:0});
+  await expect(page.locator('#insightReportText')).toContainText('平日平均は15個');
+  await expect(page.locator('#insightReportText')).toContainText('確定日数2日');
+  expect(await page.evaluate(()=>localStorage.getItem('insight_v11'))).toBe(before);expect(errors).toEqual([]);
+});
+test('暦確認日前の要求では参考平均を確定しない',async({page})=>{
+  const errors=await boot(page,confirmedHistoryFixture(),'2026-10-20T03:00:00Z');
+  await open(page);await conditions(page);await generate(page);
+  await expect(page.locator('#insightReportText')).not.toContainText('平日平均は15個');
+  await expect(page.locator('#insightReportText')).toContainText('80000円');expect(errors).toEqual([]);
+});
+for(const missing of ['history','events']){
+  test('暦があっても'+missing+'が未確認なら平均を確定しない',async({page})=>{
+    const snapshot=confirmedHistoryFixture();
+    if(missing==='history')delete snapshot.stores.store_a.tripHistoryOverrides;
+    else delete snapshot.eventManagement;
+    const errors=await boot(page,snapshot);await open(page);await conditions(page);await generate(page);
+    await expect(page.locator('#insightReportText')).not.toContainText('平日平均は15個');
+    await expect(page.locator('#insightReportText')).toContainText('日合計0個で確定');expect(errors).toEqual([]);
+  });
+}

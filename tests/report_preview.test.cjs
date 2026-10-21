@@ -76,3 +76,84 @@ test('preview and core add no outbound API or report persistence calls',()=>{
     assert.doesNotMatch(text,/\bfetch\s*\(|XMLHttpRequest|sendBeacon|localStorage\.setItem|console\.(log|warn|error)\s*\(/);
   }
 });
+
+
+// Pin the reviewed public package and unchanged lab engine used by this host.
+const crypto=require('node:crypto');
+const previewSource=fs.readFileSync(path.join(root,'insight_report_preview_v1.js'),'utf8');
+const embeddedMatch=previewSource.match(/\/\* reviewed-calendar:start \*\/([\s\S]*?)\/\* reviewed-calendar:end \*\//);
+assert.ok(embeddedMatch,'reviewed calendar package must be embedded');
+const embeddedCalendar=JSON.parse(embeddedMatch[1]);
+const calendarVersion="cao-table-2026-2027-20261021-0b2cdf75cf19";
+function canonical(v){
+  if(Array.isArray(v))return '['+v.map(canonical).join(',')+']';
+  if(v&&typeof v==='object')return '{'+Object.keys(v).sort().map(k=>JSON.stringify(k)+':'+canonical(v[k])).join(',')+'}';
+  return JSON.stringify(v);
+}
+function calendarCapture(options={}){
+  const snapshot=reportFixture(),store=snapshot.stores.store_a;
+  store.tripHistoryOverrides={version:1,categories:{food:{'2026-09':{'1':'active','2':'inactive','3':'inactive'}}}};
+  if(options.mutate)options.mutate(snapshot);
+  const raw=JSON.stringify(snapshot),before=raw;
+  const request={store_id:'store_a',period:{start:'2026-10-19',end:'2026-10-19'},reference:{start:'2026-10-12',end:'2026-10-12'},
+    quantity_day:'2026-10-19',quantity_reference:options.reference||{start:'2026-09-28',end:'2026-09-29'},
+    category_id:'food',as_of:options.as_of||'2026-10-21',comparison_confirmed:false,request_id:'calendar-test',data_revision:'calendar-fixture'};
+  const selected=api.selectCalendar(embeddedCalendar,{...request.quantity_reference,as_of:request.as_of},calendarVersion);
+  const deps={source_revision:'calendar-fixture',calendar_book:selected.calendar};
+  if(options.resolver!==false)deps.resolver=(...args)=>require('../insight_trip_history_resolver_v1.js').resolveDate(...args);
+  const host=api.createSavedHost({revision:'calendar-fixture',stores:[{id:'store_a',name:'架空店舗A'},{id:'store_b',name:'架空店舗B'}]});
+  assert.equal(host.capture(()=>raw,()=>JSON.stringify(request),deps,{min_days:2}),true);
+  assert.equal(raw,before);assert.equal(JSON.stringify(snapshot),before);
+  return {report:host.getState().report,text:host.getState().text,selected};
+}
+test('report engine is an unchanged copy of reviewed lab main d732aa5',()=>{
+  const text=fs.readFileSync(path.join(root,'insight_report_v1.js'),'utf8');
+  assert.equal(crypto.createHash('sha1').update('blob '+Buffer.byteLength(text)+'\0').update(text).digest('hex'),"02a8c7fff7b4a893a56ac0efe5af2fa598dfcad0");
+});
+test('embedded calendar matches reviewed package content digest and version',()=>{
+  const {content_sha256,...body}=embeddedCalendar;
+  assert.equal(content_sha256,"6c66c7253f57d8af7e6ff5d66a633044df3629e357f968d7a7cff4153d2517bc");
+  assert.equal(crypto.createHash('sha256').update(canonical(body)).digest('hex'),content_sha256);
+  assert.equal(embeddedCalendar.version,calendarVersion);assert.equal(embeddedCalendar.holidays.length,35);
+  assert.equal(embeddedCalendar.source.original_bytes_sha256,null);
+  assert.match(previewSource,/var CALENDAR_VERSION=/);assert.doesNotMatch(previewSource,/captureWithContext|prepareContext/);
+});
+test('calendar enables confirmed weekday mean while KPI comparisons remain held',()=>{
+  const {report}=calendarCapture();
+  assert.deepEqual(report.weekday.value,{numerator:'15',denominator:'1'});assert.equal(report.weekday.entered,2);
+  assert.equal(report.daily.value,0);assert.equal(report.kpis[0].reason,'conditions_unconfirmed');
+  assert.equal(report.kpis[1].reason,'current_zero_unverified');assert.ok(report.kpis.every(k=>!k.comparable));
+});
+test('confirmed holiday and weekend values are excluded from weekday mean',()=>{
+  const {report}=calendarCapture({reference:{start:'2026-09-21',end:'2026-09-27'},mutate:s=>{
+    for(const [i,n]of [90,50,70,10,20,900,800].entries()){
+      const record=JSON.parse(JSON.stringify(s.stores.store_a.salesCounts['2026-10-19']));
+      record.food.trips[0]={sales:n,delivery:n};s.stores.store_a.salesCounts['2026-09-'+(21+i)]=record;
+    }
+  }});
+  assert.equal(report.weekday.value.numerator,'15');assert.equal(report.weekday.entered,2);
+});
+test('entered trip zero remains in average',()=>{
+  const {report}=calendarCapture({mutate:s=>{s.stores.store_a.salesCounts['2026-09-28'].food.trips[0]={sales:0,delivery:0};}});
+  assert.equal(report.weekday.value.numerator,'10');assert.equal(report.weekday.entered,2);
+});
+test('calendar cannot supply unknown historical trips',()=>{
+  const {report}=calendarCapture({resolver:false});assert.equal(report.weekday.value,null);assert.equal(report.daily.value,0);
+});
+test('calendar cannot supply missing event registry',()=>{
+  const {report}=calendarCapture({mutate:s=>{delete s.eventManagement;}});
+  assert.equal(report.weekday.value,null);assert.equal(report.daily.value,0);
+});
+test('calendar review after as_of remains held',()=>{
+  const {report,selected}=calendarCapture({as_of:'2026-10-20'});
+  assert.equal(selected.reason,'calendar_after_as_of');assert.equal(report.weekday.value,null);assert.equal(report.kpis[0].current.value,80000);
+});
+test('unsupported year remains unknown instead of an empty holiday list',()=>{
+  const selected=api.selectCalendar(embeddedCalendar,{start:'2025-09-29',end:'2025-09-30',as_of:'2026-10-21'},calendarVersion);
+  assert.equal(selected.calendar,null);assert.equal(selected.reason,'calendar_out_of_range');
+});
+test('registered event is still excluded after holiday confirmation',()=>{
+  const {report}=calendarCapture({mutate:s=>{s.eventManagement.events.push({id:'fixture-sale',type:'sale',scope:'global',
+    startDate:'2026-09-28',endDate:'2026-09-28'});}});
+  assert.equal(report.weekday.value.numerator,'20');assert.equal(report.weekday.entered,1);
+});
