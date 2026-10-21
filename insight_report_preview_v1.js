@@ -179,6 +179,40 @@
     return root.InsightReport.selectCalendar(calendarPackage,{start:requested.quantity_reference.start,
       end:requested.quantity_reference.end,as_of:requested.as_of},CALENDAR_VERSION);
   }
+  // recorded-comparison:start
+  // Captured configured-host totals already share store, metric units and whole-store scope.
+  // This computes recorded differences only; it never marks comparable conditions as confirmed.
+  function recordedComparison(report){
+    var names={sales:'売上',waste:'廃棄金額',customers:'客数'},units={sales:'円',waste:'円',customers:'人'};
+    var out=['保存値の単純比較（条件差の調整なし）',
+      '同一店舗・全体集計の保存値の差です。曜日・祝日・イベント等の条件差は調整していません。増減率は比較期間を基準に小数第2位まで四捨五入します。'];
+    function signed(n){return (n>0n?'+':'')+n.toString();}
+    function percent(delta,base){
+      if(base===0n)return '算出できません（比較期間の値が0）';
+      var magnitude=delta<0n?-delta:delta;
+      var hundredths=(magnitude*20000n+base)/(base*2n);
+      var digits=(hundredths%100n).toString().padStart(2,'0').replace(/0+$/,'');
+      return (hundredths===0n?'':delta<0n?'-':'+')+(hundredths/100n).toString()+(digits?'.'+digits:'')+'%';
+    }
+    report.kpis.forEach(function(k){
+      var reasons=[],unit=units[k.metric];
+      [['当期',k.current],['比較期間',k.reference]].forEach(function(pair){
+        var v=pair[1];
+        if(v.unknown_zero)reasons.push(pair[0]+'の保存値0の入力状態が不明');
+        if(v.entered!==v.expected||v.value===null)reasons.push(pair[0]+'の全対象日の入力確認が未完了');
+      });
+      if(k.current.expected!==k.reference.expected)reasons.push('対象日数が異なる');
+      if(k.reason==='scope_mismatch')reasons.push('集計範囲が異なる');
+      if(reasons.length){out.push('・'+names[k.metric]+'：保留。'+reasons.join('。')+'。');return;}
+      if(!unit||![k.current.value,k.reference.value].every(function(v){return Number.isSafeInteger(v)&&v>=0;}))
+        throw Error('invalid_recorded_total');
+      var current=BigInt(k.current.value),reference=BigInt(k.reference.value),delta=current-reference;
+      out.push('・'+names[k.metric]+'：当期'+current.toString()+unit+'／比較期間'+reference.toString()+unit+
+        '。差 '+signed(delta)+unit+'（'+(delta<0n?'減少':delta>0n?'増加':'差なし')+'）、増減率 '+percent(delta,reference)+'。');
+    });
+    return out.join('\n');
+  }
+  // recorded-comparison:end
   // comparison-details:start
   // Descriptive observations only; never authorizes comparison or changes the report.
   function comparisonDetails(raw,requestText,report){
@@ -227,7 +261,7 @@
         return records.filter(function(e){return e.startDate<=period.end&&e.endDate>=period.start;}).length;
       });
     }
-    var out=['比較条件の確認（増減は引き続き保留）',
+    var out=[recordedComparison(report),'比較条件の確認（同条件での比較は未確認）',
       '・比較期間：'+requested.reference.start+'〜'+requested.reference.end+'。'];
     report.kpis.forEach(function(k){
       var notes=[];
@@ -238,7 +272,6 @@
         if(value.entered<value.expected)notes.push(pair[0]+'は全対象日の入力確認が未完了');
       });
       if(k.current.expected!==k.reference.expected)notes.push('対象日数に違いあり');
-      if(Math.min(k.current.entered,k.reference.entered)<2)notes.push('実験用の最低入力済み日数2日に未達');
       out.push('・'+labels[k.metric]+'：'+notes.join('。')+'。');
     });
     var c=counts(currentDates),r=counts(referenceDates);
@@ -275,7 +308,14 @@
   function paint(){
     var state=host?host.getState():null;
     if(!state||state.status!=='ready')detailText='';
-    body.textContent=state&&state.status==='ready'?state.text+(detailText?'\n'+detailText:''):'';
+    var text=state&&state.status==='ready'?state.text:'';
+    if(state&&state.status==='ready')state.report.kpis.forEach(function(k){
+      if(k.reason==='conditions_unconfirmed'){
+        var name={sales:'売上',waste:'廃棄金額',customers:'客数'}[k.metric];
+        text=text.split(name+'の増減は判定できません。').join(name+'の同条件比較は保留します。');
+      }
+    });
+    body.textContent=text+(text&&detailText?'\n'+detailText:'');
   }
   function invalidate(text){
     detailText='';
@@ -342,7 +382,7 @@
       paint();
       heading.textContent=fields.category.options[fields.category.selectedIndex].textContent+' ／ 取得日時：'+
         new Date().toLocaleString('ja-JP',{timeZone:'Asia/Tokyo'});
-      message.textContent='保存済みの値から作成しました。比較を保留する理由は本文末尾の「比較条件の確認」に表示しています。';
+      message.textContent='保存済みの値から作成しました。本文末尾に「保存値の単純比較」と条件の注意点を表示しています。';
     }catch(_){
       invalidate('報告を生成できません。店舗・期間・カテゴリーと保存状態を確認してください。保存失敗や別タブ更新後は、未保存の入力を控えてから再読み込みしてください。');
     }finally{paint();}

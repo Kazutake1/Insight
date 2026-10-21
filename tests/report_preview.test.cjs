@@ -165,7 +165,7 @@ const detailsMatch=previewSource.match(/\/\/ comparison-details:start([\s\S]*?)\
 assert.ok(detailsMatch);
 const detailsContext=vm.createContext({root:{InsightReport:{selectCalendar:(...args)=>api.selectCalendar(...args.map(a=>JSON.parse(JSON.stringify(a))))}},calendarPackage:embeddedCalendar,
   CALENDAR_VERSION:calendarVersion,Date,JSON,Set});
-vm.runInContext(previewSource.match(/  function shift\(iso,n\)\{[^\n]+/)[0]+'\n'+detailsMatch[1],detailsContext);
+vm.runInContext(previewSource.match(/  function shift\(iso,n\)\{[^\n]+/)[0]+'\n'+previewSource.match(/\/\/ recorded-comparison:start([\s\S]*?)\/\/ recorded-comparison:end/)[1]+'\n'+detailsMatch[1],detailsContext);
 function detailsFor(options={}){
   const capture=calendarCapture(options),before=JSON.stringify(capture);
   const details=detailsContext.comparisonDetails(capture.raw,JSON.stringify(capture.request),capture.report);
@@ -175,7 +175,7 @@ function detailsFor(options={}){
 test('details retain independent input, sample, calendar and definition blockers',()=>{
   const {details}=detailsFor();
   assert.match(details,/廃棄金額：当期の入力済み確認0日／対象1日。当期の保存値0は1日分の入力状態が不明。当期は全対象日の入力確認が未完了/);
-  assert.match(details,/最低入力済み日数2日に未達/);
+  assert.doesNotMatch(details,/最低入力済み日数2日に未達/);
   assert.match(details,/曜日構成：一致。当期 月曜1日／比較期間 月曜1日/);
   assert.match(details,/祝日構成（曜日別）：違いあり。当期 該当日なし／比較期間 月曜1日/);
   assert.match(details,/イベント登録：当期 登録なし／比較期間 登録なし。実際の開催有無や登録条件の同等性は未確認/);
@@ -190,7 +190,7 @@ test('equal holiday totals on different weekdays are not identical composition',
 });
 test('equal supported profiles do not authorize any KPI comparison',()=>{
   const {details,report}=detailsFor({request:{reference:{start:'2026-10-05',end:'2026-10-05'}}});
-  assert.match(details,/祝日構成（曜日別）：一致/);assert.match(details,/増減は引き続き保留/);
+  assert.match(details,/祝日構成（曜日別）：一致/);assert.match(details,/同条件での比較は未確認/);
   assert.ok(report.kpis.every(k=>!k.comparable));
 });
 test('partial calendar evidence and future review remain unknown independently',()=>{
@@ -235,4 +235,59 @@ test('weekday and holiday observations cover the whole period, not only saved KP
     reference:{start:'2026-10-12',end:'2026-10-13'}}});
   assert.match(details,/曜日構成：一致。当期 月曜1日・火曜1日／比較期間 月曜1日・火曜1日/);
   assert.match(details,/祝日構成（曜日別）：違いあり/);
+});
+
+test('recorded differences allow complete one-day data without approving comparable conditions',()=>{
+  const {details,report}=detailsFor();
+  assert.match(details,/売上：当期80000円／比較期間100000円。差 -20000円（減少）、増減率 -20%/);
+  assert.match(details,/客数：当期80人／比較期間100人。差 -20人（減少）、増減率 -20%/);
+  assert.match(details,/廃棄金額：保留。当期の保存値0の入力状態が不明/);
+  assert.doesNotMatch(details,/差 -3000円/);
+  assert.ok(report.kpis.every(k=>!k.comparable&&k.delta===null));
+});
+function arithmeticFor(current,reference,options={}){
+  const totals=(value,extra)=>Object.assign({value,entered:1,expected:1,unknown_zero:0},extra);
+  return detailsContext.recordedComparison({kpis:[{metric:options.metric||'sales',reason:options.reason||'conditions_unconfirmed',
+    current:totals(current,options.current),reference:totals(reference,options.reference)}]});
+}
+test('recorded arithmetic preserves increase, decrease, equality and metric units',()=>{
+  assert.match(arithmeticFor(6000,3000,{metric:'waste'}),/差 \+3000円（増加）、増減率 \+100%/);
+  assert.match(arithmeticFor(80,100,{metric:'customers'}),/差 -20人（減少）、増減率 -20%/);
+  assert.match(arithmeticFor(100,100),/差 0円（差なし）、増減率 0%/);
+});
+test('percentage rounding uses exact integer arithmetic at positive and negative half boundaries',()=>{
+  assert.match(arithmeticFor(33,32),/増減率 \+3.13%/);
+  assert.match(arithmeticFor(31,32),/増減率 -3.13%/);
+  assert.match(arithmeticFor(20002,20000),/増減率 \+0.01%/);
+  assert.match(arithmeticFor(99999999,100000000),/増減率 0%/);
+  assert.doesNotMatch(arithmeticFor(99999999,100000000),/-0%/);
+  assert.match(arithmeticFor(9007199254740991,1),/差 \+9007199254740990円.*増減率 \+900719925474099000%/);
+});
+test('known zero and undefined ratio are distinct from an unverified legacy saved zero',()=>{
+  assert.match(arithmeticFor(0,100),/差 -100円（減少）、増減率 -100%/);
+  assert.match(arithmeticFor(10,0),/差 \+10円.*算出できません（比較期間の値が0）/);
+  assert.match(arithmeticFor(0,0),/差 0円.*算出できません（比較期間の値が0）/);
+  const unknown=arithmeticFor(null,100,{current:{unknown_zero:1,entered:0}});
+  assert.match(unknown,/保留.*保存値0の入力状態が不明/);assert.doesNotMatch(unknown,/差 -100円/);
+});
+test('independent arithmetic data blockers cannot be overridden by a condition confirmation',()=>{
+  for(const options of [
+    {current:{entered:0}},{reference:{entered:0}},{current:{expected:2,entered:2}},
+    {reason:'scope_mismatch'},{current:{unknown_zero:1}},{reference:{unknown_zero:1}}
+  ]){
+    const text=arithmeticFor(80,100,{...options,reason:options.reason||'comparable'});
+    assert.match(text,/保留/);assert.doesNotMatch(text,/差 -20円/);
+  }
+});
+test('invalid or unsafe captured totals do not get coerced or rounded into values',()=>{
+  for(const n of [NaN,Infinity,-1,0.1,Number.MAX_SAFE_INTEGER+1,'80'])
+    assert.throws(()=>arithmeticFor(n,100),/invalid_recorded_total/);
+});
+test('holiday mismatch and registered events remain visible without blocking recorded arithmetic',()=>{
+  const {details}=detailsFor({mutate:s=>{s.eventManagement.events=[{id:'sale-current',type:'sale',scope:'global',
+    startDate:'2026-10-19',endDate:'2026-10-19'}];}});
+  assert.match(details,/差 -20000円（減少）、増減率 -20%/);
+  assert.match(details,/祝日構成（曜日別）：違いあり/);
+  assert.match(details,/イベント登録：当期 1件の登録あり／比較期間 登録なし/);
+  assert.match(details,/条件差は調整していません/);
 });
