@@ -15,26 +15,51 @@ async function boot(page){
 
 async function checkReportSpacing(page){
   const layout=await page.locator('#insightReportDialog').evaluate(dialog=>{
-    const bounds=n=>n.getBoundingClientRect();
-    const groups=[...dialog.querySelectorAll('.irp-period')];
-    const pairs=groups.map(group=>{
-      const controls=[...group.querySelectorAll('input[type=date]')],a=bounds(controls[0]),b=bounds(controls[1]);
+    const bounds=n=>n.getBoundingClientRect(),control=id=>dialog.querySelector('#irp-'+id);
+    const pairs=[['start','end'],['referenceStart','referenceEnd'],['quantityStart','quantityEnd']].map(ids=>{
+      const controls=ids.map(control),a=bounds(controls[0]),b=bounds(controls[1]);
       return {gap:b.left-a.right,aligned:Math.abs(a.top-b.top),
-        contained:controls.every(control=>{const r=bounds(control),p=bounds(control.parentElement);return r.left>=p.left-1&&r.right<=p.right+1;})};
+        contained:controls.every(n=>{const r=bounds(n),p=bounds(n.parentElement);return r.left>=p.left-1&&r.right<=p.right+1;})};
     });
-    const children=[...dialog.querySelector('.irp-grid').children];
-    const vertical=children.slice(2).map((n,i)=>bounds(n).top-bounds(children[i+1]).bottom);
+    const rows=[['store','category'],['start','end'],['referenceStart','referenceEnd'],['quantityDay'],['quantityStart','quantityEnd']]
+      .map(ids=>ids.map(id=>bounds(control(id).parentElement)));
+    const vertical=rows.slice(1).map((row,i)=>Math.min(...row.map(r=>r.top))-Math.max(...rows[i].map(r=>r.bottom)));
     const labels=[...dialog.querySelectorAll('.irp-field')].map(label=>{
       return bounds(label.querySelector('input,select')).top-bounds(label.querySelector('span')).bottom;
     });
-    const last=groups[groups.length-1].querySelectorAll('input')[1];
-    return {pairs,vertical,labels,buttonGap:bounds(dialog.querySelector('#insightReportGenerate')).top-bounds(last).bottom};
+    return {pairs,vertical,labels,groups:dialog.querySelectorAll('fieldset,legend').length,
+      buttonGap:bounds(dialog.querySelector('#insightReportGenerate')).top-bounds(control('quantityEnd')).bottom};
   });
+  expect(layout.groups).toBe(0);
   expect(layout.pairs).toHaveLength(3);
   for(const pair of layout.pairs){expect(pair.gap).toBeGreaterThanOrEqual(23);expect(pair.aligned).toBeLessThanOrEqual(1);expect(pair.contained).toBe(true);}
   for(const gap of layout.vertical)expect(gap).toBeGreaterThanOrEqual(23);
   for(const gap of layout.labels)expect(gap).toBeGreaterThanOrEqual(7);
   expect(layout.buttonGap).toBeGreaterThanOrEqual(23);
+}
+
+async function checkReportTheme(page){
+  const differences=await page.locator('#insightReportDialog').evaluate(dialog=>{
+    // Compare with the actual existing event-dialog rules, not another report-only palette.
+    const reference=document.createElement('dialog');reference.className='ie-dialog';reference.hidden=true;
+    const heading=document.createElement('h2'),input=document.createElement('input'),secondary=document.createElement('button'),
+      primary=document.createElement('button');input.type='date';primary.className='ie-primary';
+    reference.append(heading,input,secondary,primary);document.body.append(reference);
+    try{
+      const pairs=[
+        [dialog,reference,['backgroundColor','color','borderColor','borderRadius','boxShadow','fontFamily','fontSize']],
+        [dialog.querySelector('h2'),heading,['fontSize','fontWeight','color']],
+        [dialog.querySelector('input'),input,['backgroundColor','color','borderColor','borderRadius','fontFamily','fontSize']],
+        [dialog.querySelector('.irp-head button'),secondary,['backgroundColor','color','borderColor','borderRadius','fontFamily','fontSize']],
+        [dialog.querySelector('#insightReportGenerate'),primary,['backgroundColor','color','borderColor','borderRadius','fontFamily','fontSize']]
+      ];
+      return pairs.flatMap(([actual,expected,properties],index)=>{
+        const a=getComputedStyle(actual),b=getComputedStyle(expected);
+        return properties.filter(key=>a[key]!==b[key]).map(key=>({index,key,actual:a[key],expected:b[key]}));
+      });
+    }finally{reference.remove();}
+  });
+  expect(differences).toEqual([]);
 }
 
 async function open(page){
@@ -165,28 +190,25 @@ test('HTML風店舗名を文字として表示し、iPad相当のライトとダ
     for(const viewport of [{width:1194,height:834},{width:834,height:1194}]){
       await page.setViewportSize(viewport);
       const bounds=await page.locator('#insightReportDialog').evaluate(dialog=>{
-        const rect=dialog.getBoundingClientRect(),style=getComputedStyle(dialog);
+        const rect=dialog.getBoundingClientRect();
         return {centerX:Math.abs(rect.left+rect.width/2-innerWidth/2),centerY:Math.abs(rect.top+rect.height/2-innerHeight/2),
           inside:rect.left>=0&&rect.right<=innerWidth&&rect.top>=0&&rect.bottom<=innerHeight,overflow:dialog.scrollWidth>dialog.clientWidth,
-          background:style.backgroundColor,color:style.color,
           inputs:[...dialog.querySelectorAll('input,select,button')].every(n=>n.getBoundingClientRect().height>=44)};
       });
-      await checkReportSpacing(page);
+      await checkReportSpacing(page);await checkReportTheme(page);
       expect(bounds.centerX).toBeLessThanOrEqual(1);expect(bounds.centerY).toBeLessThanOrEqual(1);
       expect(bounds.inside).toBe(true);expect(bounds.overflow).toBe(false);expect(bounds.inputs).toBe(true);
-      expect(bounds.background).toBe(dark?'rgb(37, 37, 37)':'rgb(255, 255, 255)');
-      expect(bounds.color).toBe(dark?'rgb(238, 238, 238)':'rgb(34, 34, 34)');
     }
   }
   expect(errors).toEqual([]);
 });
 
-test('初回表示でも期間の開始・終了枠と隣の項目・生成ボタンに余白がある',async({page})=>{
+test('初回表示でも既存イベント画面のデザインに揃い、期間枠と項目・ボタンに余白がある',async({page})=>{
   const errors=await boot(page);await open(page);
   for(const dark of [false,true]){
     await page.evaluate(value=>document.documentElement.classList.toggle('dark',value),dark);
     for(const viewport of [{width:1194,height:834},{width:834,height:1194}]){
-      await page.setViewportSize(viewport);await checkReportSpacing(page);
+      await page.setViewportSize(viewport);await checkReportSpacing(page);await checkReportTheme(page);
     }
   }
   expect(errors).toEqual([]);
