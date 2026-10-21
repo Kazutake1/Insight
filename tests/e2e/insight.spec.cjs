@@ -3768,6 +3768,8 @@ test('発注予測の天気7日間と前年実績7日間は曜日で揃い、納
   await page.setViewportSize({width:1194,height:834});
   const todayTokyo=new Intl.DateTimeFormat('en-CA',{timeZone:'Asia/Tokyo',year:'numeric',month:'2-digit',day:'2-digit'})
     .format(new Date());
+  // Lock this pre-existing layout scenario to 12:00 JST (+2-day delivery); boundary tests cover <11:00 separately.
+  await page.clock.install({time:new Date(todayTokyo+'T03:00:00Z')});
   const days=Array.from({length:7},(_,i)=>{
     const date=new Date(todayTokyo+'T12:00:00Z');
     date.setUTCDate(date.getUTCDate()+i);
