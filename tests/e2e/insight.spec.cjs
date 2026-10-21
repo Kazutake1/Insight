@@ -350,10 +350,10 @@ test('トップページは外部shellと機能manifestの最新版確認をno-s
     fetch('/insight_payload_source_v1.html?e2e-shell-check=1',{cache:'no-store'}).then(r=>r.text())
   ]));
   const [source,boot,loader,payload]=sources;
-  expect(source).toContain('name="insight-shell-version" content="20261021-report-theme-build-86"');
-  expect(source).toContain('insight_shell_boot_v1.js?v=20261021-report-theme-build-86');
-  expect(source).toContain('insight_shell_loader_v1.js?v=20261021-report-theme-build-86');
-  expect(source).toContain('insight_shell_v1.css?v=20261021-report-theme-build-86');
+  expect(source).toContain('name="insight-shell-version" content="20261021-delivery-offset-fix-build-87"');
+  expect(source).toContain('insight_shell_boot_v1.js?v=20261021-delivery-offset-fix-build-87');
+  expect(source).toContain('insight_shell_loader_v1.js?v=20261021-delivery-offset-fix-build-87');
+  expect(source).toContain('insight_shell_v1.css?v=20261021-delivery-offset-fix-build-87');
   expect(source).not.toMatch(/<script(?![^>]*\bsrc=)[^>]*>/i);
   expect(source).not.toMatch(/<style\b/i);
   expect(source).not.toMatch(/script-src[^;]*'unsafe-inline'/);
@@ -3796,7 +3796,8 @@ test('発注予測の天気7日間と前年実績7日間は曜日で揃い、納
   await page.locator('#navOrderForecast').click();
   await expect(page.locator('#ofWeather .of-weather-card')).toHaveCount(7);
   await expect(page.locator('#ofYearCards .sc-day')).toHaveCount(7);
-  await expect(page.locator('#ofWeather .of-weather-card .of-weather-text').first()).toHaveText('晴れ');
+  await expect(page.locator('#ofWeather .of-weather-card .of-weather-text').first()).toHaveText('予報対象外');
+  await expect(page.locator('#ofWeather .of-weather-card .of-weather-text').nth(1)).toHaveText('晴れ');
   const weekCards=page.locator('#ofWeekCards > .sc-day');
   await expect(weekCards).toHaveCount(7);
   await expect(page.locator('#ofWeekCards > .sc-average-card')).toHaveCount(1);
@@ -3826,9 +3827,14 @@ test('発注予測の天気7日間と前年実績7日間は曜日で揃い、納
     }));
   }
   let dates=await readDates();
-  expect(dates.weather).toEqual(days);
+  const displayed=[...days];
+  displayed.unshift(await page.evaluate(date=>InsightOrderForecast.addDays(date,-1),todayTokyo));
+  displayed.pop();
+  expect(dates.weather).toEqual(displayed);
+  expect(dates.delivery).toBe(days[2]);
+  expect(dates.weather[3]).toBe(dates.delivery);
   for(let i=0;i<7;i++){
-    const d=new Date(days[i]+'T12:00:00Z');
+    const d=new Date(displayed[i]+'T12:00:00Z');
     d.setUTCDate(d.getUTCDate()-364);
     expect(dates.previous[i]).toBe(d.toISOString().slice(0,10));
     expect(new Date(dates.weather[i]).getUTCDay()).toBe(new Date(dates.previous[i]).getUTCDay());

@@ -43,7 +43,7 @@ test('発注予測は閲覧専用・実績と平均・店舗カテゴリー切�
   await page.clock.install({time:new Date('2026-10-11T03:00:00Z')});
   const result=await open(page,false,'2026-10-11');await page.setViewportSize({width:1194,height:834});
   await page.locator('#navOrderForecast').click();await expect(page.locator('#pageOrderForecast')).toHaveClass(/show/);
-  const initial=await page.evaluate(()=>InsightOrderForecast.addDays(InsightOrderForecast.today(),3));
+  const initial=await page.evaluate(()=>InsightOrderForecast.addDays(InsightOrderForecast.today(),2));
   await expect(page.locator('#ofDelivery')).toHaveValue(initial);
   await expect(page.locator('#ofWeather .of-weather-card')).toHaveCount(7);
   await expect(page.locator('#ofYearCards .sc-day')).toHaveCount(7);
@@ -60,6 +60,11 @@ test('発注予測は閲覧専用・実績と平均・店舗カテゴリー切�
       columns:weather.map((card,i)=>({weather:card.dataset.date,prior:prior[i].dataset.date}))};
   });
   expect(aligned.selected).toBe(3);
+  const dayBefore=await page.evaluate(()=>InsightOrderForecast.addDays(InsightOrderForecast.today(),-1));
+  expect(aligned.columns[0].weather).toBe(dayBefore);
+  await expect(page.locator('#ofWeather .of-weather-card').first()).toContainText('予報対象外');
+  await expect(page.locator('#ofWeather .of-weather-card').first().locator('.of-weather-placeholder')).toHaveText('—');
+  expect(await page.locator('#ofWeather .of-weather-card').first().locator('svg').count()).toBe(0);
   expect(aligned.targetDate).toBe(initial);
   expect(aligned.priorDate).toBe(aligned.expected);
   expect(aligned.meta).toContain(aligned.expected);
@@ -183,7 +188,7 @@ test('発注予測は閲覧専用・実績と平均・店舗カテゴリー切�
   const protection=await page.evaluate(()=>{const before=JSON.parse(window.__ofBefore),stored=JSON.parse(localStorage.getItem('insight_v11'));before.current='ofTestStore';return {memory:JSON.stringify(allStores)===JSON.stringify(before),storage:JSON.stringify(stored)===JSON.stringify(allStores)};});expect(protection).toEqual({memory:true,storage:true});expect(result.errors).toEqual([]);
 });
 test('予報の更新連打を抑えライト/ダーク双方で選択日を強調する',async({page})=>{
-  const result=await open(page);await page.locator('#navOrderForecast').click();await expect(page.locator('#ofWeather .sc-day')).toHaveCount(7);const symbols=await page.locator('#ofWeather .of-weather-card').evaluateAll(cards=>cards.map(card=>card.querySelector('svg')&&card.querySelector('svg').querySelectorAll('path,circle,line').length));expect(symbols.every(count=>count>0)).toBe(true);
+  const result=await open(page);await page.locator('#navOrderForecast').click();await expect(page.locator('#ofWeather .sc-day')).toHaveCount(7);const symbols=await page.locator('#ofWeather .of-weather-card').evaluateAll(cards=>cards.map(card=>card.querySelector('svg')&&card.querySelector('svg').querySelectorAll('path,circle,line').length));expect(symbols[0]).toBeNull();expect(symbols.slice(1).every(count=>count>0)).toBe(true);
   await expect(page.locator('#ofRefresh')).toBeEnabled();const before=result.calls();await page.locator('#ofRefresh').click();await expect(page.locator('#ofRefresh')).toBeEnabled();expect(result.calls()).toBe(before);
   const dayColors=await page.locator('#ofWeather .of-weather-card').evaluateAll(cards=>cards.map(c=>({date:c.dataset.date,cls:c.querySelector('.sc-day-num').className})));expect(dayColors.some(x=>x.cls.includes('sun'))).toBe(true);expect(dayColors.some(x=>x.cls.includes('sat'))).toBe(true);
   const temperatureColors=await page.locator('#ofWeather .of-weather-card').first().evaluate(card=>({max:getComputedStyle(card.querySelector('.of-temp-max')).color,min:getComputedStyle(card.querySelector('.of-temp-min')).color}));expect(temperatureColors.max).not.toBe(temperatureColors.min);
