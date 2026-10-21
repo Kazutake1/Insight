@@ -187,7 +187,43 @@ test('発注予測は閲覧専用・実績と平均・店舗カテゴリー切�
   await page.locator('#navOrderForecast').click();await expect(page.locator('#ofDelivery')).toHaveValue('2026-10-18');await expect(page.locator('#ofCategory')).toHaveValue(cats[1]);await expect(page.locator('#storeSel')).toHaveValue('ofTestStore');
   const protection=await page.evaluate(()=>{const before=JSON.parse(window.__ofBefore),stored=JSON.parse(localStorage.getItem('insight_v11'));before.current='ofTestStore';return {memory:JSON.stringify(allStores)===JSON.stringify(before),storage:JSON.stringify(stored)===JSON.stringify(allStores)};});expect(protection).toEqual({memory:true,storage:true});expect(result.errors).toEqual([]);
 });
+test('日本時間の11:00を境に納品日を+1日から+2日へ切り替え、常に4列目に表示する',async({page})=>{
+  await page.clock.install({time:new Date('2026-10-21T01:59:59Z')}); // 10:59:59 JST
+  const result=await open(page,false,'2026-10-21');
+  await page.locator('#navOrderForecast').click();
+  await expect(page.locator('#ofDelivery')).toHaveValue('2026-10-22');
+  await expect(page.locator('#ofWeather .of-weather-card')).toHaveCount(7);
+  await expect(page.locator('#ofYearCards .sc-day')).toHaveCount(7);
+  await expect(page.locator('#ofWeather .of-weather-card').nth(3)).toHaveClass(/of-selected/);
+  await expect(page.locator('#ofWeather .of-weather-card').nth(0)).toContainText('予報対象外');
+  await expect(page.locator('#ofWeather .of-weather-card').nth(1)).toContainText('予報対象外');
+  const before=await page.locator('#ofWeather .of-weather-card').evaluateAll(cards=>cards.map(card=>card.dataset.date));
+  expect(before[0]).toBe('2026-10-19');
+  expect(before[3]).toBe('2026-10-22');
+  await expect(page.locator('#ofYearCards .sc-day').nth(3)).toHaveAttribute('data-date','2025-10-23');
+  // When the same open app is revisited after the cutoff, recompute only the automatic date.
+  await page.clock.setFixedTime(new Date('2026-10-21T02:00:00Z')); // 11:00 JST
+  await page.locator('#nav1').click();
+  await page.locator('#navOrderForecast').click();
+  await expect(page.locator('#ofDelivery')).toHaveValue('2026-10-23');
+  await expect(page.locator('#ofWeather .of-weather-card').nth(3)).toHaveAttribute('data-date','2026-10-23');
+  await expect(page.locator('#ofWeather .of-weather-card').nth(3)).toHaveClass(/of-selected/);
+  await expect(page.locator('#ofWeather .of-weather-card').nth(0)).toContainText('予報対象外');
+  await expect(page.locator('#ofWeather .of-weather-card').nth(1)).not.toContainText('予報対象外');
+  await expect(page.locator('#ofYearCards .sc-day').nth(3)).toHaveAttribute('data-date','2025-10-24');
+  const after=await page.locator('#ofWeather .of-weather-card').evaluateAll(cards=>cards.map(card=>card.dataset.date));
+  expect(after[0]).toBe('2026-10-20');
+  // Explicit manual selection remains stable across navigation.
+  await page.locator('#ofDelivery').fill('2026-10-24');
+  await page.locator('#ofDelivery').dispatchEvent('change');
+  await page.locator('#nav1').click();
+  await page.locator('#navOrderForecast').click();
+  await expect(page.locator('#ofDelivery')).toHaveValue('2026-10-24');
+  expect(result.errors).toEqual([]);
+});
+
 test('予報の更新連打を抑えライト/ダーク双方で選択日を強調する',async({page})=>{
+  await page.clock.install({time:new Date('2026-10-11T03:00:00Z')});
   const result=await open(page);await page.locator('#navOrderForecast').click();await expect(page.locator('#ofWeather .sc-day')).toHaveCount(7);const symbols=await page.locator('#ofWeather .of-weather-card').evaluateAll(cards=>cards.map(card=>card.querySelector('svg')&&card.querySelector('svg').querySelectorAll('path,circle,line').length));expect(symbols[0]).toBeNull();expect(symbols.slice(1).every(count=>count>0)).toBe(true);
   await expect(page.locator('#ofRefresh')).toBeEnabled();const before=result.calls();await page.locator('#ofRefresh').click();await expect(page.locator('#ofRefresh')).toBeEnabled();expect(result.calls()).toBe(before);
   const dayColors=await page.locator('#ofWeather .of-weather-card').evaluateAll(cards=>cards.map(c=>({date:c.dataset.date,cls:c.querySelector('.sc-day-num').className})));expect(dayColors.some(x=>x.cls.includes('sun'))).toBe(true);expect(dayColors.some(x=>x.cls.includes('sat'))).toBe(true);
