@@ -20,3 +20,6 @@
 
 /* Forecasts have no past-day observation: reserve an aligned neutral icon slot. */
 .of-weather-placeholder{display:flex;align-items:center;justify-content:center;color:var(--text3);font-size:20px}
+
+/* Render the existing saved-weather icon at the same size as forecast icons. */
+.of-weather-card .of-history-icon .iwx-weather-svg{display:block;width:36px;height:36px}
