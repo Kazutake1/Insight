@@ -132,7 +132,7 @@
   function init(){
     if(root.__insightOrderForecastV1)return;
     var sales=root.InsightSalesCount,doc=root.document;if(!sales||!sales.createReadOnlyDayCard||!root.InsightTripHistoryResolver||!doc.getElementById('navSaleResults')){setTimeout(init,20);return;}root.__insightOrderForecastV1=true;
-    var state={storeId:allStores.current,delivery:addDays(today(),2),categoryId:null},forecast=null,error='',loading=false,request=0,client=createClient(root.fetch.bind(root));
+    var state={storeId:allStores.current,delivery:addDays(today(),3),categoryId:null},forecast=null,error='',loading=false,request=0,client=createClient(root.fetch.bind(root));
     function el(tag,text,cls){var node=doc.createElement(tag);if(text!==undefined)node.textContent=text;if(cls)node.className=cls;return node;}
     var link=el('link');link.rel='stylesheet';link.href='./insight_order_forecast_v1.css?v=20261012-weather-gap-1';doc.head.append(link);
     var nav=el('button',undefined,'nav-btn');nav.id='navOrderForecast';nav.type='button';nav.innerHTML='<svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M3 4h18v16H3zM3 9h18M8 4v16"/></svg><span>発注予測</span>';nav.onclick=function(){root.gotoNav('orderForecast');};var navList=doc.querySelector('#sidebar .nav-list'),divider=el('div',undefined,'of-nav-divider');divider.setAttribute('role','separator');navList.append(divider,nav);
