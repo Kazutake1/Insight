@@ -17,3 +17,6 @@
 
 /* 気象庁の天気コードに基づくシンプルなSVG。予報カードはアイコンの視認性を優先して縦幅のみ拡大。 */
 .of-weather-symbol{display:block;width:36px;height:36px;margin:0 auto;flex:0 0 36px;fill:none;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}.of-wx-sun{stroke:#ca9c42}.of-wx-cloud{stroke:var(--text3)}.of-wx-rain{stroke:#6b9bc9}.of-wx-snow{stroke:#8baac6}
+
+/* Forecasts have no past-day observation: reserve an aligned neutral icon slot. */
+.of-weather-placeholder{display:flex;align-items:center;justify-content:center;color:var(--text3);font-size:20px}

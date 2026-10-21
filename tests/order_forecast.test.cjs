@@ -92,29 +92,37 @@ test('新機能は永続保存・実績保存・外部記憶更新を持たな�
 });
 
 
-test('標準予測日は今日から3日後で天気・前年7日間の4列目が52週差で一致する',()=>{
-  for(const start of ['2026-10-21','2024-02-27','2026-12-30']){
-    const delivery=model.addDays(start,3),range=model.dates(delivery,start);
-    assert.equal(range.previousYear.length,7);
+test('納品日は今日から2日後のまま、予報と前年7日間の4列目を52週間差で揃える',()=>{
+  for(const today of ['2026-10-21','2024-02-27','2026-12-30']){
+    const delivery=model.addDays(today,2),jmaDays=[0,1,2,3,4,5,6].map(n=>({date:model.addDays(today,n),weather:'晴',weatherCode:'100'}));
+    const visible=model.displayWeatherDays(jmaDays),range=model.dates(delivery,visible[0].date);
+    assert.equal(visible.length,7);
+    assert.equal(visible[0].date,model.addDays(today,-1));
+    assert.equal(visible[0].weather,'予報対象外');
+    assert.equal(visible[0].weatherCode,null);
+    assert.equal(visible[3].date,delivery,'納品日が4列目');
+    assert.equal(visible[6].date,model.addDays(today,5));
     assert.equal(range.previousYear[3],model.addDays(delivery,-364));
-    for(let i=0;i<7;i++)assert.equal(range.previousYear[i],model.addDays(model.addDays(start,i),-364));
+    for(let i=0;i<7;i++)assert.equal(range.previousYear[i],model.addDays(visible[i].date,-364));
     assert.equal(range.weeks[5],model.addDays(delivery,-7));
     assert.equal(range.recent[0],model.addDays(delivery,-7));
+    assert.equal(jmaDays.length,7,'気象庁の元予報を変更しない');
   }
+  assert.deepEqual(model.displayWeatherDays([]),[]);
 });
 
 test('前年7日間は上段天気の表示開始日に52週間前を対応させ、曜日と列を一致させる',()=>{
-  const weatherStart='2026-10-11',delivery='2026-10-13',range=model.dates(delivery,weatherStart);
+  const weatherStart='2026-10-10',delivery='2026-10-13',range=model.dates(delivery,weatherStart);
   assert.deepEqual(range.previousYear,[
-    '2025-10-12','2025-10-13','2025-10-14','2025-10-15',
-    '2025-10-16','2025-10-17','2025-10-18'
+    '2025-10-11','2025-10-12','2025-10-13','2025-10-14',
+    '2025-10-15','2025-10-16','2025-10-17'
   ]);
   for(let i=0;i<7;i++){
     const weatherDay=model.addDays(weatherStart,i);
     assert.equal(new Date(weatherDay).getUTCDay(),new Date(range.previousYear[i]).getUTCDay());
     assert.equal(range.previousYear[i],model.addDays(weatherDay,-364));
   }
-  assert.equal(range.previousYear[2],model.addDays(delivery,-364),'納品日の52週前は同じ列');
+  assert.equal(range.previousYear[3],model.addDays(delivery,-364),'納品日の52週前は4列目');
   assert.equal(range.weeks[0],model.addDays(delivery,-42),'6週実績は納品日基準である');
   assert.equal(range.recent[0],model.addDays(delivery,-7),'直近実績には影響しない');
 });
