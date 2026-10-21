@@ -2,7 +2,7 @@
 (function(){
 function fail(e){document.body.innerHTML='<div class="insight-load-failure">Insightの読み込みに失敗しました。<br><small>'+String(e&&e.message?e.message:e)+'</small></div>';}
 if(typeof Chart==='undefined'){fail(new Error('グラフライブラリを読み込めませんでした'));return;}
-fetch('./insight_payload_source_v1.html?v=20261021-report-center-1',{cache:'no-store'}).then(function(r){if(!r.ok)throw new Error('Insight payload の取得に失敗しました ('+r.status+')');return r.text();}).then(function(html){
+fetch('./insight_payload_source_v1.html?v=20261021-report-spacing-1',{cache:'no-store'}).then(function(r){if(!r.ok)throw new Error('Insight payload の取得に失敗しました ('+r.status+')');return r.text();}).then(function(html){
 if(html.indexOf('<!DOCTYPE html>')!==0&&html.indexOf('<!doctype html>')!==0)throw new Error('HTMLデータの検証に失敗しました');
 // STEP5 complete: payload source is self-contained; feature modules are inserted before document.write().
 var orderedFeatureLoads=[
@@ -78,7 +78,7 @@ var orderedFeatureLoads=[
   './insight_weekday_chart_spacing_v1.js?v=20261006-csp-style-weekday-1',
   './insight_order_forecast_v1.js?v=20261012-weather-gap-1',
   './insight_report_v1.js?v=20261021-saved-report-1',
-  './insight_report_preview_v1.js?v=20261021-saved-report-1'
+  './insight_report_preview_v1.js?v=20261021-report-spacing-1'
 ];
 function featureSignature(entries){
   var text=entries.join('\n'),hash=2166136261;

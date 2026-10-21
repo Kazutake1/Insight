@@ -7,12 +7,18 @@
 .irp-dialog button{cursor:pointer;flex-shrink:0}
 .irp-dialog button:focus-visible,.irp-dialog input:focus-visible,.irp-dialog select:focus-visible{outline:2px solid currentColor;outline-offset:2px}
 .irp-note,.irp-message{font-size:13px;line-height:1.7;margin:12px 0 20px;overflow-wrap:anywhere}
-.irp-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:18px 20px}
-.irp-field{display:flex;flex-direction:column;gap:7px;font-size:13px;min-width:0}
+.irp-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:24px}
+.irp-field{display:flex;flex-direction:column;gap:8px;font-size:13px;min-width:0}
 .irp-field input,.irp-field select{width:100%;min-width:0}
+.irp-period,.irp-full{grid-column:1/-1}
+.irp-period{min-width:0;border:0;padding:0;margin:0}
+.irp-period legend{padding:0;margin:0 0 10px;font-size:13px;font-weight:600}
+.irp-date-pair{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));column-gap:24px;row-gap:24px;min-width:0}
+.irp-dialog .irp-date-pair input[type=date]{display:block;min-width:0;max-width:100%;width:100%;-webkit-appearance:none;appearance:none}
+.irp-dialog input[type=date]::-webkit-date-and-time-value{min-width:0;text-align:center}
 .irp-actions{grid-column:1/-1;display:flex;justify-content:flex-end;margin-top:6px}
 .irp-output{white-space:pre-wrap;overflow-wrap:anywhere;font:14px/1.9 sans-serif;margin:20px 0 0}
 .irp-output:empty{display:none}
 html.dark .irp-dialog,body.dark .irp-dialog{background:#252525;color:#eee;border-color:#666}
 html.dark .irp-dialog button,html.dark .irp-dialog input,html.dark .irp-dialog select,body.dark .irp-dialog button,body.dark .irp-dialog input,body.dark .irp-dialog select{background:#333;border-color:#777}
-@media(max-width:600px){.irp-dialog{padding:18px}.irp-grid{grid-template-columns:minmax(0,1fr)}}
+@media(max-width:600px){.irp-dialog{padding:18px}.irp-grid,.irp-date-pair{grid-template-columns:minmax(0,1fr)}}
