@@ -312,7 +312,7 @@
     if(state&&state.status==='ready')state.report.kpis.forEach(function(k){
       if(k.reason==='conditions_unconfirmed'){
         var name={sales:'売上',waste:'廃棄金額',customers:'客数'}[k.metric];
-        text=text.split(name+'の増減は判定できません。').join(name+'の同条件比較は保留します。');
+        text=text.split('\n・'+name+'の増減は判定できません。').join('\n・'+name+'の同条件比較は保留します。');
       }
     });
     body.textContent=text+(text&&detailText?'\n'+detailText:'');

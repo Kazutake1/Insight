@@ -291,3 +291,16 @@ test('holiday mismatch and registered events remain visible without blocking rec
   assert.match(details,/イベント登録：当期 1件の登録あり／比較期間 登録なし/);
   assert.match(details,/条件差は調整していません/);
 });
+
+test('display wording only changes condition-gap bullet lines and preserves identical text in store names',()=>{
+  const paint=previewSource.match(/  function paint\(\)\{[\s\S]*?\n  \}\n  function invalidate/)[0].replace(/\n  function invalidate$/,'');
+  const name='売上の増減は判定できません。架空店舗A';
+  const original=name+'　対象期間：2026-10-19〜2026-10-19\n・売上の増減は判定できません。条件未確認です。\n・廃棄金額の増減は判定できません。入力状態不明です。';
+  const state={status:'ready',text:original,report:{kpis:[{metric:'sales',reason:'conditions_unconfirmed'},{metric:'waste',reason:'current_zero_unverified'}]}};
+  const context=vm.createContext({host:{getState:()=>state},body:{textContent:''},detailText:'保存値の単純比較'});
+  vm.runInContext(paint+'\npaint();',context);
+  assert.ok(context.body.textContent.startsWith(name+'　対象期間：'));
+  assert.match(context.body.textContent,/\n・売上の同条件比較は保留します/);
+  assert.match(context.body.textContent,/\n・廃棄金額の増減は判定できません/);
+  assert.equal(state.text,original);
+});
