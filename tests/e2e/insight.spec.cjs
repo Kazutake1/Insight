@@ -350,10 +350,10 @@ test('トップページは外部shellと機能manifestの最新版確認をno-s
     fetch('/insight_payload_source_v1.html?e2e-shell-check=1',{cache:'no-store'}).then(r=>r.text())
   ]));
   const [source,boot,loader,payload]=sources;
-  expect(source).toContain('name="insight-shell-version" content="20261021-delivery-offset-fix-build-87"');
-  expect(source).toContain('insight_shell_boot_v1.js?v=20261021-delivery-offset-fix-build-87');
-  expect(source).toContain('insight_shell_loader_v1.js?v=20261021-delivery-offset-fix-build-87');
-  expect(source).toContain('insight_shell_v1.css?v=20261021-delivery-offset-fix-build-87');
+  expect(source).toContain('name="insight-shell-version" content="20261021-cutoff-11am-build-88"');
+  expect(source).toContain('insight_shell_boot_v1.js?v=20261021-cutoff-11am-build-88');
+  expect(source).toContain('insight_shell_loader_v1.js?v=20261021-cutoff-11am-build-88');
+  expect(source).toContain('insight_shell_v1.css?v=20261021-cutoff-11am-build-88');
   expect(source).not.toMatch(/<script(?![^>]*\bsrc=)[^>]*>/i);
   expect(source).not.toMatch(/<style\b/i);
   expect(source).not.toMatch(/script-src[^;]*'unsafe-inline'/);
@@ -3768,6 +3768,8 @@ test('発注予測の天気7日間と前年実績7日間は曜日で揃い、納
   await page.setViewportSize({width:1194,height:834});
   const todayTokyo=new Intl.DateTimeFormat('en-CA',{timeZone:'Asia/Tokyo',year:'numeric',month:'2-digit',day:'2-digit'})
     .format(new Date());
+  // Lock this pre-existing layout scenario to 12:00 JST (+2-day delivery); boundary tests cover <11:00 separately.
+  await page.clock.install({time:new Date(todayTokyo+'T03:00:00Z')});
   const days=Array.from({length:7},(_,i)=>{
     const date=new Date(todayTokyo+'T12:00:00Z');
     date.setUTCDate(date.getUTCDate()+i);

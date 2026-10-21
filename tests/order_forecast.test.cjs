@@ -92,21 +92,43 @@ test('新機能は永続保存・実績保存・外部記憶更新を持たな�
 });
 
 
-test('納品日は今日から2日後のまま、予報と前年7日間の4列目を52週間差で揃える',()=>{
+test('日本時間11時の締切で10:59は翌日・11:00は翌々日を納品日にする',()=>{
+  const cases=[
+    ['2026-10-21T01:59:59Z',1,'2026-10-22'], // 10:59:59 JST
+    ['2026-10-21T02:00:00Z',2,'2026-10-23'], // 11:00:00 JST
+    ['2026-10-21T02:00:01Z',2,'2026-10-23'],
+    ['2026-10-20T15:00:00Z',1,'2026-10-22'], // 00:00 JST
+    ['2026-12-31T01:59:59Z',1,'2027-01-01'],
+    ['2026-12-31T02:00:00Z',2,'2027-01-02'],
+    ['2024-02-28T01:59:59Z',1,'2024-02-29'],
+    ['2024-02-28T02:00:00Z',2,'2024-03-01']
+  ];
+  for(const [timestamp,offset,delivery] of cases){
+    const date=new Date(timestamp);
+    assert.equal(model.deliveryLeadDays(date),offset,timestamp);
+    assert.equal(model.defaultDelivery(date),delivery,timestamp);
+  }
+});
+
+test('11時前・11時以降のどちらも納品日と前年同曜日実績を4列目で揃える',()=>{
   for(const today of ['2026-10-21','2024-02-27','2026-12-30']){
-    const delivery=model.addDays(today,2),jmaDays=[0,1,2,3,4,5,6].map(n=>({date:model.addDays(today,n),weather:'晴',weatherCode:'100'}));
-    const visible=model.displayWeatherDays(jmaDays),range=model.dates(delivery,visible[0].date);
-    assert.equal(visible.length,7);
-    assert.equal(visible[0].date,model.addDays(today,-1));
-    assert.equal(visible[0].weather,'予報対象外');
-    assert.equal(visible[0].weatherCode,null);
-    assert.equal(visible[3].date,delivery,'納品日が4列目');
-    assert.equal(visible[6].date,model.addDays(today,5));
-    assert.equal(range.previousYear[3],model.addDays(delivery,-364));
-    for(let i=0;i<7;i++)assert.equal(range.previousYear[i],model.addDays(visible[i].date,-364));
-    assert.equal(range.weeks[5],model.addDays(delivery,-7));
-    assert.equal(range.recent[0],model.addDays(delivery,-7));
-    assert.equal(jmaDays.length,7,'気象庁の元予報を変更しない');
+    const jmaDays=[0,1,2,3,4,5,6].map(n=>({date:model.addDays(today,n),weather:'晴',weatherCode:'100'}));
+    for(const offset of [1,2]){
+      const delivery=model.addDays(today,offset),visible=model.displayWeatherDays(jmaDays,offset),range=model.dates(delivery,visible[0].date);
+      assert.equal(visible.length,7);
+      assert.equal(visible[0].date,model.addDays(today,offset-3));
+      for(let i=0;i<3-offset;i++){
+        assert.equal(visible[i].weather,'予報対象外');
+        assert.equal(visible[i].weatherCode,null);
+      }
+      assert.equal(visible[3].date,delivery,'納品日が4列目');
+      assert.equal(visible[6].date,model.addDays(today,offset+3));
+      assert.equal(range.previousYear[3],model.addDays(delivery,-364));
+      for(let i=0;i<7;i++)assert.equal(range.previousYear[i],model.addDays(visible[i].date,-364));
+      assert.equal(range.weeks[5],model.addDays(delivery,-7));
+      assert.equal(range.recent[0],model.addDays(delivery,-7));
+      assert.equal(jmaDays.length,7,'気象庁の元予報を変更しない');
+    }
   }
   assert.deepEqual(model.displayWeatherDays([]),[]);
 });
