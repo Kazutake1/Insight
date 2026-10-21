@@ -71,6 +71,7 @@ jobs:
           - sales_period_selector.test.cjs
           - payload_browser_smoke.test.cjs
           - payload_patch_inventory.test.cjs
+          - inline_event_bindings.test.cjs
           - sale_results.test.cjs
           - script_load_order.test.cjs
           - security_storage_regression.test.cjs

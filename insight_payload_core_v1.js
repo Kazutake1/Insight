@@ -917,11 +917,8 @@ function showAddYear(){
   if(wrap.innerHTML)return;
   wrap.innerHTML=`<span class="add-year-inline">
     <input id="ayInput" type="number" placeholder="例: 2026"
-      class="add-year-input"
-      onkeydown="if(event.key==='Enter')addYear(document.getElementById('ayInput').value);
-                 if(event.key==='Escape')document.getElementById('addYearInlineWrap').innerHTML='';">
-    <button onclick="addYear(document.getElementById('ayInput').value)"
-      class="add-year-button">追加</button>
+      class="add-year-input">
+    <button id="ayAddBtn" class="add-year-button">追加</button>
   </span>`;
   document.getElementById("ayInput")?.focus();
 }
@@ -1433,7 +1430,7 @@ function renderHaikiBudgetSection(actualTotal, actualCats){
   let html=`<div class="hf-budget-section">
     <div class="hf-budget-title">
       <span>予算</span>
-      <button class="hf-budget-edit-btn" onclick="openBudgetModal()">⚙️ 設定</button>
+      <button id="haikiBudgetEditBtn" class="hf-budget-edit-btn">⚙️ 設定</button>
     </div>`;
 
   if(!hasBudget){
@@ -1747,7 +1744,7 @@ function renderSalesForm(fy,mi,day){
     <div class="sales-weather-field">
       <div class="sales-weather-label">天気</div>
       <div class="sales-weather-options">
-        ${WX_KEYS.map(w=>`<button onclick="setSalesWeather(${ri},'${w}')" class="sales-weather-btn${row.weather===w?" active":""}" id="swx_${ri}_${w}">${window.InsightWeatherIconCompat?window.InsightWeatherIconCompat.markup(w):WX_ICONS[w]}</button>`).join("")}
+        ${WX_KEYS.map(w=>`<button data-sales-weather="${w}" data-ri="${ri}" class="sales-weather-btn${row.weather===w?" active":""}" id="swx_${ri}_${w}">${window.InsightWeatherIconCompat?window.InsightWeatherIconCompat.markup(w):WX_ICONS[w]}</button>`).join("")}
       </div>
     </div>
 
@@ -2708,10 +2705,10 @@ function showInstallBanner(){
   banner.id="installBanner";
   banner.className="install-banner";
   banner.innerHTML=`<span>📲 ホーム画面に追加して使う</span>
-    <button onclick="doInstall()" class="install-banner-action">
+    <button id="installBannerAddBtn" class="install-banner-action">
       追加する
     </button>
-    <button onclick="this.closest('#installBanner').remove()" class="install-banner-close">✕</button>`;
+    <button id="installBannerCloseBtn" class="install-banner-close">✕</button>`;
   document.body.appendChild(banner);
   setTimeout(()=>banner.remove&&banner.remove(),15000);
 }
@@ -2729,7 +2726,7 @@ function showIOSInstallHint(){
   hint.innerHTML=`
     <div class="ios-install-head">
       <div class="ios-install-title">📲 アプリとして使う</div>
-      <button onclick="this.closest('#iosHint').remove()" class="ios-install-later">後で</button>
+      <button id="iosHintCloseBtn" class="ios-install-later">後で</button>
     </div>
     <div class="ios-install-copy">
       Safariのアドレスバー下の <strong class="ios-install-strong">共有ボタン（□↑）</strong> をタップして<br>
