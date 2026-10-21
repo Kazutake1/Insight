@@ -76,7 +76,7 @@ var orderedFeatureLoads=[
   './insight_input_chart_cleanup_v1.js?v=20261006-remove-chart-copy-1',
   './insight_weekday_chart_fix_v1.js?v=20261006-waste-zero-past-1',
   './insight_weekday_chart_spacing_v1.js?v=20261006-csp-style-weekday-1',
-  './insight_order_forecast_v1.js?v=20261021-delivery-offset-fix-1',
+  './insight_order_forecast_v1.js?v=20261021-cutoff-11am-1',
   './insight_report_v1.js?v=20261021-saved-report-1',
   './insight_report_preview_v1.js?v=20261021-report-theme-1'
 ];
