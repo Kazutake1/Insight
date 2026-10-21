@@ -92,6 +92,17 @@ test('新機能は永続保存・実績保存・外部記憶更新を持たな�
 });
 
 
+test('標準予測日は今日から3日後で天気・前年7日間の4列目が52週差で一致する',()=>{
+  for(const start of ['2026-10-21','2024-02-27','2026-12-30']){
+    const delivery=model.addDays(start,3),range=model.dates(delivery,start);
+    assert.equal(range.previousYear.length,7);
+    assert.equal(range.previousYear[3],model.addDays(delivery,-364));
+    for(let i=0;i<7;i++)assert.equal(range.previousYear[i],model.addDays(model.addDays(start,i),-364));
+    assert.equal(range.weeks[5],model.addDays(delivery,-7));
+    assert.equal(range.recent[0],model.addDays(delivery,-7));
+  }
+});
+
 test('前年7日間は上段天気の表示開始日に52週間前を対応させ、曜日と列を一致させる',()=>{
   const weatherStart='2026-10-11',delivery='2026-10-13',range=model.dates(delivery,weatherStart);
   assert.deepEqual(range.previousYear,[
