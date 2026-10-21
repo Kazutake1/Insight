@@ -78,7 +78,7 @@ async function conditions(page,store='store_a'){
 async function generate(page){
   await page.locator('#insightReportGenerate').click();
   await expect(page.locator('#insightReportText')).toContainText('対象期間：2026-10-19');
-  await expect(page.locator('#insightReportText')).toContainText('比較条件の確認（増減は引き続き保留）');
+  await expect(page.locator('#insightReportText')).toContainText('比較条件の確認（同条件での比較は未確認）');
 }
 test('明示カテゴリーで保存済み報告を生成し、通信・保存・未保存live混入を起こさない',async({page})=>{
   const errors=await boot(page);
@@ -313,4 +313,46 @@ test('詳細作成中に条件が失効した場合は旧報告も詳細も公�
   expect(result.calls).toBe(3);expect(result.text).toBe('');expect(result.heading).toBe('');
   await expect(page.locator('#insightReportStatus')).toContainText('報告を生成できません');
   await generate(page);expect(errors).toEqual([]);
+});
+
+test('完全な1日分は保存値の単純差を示し、同条件比較の保留と祝日差を区別する',async({page})=>{
+  const errors=await boot(page);await open(page);await conditions(page);await generate(page);
+  const output=page.locator('#insightReportText');
+  await expect(output).toContainText('保存値の単純比較（条件差の調整なし）');
+  await expect(output).toContainText('売上：当期80000円／比較期間100000円。差 -20000円（減少）、増減率 -20%');
+  await expect(output).toContainText('客数：当期80人／比較期間100人。差 -20人（減少）、増減率 -20%');
+  await expect(output).toContainText('売上の同条件比較は保留します');
+  await expect(output).not.toContainText('売上の増減は判定できません');
+  await expect(output).toContainText('祝日構成（曜日別）：違いあり');
+  await expect(output).toContainText('廃棄金額：保留。当期の保存値0の入力状態が不明');
+  await expect(output).not.toContainText('差 -3000円');expect(errors).toEqual([]);
+});
+test('入力不足と日数差では単純差を表示せず、揃った条件へ戻した時だけ表示する',async({page})=>{
+  const errors=await boot(page);await open(page);await conditions(page);
+  await page.locator('#irp-end').fill('2026-10-20');await generate(page);
+  const output=page.locator('#insightReportText');
+  await expect(output).toContainText('売上：保留。');
+  await expect(output).toContainText('対象日数が異なる');await expect(output).not.toContainText('差 -20000円');
+  await page.locator('#irp-end').fill('2026-10-19');await expect(output).toBeEmpty();
+  await generate(page);await expect(output).toContainText('差 -20000円');expect(errors).toEqual([]);
+});
+test('対象店舗とイベント条件が変わっても保存値だけを比較し、保存も送信もしない',async({page})=>{
+  const snapshot=reportFixture();
+  snapshot.eventManagement.events.push({id:'current-sale',scope:'global',type:'sale',startDate:'2026-10-19',endDate:'2026-10-19'});
+  const errors=await boot(page,snapshot);await open(page);await conditions(page,'store_b');
+  const before=await page.evaluate(()=>localStorage.getItem('insight_v11'));
+  const counters=await page.evaluate(()=>{
+    const write=Storage.prototype.setItem,fetch=window.fetch;let writes=0,requests=0;
+    Storage.prototype.setItem=()=>{writes++;throw Error('must_not_write');};
+    window.fetch=()=>{requests++;throw Error('must_not_send');};
+    try{document.getElementById('insightReportConditions').requestSubmit();return {writes,requests};}
+    finally{Storage.prototype.setItem=write;window.fetch=fetch;}
+  });
+  expect(counters).toEqual({writes:0,requests:0});
+  const output=page.locator('#insightReportText');
+  await expect(output).toContainText('架空店舗B');
+  await expect(output).toContainText('売上：当期40000円／比較期間100000円。差 -60000円（減少）、増減率 -60%');
+  await expect(output).toContainText('イベント登録：当期 1件の登録あり／比較期間 登録なし');
+  await expect(output).toContainText('条件差は調整していません');
+  expect(await page.evaluate(()=>localStorage.getItem('insight_v11'))).toBe(before);expect(errors).toEqual([]);
 });
