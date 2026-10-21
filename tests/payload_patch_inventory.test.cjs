@@ -25,12 +25,13 @@ test('Index shellはinline script/styleを持たず外部assetへ分離する',(
   const boot=read('insight_shell_boot_v1.js');
   const loader=read('insight_shell_loader_v1.js');
   const css=read('insight_shell_v1.css');
-  assert.match(index,/insight_shell_boot_v1\.js\?v=20261021-csp-events-build-90/);
-  assert.match(index,/insight_shell_loader_v1\.js\?v=20261021-csp-events-build-90/);
-  assert.match(index,/insight_shell_v1\.css\?v=20261021-csp-events-build-90/);
+  assert.match(index,/insight_shell_boot_v1\.js\?v=20261021-csp-unpkg-prune-build-91/);
+  assert.match(index,/insight_shell_loader_v1\.js\?v=20261021-csp-unpkg-prune-build-91/);
+  assert.match(index,/insight_shell_v1\.css\?v=20261021-csp-unpkg-prune-build-91/);
   assert.doesNotMatch(index,/<script(?![^>]*\bsrc=)[^>]*>/i);
   assert.doesNotMatch(index,/<style\b/i);
   assert.doesNotMatch(index,/script-src[^;]*'unsafe-inline'/);
+  assert.doesNotMatch(index,/https:\/\/unpkg\.com/);
   assert.match(index,/style-src 'self';/);
   assert.doesNotMatch(index,/style-src[^;]*'unsafe-inline'/);
   assert.match(boot,/fetch\('\.\/Index\.html\?insight_probe='/);
@@ -185,8 +186,8 @@ test('canonical payloadはinline script/styleを持たず外部assetを順序固
 
 test('トップページはキャッシュ抑止とシェル・機能manifestの自己更新を持つ',()=>{
   const index=readShell();
-  assert.match(index,/insight-shell-version" content="20261021-csp-events-build-90/);
-  assert.match(index,/var BUILD="20261021-csp-events-build-90"/);
+  assert.match(index,/insight-shell-version" content="20261021-csp-unpkg-prune-build-91/);
+  assert.match(index,/var BUILD="20261021-csp-unpkg-prune-build-91"/);
   assert.match(index,/Shell rule: bump BUILD whenever the loader/);
   assert.match(index,/Cache-Control" content="no-cache, no-store, must-revalidate/);
   assert.match(index,/insight_probe=/);
