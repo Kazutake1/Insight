@@ -78,6 +78,7 @@ async function conditions(page,store='store_a'){
 async function generate(page){
   await page.locator('#insightReportGenerate').click();
   await expect(page.locator('#insightReportText')).toContainText('対象期間：2026-10-19');
+  await expect(page.locator('#insightReportText')).toContainText('比較条件の確認（増減は引き続き保留）');
 }
 test('明示カテゴリーで保存済み報告を生成し、通信・保存・未保存live混入を起こさない',async({page})=>{
   const errors=await boot(page);
@@ -265,3 +266,51 @@ for(const missing of ['history','events']){
     await expect(page.locator('#insightReportText')).toContainText('日合計0個で確定');expect(errors).toEqual([]);
   });
 }
+
+test('比較条件の詳細は複数理由を保持し、同じ曜日でも祝日の違いを示す',async({page})=>{
+  const errors=await boot(page);await open(page);await conditions(page);await generate(page);
+  const output=page.locator('#insightReportText');
+  await expect(output).toContainText('当期の保存値0は1日分の入力状態が不明');
+  await expect(output).toContainText('曜日構成：一致。当期 月曜1日／比較期間 月曜1日');
+  await expect(output).toContainText('祝日構成（曜日別）：違いあり。当期 該当日なし／比較期間 月曜1日');
+  await expect(output).toContainText('イベント登録：当期 登録なし／比較期間 登録なし');
+  await expect(output).toContainText('実際の開催有無や登録条件の同等性は未確認');
+  await expect(output).toContainText('集計定義：未確認');
+  await expect(output).not.toContainText('変化率の絶対値は');expect(errors).toEqual([]);
+});
+test('イベント資料がない場合は登録なしと表示しない',async({page})=>{
+  const snapshot=reportFixture();delete snapshot.eventManagement;
+  const errors=await boot(page,snapshot);await open(page);await conditions(page);await generate(page);
+  await expect(page.locator('#insightReportText')).toContainText('イベント登録：未確認');
+  await expect(page.locator('#insightReportText')).not.toContainText('イベント登録：当期 登録なし');
+  expect(errors).toEqual([]);
+});
+test('暦資料対象外の比較期間を未確認として表示し条件変更で詳細も消す',async({page})=>{
+  const snapshot=reportFixture();Object.values(snapshot.stores).forEach(store=>store.years.push('2025'));
+  const errors=await boot(page,snapshot);await open(page);await conditions(page);
+  await page.locator('#irp-referenceStart').fill('2025-10-13');await page.locator('#irp-referenceEnd').fill('2025-10-13');
+  await generate(page);
+  await expect(page.locator('#insightReportText')).toContainText('祝日構成：未確認。当期 資料確認済み／比較期間 資料の確認範囲外');
+  await page.locator('#irp-referenceStart').fill('2025-10-14');
+  await expect(page.locator('#insightReportText')).toBeEmpty();expect(errors).toEqual([]);
+});
+
+test('詳細作成中に条件が失効した場合は旧報告も詳細も公開しない',async({page})=>{
+  const errors=await boot(page);await open(page);await conditions(page);
+  const result=await page.evaluate(()=>{
+    const original=window.InsightReport;let calls=0;
+    window.InsightReport=Object.assign({},original,{selectCalendar(...args){
+      const selected=original.selectCalendar(...args);
+      if(++calls===2)document.getElementById('irp-start').dispatchEvent(new Event('input',{bubbles:true}));
+      return selected;
+    }});
+    try{
+      document.getElementById('insightReportConditions').requestSubmit();
+      return {calls,text:document.getElementById('insightReportText').textContent,
+        heading:document.getElementById('insightReportCapturedAt').textContent};
+    }finally{window.InsightReport=original;}
+  });
+  expect(result.calls).toBe(3);expect(result.text).toBe('');expect(result.heading).toBe('');
+  await expect(page.locator('#insightReportStatus')).toContainText('報告を生成できません');
+  await generate(page);expect(errors).toEqual([]);
+});
