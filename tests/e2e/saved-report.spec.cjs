@@ -190,17 +190,14 @@ test('HTML風店舗名を文字として表示し、iPad相当のライトとダ
     for(const viewport of [{width:1194,height:834},{width:834,height:1194}]){
       await page.setViewportSize(viewport);
       const bounds=await page.locator('#insightReportDialog').evaluate(dialog=>{
-        const rect=dialog.getBoundingClientRect(),style=getComputedStyle(dialog);
+        const rect=dialog.getBoundingClientRect();
         return {centerX:Math.abs(rect.left+rect.width/2-innerWidth/2),centerY:Math.abs(rect.top+rect.height/2-innerHeight/2),
           inside:rect.left>=0&&rect.right<=innerWidth&&rect.top>=0&&rect.bottom<=innerHeight,overflow:dialog.scrollWidth>dialog.clientWidth,
-          background:style.backgroundColor,color:style.color,
           inputs:[...dialog.querySelectorAll('input,select,button')].every(n=>n.getBoundingClientRect().height>=44)};
       });
       await checkReportSpacing(page);await checkReportTheme(page);
       expect(bounds.centerX).toBeLessThanOrEqual(1);expect(bounds.centerY).toBeLessThanOrEqual(1);
       expect(bounds.inside).toBe(true);expect(bounds.overflow).toBe(false);expect(bounds.inputs).toBe(true);
-      expect(bounds.background).toBe(dark?'rgb(28, 28, 34)':'rgb(255, 255, 255)');
-      expect(bounds.color).toBe(dark?'rgb(240, 240, 244)':'rgb(26, 26, 26)');
     }
   }
   expect(errors).toEqual([]);
