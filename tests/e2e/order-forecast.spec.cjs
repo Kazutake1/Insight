@@ -189,6 +189,7 @@ test('発注予測は閲覧専用・実績と平均・店舗カテゴリー切�
 });
 test('日本時間の11:00を境に納品日を+1日から+2日へ切り替え、常に4列目に表示する',async({page})=>{
   await page.clock.install({time:new Date('2026-10-21T01:59:59Z')}); // 10:59:59 JST
+  await page.clock.setFixedTime(new Date('2026-10-21T01:59:59Z')); // Prevent page load from advancing past the cutoff
   const result=await open(page,false,'2026-10-21');
   // Restore the saved historical weather for each of the two days before the forecast.
   await page.evaluate(()=>{
