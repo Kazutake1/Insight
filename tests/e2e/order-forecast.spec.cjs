@@ -43,7 +43,28 @@ test('発注予測は閲覧専用・実績と平均・店舗カテゴリー切�
   await page.clock.install({time:new Date('2026-10-11T03:00:00Z')});
   const result=await open(page,false,'2026-10-11');await page.setViewportSize({width:1194,height:834});
   await page.locator('#navOrderForecast').click();await expect(page.locator('#pageOrderForecast')).toHaveClass(/show/);
-  const initial=await page.evaluate(()=>InsightOrderForecast.addDays(InsightOrderForecast.today(),2));await expect(page.locator('#ofDelivery')).toHaveValue(initial);
+  const initial=await page.evaluate(()=>InsightOrderForecast.addDays(InsightOrderForecast.today(),3));
+  await expect(page.locator('#ofDelivery')).toHaveValue(initial);
+  await expect(page.locator('#ofWeather .of-weather-card')).toHaveCount(7);
+  await expect(page.locator('#ofYearCards .sc-day')).toHaveCount(7);
+  // The default forecast target and its 52-weeks-earlier counterpart occupy column four.
+  await expect(page.locator('#ofWeather .of-weather-card').nth(3)).toHaveClass(/of-selected/);
+  const aligned=await page.evaluate(()=>{
+    const weather=Array.from(document.querySelectorAll('#ofWeather .of-weather-card'));
+    const prior=Array.from(document.querySelectorAll('#ofYearCards .sc-day'));
+    const target=document.getElementById('ofDelivery').value;
+    return {selected:weather.findIndex(card=>card.classList.contains('of-selected')),
+      targetDate:weather[3].dataset.date,priorDate:prior[3].dataset.date,
+      expected:InsightOrderForecast.addDays(target,-364),
+      meta:document.getElementById('ofPreviousYear').textContent,
+      columns:weather.map((card,i)=>({weather:card.dataset.date,prior:prior[i].dataset.date}))};
+  });
+  expect(aligned.selected).toBe(3);
+  expect(aligned.targetDate).toBe(initial);
+  expect(aligned.priorDate).toBe(aligned.expected);
+  expect(aligned.meta).toContain(aligned.expected);
+  for(const column of aligned.columns)
+    expect(column.prior).toBe(await page.evaluate(date=>InsightOrderForecast.addDays(date,-364),column.weather));
   await page.locator('#ofDelivery').fill('2026-10-11');await page.locator('#ofDelivery').dispatchEvent('change');await expect(page.locator('#ofSchedule')).toHaveCount(0);
   await expect(page.locator('#ofWeather .sc-day')).toHaveCount(7);await expect(page.locator('#ofWeather .of-selected')).toHaveCount(1);const dimensions=await page.locator('#ofWeather .of-weather-card').first().evaluate(card=>{const cardRect=card.getBoundingClientRect(),iconRect=card.querySelector('.of-weather-symbol').getBoundingClientRect();return {height:cardRect.height,iconWidth:iconRect.width,iconHeight:iconRect.height,iconInside:iconRect.bottom<=cardRect.bottom&&iconRect.top>=cardRect.top};});expect(dimensions.height).toBeGreaterThanOrEqual(145);expect(dimensions.height).toBeLessThanOrEqual(160);expect(dimensions.iconWidth).toBeGreaterThanOrEqual(34);expect(dimensions.iconHeight).toBeGreaterThanOrEqual(34);expect(dimensions.iconInside).toBe(true);await expect(page.locator('#ofWeather .of-temp-max')).toHaveCount(7);await expect(page.locator('#ofWeather .of-temp-min')).toHaveCount(7);await expect(page.locator('#ofWeather .of-weather-symbol')).toHaveCount(7);await expect(page.locator('#ofWeather .of-weather-symbol[aria-hidden="true"]')).toHaveCount(7);await expect(page.locator('#ofWeatherStatus')).toBeHidden();await expect(page.locator('#ofWeather .of-weather-card small').first()).toContainText('降水');await expect(page.locator('#ofWeather a.of-source')).toHaveCount(0);await expect(page.locator('.of-source-description')).toBeHidden();await page.locator('.of-source-info summary').click();await expect(page.locator('.of-source-description')).toBeVisible();await expect(page.locator('.of-source-description')).toContainText('気象庁ホームページ');await page.locator('.of-source-info summary').click();await expect(page.locator('.of-source-description')).toBeHidden();
   await page.locator('#ofDelivery').fill('2026-10-18');await page.locator('#ofDelivery').dispatchEvent('change');
