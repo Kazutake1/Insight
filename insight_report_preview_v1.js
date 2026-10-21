@@ -27,10 +27,16 @@
     if(message&&dialog&&dialog.open)message.textContent=text||'内容が変わりました。条件を確認して生成し直してください。';
   }
   function clearHost(){if(host)host.close();host=null;tickets.clear();if(body)body.textContent='';if(heading)heading.textContent='';}
-  function addField(id,label,type){
+  function addField(id,label,type,parent){
     var wrap=node('label',undefined,'irp-field'),title=node('span',label),input=node(type==='select'?'select':'input');
     input.id='irp-'+id;input.name=id;if(type!=='select')input.type=type;
-    input.required=true;fields[id]=input;wrap.append(title,input);form.append(wrap);return input;
+    input.required=true;fields[id]=input;wrap.append(title,input);(parent||form).append(wrap);return input;
+  }
+  function addPeriod(label,startId,endId){
+    var group=node('fieldset',undefined,'irp-period'),legend=node('legend',label);
+    var row=node('div',undefined,'irp-date-pair');
+    group.append(legend,row);form.append(group);
+    addField(startId,'開始日','date',row);addField(endId,'終了日','date',row);
   }
   function option(select,value,label){var o=node('option',label);o.value=value;select.append(o);}
   function catalog(){
@@ -121,10 +127,10 @@
     var note=node('p','保存済みの値を端末内で集計します。未保存の入力は含めず、通信・モデル呼出し・報告の保存は行いません。','irp-note');
     form=node('form',undefined,'irp-grid');form.id='insightReportConditions';
     addField('store','対象店舗','select');addField('category','数量カテゴリー','select');
-    addField('start','対象期間・開始','date');addField('end','対象期間・終了','date');
-    addField('referenceStart','比較期間・開始','date');addField('referenceEnd','比較期間・終了','date');
-    addField('quantityDay','日合計の対象日','date');
-    addField('quantityStart','参考平日平均の期間・開始','date');addField('quantityEnd','参考平日平均の期間・終了','date');
+    addPeriod('対象期間','start','end');
+    addPeriod('比較期間','referenceStart','referenceEnd');
+    addField('quantityDay','日合計の対象日','date').parentElement.classList.add('irp-full');
+    addPeriod('参考平日平均の期間','quantityStart','quantityEnd');
     var actions=node('div',undefined,'irp-actions'),submit=node('button','報告を生成');
     submit.id='insightReportGenerate';submit.type='submit';actions.append(submit);form.append(actions);
     form.addEventListener('submit',function(e){e.preventDefault();generate();});

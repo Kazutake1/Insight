@@ -12,6 +12,31 @@ async function boot(page){
   await page.waitForFunction(()=>window.InsightTripHistoryResolver&&window.InsightStorage&&window.InsightReportPreview);
   return errors;
 }
+
+async function checkReportSpacing(page){
+  const layout=await page.locator('#insightReportDialog').evaluate(dialog=>{
+    const bounds=n=>n.getBoundingClientRect();
+    const groups=[...dialog.querySelectorAll('.irp-period')];
+    const pairs=groups.map(group=>{
+      const controls=[...group.querySelectorAll('input[type=date]')],a=bounds(controls[0]),b=bounds(controls[1]);
+      return {gap:b.left-a.right,aligned:Math.abs(a.top-b.top),
+        contained:controls.every(control=>{const r=bounds(control),p=bounds(control.parentElement);return r.left>=p.left-1&&r.right<=p.right+1;})};
+    });
+    const children=[...dialog.querySelector('.irp-grid').children];
+    const vertical=children.slice(2).map((n,i)=>bounds(n).top-bounds(children[i+1]).bottom);
+    const labels=[...dialog.querySelectorAll('.irp-field')].map(label=>{
+      return bounds(label.querySelector('input,select')).top-bounds(label.querySelector('span')).bottom;
+    });
+    const last=groups[groups.length-1].querySelectorAll('input')[1];
+    return {pairs,vertical,labels,buttonGap:bounds(dialog.querySelector('#insightReportGenerate')).top-bounds(last).bottom};
+  });
+  expect(layout.pairs).toHaveLength(3);
+  for(const pair of layout.pairs){expect(pair.gap).toBeGreaterThanOrEqual(23);expect(pair.aligned).toBeLessThanOrEqual(1);expect(pair.contained).toBe(true);}
+  for(const gap of layout.vertical)expect(gap).toBeGreaterThanOrEqual(23);
+  for(const gap of layout.labels)expect(gap).toBeGreaterThanOrEqual(7);
+  expect(layout.buttonGap).toBeGreaterThanOrEqual(23);
+}
+
 async function open(page){
   await page.locator('#insightReportOpen').click();await expect(page.locator('#insightReportDialog')).toBeVisible();
   await expect.poll(()=>page.locator('#insightReportDialog').evaluate(dialog=>{
@@ -146,10 +171,22 @@ test('HTML風店舗名を文字として表示し、iPad相当のライトとダ
           background:style.backgroundColor,color:style.color,
           inputs:[...dialog.querySelectorAll('input,select,button')].every(n=>n.getBoundingClientRect().height>=44)};
       });
+      await checkReportSpacing(page);
       expect(bounds.centerX).toBeLessThanOrEqual(1);expect(bounds.centerY).toBeLessThanOrEqual(1);
       expect(bounds.inside).toBe(true);expect(bounds.overflow).toBe(false);expect(bounds.inputs).toBe(true);
       expect(bounds.background).toBe(dark?'rgb(37, 37, 37)':'rgb(255, 255, 255)');
       expect(bounds.color).toBe(dark?'rgb(238, 238, 238)':'rgb(34, 34, 34)');
+    }
+  }
+  expect(errors).toEqual([]);
+});
+
+test('初回表示でも期間の開始・終了枠と隣の項目・生成ボタンに余白がある',async({page})=>{
+  const errors=await boot(page);await open(page);
+  for(const dark of [false,true]){
+    await page.evaluate(value=>document.documentElement.classList.toggle('dark',value),dark);
+    for(const viewport of [{width:1194,height:834},{width:834,height:1194}]){
+      await page.setViewportSize(viewport);await checkReportSpacing(page);
     }
   }
   expect(errors).toEqual([]);
