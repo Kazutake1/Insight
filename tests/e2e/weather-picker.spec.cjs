@@ -21,6 +21,20 @@ test('天気選択肢の全11種類は独立したSVGで表示され選択も維
   await expect(page.locator('#qWeatherCompactMenu .qwc-option[data-wx="霧"]')).toHaveCount(0);
   await expect(page.locator('#qWeatherCompactMenu .qwc-option[data-wx="凍雨"]')).toHaveCount(0);
   const choices=['快晴','晴','晴曇','曇','小雨','雨','大雨','みぞれ','雪','大雪','雷雨'];
+  // 天気名の文字数が変わっても気温欄と自動取得の位置は動かない。
+  const layout=()=>page.evaluate(()=>{
+    const rect=id=>{const r=document.querySelector(id).getBoundingClientRect();return {x:r.x,y:r.y,right:r.right,width:r.width};};
+    const trigger=document.querySelector('#qWeatherCompactTrigger');
+    return {
+      weather:rect('#qWeatherCompact'),
+      temperature:rect('#qTemperatureInputs'),
+      autoFetch:rect('#autoWxBtn'),
+      triggerFits:trigger.scrollWidth<=trigger.clientWidth+1
+    };
+  });
+  const initialLayout=await layout();
+  expect(initialLayout.temperature.x).toBeGreaterThan(initialLayout.weather.right);
+  expect(initialLayout.autoFetch.x).toBeGreaterThan(initialLayout.temperature.right);
   const icons=[];
   for(const weather of choices){
     const option=page.locator('#qWeatherCompactMenu .qwc-option[data-wx="'+weather+'"]');
@@ -36,6 +50,12 @@ test('天気選択肢の全11種類は独立したSVGで表示され選択も維
     await page.locator('#qWeatherCompactMenu .qwc-option[data-wx="'+weather+'"]').click();
     await expect(trigger.locator('.qwc-label')).toHaveText(weather);
     await expect(trigger.locator('svg.iwx-weather-svg')).toBeVisible();
+    const currentLayout=await layout();
+    expect(currentLayout.triggerFits,'天気名が切れないこと: '+weather).toBe(true);
+    for(const name of ['temperature','autoFetch']){
+      expect(Math.abs(currentLayout[name].x-initialLayout[name].x),'横位置: '+weather+' '+name).toBeLessThanOrEqual(1);
+      expect(Math.abs(currentLayout[name].y-initialLayout[name].y),'縦位置: '+weather+' '+name).toBeLessThanOrEqual(1);
+    }
     await trigger.click();
     await expect(page.locator('#qWeatherCompactMenu .qwc-option[data-wx="'+weather+'"]')).toHaveClass(/active/);
   }

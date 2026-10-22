@@ -232,7 +232,8 @@ test('クイック入力の天気セレクタは固定スタイルを外部CSS�
   assert.match(weather,/function ensureControl\(/);
   assert.match(weather,/MutationObserver\(sync\)/);
   assert.match(css,/#qWeatherSel\{display:none!important\}/);
-  assert.match(css,/\.qwc-trigger\{height:36px;display:inline-flex/);
+  assert.match(css,/\.quick-weather-compact\{position:relative;flex:0 0 112px;width:112px;box-sizing:border-box\}/);
+  assert.match(css,/\.qwc-trigger\{width:100%;box-sizing:border-box;height:36px;display:inline-flex/);
   assert.match(css,/\.qwc-menu\{position:absolute;z-index:1200/);
   assert.match(css,/\.qwc-option\.active\{border-color:var\(--text,#1a1a1a\)/);
   assert.match(css,/@media\(max-width:759px\)\{\.qwc-menu\{left:auto;right:0\}/);

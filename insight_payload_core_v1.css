@@ -738,8 +738,8 @@ html.dark body,body.dark{background:#251b26}
 
 /* Compact weather selector v1: fixed presentation rules externalized from runtime JS. */
 #qWeatherSel{display:none!important}
-.quick-weather-compact{position:relative;flex:0 0 auto}
-.qwc-trigger{height:36px;display:inline-flex;align-items:center;gap:5px;padding:0 10px;border:1.5px solid var(--border,#ddd);border-radius:9px;background:var(--surface,#fff);color:var(--text,#1a1a1a);font:700 11px/1 -apple-system,BlinkMacSystemFont,"Noto Sans JP",sans-serif;cursor:pointer;white-space:nowrap}
+.quick-weather-compact{position:relative;flex:0 0 112px;width:112px;box-sizing:border-box}
+.qwc-trigger{width:100%;box-sizing:border-box;height:36px;display:inline-flex;align-items:center;gap:5px;padding:0 10px;border:1.5px solid var(--border,#ddd);border-radius:9px;background:var(--surface,#fff);color:var(--text,#1a1a1a);font:700 11px/1 -apple-system,BlinkMacSystemFont,"Noto Sans JP",sans-serif;cursor:pointer;white-space:nowrap}
 .qwc-trigger .qwc-icon{font-size:18px;line-height:1}
 .qwc-trigger .qwc-arrow{font-size:9px;color:var(--text4,#999);margin-left:1px}
 .qwc-menu{position:absolute;z-index:1200;top:calc(100% + 6px);left:0;width:228px;box-sizing:border-box;padding:8px;display:grid;grid-template-columns:repeat(3,1fr);gap:6px;border:1px solid var(--border,#ddd);border-radius:12px;background:var(--surface,#fff);box-shadow:0 10px 30px rgba(0,0,0,.16)}
