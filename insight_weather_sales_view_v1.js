@@ -230,6 +230,7 @@
     },100);
   }
   root.InsightWeatherSalesView={collect:collect,PERIODS:PERIODS.slice(),open:open,close:close};
+  if(typeof module!=='undefined'&&module.exports)module.exports=root.InsightWeatherSalesView;
   if(!root.document)return;
   if(root.document.readyState==='loading')root.document.addEventListener('DOMContentLoaded',init,{once:true});
   else root.setTimeout(init,0);
