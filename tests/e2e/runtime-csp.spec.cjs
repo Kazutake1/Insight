@@ -4,7 +4,7 @@ test('実際の画面操作でCSP違反が出ず、禁止されたinline script�
   // Register before navigation so startup violations are not missed.
   await page.addInitScript(()=>{
     window.__insightCspViolations=[];
-    window.addEventListener('securitypolicyviolation',event=>{
+    document.addEventListener('securitypolicyviolation',event=>{
       window.__insightCspViolations.push({
         directive:event.effectiveDirective,
         blockedURI:event.blockedURI,
@@ -54,8 +54,8 @@ test('実際の画面操作でCSP違反が出ず、禁止されたinline script�
     window.__insightCspScriptProbeExecuted=false;
     const script=document.createElement('script');
     script.textContent='window.__insightCspScriptProbeExecuted=true';
+    script.dataset.insightCspProbe='script';
     document.head.appendChild(script);
-    script.remove();
   });
   const scriptViolations=()=>page.evaluate(()=>
     window.__insightCspViolations.filter(event=>
@@ -72,10 +72,13 @@ test('実際の画面操作でCSP違反が出ず、禁止されたinline script�
     const button=document.createElement('button');
     button.type='button';
     button.setAttribute('onclick','window.__insightCspHandlerProbeExecuted=true');
+    button.dataset.insightCspProbe='handler';
     document.body.appendChild(button);
     button.click();
-    button.remove();
   });
   await expect.poll(scriptViolations).toBeGreaterThan(beforeHandler);
   expect(await page.evaluate(()=>window.__insightCspHandlerProbeExecuted)).toBe(false);
+  await page.evaluate(()=>{
+    document.querySelectorAll('[data-insight-csp-probe]').forEach(node=>node.remove());
+  });
 });
