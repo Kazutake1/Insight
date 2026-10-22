@@ -55,6 +55,7 @@ var orderedFeatureLoads=[
   './insight_weather_sales_readiness_v1.js?v=20261022-step3-quality-1',
   './insight_weather_sales_trends_v1.js?v=20261022-step3-trends-1',
   './insight_weather_sales_diagnostics_v1.js?v=20261022-step3-diagnostics-1',
+  './insight_weather_sales_view_v1.js?v=20261022-step4-view-1',
   './insight_multiyear_analysis_v1.js?v=20261003-multiyear-1',
   './insight_weekday_analysis_v1.js?v=20261003-weekday-1',
   './insight_sale_impact_v1.js?v=20261003-sale-impact-1',
