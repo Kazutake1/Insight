@@ -47,6 +47,10 @@ test('販売傾向の確認：期間選択・画面配置・既存保存デー�
 });
 
 test('同曜日の条件別平均と基準0、データ不足を区別して表示する',async({page})=>{
+  await page.route('**/Index.html*',async route=>{
+    const response=await route.fetch();
+    await route.fulfill({response,body:(await response.text()).replace(/;?\s*upgrade-insecure-requests/g,'')});
+  });
   await page.goto('/Index.html');
   await expect.poll(()=>page.evaluate(()=>!!window.InsightWeatherSalesView)).toBe(true);
   await page.locator('#navSettings').click();
