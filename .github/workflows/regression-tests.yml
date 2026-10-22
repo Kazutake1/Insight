@@ -62,6 +62,7 @@ jobs:
           - multiyear_analysis.test.cjs
           - weekday_analysis.test.cjs
           - weather_sales_readiness.test.cjs
+          - weather_sales_trends.test.cjs
           - sale_impact.test.cjs
           - event_impact.test.cjs
           - seasonality_analysis.test.cjs
