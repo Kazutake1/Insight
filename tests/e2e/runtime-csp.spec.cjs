@@ -57,6 +57,13 @@ test('実際の画面操作でCSP違反が出ず、禁止されたinline script�
     script.dataset.insightCspProbe='script';
     document.head.appendChild(script);
   });
+  const scriptState=await page.evaluate(()=>({
+    executed:window.__insightCspScriptProbeExecuted,
+    events:window.__insightCspViolations.slice(),
+    cspMetaPresent:!!document.querySelector('meta[http-equiv="Content-Security-Policy"]')
+  }));
+  console.log('CSP_SCRIPT_DIAGNOSTIC '+JSON.stringify(scriptState));
+  expect(scriptState.executed,'inline script must not execute under enforced CSP').toBe(false);
   const scriptViolations=()=>page.evaluate(()=>
     window.__insightCspViolations.filter(event=>
       event.disposition==='enforce'&&/^script-src(?:-|$)/.test(event.directive)&&
