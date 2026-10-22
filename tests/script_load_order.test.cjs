@@ -54,6 +54,7 @@ const ordered=[
   'insight_weather_sales_readiness_v1.js',
   'insight_weather_sales_trends_v1.js',
   'insight_weather_sales_diagnostics_v1.js',
+  'insight_weather_sales_view_v1.js',
   'insight_multiyear_analysis_v1.js',
   'insight_weekday_analysis_v1.js',
   'insight_sale_impact_v1.js',
