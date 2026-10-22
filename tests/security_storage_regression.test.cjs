@@ -129,6 +129,7 @@ test('Index.htmlは必要先だけを許可するCSPを定義する',()=>{
     "form-action 'self'",
     "frame-src 'none'",
     "worker-src 'self'",
+    "manifest-src 'self' blob:",
     "upgrade-insecure-requests"
   ].forEach(directive=>assert.ok(policy.includes(directive),'CSPに '+directive+' が含まれること'));
   assert.doesNotMatch(policy,/'unsafe-eval'/);
