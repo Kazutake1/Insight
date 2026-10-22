@@ -153,7 +153,7 @@ test('CSPを監視しながら実画面の天気・年度・廃棄予算・分�
 
   await page.locator('#aiAnalysisToggle').click();
   await expect(page.locator('body')).toHaveClass(/ai-analysis-open/);
-  await page.locator('#aiAnalysisClose').click();
+  await page.locator('.ai-workspace-close').click();
   await expect(page.locator('body')).not.toHaveClass(/ai-analysis-open/);
 
   await page.locator('#navOrderForecast').click();
