@@ -115,6 +115,17 @@ test('過去の手動対象便設定を尊重し、同月の現在の便設定�
   assert.deepEqual(r.categories[0].trips.slice(1).map(t=>t.counts.inactiveTrip),[1,1]);
 });
 
+test('過去の推定対象外を確定した対象外と混同しない',()=>{
+  const s=fixture('09',8);
+  const category=s.salesCountManagement.categories[0];
+  category.activeTrips=[true,true,true];
+  const r=examine(s,{startDate:'2026-09-01',endDate:'2026-09-08'});
+  assert.equal(trip(r,0).eligibleDays,8);
+  assert.equal(trip(r,1).counts.tentativeInactiveTrip,8);
+  assert.equal(trip(r,2).counts.tentativeInactiveTrip,8);
+  assert.equal(trip(r,1).counts.inactiveTrip,0);
+});
+
 test('同じ曜日・天気のサンプル件数が3未満なら比較可能と判断しない',()=>{
   const s=fixture('10',9);
   const r=examine(s,{endDate:'2026-10-09'});
@@ -135,6 +146,7 @@ test('別店舗の記録を混ぜず、当日・未来日・不正な期間を�
   assert.throws(()=>examine(s,{endDate:'2026-10-22'}),/終了日/);
   assert.throws(()=>examine(s,{startDate:'2026-10-10',endDate:'2026-10-08'}),/期間/);
   assert.equal(readiness.validTemp(''),false);
+  assert.equal(readiness.validTemp('  '),false);
   assert.equal(readiness.validTemp(null),false);
   assert.equal(readiness.validTemp(0),true);
 });
