@@ -356,3 +356,52 @@ test('対象店舗とイベント条件が変わっても保存値だけを比�
   await expect(output).toContainText('条件差は調整していません');
   expect(await page.evaluate(()=>localStorage.getItem('insight_v11'))).toBe(before);expect(errors).toEqual([]);
 });
+
+function focusReadyFixture(values={sales:80,waste:6000,customers:80}){
+  const snapshot=confirmedHistoryFixture();
+  Object.assign(snapshot.stores.store_a.data['2026']['10月'][18],
+    {売上:values.sales,廃棄金額:values.waste,客数:values.customers,weather:'晴'});
+  return snapshot;
+}
+async function focusSection(page){
+  return (await page.locator('#insightReportText').textContent()).split('確認情報（非選択も全件保持）')[0];
+}
+test('冒頭の注目項目に保存値の3指標の変化を並べ、同条件比較の未確認は本文へ保持する',async({page})=>{
+  const errors=await boot(page,focusReadyFixture());await open(page);await conditions(page);await generate(page);
+  const summary=await focusSection(page);
+  expect(summary).toContain('保存値の単純差を含みます');
+  const rows=summary.split('\n').filter(l=>l.startsWith('・'));
+  expect(rows).toHaveLength(3);
+  expect(rows[0]).toContain('売上：当期80000円');expect(rows[1]).toContain('廃棄金額：当期6000円');expect(rows[2]).toContain('客数：当期80人');
+  expect(summary).not.toContain('同条件比較は保留');
+  await expect(page.locator('#insightReportText')).toContainText('売上の同条件比較は保留します');
+  await expect(page.locator('#insightReportText')).toContainText('祝日構成（曜日別）：違いあり');expect(errors).toEqual([]);
+});
+test('入力状態不明と資料不足は変化より優先し、非選択の客数変化も残す',async({page})=>{
+  const snapshot=confirmedHistoryFixture(),errors=await boot(page,snapshot);
+  await open(page);await conditions(page);await generate(page);
+  const rows=(await focusSection(page)).split('\n').filter(l=>l.startsWith('・'));
+  expect(rows).toHaveLength(3);expect(rows[0]).toContain('廃棄金額の増減は判定できません');
+  expect(rows[1]).toContain('天候資料は未提供');expect(rows[2]).toContain('売上：当期80000円');
+  await expect(page.locator('#insightReportText')).toContainText('客数：当期80人／比較期間100人。差 -20人');
+  expect(errors).toEqual([]);
+});
+test('保存値が同じなら変化なしを示し、注目項目を数合わせしない',async({page})=>{
+  const errors=await boot(page,focusReadyFixture({sales:100,waste:3000,customers:100}));
+  await open(page);await conditions(page);await generate(page);
+  const summary=await focusSection(page);
+  expect(summary).toContain('状態：保存値の単純比較で3指標は差なし');
+  expect(summary).toContain('注目候補なし。数合わせの項目は作成していません');
+  expect(summary.split('\n').filter(l=>l.startsWith('・'))).toHaveLength(0);
+  await expect(page.locator('#insightReportText')).toContainText('当期100000円／比較期間100000円');
+  expect(errors).toEqual([]);
+});
+test('小さな変化を変化なしとは表示せず、全件の差と率を保持する',async({page})=>{
+  const errors=await boot(page,focusReadyFixture({sales:99,waste:2990,customers:99}));
+  await open(page);await conditions(page);await generate(page);
+  const summary=await focusSection(page);
+  expect(summary).toContain('状態：保存値の変化は実験用閾値未満');
+  expect(summary).not.toContain('3指標は差なし');
+  await expect(page.locator('#insightReportText')).toContainText('差 -1000円（減少）、増減率 -1%');
+  expect(errors).toEqual([]);
+});

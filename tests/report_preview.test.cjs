@@ -292,15 +292,81 @@ test('holiday mismatch and registered events remain visible without blocking rec
   assert.match(details,/条件差は調整していません/);
 });
 
-test('display wording only changes condition-gap bullet lines and preserves identical text in store names',()=>{
+
+test('display wording preserves store names and all original fact and gap sections',()=>{
+  const {report,text}=calendarCapture();
   const paint=previewSource.match(/  function paint\(\)\{[\s\S]*?\n  \}\n  function invalidate/)[0].replace(/\n  function invalidate$/,'');
   const name='売上の増減は判定できません。架空店舗A';
-  const original=name+'　対象期間：2026-10-19〜2026-10-19\n・売上の増減は判定できません。条件未確認です。\n・廃棄金額の増減は判定できません。入力状態不明です。';
-  const state={status:'ready',text:original,report:{kpis:[{metric:'sales',reason:'conditions_unconfirmed'},{metric:'waste',reason:'current_zero_unverified'}]}};
-  const context=vm.createContext({host:{getState:()=>state},body:{textContent:''},detailText:'保存値の単純比較'});
+  const original=text.replace(/^架空店舗A/,name);
+  const state={status:'ready',text:original,report};
+  const context=vm.createContext({host:{getState:()=>state},body:{textContent:''},detailText:'保存値の単純比較',renderPreview:detailsContext.renderPreview});
   vm.runInContext(paint+'\npaint();',context);
   assert.ok(context.body.textContent.startsWith(name+'　対象期間：'));
   assert.match(context.body.textContent,/\n・売上の同条件比較は保留します/);
   assert.match(context.body.textContent,/\n・廃棄金額の増減は判定できません/);
+  assert.match(context.body.textContent,/確認情報（非選択も全件保持）/);
+  assert.match(context.body.textContent,/不足情報（非選択も全件保持）/);
   assert.equal(state.text,original);
+});
+function focusFixture(values={sales:[80,100],waste:[60,30],customers:[80,100]},extra=[]){
+  const metrics=['sales','waste','customers'];
+  const totals=(v,p)=>({value:v,entered:v===null?0:1,expected:1,unknown_zero:v===null?1:0,evidence_ids:[p]});
+  return {rules:{focus_limit:3,min_days:2,relative_threshold:{numerator:'1',denominator:'10'}},
+    kpis:metrics.map(metric=>({metric,reason:values[metric][0]===null?'current_zero_unverified':'conditions_unconfirmed',
+      comparable:false,delta:null,current:totals(values[metric][0],metric+'-current'),reference:totals(values[metric][1],metric+'-reference')})),
+    lines:metrics.map((metric,i)=>({key:metric+'.gap',kind:'GAP',text:metric+' comparison held',evidence_ids:[metric+'-current',metric+'-reference'],
+      rank:[0,i,{numerator:'0',denominator:'1'}]})).concat(extra)};
+}
+function focusFor(report){
+  const before=JSON.stringify(report),result=detailsContext.recordedFocus(report);
+  assert.equal(JSON.stringify(report),before);assert.ok(report.kpis.every(k=>k.comparable===false&&k.delta===null));
+  return {keys:Array.from(result.selected,x=>x.key),...result};
+}
+test('recorded focus uses the existing metric order for all adverse and all favorable changes',()=>{
+  assert.deepEqual(focusFor(focusFixture()).keys,['sales.recorded-change','waste.recorded-change','customers.recorded-change']);
+  assert.deepEqual(focusFor(focusFixture({sales:[120,100],waste:[20,30],customers:[120,100]})).keys,
+    ['sales.recorded-change','waste.recorded-change','customers.recorded-change']);
+});
+test('adverse changes precede favorable changes without treating sales growth as adverse',()=>{
+  assert.deepEqual(focusFor(focusFixture({sales:[120,100],waste:[60,30],customers:[80,100]})).keys,
+    ['waste.recorded-change','customers.recorded-change','sales.recorded-change']);
+});
+test('actual input and context gaps still precede recorded changes',()=>{
+  const gap={key:'weather.context',kind:'GAP',text:'weather absent',evidence_ids:['weather-source'],
+    rank:[0,6,{numerator:'0',denominator:'1'}]};
+  const result=focusFor(focusFixture({sales:[80,100],waste:[null,30],customers:[80,100]},[gap]));
+  assert.deepEqual(result.keys,['waste.gap','weather.context','sales.recorded-change']);
+  assert.equal(result.selected[0].selection_reason,'不足情報を優先');
+});
+test('equal nonzero totals create no padded focus items and do not mean values are zero',()=>{
+  const result=focusFor(focusFixture({sales:[100,100],waste:[30,30],customers:[100,100]}));
+  assert.deepEqual(result.keys,[]);assert.equal(result.status,'保存値の単純比較で3指標は差なし');
+});
+test('below threshold differs from no change and exact threshold is included',()=>{
+  const below=focusFor(focusFixture({sales:[109995,100000],waste:[30,30],customers:[100,100]}));
+  assert.deepEqual(below.keys,[]);assert.equal(below.status,'保存値の変化は実験用閾値未満');
+  assert.match(detailsContext.recordedComparison(focusFixture({sales:[109995,100000],waste:[30,30],customers:[100,100]})),/増減率 \+10%/);
+  assert.deepEqual(focusFor(focusFixture({sales:[110000,100000],waste:[30,30],customers:[100,100]})).keys,['sales.recorded-change']);
+});
+test('focus limit is respected without hiding nonselected recorded rows or original evidence',()=>{
+  const report=focusFixture();report.rules.focus_limit=1;
+  const result=focusFor(report);assert.deepEqual(result.keys,['sales.recorded-change']);
+  assert.deepEqual(Array.from(result.selected[0].evidence_ids),['sales-current','sales-reference']);
+  const full=detailsContext.recordedComparison(report);
+  for(const name of ['売上','廃棄金額','客数'])assert.match(full,new RegExp(name+'：当期'));
+});
+test('selection is independent of incoming line order',()=>{
+  const a=focusFixture(),b=focusFixture();b.lines.reverse();b.kpis.reverse();
+  assert.deepEqual(focusFor(a).keys,focusFor(b).keys);
+});
+test('rendered summary preserves every nonselected fact and condition gap in the full sections',()=>{
+  const {report,text}=calendarCapture(),rendered=detailsContext.renderPreview(report,text);
+  const full=rendered.slice(rendered.indexOf('確認情報（非選択も全件保持）'));
+  for(const line of report.lines){
+    const expected=line.text.replace(/^(売上|廃棄金額|客数)の増減は判定できません。曜日構成/, '$1の同条件比較は保留します。曜日構成');
+    assert.ok(full.includes(expected),line.key);
+  }
+  const summary=rendered.split('確認情報（非選択も全件保持）')[0];
+  assert.ok(summary.includes('保存値の単純差を含みます'));
+  assert.doesNotMatch(summary,/売上の同条件比較は保留/);
 });

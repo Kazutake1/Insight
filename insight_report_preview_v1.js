@@ -182,10 +182,9 @@
   // recorded-comparison:start
   // Captured configured-host totals already share store, metric units and whole-store scope.
   // This computes recorded differences only; it never marks comparable conditions as confirmed.
-  function recordedComparison(report){
+  function recordedRows(report){
     var names={sales:'売上',waste:'廃棄金額',customers:'客数'},units={sales:'円',waste:'円',customers:'人'};
-    var out=['保存値の単純比較（条件差の調整なし）',
-      '同一店舗・全体集計の保存値の差です。曜日・祝日・イベント等の条件差は調整していません。増減率は比較期間を基準に小数第2位まで四捨五入します。'];
+    var rows=[];
     function signed(n){return (n>0n?'+':'')+n.toString();}
     function percent(delta,base){
       if(base===0n)return '算出できません（比較期間の値が0）';
@@ -203,14 +202,67 @@
       });
       if(k.current.expected!==k.reference.expected)reasons.push('対象日数が異なる');
       if(k.reason==='scope_mismatch')reasons.push('集計範囲が異なる');
-      if(reasons.length){out.push('・'+names[k.metric]+'：保留。'+reasons.join('。')+'。');return;}
+      if(reasons.length){rows.push({metric:k.metric,held:true,text:names[k.metric]+'：保留。'+reasons.join('。')+'。'});return;}
       if(!unit||![k.current.value,k.reference.value].every(function(v){return Number.isSafeInteger(v)&&v>=0;}))
         throw Error('invalid_recorded_total');
       var current=BigInt(k.current.value),reference=BigInt(k.reference.value),delta=current-reference;
-      out.push('・'+names[k.metric]+'：当期'+current.toString()+unit+'／比較期間'+reference.toString()+unit+
-        '。差 '+signed(delta)+unit+'（'+(delta<0n?'減少':delta>0n?'増加':'差なし')+'）、増減率 '+percent(delta,reference)+'。');
+      rows.push({metric:k.metric,held:false,delta:delta,base:reference,text:names[k.metric]+'：当期'+current.toString()+unit+'／比較期間'+reference.toString()+unit+
+        '。差 '+signed(delta)+unit+'（'+(delta<0n?'減少':delta>0n?'増加':'差なし')+'）、増減率 '+percent(delta,reference)+'。'});
     });
-    return out.join('\n');
+    return rows;
+  }
+  function recordedComparison(report){
+    return ['保存値の単純比較（条件差の調整なし）',
+      '同一店舗・全体集計の保存値の差です。曜日・祝日・イベント等の条件差は調整していません。増減率は比較期間を基準に小数第2位まで四捨五入します。']
+      .concat(recordedRows(report).map(function(row){return '・'+row.text;})).join('\n');
+  }
+  function recordedFocus(report){
+    var rows=recordedRows(report),metrics=['sales','waste','customers'];
+    var candidates=report.lines.filter(function(line){
+      if(line.rank===null)return false;
+      return !rows.some(function(row){return !row.held&&(line.key===row.metric+'.gap'||line.key===row.metric+'.change');});
+    }).map(function(line){
+      return {key:line.key,text:line.text,evidence_ids:line.evidence_ids.slice(),rank:line.rank,
+        selection_reason:line.kind==='GAP'?'不足情報を優先':'既存の実験用ルール'};
+    });
+    var threshold=report.rules.relative_threshold;
+    rows.forEach(function(row){
+      if(row.held||row.delta===0n)return;
+      var magnitude=row.delta<0n?-row.delta:row.delta;
+      if(row.base!==0n&&magnitude*BigInt(threshold.denominator)<BigInt(threshold.numerator)*row.base)return;
+      var adverse=row.metric==='waste'?row.delta>0n:row.delta<0n;
+      var kpi=report.kpis.find(function(k){return k.metric===row.metric;});
+      candidates.push({key:row.metric+'.recorded-change',text:row.text,evidence_ids:Array.from(new Set(kpi.current.evidence_ids.concat(kpi.reference.evidence_ids))),
+        rank:[adverse?1:2,metrics.indexOf(row.metric),{numerator:(row.base===0n?0n:-magnitude).toString(),denominator:(row.base||1n).toString()}],
+        selection_reason:adverse?'保存値の悪化方向の変化を優先':'保存値の改善方向の変化を表示'});
+    });
+    function compare(a,b){
+      var left=BigInt(a.numerator)*BigInt(b.denominator),right=BigInt(b.numerator)*BigInt(a.denominator);
+      return left<right?-1:left>right?1:0;
+    }
+    candidates.sort(function(a,b){return a.rank[0]-b.rank[0]||a.rank[1]-b.rank[1]||compare(a.rank[2],b.rank[2])||
+      (a.key<b.key?-1:a.key>b.key?1:0);});
+    var selected=candidates.slice(0,report.rules.focus_limit);
+    var status=selected.length?'注目候補あり':rows.some(function(row){return row.held;})?'保存値の単純比較を保留':
+      rows.every(function(row){return row.delta===0n;})?'保存値の単純比較で3指標は差なし':'保存値の変化は実験用閾値未満';
+    return {status:status,selected:selected};
+  }
+  function renderPreview(report,text){
+    var original=text.split('\n'),boundary=original.indexOf('確認情報（非選択も全件保持）');
+    if(original[3]!=='注目項目（実験用の優先ルール）'||boundary<4)throw Error('report_display_contract_changed');
+    var focus=recordedFocus(report);
+    var output=original.slice(0,2).concat(['状態：'+focus.status,'注目項目（実験用の優先ルール）',
+      '保存値の単純差を含みます。曜日・祝日・イベント等の条件差は未調整です。']);
+    output=output.concat(focus.selected.length?focus.selected.map(function(line){return '・'+line.text+'（選択理由：'+line.selection_reason+'）';}):
+      ['注目候補なし。数合わせの項目は作成していません。'],original.slice(boundary));
+    text=output.join('\n');
+    report.kpis.forEach(function(k){
+      if(k.reason==='conditions_unconfirmed'){
+        var name={sales:'売上',waste:'廃棄金額',customers:'客数'}[k.metric];
+        text=text.split('\n・'+name+'の増減は判定できません。').join('\n・'+name+'の同条件比較は保留します。');
+      }
+    });
+    return text;
   }
   // recorded-comparison:end
   // comparison-details:start
@@ -308,13 +360,7 @@
   function paint(){
     var state=host?host.getState():null;
     if(!state||state.status!=='ready')detailText='';
-    var text=state&&state.status==='ready'?state.text:'';
-    if(state&&state.status==='ready')state.report.kpis.forEach(function(k){
-      if(k.reason==='conditions_unconfirmed'){
-        var name={sales:'売上',waste:'廃棄金額',customers:'客数'}[k.metric];
-        text=text.split('\n・'+name+'の増減は判定できません。').join('\n・'+name+'の同条件比較は保留します。');
-      }
-    });
+    var text=state&&state.status==='ready'?renderPreview(state.report,state.text):'';
     body.textContent=text+(text&&detailText?'\n'+detailText:'');
   }
   function invalidate(text){
