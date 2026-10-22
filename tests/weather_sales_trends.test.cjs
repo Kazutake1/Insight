@@ -4,7 +4,7 @@ const trends=require('../insight_weather_sales_trends_v1.js');
 const history=require('../insight_trip_history_resolver_v1.js');
 const readiness=require('../insight_weather_sales_readiness_v1.js');
 
-function sample(date,weekday,weather,sales,max=24,min=12,dayType='weekday'){
+function sample(date,weekday,weather,sales,max=24,min=0,dayType='weekday'){
   return {date,weekday,weather,sales,tempMaxC:max,tempMinC:min,dayType};
 }
 function report(samples,opts={}){
