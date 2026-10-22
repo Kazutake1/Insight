@@ -10,7 +10,7 @@
   var resolverDefault=typeof module!=='undefined'&&module.exports?
     require('./insight_trip_history_resolver_v1.js'):root.InsightTripHistoryResolver;
   var DEFAULT_DAYS=84,MAX_DAYS=366,MIN_COHORT=3;
-  var REASONS=['eligible','inactiveTrip','unknownTrip','reviewTrip','missingDailyRow',
+  var REASONS=['eligible','inactiveTrip','tentativeInactiveTrip','unknownTrip','reviewTrip','missingDailyRow',
     'missingConditions','eventDay','missingWeather','missingTemperature','missingSales'];
 
   function object(value){return !!value&&typeof value==='object'&&!Array.isArray(value);}
@@ -37,7 +37,7 @@
     return result;
   }
   function validTemp(value){
-    return value!==null&&value!==undefined&&value!==''&&Number.isFinite(Number(value));
+    return value!==null&&value!==undefined&&String(value).trim()!==''&&Number.isFinite(Number(value));
   }
   function rowAt(store,date){
     var year=date.slice(0,4),month=Number(date.slice(5,7)),day=Number(date.slice(8,10));
@@ -59,7 +59,7 @@
     catch(_){return {reason:'unknownTrip'};}
     var trip=decision&&decision.trips&&decision.trips[index];
     if(!trip||trip.status==='unknown')return {reason:'unknownTrip'};
-    if(trip.status==='inactive')return {reason:'inactiveTrip'};
+    if(trip.status==='inactive')return {reason:trip.tentative?'tentativeInactiveTrip':'inactiveTrip'};
     if(trip.status!=='active'||trip.conflict||trip.needsDateReview)return {reason:'reviewTrip'};
     var row=rowAt(store,date);
     if(!row)return {reason:'missingDailyRow'};
