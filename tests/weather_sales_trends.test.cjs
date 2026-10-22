@@ -79,10 +79,13 @@ test('通常の月曜日と祝日の月曜日、日曜日を分ける',()=>{
     sample('2026-09-14',1,'雨',99,20,10,'sundayHoliday'),
     sample('2026-09-06',0,'雨',99,20,10,'sundayHoliday')
   ];
-  // same date duplicate within a trip is intentionally rejected; use distinct dates
-  extras[0].date='2026-10-26';
-  extras[1].date='2026-11-02';
-  const result=trends.summarize(report([...mondaySix(),...extras]));
+  // Keep holiday Mondays distinct from regular Mondays within the reporting period.
+  extras[0].date='2026-10-19';
+  extras[1].date='2026-10-26';
+  const fixture=report([...mondaySix(),...extras]);
+  fixture.period.endDate='2026-10-26';
+  fixture.period.days=56;
+  const result=trends.summarize(fixture);
   const groups=result.categories[0].trips[0].byCalendar;
   assert.equal(mon(result).sampleCount,6);
   assert.equal(groups.filter(x=>x.dayType==='sundayHoliday').length,2);
