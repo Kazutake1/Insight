@@ -1,0 +1,16 @@
+/* Only the read-only weather/sales tendency viewer. Existing screens are unaffected. */
+#insightWeatherSalesViewOverlay .iwsv-dialog{width:min(920px,100%);max-width:100%;min-width:0}
+#insightWeatherSalesViewOverlay .iwsv-body{display:flex;flex-direction:column;gap:14px;min-width:0}
+#insightWeatherSalesViewOverlay .iwsv-note{margin:0;color:var(--text4,#777);font-size:12px;line-height:1.6}
+#insightWeatherSalesViewOverlay .iwsv-controls{display:grid;grid-template-columns:repeat(auto-fit,minmax(142px,1fr));gap:14px;margin:4px 0;min-width:0}
+#insightWeatherSalesViewOverlay .iwsv-field{display:flex;flex-direction:column;gap:7px;min-width:0;font-size:12px;font-weight:700}
+#insightWeatherSalesViewOverlay .iwsv-field select{box-sizing:border-box;width:100%;min-width:0;min-height:42px;padding:8px 28px 8px 10px;border:1px solid var(--border,#bbb);border-radius:9px;background:var(--surface,#fff);color:var(--text,#222);font:inherit}
+#insightWeatherSalesViewOverlay .iwsv-period{margin:0;font-size:13px;font-weight:700}
+#insightWeatherSalesViewOverlay .iwsv-details{display:flex;flex-direction:column;gap:16px;min-width:0}
+#insightWeatherSalesViewOverlay .iwsv-summary{margin:0;padding:10px 12px;border-radius:9px;background:var(--surface2,#f7f7f7);font-weight:700}
+#insightWeatherSalesViewOverlay .iwsv-section{display:flex;flex-direction:column;gap:8px;min-width:0}
+#insightWeatherSalesViewOverlay .iwsv-subtitle{font-size:14px;margin:0;font-weight:700}
+#insightWeatherSalesViewOverlay .iwsv-table{min-width:520px}
+#insightWeatherSalesViewOverlay .iwsv-table th:first-child,#insightWeatherSalesViewOverlay .iwsv-table td:first-child{text-align:left}
+#insightWeatherSalesViewOverlay .ipdh-table-scroll{min-width:0;max-width:100%;overflow-x:auto}
+@media(max-width:520px){#insightWeatherSalesViewOverlay .iwsv-controls{grid-template-columns:repeat(2,minmax(0,1fr));gap:12px}}

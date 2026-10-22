@@ -64,6 +64,7 @@ jobs:
           - weather_sales_readiness.test.cjs
           - weather_sales_trends.test.cjs
           - weather_sales_diagnostics.test.cjs
+          - weather_sales_view.test.cjs
           - sale_impact.test.cjs
           - event_impact.test.cjs
           - seasonality_analysis.test.cjs

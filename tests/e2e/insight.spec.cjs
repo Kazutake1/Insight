@@ -352,7 +352,7 @@ test('トップページは外部shellと機能manifestの最新版確認をno-s
   const [source,boot,loader,payload]=sources;
   expect(source).toContain('name="insight-shell-version" content="20261022-csp-manifest-build-96"');
   expect(source).toContain('insight_shell_boot_v1.js?v=20261022-csp-manifest-build-96');
-  expect(source).toContain('insight_shell_loader_v1.js?v=20261022-weather-sales-diagnostics-1');
+  expect(source).toContain('insight_shell_loader_v1.js?v=20261022-weather-sales-view-1');
   expect(source).toContain('insight_shell_v1.css?v=20261022-csp-manifest-build-96');
   expect(source).not.toMatch(/<script(?![^>]*\bsrc=)[^>]*>/i);
   expect(source).not.toMatch(/<style\b/i);
