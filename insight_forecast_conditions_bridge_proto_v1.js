@@ -65,6 +65,7 @@
       return fallback;
     }
     required(obj(part)&&defaults.allowed.includes(part.state)&&
+      part.coverage!==undefined&&
       (part.known_at===null||validJst(part.known_at)),
       'invalid_target_evidence');
     var item={state:part.state,coverage:coverage(scope,day,part.coverage),
@@ -82,13 +83,13 @@
       records:[],omission_rule:null};
     required(obj(part)&&part.ledger===ledger&&
       ['ok','omitted','unavailable','invalid'].includes(part.read_state)&&
+      part.coverage!==undefined&&
       (part.known_at===null||validJst(part.known_at))&&
       Array.isArray(part.records)&&
       (part.read_state==='ok'||part.records.length===0)&&
       (part.omission_rule===null||nonblank(part.omission_rule))&&
       (part.read_state==='omitted'||part.omission_rule===null),
       'invalid_target_registry');
-    var seen=[];
     var records=part.records.map(function(item){
       required(obj(item)&&EVENT_TYPES.includes(item.event_type)&&
         ['applies','not_applies','unknown','conflict'].includes(item.applicability)&&
