@@ -280,7 +280,7 @@ test('既存の3便7列表と要確認の保存値・気温内訳を画面へ表
   const inactive={status:'inactive',source:'current',tentative:false,needsDateReview:false};
   sandbox.window.InsightTripHistoryResolver={resolveDate(_all,_store,_cat,date){
     return {trips:[{status:'active',source:'current',tentative:false,
-      needsDateReview:date==='2026-10-01'},inactive,inactive]};
+      needsDateReview:_store==='a'&&date==='2026-10-01'},inactive,inactive]};
   }};
   sandbox.window.InsightPredictionDataHealth.open();
   const nodes=[];
