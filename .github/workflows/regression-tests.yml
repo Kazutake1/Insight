@@ -48,6 +48,7 @@ jobs:
           - data_health.test.cjs
           - prediction_data_health.test.cjs
           - forecast_input_normalizer.test.cjs
+          - forecast_conditions_bridge.test.cjs
           - css_structure.test.cjs
           - daily_anomaly.test.cjs
           - hook_bridge.test.cjs
