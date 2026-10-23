@@ -231,3 +231,68 @@ test('ブラウザ読み込み順: Resolverが後から存在しても実行時�
     start:'2026-10-01',end:'2026-10-05',today:'2026-10-23'});
   assert.equal(r.stores[0].categories[0].completeDays,5);
 });
+
+test('月次推定のactiveは当日入力がなければ確認済み対象日にしない',()=>{
+  const s=datedSnapshot();
+  delete s.stores.a.salesCounts['2026-10-02'];
+  delete s.stores.a.salesCounts['2026-10-04'];
+  const resolver={resolveDate(){
+    return {trips:[{status:'active',source:'inference',tentative:false,needsDateReview:false},
+      {status:'inactive',source:'manual',tentative:false,needsDateReview:false},
+      {status:'inactive',source:'manual',tentative:false,needsDateReview:false}]};
+  }};
+  const report=reportTrip(s,{resolver});
+  assert.deepEqual(report.trips[0].statusDays,
+    {confirmed_active:3,confirmed_inactive:0,review:0,unverified:2});
+  assert.equal(report.trips[0].sales,3);
+  assert.equal(report.trips[0].longestGap,0);
+  assert.equal(report.reviewDays,2);
+  assert.equal(report.completeDays,3);
+});
+
+test('既存の3便7列表と要確認の保存値・気温内訳を画面へ表示',()=>{
+  const fs=require('node:fs'),vm=require('node:vm');
+  const script=fs.readFileSync(require.resolve('../insight_prediction_data_health_v1.js'),'utf8');
+  class Element{
+    constructor(tag){this.tagName=tag;this.children=[];this.className='';
+      this.textContent='';this.hidden=false;this.rowSpan=1;}
+    append(...children){this.children.push(...children);}
+    replaceChildren(...children){this.children=children;}
+    setAttribute(){}
+    addEventListener(){}
+    focus(){this.focused=true;}
+    querySelector(selector){
+      const match=el=>selector[0]==='.'&&String(el.className).split(' ').includes(selector.slice(1));
+      const find=el=>{
+        for(const ch of el.children){if(match(ch))return ch;const nested=find(ch);if(nested)return nested;}
+        return null;
+      };
+      return find(this);
+    }
+  }
+  const document={readyState:'loading',body:new Element('body'),
+    createElement:tag=>new Element(tag),addEventListener(){}};
+  const s=datedSnapshot();
+  s.stores.a.data[2026]['10月'][0].tempMaxC=0;
+  s.stores.a.data[2026]['10月'][0].tempMinC=10;
+  const sandbox={window:{document,allStores:s}};
+  vm.runInNewContext(script,sandbox,{filename:'insight_prediction_data_health_v1.js'});
+  const inactive={status:'inactive',source:'current',tentative:false,needsDateReview:false};
+  sandbox.window.InsightTripHistoryResolver={resolveDate(_all,_store,_cat,date){
+    return {trips:[{status:'active',source:'current',tentative:false,
+      needsDateReview:date==='2026-10-01'},inactive,inactive]};
+  }};
+  sandbox.window.InsightPredictionDataHealth.open();
+  const nodes=[];
+  function collect(el){nodes.push(el);el.children.forEach(collect);}
+  collect(document.body);
+  const notes=nodes.filter(n=>n.className==='ipdh-note').map(n=>n.textContent);
+  assert.ok(notes.some(n=>n.includes('最高・最低逆転 1日')));
+  assert.ok(notes.some(n=>n.includes('要確認のため表の入力済み日数に含めない保存値：食品 1便：納品1日・販売1日')));
+  const headers=nodes.filter(n=>n.tagName==='thead').flatMap(n=>n.children)
+    .flatMap(n=>n.children).map(n=>n.textContent);
+  assert.deepEqual(headers,['カテゴリー','便','納品','販売','両方','直近8週販売','中間の連続欠損',
+    'カテゴリー','便','納品','販売','両方','直近8週販売','中間の連続欠損']);
+  assert.equal(nodes.filter(n=>n.tagName==='tr'&&n.children.some(t=>t.textContent==='1便（要確認）')).length,1);
+  assert.ok(nodes.some(n=>n.className==='ipdh-overlay'&&n.hidden===false));
+});
