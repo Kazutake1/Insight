@@ -31,6 +31,8 @@
       record_ref:ref(snapshotId,parts.concat([key])),available_at:null};
   }
   function quantityRecord(store,date,category,trip){
+    // A missing legacy collection differs from a corrupt collection.
+    if(store.salesCounts!==undefined&&!object(store.salesCounts))return {invalid:true};
     var day=object(store.salesCounts)&&store.salesCounts[date];
     if(day!==undefined&&!object(day))return {invalid:true};
     var cat=day&&day[category];
@@ -73,11 +75,17 @@
       if(!candidate||!['active','inactive','unknown'].includes(candidate.status)||
          !SOURCES.includes(candidate.source))throw new Error('unsupported_resolver_state');
       result=candidate;
-      if(typeof resolver.monthly==='function'){
-        var monthly=resolver.monthly(snapshot,scope.store_id,scope.category_id,date.slice(0,7),{today:ctx.today});
-        month=monthly&&Array.isArray(monthly.trips)?monthly.trips[scope.trip-1]||null:null;
-      }
     }catch(_){issue='resolver_unavailable_or_invalid';}
+    // Missing monthly diagnostics must not erase a valid dated decision.
+    if(result&&typeof resolver.monthly==='function'){
+      try{
+        var monthly=resolver.monthly(snapshot,scope.store_id,scope.category_id,date.slice(0,7),{today:ctx.today});
+        var rawBasis=monthly&&Array.isArray(monthly.trips)?monthly.trips[scope.trip-1]:null;
+        if(!rawBasis||!['active','inactive','unknown'].includes(rawBasis.status)||
+           !SOURCES.includes(rawBasis.source))throw new Error('invalid_monthly_basis');
+        month=rawBasis;
+      }catch(_){issue='monthly_basis_unavailable';}
+    }
     if(!result)return {status:'unknown',source:'unavailable',
       tentative:null,needsDateReview:null,conflict:null,monthly_basis:null,
       resolver_version:'insight-trip-history-resolver-v1',issue:issue,
@@ -132,8 +140,9 @@
             }
             if(date<e.startDate||date>e.endDate)return;
             items.push({event_type:e.type,applicability:categoryApplicability(e,snapshot,scope.category_id),
-              record_ref:ref(snapshotId,ledger.path.concat([String(i)])),
-              source_id:typeof e.id==='string'?e.id:null,known_at:null});
+              record_ref:{snapshot_id:snapshotId,local_locator:ledger.path.concat([String(i)]),
+                source_id:typeof e.id==='string'?e.id:null},
+              known_at:null});
           });
         }
         return {ledger:ledger.kind,read_state:state,omission_rule:null,
@@ -150,6 +159,9 @@
     requireValue(object(scope)&&typeof scope.store_id==='string'&&scope.store_id&&
       typeof scope.category_id==='string'&&scope.category_id&&
       Number.isInteger(scope.trip)&&scope.trip>=1&&scope.trip<=3,'invalid_scope');
+    // Align this prototype with the FICTIONAL lab Scope, never real store IDs.
+    requireValue(['lab_a','lab_b'].includes(scope.store_id)&&
+      ['fictional_rice','fictional_bread'].includes(scope.category_id),'fictional_scope_required');
     var store=object(snapshot.stores)&&snapshot.stores[scope.store_id];
     var cats=snapshot.salesCountManagement&&snapshot.salesCountManagement.categories;
     requireValue(object(store)&&Array.isArray(cats)&&
@@ -160,6 +172,8 @@
     requireValue(strictJst(context.captured_at)&&validDay(context.today)&&
       ['session_id','request_id','snapshot_id'].every(function(k){return typeof context[k]==='string'&&context[k].length>0;})&&
       Number.isSafeInteger(context.revision)&&context.revision>=0,'invalid_snapshot_identity');
+    requireValue(request.purpose==='historical_replay'||
+      context.captured_at<=request.issued_at,'snapshot_after_issue');
     requireValue(context.storage&&context.storage.pending===false&&
       context.storage.held===false&&context.storage.conflict===false,'unsafe_storage_state');
     requireValue(context.resolver&&typeof context.resolver.resolveDate==='function','resolver_required');
