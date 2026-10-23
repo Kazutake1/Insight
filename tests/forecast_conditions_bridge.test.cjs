@@ -207,10 +207,14 @@ test('B13: 歴史レコードのscope混入や対象日を含んだhistoryを拒
   assert.throws(()=>convert(e2),/invalid_snapshot_or_history/);
 });
 
-test('B14: 認識不能なイベント種別・適用根拠でcandidate用証拠を生成しない',()=>{
+test('B14: 未対応イベント種別をそのまま保持しlab側でundeterminedと判定可能にする',()=>{
   const t=targetEvidence();t.registries.store.records=[
     {event_type:'new_event_type',applicability:'applies',
       record_ref:recordRef('item'),known_at:null}];
+  const dto=convert(normalized(),t);
+  assert.equal(dto.registries[1].records[0].event_type,'new_event_type');
+  assert.equal(Object.hasOwn(dto,'eligibility'),false);
+  t.registries.store.records[0].event_type='';
   assert.throws(()=>convert(normalized(),t),/invalid_target_registry_item/);
   t.registries.store.records[0].event_type='sale';
   t.registries.store.records[0].applicability='not_sure';
