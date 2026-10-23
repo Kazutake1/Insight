@@ -237,3 +237,27 @@ test('B16: I/O・画面操作・ストレージ・予測エンジンに接続し
   assert.ok(!script.includes('insight_v11'));
   assert.ok(!/predict\(/.test(script));
 });
+
+test('B17: 明示した架空対象日の根拠にcoverageがなければ推測で補完しない',()=>{
+  const t=targetEvidence();
+  delete t.calendar.coverage;
+  assert.throws(()=>convert(normalized(),t),/invalid_target_evidence/);
+  const t2=targetEvidence();
+  delete t2.registries.common.coverage;
+  assert.throws(()=>convert(normalized(),t2),/invalid_target_registry/);
+  const t3=targetEvidence();
+  delete t3.sale.coverage;
+  assert.throws(()=>convert(normalized(),t3),/invalid_target_evidence/);
+});
+
+test('B18: 別日付の登録証拠の範囲を勝手に予測対象日へ拡張しない',()=>{
+  const t=targetEvidence();
+  t.registries.store.coverage.start_day='2026-10-17';
+  t.registries.store.coverage.end_day='2026-10-18';
+  const dto=convert(normalized(),t);
+  assert.deepEqual([dto.registries[1].coverage.start_day,dto.registries[1].coverage.end_day],
+    ['2026-10-17','2026-10-18']);
+  assert.equal(dto.request.target_day,'2026-10-24');
+  // Lab evaluates uncovered registry as undetermined; the Bridge never expands coverage.
+  assert.equal(Object.hasOwn(dto,'eligibility'),false);
+});
