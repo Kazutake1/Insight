@@ -118,7 +118,7 @@ function createFixtureSnapshotReader(source) {
   const guards = new WeakMap(); // prevent one reader from approving another source's snapshot
   return Object.freeze({
     read(request) {
-      const normalized = validateRequest(request);
+      const normalized = freeze(validateRequest(request));
       const before = inspection(source);
       let rawFixture;
       try { rawFixture = source.readFixture(normalized); }
