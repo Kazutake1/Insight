@@ -13,8 +13,6 @@
     version:'fictional-registered-conditions-v1',
     event_mapping:'fictional-all-registered-types-v1'};
   var ALLOWED_OMISSION='fictional-legacy-optional-ledgers-v1';
-  var EVENT_TYPES=['sale','campaign','nearby','special','environment',
-    'equipment','staff','bulk','other'];
   function obj(value){return value!==null&&typeof value==='object'&&!Array.isArray(value);}
   function required(ok,reason){if(!ok)throw new Error(reason);}
   function nonblank(v){return typeof v==='string'&&!!v.trim();}
@@ -91,7 +89,9 @@
       (part.read_state==='omitted'||part.omission_rule===null),
       'invalid_target_registry');
     var records=part.records.map(function(item){
-      required(obj(item)&&EVENT_TYPES.includes(item.event_type)&&
+      // Unknown nonempty types are preserved; the lab marks them undetermined,
+      // rather than silently treating an unseen type as absent.
+      required(obj(item)&&nonblank(item.event_type)&&
         ['applies','not_applies','unknown','conflict'].includes(item.applicability)&&
         (item.known_at===null||validJst(item.known_at)),'invalid_target_registry_item');
       return {event_type:item.event_type,applicability:item.applicability,
