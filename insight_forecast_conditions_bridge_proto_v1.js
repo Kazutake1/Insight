@@ -59,8 +59,10 @@
   }
   function evidencePart(part,scope,day,id,defaults){
     if(part===undefined){
-      return {state:defaults.state,version:defaults.version,
+      var fallback={state:defaults.state,
         coverage:coverage(scope,day),ref:syntheticRef(id,day,defaults.name),known_at:null};
+      if(defaults.isCalendar)fallback.version=defaults.version;
+      return fallback;
     }
     required(obj(part)&&defaults.allowed.includes(part.state)&&
       (part.known_at===null||validJst(part.known_at)),
