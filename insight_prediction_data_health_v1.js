@@ -237,6 +237,11 @@
         ['客数＋天気＋気温',store.weatherWithCustomer+'日']
       ].forEach(function(pair){var item=element('div',undefined,'ipdh-metric');item.append(element('span',pair[0]),element('strong',pair[1]));summary.append(item);});
       section.append(summary);
+      if(store.temperatureMissing||store.temperatureInvalid||store.temperatureReversed){
+        section.append(element('p','気温の確認事項：未入力 '+store.temperatureMissing+
+          '日／不正値 '+store.temperatureInvalid+'日／最高・最低逆転 '+
+          store.temperatureReversed+'日。','ipdh-note'));
+      }
       var tableScroll=element('div',undefined,'ipdh-table-scroll');
       var table=element('table');table.className='ipdh-table';
       var thead=element('thead'),head=element('tr');
@@ -259,6 +264,19 @@
         });
       });
       table.append(tbody);tableScroll.append(table);section.append(tableScroll);
+      var reviewEntries=[];
+      store.categories.forEach(function(category){
+        category.trips.forEach(function(t){
+          var saved=t.reviewSaved;
+          if(!saved||!(saved.delivery||saved.sales))return;
+          reviewEntries.push(category.name+' '+t.trip+'便：納品'+saved.delivery+
+            '日・販売'+saved.sales+'日');
+        });
+      });
+      if(reviewEntries.length){
+        section.append(element('p','要確認のため表の入力済み日数に含めない保存値：'+
+          reviewEntries.join('／')+'。','ipdh-note'));
+      }
       section.append(element('p','納品・販売・両方＝対象便と確認できた日の入力済み日数（0を含む）。直近8週販売＝直近56日間。連続欠損＝対象と確認できる連続期間内の最大未入力日数。対象便が不明・競合する日の保存値は残し、入力漏れとは断定しません。','ipdh-note'));
       body.append(section);
     });
