@@ -120,9 +120,10 @@ function createFixtureSnapshotReader(source) {
     read(request) {
       const normalized = validateRequest(request);
       const before = inspection(source);
-      let payload;
-      try { payload = copy(source.readFixture(normalized)); }
+      let rawFixture;
+      try { rawFixture = source.readFixture(normalized); }
       catch { reject('fixture_read_failed'); }
+      const payload = copy(rawFixture);
       const after = inspection(source);
       if (before.token !== after.token) reject('source_changed_during_read');
       assertFixture(payload, normalized);
