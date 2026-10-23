@@ -97,8 +97,11 @@ test('F06: 過去便のobserved_dayと月次manual根拠・保存済み0・競�
   assert.equal(row.trip_resolution.status,'active');
   assert.equal(row.trip_resolution.source,'observed_day');
   assert.equal(row.trip_resolution.conflict,true);
-  assert.equal(row.trip_resolution.monthly_basis.status,'inactive');
-  assert.equal(row.trip_resolution.monthly_basis.source,'manual');
+  // A saved 0 conflicts with an older manual "inactive" override.
+  // The real monthly resolver correctly reports a conflict (unknown), not inactive.
+  assert.equal(row.trip_resolution.monthly_basis.status,'unknown');
+  assert.equal(row.trip_resolution.monthly_basis.source,'conflict');
+  assert.equal(row.trip_resolution.monthly_basis.needsDateReview,true);
 });
 test('F07: Resolver例外や未知状態を対象外と推定せずunknownにする',()=>{
   for(const candidate of [
