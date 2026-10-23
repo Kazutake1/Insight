@@ -33,7 +33,7 @@
   function quantityRecord(store,date,category,trip){
     // A missing legacy collection differs from a corrupt collection.
     if(store.salesCounts!==undefined&&!object(store.salesCounts))return {invalid:true};
-    var day=object(store.salesCounts)&&store.salesCounts[date];
+    var day=object(store.salesCounts)?store.salesCounts[date]:undefined;
     if(day!==undefined&&!object(day))return {invalid:true};
     var cat=day&&day[category];
     if(cat!==undefined&&(!object(cat)||!Array.isArray(cat.trips)||cat.trips.length!==3))
@@ -95,7 +95,7 @@
       conflict:result.conflict===true,
       monthly_basis:month?{status:month.status,source:month.source,
         tentative:month.tentative===true,needsDateReview:month.needsDateReview===true}:null,
-      resolver_version:'insight-trip-history-resolver-v1',issue:null,
+      resolver_version:'insight-trip-history-resolver-v1',issue:issue,
       record_ref:ref(snapshotId,base)};
   }
   function categoryApplicability(event,snapshot,categoryId){
