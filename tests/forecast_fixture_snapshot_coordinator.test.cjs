@@ -127,6 +127,23 @@ test('S02: malformed scope, date, period, source data and nonfinite counts rejec
   const src = fixture(); src.payload.history[0].sales.value = NaN;
   assert.throws(() => createFixtureSnapshotReader(src).read(req()), /non_finite_fixture_value/);
 });
+test('S05: malformed known_at cannot silently become unknown', () => {
+  const src = fixture();
+  src.payload.history[0].known_at = 'unparseable';
+  assert.throws(() => createFixtureSnapshotReader(src).read(req()), /invalid_known_at/);
+});
+test('S02: sparse arrays never silently turn missing into explicit null', () => {
+  const src = fixture();
+  src.payload.history[0].sales.samples = new Array(1);
+  assert.throws(() => createFixtureSnapshotReader(src).read(req()), /sparse_fixture_array/);
+});
+test('S06: a different reader cannot attest this reader\'s snapshot', () => {
+  const first = createFixtureSnapshotReader(fixture());
+  const second = createFixtureSnapshotReader(fixture());
+  const snap = first.read(req());
+  assert.equal(first.isCurrent(snap), true);
+  assert.equal(second.isCurrent(snap), false);
+});
 test('S06: latest async result is adopted only with unchanged scope and source', async () => {
   const src = fixture(); const reader = createFixtureSnapshotReader(src);
   const coord = createFixtureRequestCoordinator({ reader, session_id: 'fake-session', evaluate: async () => ({ outcome: 'completed', conditions: 'candidate', forecast: 'HELD' }) });
