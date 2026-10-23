@@ -5,7 +5,6 @@
  * A source-provided fingerprint is not authentication or proof of persistence.
  */
 const SNAPSHOT_SCHEMA = 'fictional-snapshot-v0';
-const guards = new WeakMap();
 let serial = 0;
 
 function reject(code) { throw new Error(code); }
@@ -20,6 +19,10 @@ function copy(value) {
     if (typeof v !== 'object' || seen.has(v)) reject('invalid_fixture_value');
     if (Object.getPrototypeOf(v) !== Object.prototype && !Array.isArray(v) && Object.getPrototypeOf(v) !== null) reject('invalid_fixture_object');
     seen.add(v);
+    if (Array.isArray(v)) {
+      for (let i = 0; i < v.length; i++) if (!Object.hasOwn(v, i)) reject('sparse_fixture_array');
+    }
+    if (Reflect.ownKeys(v).some(key => typeof key === 'symbol')) reject('invalid_fixture_member');
     for (const [key, desc] of Object.entries(Object.getOwnPropertyDescriptors(v))) {
       if (key === '__proto__' || key === 'constructor' || key === 'prototype' || !Object.hasOwn(desc, 'value')) reject('invalid_fixture_member');
       check(desc.value);
@@ -45,6 +48,11 @@ function day(value) {
 function jst(value) {
   if (typeof value !== 'string' || !/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d+)?\+09:00$/.test(value) || !Number.isFinite(Date.parse(value))) reject('invalid_jst_timestamp');
   return value;
+}
+function assertKnownAt(value, issuedAt) {
+  if (value === null || value === undefined) return;
+  if (typeof value !== 'string' || !/^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}(?:\\.\\d+)?(?:Z|[+-]\\d{2}:\\d{2})$/.test(value) || !Number.isFinite(Date.parse(value))) reject('invalid_known_at');
+  if (Date.parse(value) > Date.parse(issuedAt)) reject('future_knowledge');
 }
 function automaticTargetDay(issuedAt) {
   jst(issuedAt);
@@ -98,20 +106,23 @@ function assertFixture(payload, request) {
     const recordDay = day(record.day);
     if (seen.has(recordDay) || recordDay >= request.target_day || recordDay > issuedDay) reject('history_boundary');
     seen.add(recordDay);
-    if (record.known_at !== null && record.known_at !== undefined && Date.parse(record.known_at) > Date.parse(request.request_issued_at)) reject('future_knowledge');
+    assertKnownAt(record.known_at, request.request_issued_at);
   }
   if (payload.target_evidence !== null && payload.target_evidence !== undefined) {
     if (!sameScope(payload.target_evidence.scope, request.scope) || day(payload.target_evidence.day) !== request.target_day) reject('target_evidence_mismatch');
-    if (payload.target_evidence.known_at !== null && payload.target_evidence.known_at !== undefined && Date.parse(payload.target_evidence.known_at) > Date.parse(request.request_issued_at)) reject('future_knowledge');
+    assertKnownAt(payload.target_evidence.known_at, request.request_issued_at);
   }
 }
 function createFixtureSnapshotReader(source) {
   if (source?.fixture !== true) reject('fixture_source_required');
+  const guards = new WeakMap(); // prevent one reader from approving another source's snapshot
   return Object.freeze({
     read(request) {
       const normalized = validateRequest(request);
       const before = inspection(source);
-      const payload = copy(source.readFixture(normalized));
+      let payload;
+      try { payload = copy(source.readFixture(normalized)); }
+      catch { reject('fixture_read_failed'); }
       const after = inspection(source);
       if (before.token !== after.token) reject('source_changed_during_read');
       assertFixture(payload, normalized);
