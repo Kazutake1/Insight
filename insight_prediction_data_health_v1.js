@@ -5,6 +5,16 @@
 
   var START='2025-09-01';
   var WEEK=['日','月','火','水','木','金','土'];
+  // Resolved only when examine() is called: the browser loader loads this file
+  // before InsightTripHistoryResolver.
+  var nodeResolver=typeof module!=='undefined'&&module.exports?
+    require('./insight_trip_history_resolver_v1.js'):null;
+  function resolverFor(options){
+    var resolver=options&&options.resolver||nodeResolver||root.InsightTripHistoryResolver;
+    if(!resolver||typeof resolver.resolveDate!=='function')
+      throw new Error('過去対象便の判定機能を利用できません。');
+    return resolver;
+  }
   function isObject(v){return !!v&&typeof v==='object'&&!Array.isArray(v);}
   function parseDate(s){
     if(!/^\d{4}-\d{2}-\d{2}$/.test(String(s||'')))return null;
@@ -19,7 +29,47 @@
     return addDays(values.year+'-'+values.month+'-'+values.day,-1);
   }
   function validCount(value){return Number.isSafeInteger(value)&&value>=0;}
-  function validTemp(value){return value!==null&&value!==undefined&&value!==''&&Number.isFinite(Number(value));}
+  function validTemp(value){
+    return value!==null&&value!==undefined&&String(value).trim()!==''&&Number.isFinite(Number(value));
+  }
+  function temperatureState(row){
+    if(!row||row.tempMaxC===undefined||row.tempMinC===undefined||
+      row.tempMaxC===null||row.tempMinC===null||
+      String(row.tempMaxC).trim()===''||String(row.tempMinC).trim()==='')return 'missing';
+    if(!validTemp(row.tempMaxC)||!validTemp(row.tempMinC))return 'invalid';
+    return Number(row.tempMaxC)<Number(row.tempMinC)?'reversed':'valid';
+  }
+  function validSavedTrip(record,index){
+    var trip=record&&Array.isArray(record.trips)?record.trips[index]:null;
+    return isObject(trip)?trip:null;
+  }
+  function dateTripState(raw,trip){
+    if(!trip||!['active','inactive','unknown'].includes(trip.status))return 'unverified';
+    if(trip.tentative||trip.needsDateReview||trip.conflict)return 'review';
+    if(trip.status==='unknown')return 'unverified';
+    if(trip.status==='inactive')
+      return trip.source==='current'||trip.source==='manual'?'confirmed_inactive':'unverified';
+    if(trip.source==='current'||trip.source==='manual')return 'confirmed_active';
+    // A monthly inference is not evidence that a trip was active on every day.
+    // "observed_day" can originate from delivery alone, not necessarily sales.
+    if((trip.source==='observed_day'||trip.source==='inference')&&raw&&
+      (validCount(raw.sales)||validCount(raw.delivery)))return 'confirmed_active';
+    return 'unverified';
+  }
+  function gapWithinActiveDays(days){
+    var longest=null,flags=[];
+    function flush(){
+      if(!flags.length)return;
+      var run=longestInnerGap(flags);
+      if(run!==null)longest=longest===null?run:Math.max(longest,run);
+      flags=[];
+    }
+    days.forEach(function(day){
+      if(day.status==='confirmed_active')flags.push(day.hasSales);
+      else flush();
+    });
+    flush();return longest;
+  }
   function dayRow(store,date){
     var year=date.slice(0,4),month=Number(date.slice(5,7)),day=Number(date.slice(8,10));
     var list=store.data&&store.data[year]&&store.data[year][month+'月'];
@@ -44,21 +94,28 @@
     var stores=isObject(snapshot)&&isObject(snapshot.stores)?snapshot.stores:{};
     var categories=snapshot&&snapshot.salesCountManagement&&snapshot.salesCountManagement.categories;
     if(!Array.isArray(categories))categories=[];
-    var recentStart=addDays(end,-55);
+    var recentStart=addDays(end,-55),resolver=resolverFor(options);
+    // Memoize month inference for the duration of this read-only report.
+    var monthCache=new Map(),resolverOptions={monthCache:monthCache};
+    if(options.today!==undefined)resolverOptions.today=options.today;
     var result={start:start,end:end,days:days.length,stores:[]};
     Object.keys(stores).forEach(function(id){
       var store=stores[id];if(!isObject(store))return;
       var storeReport={
         id:id,name:String(store.name||id),
         customersPositive:0,customersUncertain:0,
-        weather:0,temperature:0,weatherWithCustomer:0,
+        weather:0,temperature:0,temperatureMissing:0,temperatureInvalid:0,
+        temperatureReversed:0,weatherWithCustomer:0,
         categories:[]
       };
       days.forEach(function(date){
         var row=dayRow(store,date);
         var hasCustomer=!!row&&Number.isFinite(Number(row.客数))&&row.客数!==''&&row.客数!==null&&Number(row.客数)>0;
         var weather=!!row&&typeof row.weather==='string'&&row.weather.trim().length>0;
-        var temperature=!!row&&validTemp(row.tempMaxC)&&validTemp(row.tempMinC);
+        var tempStatus=temperatureState(row),temperature=tempStatus==='valid';
+        if(tempStatus==='missing')storeReport.temperatureMissing++;
+        else if(tempStatus==='invalid')storeReport.temperatureInvalid++;
+        else if(tempStatus==='reversed')storeReport.temperatureReversed++;
         if(hasCustomer)storeReport.customersPositive++;
         else storeReport.customersUncertain++;
         if(weather)storeReport.weather++;
@@ -67,26 +124,66 @@
       });
       categories.forEach(function(category){
         if(!isObject(category)||typeof category.id!=='string')return;
-        var mask=Array.isArray(category.activeTrips)&&category.activeTrips.length===3?category.activeTrips:[true,true,true];
-        var categoryReport={id:category.id,name:String(category.name||category.id),hidden:!!category.hidden,trips:[],completeDays:0};
-        var completeFlags=days.map(function(date){
+        var categoryReport={id:category.id,name:String(category.name||category.id),
+          hidden:!!category.hidden,trips:[],completeDays:0,
+          incompleteDays:0,reviewDays:0,allInactiveDays:0,resolverErrorDays:0};
+        var dated=days.map(function(date){
           var record=store.salesCounts&&store.salesCounts[date]&&store.salesCounts[date][category.id];
-          var trips=record&&Array.isArray(record.trips)?record.trips:[];
-          return [0,1,2].every(function(i){if(mask[i]===false)return true;var t=trips[i];return !!t&&validCount(t.sales)&&validCount(t.delivery);});
+          var decision;
+          try{decision=resolver.resolveDate(snapshot,id,category.id,date,resolverOptions);}
+          catch(_){categoryReport.resolverErrorDays++;}
+          var sourceTrips=decision&&Array.isArray(decision.trips)&&decision.trips.length===3?decision.trips:null;
+          return {date:date,trips:[0,1,2].map(function(index){
+            var raw=validSavedTrip(record,index);
+            var status=dateTripState(raw,sourceTrips&&sourceTrips[index]);
+            return {status:status,raw:raw,hasSales:!!raw&&validCount(raw.sales),
+              hasDelivery:!!raw&&validCount(raw.delivery),
+              source:sourceTrips&&sourceTrips[index]&&sourceTrips[index].source||null};
+          })};
         });
-        categoryReport.completeDays=completeFlags.filter(Boolean).length;
+        dated.forEach(function(day){
+          var active=day.trips.filter(function(t){return t.status==='confirmed_active';});
+          var uncertain=day.trips.some(function(t){return t.status==='review'||t.status==='unverified';});
+          if(active.length&&day.trips.every(function(t){
+            return t.status==='confirmed_inactive'||t.status==='confirmed_active'&&t.hasSales&&t.hasDelivery;
+          }))categoryReport.completeDays++;
+          else if(!active.length&&!uncertain)categoryReport.allInactiveDays++;
+          else if(uncertain)categoryReport.reviewDays++;
+          else categoryReport.incompleteDays++;
+        });
         for(var i=0;i<3;i++){
-          if(mask[i]===false){categoryReport.trips.push({trip:i+1,active:false});continue;}
-          var flags=[],trip={trip:i+1,active:true,delivery:0,sales:0,both:0,recentSales:0,zeroSales:0,longestGap:null};
-          days.forEach(function(date){
-            var record=store.salesCounts&&store.salesCounts[date]&&store.salesCounts[date][category.id],t=record&&Array.isArray(record.trips)?record.trips[i]:null;
-            var delivery=!!t&&validCount(t.delivery),sale=!!t&&validCount(t.sales);
-            if(delivery)trip.delivery++;
-            if(sale){trip.sales++;if(date>=recentStart)trip.recentSales++;if(t.sales===0)trip.zeroSales++;}
-            if(delivery&&sale)trip.both++;
-            flags.push(sale);
+          var items=dated.map(function(day){return Object.assign({date:day.date},day.trips[i]);});
+          var statusDays={confirmed_active:0,confirmed_inactive:0,review:0,unverified:0};
+          var trip={trip:i+1,active:true,delivery:0,sales:0,both:0,recentSales:0,
+            zeroSales:0,longestGap:null,statusDays:statusDays,periodStatus:'needs_review',
+            reviewSaved:{delivery:0,sales:0,both:0},
+            quantityRelation:{equal:0,salesAboveDelivery:0,salesBelowDelivery:0},
+            reviewQuantityRelation:{equal:0,salesAboveDelivery:0,salesBelowDelivery:0}};
+          items.forEach(function(item){
+            statusDays[item.status]++;
+            var validDelivery=item.hasDelivery,validSales=item.hasSales;
+            if(item.status==='confirmed_active'){
+              if(validDelivery)trip.delivery++;
+              if(validSales){trip.sales++;if(item.date>=recentStart)trip.recentSales++;
+                if(item.raw.sales===0)trip.zeroSales++;}
+              if(validDelivery&&validSales)trip.both++;
+            }else{
+              if(validDelivery)trip.reviewSaved.delivery++;
+              if(validSales)trip.reviewSaved.sales++;
+              if(validDelivery&&validSales)trip.reviewSaved.both++;
+            }
+            if(validDelivery&&validSales){
+              var comparison=item.raw.sales===item.raw.delivery?'equal':
+                item.raw.sales>item.raw.delivery?'salesAboveDelivery':'salesBelowDelivery';
+              (item.status==='confirmed_active'?trip.quantityRelation:trip.reviewQuantityRelation)[comparison]++;
+            }
           });
-          trip.longestGap=longestInnerGap(flags);
+          trip.longestGap=gapWithinActiveDays(items);
+          if(statusDays.confirmed_inactive===days.length)trip.periodStatus='all_inactive';
+          else if(statusDays.confirmed_active===days.length)trip.periodStatus='all_active';
+          else if(statusDays.review||statusDays.unverified)trip.periodStatus='needs_review';
+          else trip.periodStatus='mixed';
+          trip.active=trip.periodStatus!=='all_inactive';
           categoryReport.trips.push(trip);
         }
         storeReport.categories.push(categoryReport);
@@ -150,7 +247,9 @@
         category.trips.forEach(function(t){
           var row=element('tr');
           if(t.trip===1){var label=element('th',category.name+(category.hidden?'（非表示）':''));label.rowSpan=3;label.scope='rowgroup';row.append(label);}
-          row.append(element('td',t.trip+'便'));
+          var periodLabel=t.periodStatus==='mixed'?'（一部対象）':
+            t.periodStatus==='needs_review'?'（要確認）':'';
+          row.append(element('td',t.trip+'便'+periodLabel));
           if(t.active){
             [t.delivery,t.sales,t.both,t.recentSales,t.longestGap===null?'—':t.longestGap+'日'].forEach(function(value){row.append(element('td',String(value)));});
           }else{
@@ -160,7 +259,7 @@
         });
       });
       table.append(tbody);tableScroll.append(table);section.append(tableScroll);
-      section.append(element('p','納品・販売・両方＝対象期間内の入力済み日数（明示的な0を含む）。直近8週販売＝直近56日間の販売入力日数。連続欠損＝最初と最後の販売入力日の間にある最大未入力日数。','ipdh-note'));
+      section.append(element('p','納品・販売・両方＝対象便と確認できた日の入力済み日数（0を含む）。直近8週販売＝直近56日間。連続欠損＝対象と確認できる連続期間内の最大未入力日数。対象便が不明・競合する日の保存値は残し、入力漏れとは断定しません。','ipdh-note'));
       body.append(section);
     });
     overlay.hidden=false;overlay.querySelector('.ipdh-close').focus();
