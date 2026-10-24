@@ -1,0 +1,10 @@
+/* Optional encrypted backup settings; no inline styles required by CSP. */
+#insightEncryptedBackup .insight-secure-group{display:grid;gap:10px;margin-top:14px;padding:14px;border:1px solid var(--border);border-radius:11px;background:var(--surface2)}
+#insightEncryptedBackup .insight-secure-group h3{font-size:14px;font-weight:700;color:var(--text)}
+#insightEncryptedBackup .insight-secure-field{display:grid;gap:6px;font-size:13px;color:var(--text3);font-weight:600}
+#insightEncryptedBackup .insight-secure-field input{min-width:0;width:100%;min-height:44px;padding:9px 11px;border:1px solid var(--input-border);border-radius:9px;background:var(--input-bg);color:var(--text);font:inherit}
+#insightEncryptedBackup .insight-secure-group button{min-height:44px;padding:10px 12px;border:1px solid var(--border);border-radius:10px;background:var(--surface);color:var(--text);font-size:13px;font-weight:700;cursor:pointer}
+#insightEncryptedBackup .insight-secure-group button:disabled{opacity:.55;cursor:default}
+#insightEncryptedBackup .insight-secure-group p{font-size:12px;line-height:1.65;color:var(--text3)}
+#insightEncryptedBackup [role=status]{min-height:1em;overflow-wrap:anywhere}
+#insightEncryptedBackup button:focus-visible,#insightEncryptedBackup input:focus-visible{outline:2px solid var(--text3);outline-offset:2px}
