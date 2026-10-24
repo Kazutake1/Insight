@@ -71,10 +71,10 @@ function createFictionalTripGroup(input){
   }));
   let epoch=input.ui_epoch,invalidated=false;
   function invalidate(){
-    if(!invalidated){
-      invalidated=true;
-      epoch=epoch===Number.MAX_SAFE_INTEGER?null:epoch+1;
-    }
+    invalidated=true;
+    // Each intervening event advances the generation. Overflow requires a new
+    // session and cannot be silently wrapped back to an older epoch.
+    if(epoch!==null)epoch=epoch===Number.MAX_SAFE_INTEGER?null:epoch+1;
     return epoch;
   }
   function isCurrent(child,observed){
@@ -91,7 +91,10 @@ function createFictionalTripGroup(input){
   function adopt(child,response,observed){
     if(!isCurrent(child,observed))return refused('superseded_or_changed');
     if(!response||typeof response!=='object'||
+      response.session_id!==common.session_id||
       response.request_id!==child.context.request_id||
+      response.issued_at!==common.issued_at||
+      response.purpose!==common.purpose||
       response.snapshot_id!==common.snapshot_id||
       response.ui_epoch!==common.ui_epoch||
       response.target_day!==common.target_day||
@@ -108,7 +111,13 @@ function createFictionalTripGroup(input){
       authorized_for_model:false,provenance_verified:false});
   }
   function view(results){
+    // Display only a complete, matching set of adopted fixture replies.
     // Never issue a confirmed daily total, including an all-READY fixture.
+    if(invalidated||!Array.isArray(results)||results.length!==children.length||
+      results.some((r,i)=>!r||r.request_id!==children[i].context.request_id||
+        r.accepted!==true||r.freshness!=='current'||r.fixture_only!==true||
+        r.authorized_for_model!==false||r.provenance_verified!==false))
+      return refused('group_incomplete_or_changed');
     return stable({kind:'FICTIONAL_TRIP_GROUP_ONLY',items:stable(results.slice()),
       daily_total:null,daily_total_confirmed:false,authorized_for_model:false,
       provenance_verified:false});
