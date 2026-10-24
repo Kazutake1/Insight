@@ -42,6 +42,24 @@ function evidenceKnown(value, issue, seen=new Set()) {
   seen.delete(value);
   return true;
 }
+function validRef(ref, snapshotId) {
+  return object(ref) && ref.snapshot_id===snapshotId &&
+    Array.isArray(ref.local_locator) && ref.local_locator.length>0 &&
+    ref.local_locator.every(p=>typeof p==='string'&&p.trim()) &&
+    (ref.source_id===null || ref.source_id===undefined ||
+      (typeof ref.source_id==='string'&&ref.source_id.trim()));
+}
+function validCoverage(c,scope,day) {
+  return object(c) && c.store===scope.store_id &&
+    (c.category===scope.category_id||c.category===null) &&
+    validDay(c.start_day)&&validDay(c.end_day) &&
+    c.start_day<=day && day<=c.end_day;
+}
+function validPart(part,allowed,scope,day,id) {
+  return object(part)&&allowed.includes(part.state)&&
+    validCoverage(part.coverage,scope,day)&&validRef(part.record_ref,id)&&
+    (part.known_at===null||validJst(part.known_at));
+}
 function metricConsistent(source, output) {
   if (!object(source)||!object(output)||!['entered','missing','invalid'].includes(source.state))return false;
   if(source.state!==output.state)return false;
@@ -103,12 +121,23 @@ function validateFixtureHandoff({reader,snapshot,envelope,target_evidence}) {
   if(!object(target_evidence.calendar)||!object(target_evidence.sale)||
     !object(target_evidence.event)||!object(target_evidence.registries)||
     !object(target_evidence.policy))reject();
+  const id=snapshot.snapshot_id;
+  if(!validPart(target_evidence.calendar,['holiday','non_holiday','unknown','conflict'],scope,req.target_day,id)||
+    !validPart(target_evidence.sale,['confirmed_present','confirmed_absent','unknown','conflict'],scope,req.target_day,id)||
+    !validPart(target_evidence.event,['confirmed_present','confirmed_absent','unknown','conflict'],scope,req.target_day,id)||
+    (target_evidence.calendar.version!==null&&
+      (typeof target_evidence.calendar.version!=='string'||!target_evidence.calendar.version.trim())))reject();
   if(!isUnknown(target_evidence,'sale',rTarget?.sale)||
     !isUnknown(target_evidence,'event',rTarget?.event)||
     !isUnknown(target_evidence,'calendar',rTarget?.calendar))reject();
   for(const kind of ['common','store']){
     const reg=target_evidence.registries[kind];
-    if(!object(reg)||!['unavailable','invalid'].includes(reg.read_state)||
+    if(!object(reg)||reg.ledger!==kind||
+      !validCoverage(reg.coverage,scope,req.target_day)||
+      !validRef(reg.record_ref,id)||
+      !(reg.known_at===null||validJst(reg.known_at))||
+      reg.omission_rule!==null||
+      !['unavailable','invalid'].includes(reg.read_state)||
       !Array.isArray(reg.records)||reg.records.length!==0)reject();
   }
   if(!Array.isArray(target_evidence.policy.allowed_omission_rules)||
