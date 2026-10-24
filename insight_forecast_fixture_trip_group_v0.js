@@ -51,6 +51,9 @@ function createFictionalTripGroup(input){
     if(!Number.isInteger(trip)||trip<1||trip>3||seen.has(trip))reject();
     seen.add(trip);
   }
+  // Capture primitive scope values before the caller can mutate its input.
+  const fixedStoreId=input.store_id;
+  const fixedCategoryId=input.category_id;
   // Version evidence never becomes a claim of provenance.
   const versionStamp=versions(input.source_versions);
   const common=stable({
@@ -60,8 +63,8 @@ function createFictionalTripGroup(input){
     purpose:input.purpose,source_versions:versionStamp
   });
   const children=stable(input.trips.map(trip=>{
-    const scope=stable({store_id:input.store_id,
-      category_id:input.category_id,trip});
+    const scope=stable({store_id:fixedStoreId,
+      category_id:fixedCategoryId,trip});
     const context=stable({...common,request_id:input.group_id+'.trip'+trip,scope});
     // The existing strict Reader request accepts only these six keys.
     const reader_request=stable({scope,target_day:common.target_day,
@@ -69,9 +72,13 @@ function createFictionalTripGroup(input){
       purpose:common.purpose,history_days:input.history_days});
     return stable({context,reader_request});
   }));
+  // Only records actually produced by this group's adopt may be displayed.
+  // Map identity also prevents clones or another group's replies being reused.
+  const adoptedByChild=new Map();
   let epoch=input.ui_epoch,invalidated=false;
   function invalidate(){
     invalidated=true;
+    adoptedByChild.clear();
     // Each intervening event advances the generation. Overflow requires a new
     // session and cannot be silently wrapped back to an older epoch.
     if(epoch!==null)epoch=epoch===Number.MAX_SAFE_INTEGER?null:epoch+1;
@@ -83,8 +90,8 @@ function createFictionalTripGroup(input){
       observed.snapshot_id!==common.snapshot_id||
       observed.target_day!==common.target_day||
       observed.manual_target!==common.manual_target||
-      observed.store_id!==input.store_id||
-      observed.category_id!==input.category_id||
+      observed.store_id!==fixedStoreId||
+      observed.category_id!==fixedCategoryId||
       !sameVersions(versionStamp,observed.source_versions))return false;
     return true;
   }
@@ -106,19 +113,23 @@ function createFictionalTripGroup(input){
       !['READY','HELD','INACTIVE'].includes(response.status)||
       (response.status==='READY'?(!Number.isSafeInteger(response.value)||
         response.value<0):response.value!==null))return refused('context_or_state_mismatch');
-    return stable({accepted:true,freshness:'current',fixture_only:true,
+    const adopted=stable({accepted:true,freshness:'current',fixture_only:true,
       status:response.status,value:response.value,request_id:child.context.request_id,
       authorized_for_model:false,provenance_verified:false});
+    adoptedByChild.set(child,adopted);
+    return adopted;
   }
   function view(results){
     // Display only a complete, matching set of adopted fixture replies.
     // Never issue a confirmed daily total, including an all-READY fixture.
     if(invalidated||!Array.isArray(results)||results.length!==children.length||
-      results.some((r,i)=>!r||r.request_id!==children[i].context.request_id||
+      results.some((r,i)=>!r||r!==adoptedByChild.get(children[i])||
+        r.request_id!==children[i].context.request_id||
         r.accepted!==true||r.freshness!=='current'||r.fixture_only!==true||
         r.authorized_for_model!==false||r.provenance_verified!==false))
       return refused('group_incomplete_or_changed');
-    return stable({kind:'FICTIONAL_TRIP_GROUP_ONLY',items:stable(results.slice()),
+    const safeItems=children.map(child=>adoptedByChild.get(child));
+    return stable({kind:'FICTIONAL_TRIP_GROUP_ONLY',items:stable(safeItems),
       daily_total:null,daily_total_confirmed:false,authorized_for_model:false,
       provenance_verified:false});
   }
