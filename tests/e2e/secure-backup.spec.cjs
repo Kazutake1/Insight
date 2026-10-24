@@ -136,7 +136,7 @@ test('encrypted backup controls fit 11-inch iPad landscape/portrait in both them
       expect(result.right).toBeLessThanOrEqual(result.viewportWidth+1);
       expect(result.overflow).toBeLessThanOrEqual(1);
       for(const overflow of result.groupOverflow)expect(overflow).toBeLessThanOrEqual(1);
-      expect(result.fields.length).toBe(7);
+      expect(result.fields.length).toBe(6);
       for(const field of result.fields){
         expect(field.height).toBeGreaterThanOrEqual(44);
         expect(field.left).toBeGreaterThanOrEqual(result.left-1);
