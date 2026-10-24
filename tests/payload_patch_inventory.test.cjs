@@ -26,7 +26,7 @@ test('Index shellはinline script/styleを持たず外部assetへ分離する',(
   const loader=read('insight_shell_loader_v1.js');
   const css=read('insight_shell_v1.css');
   assert.match(index,/insight_shell_boot_v1\.js\?v=20261024-encrypted-backup-build-97/);
-  assert.match(index,/insight_shell_loader_v1\.js\?v=20261022-weather-sales-view-1/);
+  assert.match(index,/insight_shell_loader_v1\.js\?v=20261024-encrypted-backup-ui-1/);
   assert.match(index,/insight_shell_v1\.css\?v=20261024-encrypted-backup-build-97/);
   assert.doesNotMatch(index,/<script(?![^>]*\bsrc=)[^>]*>/i);
   assert.doesNotMatch(index,/<style\b/i);
