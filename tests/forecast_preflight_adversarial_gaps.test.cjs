@@ -92,9 +92,10 @@ test('G2 gap: identical fake report token cannot prove an unsaved live edit',()=
   assert.equal(src.reads,1);
 });
 test('G3: existing DataHealth catches swapped daily d; fictional Reader has no structural gate',()=>{
-  const saved=syntheticYear(),live=structuredClone(saved);
+  const saved=syntheticYear();
   const rows=saved.stores.lab_a.data['2026']['10月'];
   [rows[16],rows[17]]=[rows[17],rows[16]];
+  const live=structuredClone(saved); // identical but structurally invalid
   const diagnosis=dataHealth.check(saved);
   assert.ok(diagnosis.issues.some(x=>x.code==='daily_date_mismatch'&&x.severity==='error'));
   assert.equal(fakePreflight(saved,live,true),'CAPTURE_BLOCKED');
