@@ -45,13 +45,25 @@ function day(value) {
   if (!Number.isFinite(date.getTime()) || date.toISOString().slice(0, 10) !== value) reject('invalid_target_day');
   return value;
 }
+function validTimestamp(value, requireJst) {
+  if (typeof value !== 'string') return false;
+  const match = /^(\d{4}-\d{2}-\d{2})T(\d{2}):(\d{2}):(\d{2})(?:\.(\d+))?(Z|[+-]\d{2}:\d{2})$/.exec(value);
+  if (!match) return false;
+  const calendar = new Date(match[1] + 'T00:00:00Z');
+  if (!Number.isFinite(calendar.getTime()) || calendar.toISOString().slice(0, 10) !== match[1]) return false;
+  if (Number(match[2]) > 23 || Number(match[3]) > 59 || Number(match[4]) > 59) return false;
+  const offset = match[6];
+  if (requireJst && offset !== '+09:00') return false;
+  if (offset !== 'Z' && (Number(offset.slice(1, 3)) > 23 || Number(offset.slice(4, 6)) > 59)) return false;
+  return Number.isFinite(Date.parse(value));
+}
 function jst(value) {
-  if (typeof value !== 'string' || !/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d+)?\+09:00$/.test(value) || !Number.isFinite(Date.parse(value))) reject('invalid_jst_timestamp');
+  if (!validTimestamp(value, true)) reject('invalid_jst_timestamp');
   return value;
 }
 function assertKnownAt(value, issuedAt) {
   if (value === null || value === undefined) return;
-  if (typeof value !== 'string' || !/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d+)?(?:Z|[+-]\d{2}:\d{2})$/.test(value) || !Number.isFinite(Date.parse(value))) reject('invalid_known_at');
+  if (!validTimestamp(value, false)) reject('invalid_known_at');
   if (Date.parse(value) > Date.parse(issuedAt)) reject('future_knowledge');
 }
 function assertNestedKnownAt(value, issuedAt) {
