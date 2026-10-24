@@ -94,3 +94,56 @@ test('optional encrypted backup exports ciphertext, rejects wrong passphrase and
   expect(csp).toEqual([]);
   expect(failures).toEqual([]);
 });
+
+
+test('encrypted backup controls fit 11-inch iPad landscape/portrait in both themes',async({page})=>{
+  const pageErrors=[];
+  page.on('pageerror',error=>pageErrors.push(error.message));
+  // Local HTTP must not be upgraded to HTTPS by the production CSP.
+  await page.route('**/Index.html*',async route=>{
+    const response=await route.fetch();
+    await route.fulfill({response,body:(await response.text()).replace(/;?\s*upgrade-insecure-requests/g,'')});
+  });
+  await page.goto('/Index.html',{waitUntil:'domcontentloaded'});
+  await page.locator('#navSettings').click();
+  const section=page.locator('#insightEncryptedBackup');
+  await expect(section).toBeVisible();
+
+  for(const viewport of [{width:1194,height:834},{width:834,height:1194}]){
+    await page.setViewportSize(viewport);
+    for(const dark of [false,true]){
+      await page.evaluate(enabled=>{
+        document.documentElement.classList.toggle('dark',enabled);
+        document.body.classList.toggle('dark',enabled);
+      },dark);
+      await section.scrollIntoViewIfNeeded();
+      const result=await section.evaluate(node=>{
+        const sectionBounds=node.getBoundingClientRect();
+        const fields=Array.from(node.querySelectorAll('input,button')).map(el=>{
+          const bounds=el.getBoundingClientRect();
+          return {height:bounds.height,left:bounds.left,right:bounds.right,display:getComputedStyle(el).display};
+        });
+        return {
+          viewportWidth:window.innerWidth,
+          left:sectionBounds.left,right:sectionBounds.right,
+          overflow:node.scrollWidth-node.clientWidth,
+          groupOverflow:Array.from(node.querySelectorAll('.insight-secure-group'))
+            .map(el=>el.scrollWidth-el.clientWidth),
+          fields
+        };
+      });
+      expect(result.left).toBeGreaterThanOrEqual(-1);
+      expect(result.right).toBeLessThanOrEqual(result.viewportWidth+1);
+      expect(result.overflow).toBeLessThanOrEqual(1);
+      for(const overflow of result.groupOverflow)expect(overflow).toBeLessThanOrEqual(1);
+      expect(result.fields.length).toBe(7);
+      for(const field of result.fields){
+        expect(field.height).toBeGreaterThanOrEqual(44);
+        expect(field.left).toBeGreaterThanOrEqual(result.left-1);
+        expect(field.right).toBeLessThanOrEqual(result.right+1);
+        expect(field.display).not.toBe('none');
+      }
+    }
+  }
+  expect(pageErrors).toEqual([]);
+});
