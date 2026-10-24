@@ -384,7 +384,11 @@ test('S09: fake replay unknown known_at remains unknown, never inferred as issue
 });
 
 function fictionalHandoff() {
-  const source=fixture(),reader=createFixtureSnapshotReader(source),snapshot=reader.read(req());
+  const source=fixture();
+  // The handoff contract does not convert an omitted field into an asserted missing value.
+  // Supply explicit missing evidence in this entirely fictional positive fixture.
+  source.payload.history[1].delivery={state:'missing',value:null};
+  const reader=createFixtureSnapshotReader(source),snapshot=reader.read(req());
   const envelope={
     kind:'FICTIONAL',schema_version:'fictional-insight-input-v0',
     session_id:'fixture-session',request_id:'fixture-session:1',
