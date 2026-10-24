@@ -185,6 +185,9 @@ function checkSource(n,anchor){
   keys(n.times,ts);
   for(const t of ts)tag(n.times[t],'time');
   fact(n.role,n.fact);
+  if(n.role==='weather_report'&&n.times.published_at.state==='known'&&
+      n.times.received_at.state==='known'&&
+      Date.parse(n.times.published_at.value)>Date.parse(n.times.received_at.value))fail();
 }
 function checkBinding(n,anchor){
   keys(n,['kind','ref','role','snapshot_id','source_ref','mapping_refs',
@@ -324,7 +327,9 @@ function evaluate(input){
         const at=covers(n.coverage,a,
           n.role==='historical_sales'||n.role==='historical_context'?n.fact.day:
           n.role==='weather_report'?n.fact.day:a.target_day);
-        if(at!=='ok')return false;
+        if(at!=='ok'||
+          (n.role==='target_calendar'&&n.coverage.area.mode==='unknown')||
+          (n.role==='weather_report'&&n.coverage.site.mode==='unknown'))return false;
         return Object.values(n.times).every(t=>knownBefore(t,cutoff));
       }
       if(n.kind==='binding'){
