@@ -86,14 +86,17 @@ function createFixtureCapturePreflight(source){
     const startEpoch=epoch;
     const first=source.inspect();
     const firstText=serialize(first);
-    const selectedBefore=source.readSelection(),savedEvidence=source.readSaved();
-    const liveEvidence=source.readLive(),selectedAfter=source.readSelection();
-    if(![selectedBefore,savedEvidence,liveEvidence,selectedAfter].every(plainRecord))
-      throw new Error('non_object_fixture_evidence');
-    const firstSelection=serialize(selectedBefore);
-    const saved=serialize(savedEvidence);
-    const live=serialize(liveEvidence);
-    const lastSelection=serialize(selectedAfter);
+    // Capture each observation immediately. Do not keep references that a
+    // later source read could mutate before they are serialized.
+    function readRecord(reader){
+      const value=reader();
+      if(!plainRecord(value))throw new Error('non_object_fixture_evidence');
+      return serialize(value);
+    }
+    const firstSelection=readRecord(()=>source.readSelection());
+    const saved=readRecord(()=>source.readSaved());
+    const live=readRecord(()=>source.readLive());
+    const lastSelection=readRecord(()=>source.readSelection());
     const last=source.inspect();
     const lastText=serialize(last);
     if(startEpoch!==epoch||firstText!==lastText||firstSelection!==lastSelection)
