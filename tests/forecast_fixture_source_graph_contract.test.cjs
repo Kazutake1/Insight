@@ -374,3 +374,99 @@ test('G22: all fictional target evidence can be screened, never forecast/authori
   assert.equal(Object.hasOwn(r,'value'),false);
   assert.equal(Object.hasOwn(r,'daily_total'),false);
 });
+
+
+/*
+ * G23-G26: AI社員Work independent review R3-R6 (Issue #211).
+ * Each adversarial case complements G01-G22; no production bridge.
+ */
+test('G23 R3: registry unknown-time exemption never skips coverage, derived rule or cutoff',()=>{
+  for(const edit of [
+    g=>{find(g,'common_source').coverage.store=dim('unknown');},
+    g=>{find(g,'registration_result').rule_version=UNKNOWN();},
+    g=>{find(g,'registration_result').effective_at=KNOWN('2026-10-26T09:00:00+09:00');},
+    g=>{find(g,'common_source_binding').rule_version=UNKNOWN();},
+    g=>{find(g,'common_source_binding').known_at=KNOWN('2026-10-25T10:58:30+09:00');}
+  ]){
+    const g=graph();edit(g);
+    const r=outcome(g,'FICTIONAL_SCREENING_ONLY');
+    assert.equal(r.candidate_status,'undetermined');
+    assert.equal(r.authorized_for_model,false);
+  }
+  // One registry at an actually known, timely state must not make a still
+  // unknown-but-current other registry ineligible solely because it is known.
+  const mixed=graph();
+  find(mixed,'common_source').times.known_at=KNOWN(EARLY);
+  assert.equal(outcome(mixed,'FICTIONAL_SCREENING_ONLY').candidate_status,'candidate');
+  const late=graph();
+  find(late,'common_source').times.known_at=KNOWN('2026-10-25T10:58:30+09:00');
+  assert.equal(outcome(late,'FICTIONAL_SCREENING_ONLY').candidate_status,'undetermined');
+  const replay=graph();
+  replay.anchor.purpose='historical_replay';
+  assert.equal(outcome(replay,'FICTIONAL_SCREENING_ONLY').candidate_status,'undetermined');
+});
+test('G24 R4: known coverage mismatch outranks unknown dimension in every combination',()=>{
+  const edits=[
+    g=>{const c=find(g,'trip_source').coverage;c.store=dim('unknown');c.trip=exact(3);},
+    g=>{const c=find(g,'trip_source').coverage;c.store=dim('unknown');c.category=exact('fictional_bread');},
+    g=>{const c=find(g,'trip_source').coverage;c.store=dim('unknown');c.start_day='2026-10-27';c.end_day='2026-10-27';},
+    g=>{const c=find(g,'trip_source').coverage;c.category=dim('unknown');c.store=exact('lab_b');}
+  ];
+  for(const edit of edits){const g=graph();edit(g);outcome(g,'REJECT');}
+  const onlyUnknown=graph();
+  find(onlyUnknown,'trip_source').coverage.store=dim('unknown');
+  const r=outcome(onlyUnknown,'FICTIONAL_SCREENING_ONLY');
+  assert.equal(r.target_status,'HELD');
+});
+test('G25 R5: forecast publication freshness uses policy seconds and actual cutoff',()=>{
+  const expired=addWeather(graph());
+  find(expired,'weather_policy_source').fact.max_age_seconds=1;
+  assert.equal(outcome(expired,'FICTIONAL_SCREENING_ONLY').weather_status,'HELD');
+  const exact=addWeather(graph());
+  find(exact,'weather_policy_source').fact.max_age_seconds=1;
+  find(exact,'weather_record').times.published_at=KNOWN('2026-10-25T10:57:59+09:00');
+  find(exact,'weather_record').times.received_at=KNOWN('2026-10-25T10:57:59+09:00');
+  assert.equal(outcome(exact,'FICTIONAL_SCREENING_ONLY').weather_status,'SCREENED');
+  const same=addWeather(graph());
+  find(same,'weather_policy_source').fact.max_age_seconds=1;
+  find(same,'weather_record').times.published_at=KNOWN(CAPTURE);
+  find(same,'weather_record').times.received_at=KNOWN(CAPTURE);
+  assert.equal(outcome(same,'FICTIONAL_SCREENING_ONLY').weather_status,'SCREENED');
+  const tooOld=addWeather(graph());
+  find(tooOld,'weather_policy_source').fact.max_age_seconds=1;
+  find(tooOld,'weather_record').times.published_at=KNOWN('2026-10-25T10:57:58+09:00');
+  find(tooOld,'weather_record').times.received_at=KNOWN('2026-10-25T10:57:58+09:00');
+  assert.equal(outcome(tooOld,'FICTIONAL_SCREENING_ONLY').weather_status,'HELD');
+});
+test('G26 R6: duplicated same-day historical sale cannot inflate samples, even with new refs',()=>{
+  const cloneRoot=graph();
+  const copy=structuredClone(find(cloneRoot,'history_row_zero'));
+  copy.ref='history_row_duplicate';
+  cloneRoot.nodes.push(copy);
+  cloneRoot.roots.history.push(copy.ref);
+  outcome(cloneRoot,'REJECT');
+  const clonedSources=graph();
+  const renames={
+    history_sales_zero:'history_sales_extra',
+    history_sales_zero_binding:'history_sales_extra_binding',
+    history_context_zero:'history_context_extra',
+    history_context_zero_binding:'history_context_extra_binding',
+    history_row_zero:'history_row_extra'
+  };
+  for(const old of Object.keys(renames)){
+    const duplicate=structuredClone(find(clonedSources,old));
+    duplicate.ref=renames[old];
+    if(duplicate.kind==='binding')duplicate.source_ref=renames[duplicate.source_ref];
+    if(duplicate.kind==='derived')
+      duplicate.dependencies=duplicate.dependencies.map(d=>renames[d]||d);
+    clonedSources.nodes.push(duplicate);
+  }
+  clonedSources.roots.history.push('history_row_extra');
+  outcome(clonedSources,'REJECT');
+  // Genuine two different days with valid timestamps remain two data rows.
+  const twoDays=graph();
+  find(twoDays,'history_sales_unknown').times.available_at=
+    KNOWN('2026-10-13T09:00:00+09:00');
+  const r=outcome(twoDays,'FICTIONAL_SCREENING_ONLY');
+  assert.deepEqual([r.history_eligible,r.history_zero,r.history_excluded],[2,1,0]);
+});
