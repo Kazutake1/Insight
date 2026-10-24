@@ -1,0 +1,4855 @@
+{
+  "fixture_version": "fictional-conditions-bridge-parity-v0",
+  "kind": "FICTIONAL",
+  "provenance": {
+    "insight_repository": "Kazutake1/Insight",
+    "insight_commit": "a2eeb21c3061d56702fa17fc5e7f757d29b154cd",
+    "bridge_path": "insight_forecast_conditions_bridge_proto_v1.js",
+    "lab_repository": "Kazutake1/insight-ai-lab",
+    "lab_base_commit": "7b31cc07709ed3d061024341453859504a15599e"
+  },
+  "base_envelope": {
+    "kind": "FICTIONAL",
+    "schema_version": "fictional-insight-input-v0",
+    "scope": {
+      "store_id": "lab_a",
+      "category_id": "fictional_rice",
+      "trip": 1
+    },
+    "request_id": "fictional-request-a",
+    "target_day": "2026-10-24",
+    "issued_at": "2026-10-23T10:59:00+09:00",
+    "purpose": "current_snapshot",
+    "snapshot": {
+      "snapshot_id": "fictional-snapshot-a",
+      "captured_at": "2026-10-23T10:58:00+09:00",
+      "pending": false,
+      "held": false,
+      "conflict": false
+    },
+    "history": [
+      {
+        "date": "2026-10-18",
+        "scope": {
+          "store_id": "lab_a",
+          "category_id": "fictional_rice",
+          "trip": 1
+        }
+      }
+    ]
+  },
+  "base_target_evidence": {
+    "kind": "FICTIONAL_TARGET_EVIDENCE_V0",
+    "target_day": "2026-10-24",
+    "scope": {
+      "store_id": "lab_a",
+      "category_id": "fictional_rice",
+      "trip": 1
+    },
+    "calendar": {
+      "state": "non_holiday",
+      "version": "fictional-calendar-v1",
+      "coverage": {
+        "store": "lab_a",
+        "category": "fictional_rice",
+        "start_day": "2026-10-24",
+        "end_day": "2026-10-24"
+      },
+      "record_ref": {
+        "snapshot_id": "fictional-snapshot-a",
+        "local_locator": [
+          "fictional",
+          "target",
+          "2026-10-24",
+          "calendar"
+        ],
+        "source_id": null
+      },
+      "known_at": "2026-10-23T10:00:00+09:00"
+    },
+    "sale": {
+      "state": "unknown",
+      "coverage": {
+        "store": "lab_a",
+        "category": "fictional_rice",
+        "start_day": "2026-10-24",
+        "end_day": "2026-10-24"
+      },
+      "record_ref": {
+        "snapshot_id": "fictional-snapshot-a",
+        "local_locator": [
+          "fictional",
+          "target",
+          "2026-10-24",
+          "sale-confirmation"
+        ],
+        "source_id": null
+      },
+      "known_at": null
+    },
+    "event": {
+      "state": "unknown",
+      "coverage": {
+        "store": "lab_a",
+        "category": "fictional_rice",
+        "start_day": "2026-10-24",
+        "end_day": "2026-10-24"
+      },
+      "record_ref": {
+        "snapshot_id": "fictional-snapshot-a",
+        "local_locator": [
+          "fictional",
+          "target",
+          "2026-10-24",
+          "event-confirmation"
+        ],
+        "source_id": null
+      },
+      "known_at": null
+    },
+    "registries": {
+      "common": {
+        "ledger": "common",
+        "read_state": "ok",
+        "coverage": {
+          "store": "lab_a",
+          "category": "fictional_rice",
+          "start_day": "2026-10-24",
+          "end_day": "2026-10-24"
+        },
+        "record_ref": {
+          "snapshot_id": "fictional-snapshot-a",
+          "local_locator": [
+            "fictional",
+            "target",
+            "2026-10-24",
+            "common"
+          ],
+          "source_id": null
+        },
+        "known_at": null,
+        "omission_rule": null,
+        "records": []
+      },
+      "store": {
+        "ledger": "store",
+        "read_state": "ok",
+        "coverage": {
+          "store": "lab_a",
+          "category": "fictional_rice",
+          "start_day": "2026-10-24",
+          "end_day": "2026-10-24"
+        },
+        "record_ref": {
+          "snapshot_id": "fictional-snapshot-a",
+          "local_locator": [
+            "fictional",
+            "target",
+            "2026-10-24",
+            "store"
+          ],
+          "source_id": null
+        },
+        "known_at": null,
+        "omission_rule": null,
+        "records": []
+      }
+    },
+    "policy": {
+      "allowed_omission_rules": []
+    }
+  },
+  "cases": [
+    {
+      "id": "default_unknown",
+      "default_evidence": true,
+      "expected": {
+        "outcome": "completed",
+        "eligibility": "undetermined",
+        "reason_codes": [
+          "calendar_coverage_or_version_unknown",
+          "registry_unavailable"
+        ]
+      },
+      "dto": {
+        "request": {
+          "kind": "FICTIONAL",
+          "schema_version": "fictional-forecast-conditions-v1",
+          "request_id": "fictional-request-a",
+          "snapshot_id": "fictional-snapshot-a",
+          "captured_at": "2026-10-23T10:58:00+09:00",
+          "scope": {
+            "store": "lab_a",
+            "category": "fictional_rice",
+            "trip": 1
+          },
+          "target_day": "2026-10-24",
+          "issued_at": "2026-10-23T10:59:00+09:00",
+          "purpose": "current_snapshot"
+        },
+        "policy": {
+          "id": "registered_conditions_only",
+          "version": "fictional-registered-conditions-v1",
+          "event_mapping": "fictional-all-registered-types-v1",
+          "allowed_omission_rules": []
+        },
+        "calendar": {
+          "state": "unknown",
+          "coverage": {
+            "store": "lab_a",
+            "category": "fictional_rice",
+            "start_day": "2026-10-24",
+            "end_day": "2026-10-24"
+          },
+          "ref": {
+            "snapshot_id": "fictional-snapshot-a",
+            "local_locator": [
+              "bridge",
+              "target",
+              "2026-10-24",
+              "calendar"
+            ],
+            "source_id": null
+          },
+          "known_at": null,
+          "version": null
+        },
+        "sale": {
+          "state": "unknown",
+          "coverage": {
+            "store": "lab_a",
+            "category": "fictional_rice",
+            "start_day": "2026-10-24",
+            "end_day": "2026-10-24"
+          },
+          "ref": {
+            "snapshot_id": "fictional-snapshot-a",
+            "local_locator": [
+              "bridge",
+              "target",
+              "2026-10-24",
+              "sale-confirmation"
+            ],
+            "source_id": null
+          },
+          "known_at": null
+        },
+        "event": {
+          "state": "unknown",
+          "coverage": {
+            "store": "lab_a",
+            "category": "fictional_rice",
+            "start_day": "2026-10-24",
+            "end_day": "2026-10-24"
+          },
+          "ref": {
+            "snapshot_id": "fictional-snapshot-a",
+            "local_locator": [
+              "bridge",
+              "target",
+              "2026-10-24",
+              "event-confirmation"
+            ],
+            "source_id": null
+          },
+          "known_at": null
+        },
+        "registries": [
+          {
+            "ledger": "common",
+            "read_state": "unavailable",
+            "coverage": {
+              "store": "lab_a",
+              "category": "fictional_rice",
+              "start_day": "2026-10-24",
+              "end_day": "2026-10-24"
+            },
+            "ref": {
+              "snapshot_id": "fictional-snapshot-a",
+              "local_locator": [
+                "bridge",
+                "target",
+                "2026-10-24",
+                "registry-common"
+              ],
+              "source_id": null
+            },
+            "known_at": null,
+            "records": [],
+            "omission_rule": null
+          },
+          {
+            "ledger": "store",
+            "read_state": "unavailable",
+            "coverage": {
+              "store": "lab_a",
+              "category": "fictional_rice",
+              "start_day": "2026-10-24",
+              "end_day": "2026-10-24"
+            },
+            "ref": {
+              "snapshot_id": "fictional-snapshot-a",
+              "local_locator": [
+                "bridge",
+                "target",
+                "2026-10-24",
+                "registry-store"
+              ],
+              "source_id": null
+            },
+            "known_at": null,
+            "records": [],
+            "omission_rule": null
+          }
+        ]
+      }
+    },
+    {
+      "id": "registered_absence",
+      "expected": {
+        "outcome": "completed",
+        "eligibility": "candidate",
+        "reason_codes": [
+          "registered_absent_only"
+        ]
+      },
+      "dto": {
+        "request": {
+          "kind": "FICTIONAL",
+          "schema_version": "fictional-forecast-conditions-v1",
+          "request_id": "fictional-request-a",
+          "snapshot_id": "fictional-snapshot-a",
+          "captured_at": "2026-10-23T10:58:00+09:00",
+          "scope": {
+            "store": "lab_a",
+            "category": "fictional_rice",
+            "trip": 1
+          },
+          "target_day": "2026-10-24",
+          "issued_at": "2026-10-23T10:59:00+09:00",
+          "purpose": "current_snapshot"
+        },
+        "policy": {
+          "id": "registered_conditions_only",
+          "version": "fictional-registered-conditions-v1",
+          "event_mapping": "fictional-all-registered-types-v1",
+          "allowed_omission_rules": []
+        },
+        "calendar": {
+          "state": "non_holiday",
+          "coverage": {
+            "store": "lab_a",
+            "category": "fictional_rice",
+            "start_day": "2026-10-24",
+            "end_day": "2026-10-24"
+          },
+          "ref": {
+            "snapshot_id": "fictional-snapshot-a",
+            "local_locator": [
+              "fictional",
+              "target",
+              "2026-10-24",
+              "calendar"
+            ],
+            "source_id": null
+          },
+          "known_at": "2026-10-23T10:00:00+09:00",
+          "version": "fictional-calendar-v1"
+        },
+        "sale": {
+          "state": "unknown",
+          "coverage": {
+            "store": "lab_a",
+            "category": "fictional_rice",
+            "start_day": "2026-10-24",
+            "end_day": "2026-10-24"
+          },
+          "ref": {
+            "snapshot_id": "fictional-snapshot-a",
+            "local_locator": [
+              "fictional",
+              "target",
+              "2026-10-24",
+              "sale-confirmation"
+            ],
+            "source_id": null
+          },
+          "known_at": null
+        },
+        "event": {
+          "state": "unknown",
+          "coverage": {
+            "store": "lab_a",
+            "category": "fictional_rice",
+            "start_day": "2026-10-24",
+            "end_day": "2026-10-24"
+          },
+          "ref": {
+            "snapshot_id": "fictional-snapshot-a",
+            "local_locator": [
+              "fictional",
+              "target",
+              "2026-10-24",
+              "event-confirmation"
+            ],
+            "source_id": null
+          },
+          "known_at": null
+        },
+        "registries": [
+          {
+            "ledger": "common",
+            "read_state": "ok",
+            "coverage": {
+              "store": "lab_a",
+              "category": "fictional_rice",
+              "start_day": "2026-10-24",
+              "end_day": "2026-10-24"
+            },
+            "ref": {
+              "snapshot_id": "fictional-snapshot-a",
+              "local_locator": [
+                "fictional",
+                "target",
+                "2026-10-24",
+                "common"
+              ],
+              "source_id": null
+            },
+            "known_at": null,
+            "records": [],
+            "omission_rule": null
+          },
+          {
+            "ledger": "store",
+            "read_state": "ok",
+            "coverage": {
+              "store": "lab_a",
+              "category": "fictional_rice",
+              "start_day": "2026-10-24",
+              "end_day": "2026-10-24"
+            },
+            "ref": {
+              "snapshot_id": "fictional-snapshot-a",
+              "local_locator": [
+                "fictional",
+                "target",
+                "2026-10-24",
+                "store"
+              ],
+              "source_id": null
+            },
+            "known_at": null,
+            "records": [],
+            "omission_rule": null
+          }
+        ]
+      }
+    },
+    {
+      "id": "registered_sale",
+      "evidence_edits": [
+        {
+          "path": [
+            "registries",
+            "common",
+            "records"
+          ],
+          "value": [
+            {
+              "event_type": "sale",
+              "applicability": "applies",
+              "record_ref": {
+                "snapshot_id": "fictional-snapshot-a",
+                "local_locator": [
+                  "fictional",
+                  "target",
+                  "2026-10-24",
+                  "item"
+                ],
+                "source_id": "fictional-original-event"
+              },
+              "known_at": null
+            }
+          ]
+        }
+      ],
+      "expected": {
+        "outcome": "completed",
+        "eligibility": "not_candidate",
+        "reason_codes": [
+          "registered_present"
+        ]
+      },
+      "dto": {
+        "request": {
+          "kind": "FICTIONAL",
+          "schema_version": "fictional-forecast-conditions-v1",
+          "request_id": "fictional-request-a",
+          "snapshot_id": "fictional-snapshot-a",
+          "captured_at": "2026-10-23T10:58:00+09:00",
+          "scope": {
+            "store": "lab_a",
+            "category": "fictional_rice",
+            "trip": 1
+          },
+          "target_day": "2026-10-24",
+          "issued_at": "2026-10-23T10:59:00+09:00",
+          "purpose": "current_snapshot"
+        },
+        "policy": {
+          "id": "registered_conditions_only",
+          "version": "fictional-registered-conditions-v1",
+          "event_mapping": "fictional-all-registered-types-v1",
+          "allowed_omission_rules": []
+        },
+        "calendar": {
+          "state": "non_holiday",
+          "coverage": {
+            "store": "lab_a",
+            "category": "fictional_rice",
+            "start_day": "2026-10-24",
+            "end_day": "2026-10-24"
+          },
+          "ref": {
+            "snapshot_id": "fictional-snapshot-a",
+            "local_locator": [
+              "fictional",
+              "target",
+              "2026-10-24",
+              "calendar"
+            ],
+            "source_id": null
+          },
+          "known_at": "2026-10-23T10:00:00+09:00",
+          "version": "fictional-calendar-v1"
+        },
+        "sale": {
+          "state": "unknown",
+          "coverage": {
+            "store": "lab_a",
+            "category": "fictional_rice",
+            "start_day": "2026-10-24",
+            "end_day": "2026-10-24"
+          },
+          "ref": {
+            "snapshot_id": "fictional-snapshot-a",
+            "local_locator": [
+              "fictional",
+              "target",
+              "2026-10-24",
+              "sale-confirmation"
+            ],
+            "source_id": null
+          },
+          "known_at": null
+        },
+        "event": {
+          "state": "unknown",
+          "coverage": {
+            "store": "lab_a",
+            "category": "fictional_rice",
+            "start_day": "2026-10-24",
+            "end_day": "2026-10-24"
+          },
+          "ref": {
+            "snapshot_id": "fictional-snapshot-a",
+            "local_locator": [
+              "fictional",
+              "target",
+              "2026-10-24",
+              "event-confirmation"
+            ],
+            "source_id": null
+          },
+          "known_at": null
+        },
+        "registries": [
+          {
+            "ledger": "common",
+            "read_state": "ok",
+            "coverage": {
+              "store": "lab_a",
+              "category": "fictional_rice",
+              "start_day": "2026-10-24",
+              "end_day": "2026-10-24"
+            },
+            "ref": {
+              "snapshot_id": "fictional-snapshot-a",
+              "local_locator": [
+                "fictional",
+                "target",
+                "2026-10-24",
+                "common"
+              ],
+              "source_id": null
+            },
+            "known_at": null,
+            "records": [
+              {
+                "event_type": "sale",
+                "applicability": "applies",
+                "ref": {
+                  "snapshot_id": "fictional-snapshot-a",
+                  "local_locator": [
+                    "fictional",
+                    "target",
+                    "2026-10-24",
+                    "item"
+                  ],
+                  "source_id": "fictional-original-event"
+                },
+                "known_at": null
+              }
+            ],
+            "omission_rule": null
+          },
+          {
+            "ledger": "store",
+            "read_state": "ok",
+            "coverage": {
+              "store": "lab_a",
+              "category": "fictional_rice",
+              "start_day": "2026-10-24",
+              "end_day": "2026-10-24"
+            },
+            "ref": {
+              "snapshot_id": "fictional-snapshot-a",
+              "local_locator": [
+                "fictional",
+                "target",
+                "2026-10-24",
+                "store"
+              ],
+              "source_id": null
+            },
+            "known_at": null,
+            "records": [],
+            "omission_rule": null
+          }
+        ]
+      }
+    },
+    {
+      "id": "registered_event",
+      "evidence_edits": [
+        {
+          "path": [
+            "registries",
+            "store",
+            "records"
+          ],
+          "value": [
+            {
+              "event_type": "nearby",
+              "applicability": "applies",
+              "record_ref": {
+                "snapshot_id": "fictional-snapshot-a",
+                "local_locator": [
+                  "fictional",
+                  "target",
+                  "2026-10-24",
+                  "item"
+                ],
+                "source_id": "fictional-original-event"
+              },
+              "known_at": null
+            }
+          ]
+        }
+      ],
+      "expected": {
+        "outcome": "completed",
+        "eligibility": "not_candidate",
+        "reason_codes": [
+          "registered_present"
+        ]
+      },
+      "dto": {
+        "request": {
+          "kind": "FICTIONAL",
+          "schema_version": "fictional-forecast-conditions-v1",
+          "request_id": "fictional-request-a",
+          "snapshot_id": "fictional-snapshot-a",
+          "captured_at": "2026-10-23T10:58:00+09:00",
+          "scope": {
+            "store": "lab_a",
+            "category": "fictional_rice",
+            "trip": 1
+          },
+          "target_day": "2026-10-24",
+          "issued_at": "2026-10-23T10:59:00+09:00",
+          "purpose": "current_snapshot"
+        },
+        "policy": {
+          "id": "registered_conditions_only",
+          "version": "fictional-registered-conditions-v1",
+          "event_mapping": "fictional-all-registered-types-v1",
+          "allowed_omission_rules": []
+        },
+        "calendar": {
+          "state": "non_holiday",
+          "coverage": {
+            "store": "lab_a",
+            "category": "fictional_rice",
+            "start_day": "2026-10-24",
+            "end_day": "2026-10-24"
+          },
+          "ref": {
+            "snapshot_id": "fictional-snapshot-a",
+            "local_locator": [
+              "fictional",
+              "target",
+              "2026-10-24",
+              "calendar"
+            ],
+            "source_id": null
+          },
+          "known_at": "2026-10-23T10:00:00+09:00",
+          "version": "fictional-calendar-v1"
+        },
+        "sale": {
+          "state": "unknown",
+          "coverage": {
+            "store": "lab_a",
+            "category": "fictional_rice",
+            "start_day": "2026-10-24",
+            "end_day": "2026-10-24"
+          },
+          "ref": {
+            "snapshot_id": "fictional-snapshot-a",
+            "local_locator": [
+              "fictional",
+              "target",
+              "2026-10-24",
+              "sale-confirmation"
+            ],
+            "source_id": null
+          },
+          "known_at": null
+        },
+        "event": {
+          "state": "unknown",
+          "coverage": {
+            "store": "lab_a",
+            "category": "fictional_rice",
+            "start_day": "2026-10-24",
+            "end_day": "2026-10-24"
+          },
+          "ref": {
+            "snapshot_id": "fictional-snapshot-a",
+            "local_locator": [
+              "fictional",
+              "target",
+              "2026-10-24",
+              "event-confirmation"
+            ],
+            "source_id": null
+          },
+          "known_at": null
+        },
+        "registries": [
+          {
+            "ledger": "common",
+            "read_state": "ok",
+            "coverage": {
+              "store": "lab_a",
+              "category": "fictional_rice",
+              "start_day": "2026-10-24",
+              "end_day": "2026-10-24"
+            },
+            "ref": {
+              "snapshot_id": "fictional-snapshot-a",
+              "local_locator": [
+                "fictional",
+                "target",
+                "2026-10-24",
+                "common"
+              ],
+              "source_id": null
+            },
+            "known_at": null,
+            "records": [],
+            "omission_rule": null
+          },
+          {
+            "ledger": "store",
+            "read_state": "ok",
+            "coverage": {
+              "store": "lab_a",
+              "category": "fictional_rice",
+              "start_day": "2026-10-24",
+              "end_day": "2026-10-24"
+            },
+            "ref": {
+              "snapshot_id": "fictional-snapshot-a",
+              "local_locator": [
+                "fictional",
+                "target",
+                "2026-10-24",
+                "store"
+              ],
+              "source_id": null
+            },
+            "known_at": null,
+            "records": [
+              {
+                "event_type": "nearby",
+                "applicability": "applies",
+                "ref": {
+                  "snapshot_id": "fictional-snapshot-a",
+                  "local_locator": [
+                    "fictional",
+                    "target",
+                    "2026-10-24",
+                    "item"
+                  ],
+                  "source_id": "fictional-original-event"
+                },
+                "known_at": null
+              }
+            ],
+            "omission_rule": null
+          }
+        ]
+      }
+    },
+    {
+      "id": "unknown_type",
+      "evidence_edits": [
+        {
+          "path": [
+            "registries",
+            "store",
+            "records"
+          ],
+          "value": [
+            {
+              "event_type": "unmapped",
+              "applicability": "applies",
+              "record_ref": {
+                "snapshot_id": "fictional-snapshot-a",
+                "local_locator": [
+                  "fictional",
+                  "target",
+                  "2026-10-24",
+                  "item"
+                ],
+                "source_id": "fictional-original-event"
+              },
+              "known_at": null
+            }
+          ]
+        }
+      ],
+      "expected": {
+        "outcome": "completed",
+        "eligibility": "undetermined",
+        "reason_codes": [
+          "event_type_unmapped"
+        ]
+      },
+      "dto": {
+        "request": {
+          "kind": "FICTIONAL",
+          "schema_version": "fictional-forecast-conditions-v1",
+          "request_id": "fictional-request-a",
+          "snapshot_id": "fictional-snapshot-a",
+          "captured_at": "2026-10-23T10:58:00+09:00",
+          "scope": {
+            "store": "lab_a",
+            "category": "fictional_rice",
+            "trip": 1
+          },
+          "target_day": "2026-10-24",
+          "issued_at": "2026-10-23T10:59:00+09:00",
+          "purpose": "current_snapshot"
+        },
+        "policy": {
+          "id": "registered_conditions_only",
+          "version": "fictional-registered-conditions-v1",
+          "event_mapping": "fictional-all-registered-types-v1",
+          "allowed_omission_rules": []
+        },
+        "calendar": {
+          "state": "non_holiday",
+          "coverage": {
+            "store": "lab_a",
+            "category": "fictional_rice",
+            "start_day": "2026-10-24",
+            "end_day": "2026-10-24"
+          },
+          "ref": {
+            "snapshot_id": "fictional-snapshot-a",
+            "local_locator": [
+              "fictional",
+              "target",
+              "2026-10-24",
+              "calendar"
+            ],
+            "source_id": null
+          },
+          "known_at": "2026-10-23T10:00:00+09:00",
+          "version": "fictional-calendar-v1"
+        },
+        "sale": {
+          "state": "unknown",
+          "coverage": {
+            "store": "lab_a",
+            "category": "fictional_rice",
+            "start_day": "2026-10-24",
+            "end_day": "2026-10-24"
+          },
+          "ref": {
+            "snapshot_id": "fictional-snapshot-a",
+            "local_locator": [
+              "fictional",
+              "target",
+              "2026-10-24",
+              "sale-confirmation"
+            ],
+            "source_id": null
+          },
+          "known_at": null
+        },
+        "event": {
+          "state": "unknown",
+          "coverage": {
+            "store": "lab_a",
+            "category": "fictional_rice",
+            "start_day": "2026-10-24",
+            "end_day": "2026-10-24"
+          },
+          "ref": {
+            "snapshot_id": "fictional-snapshot-a",
+            "local_locator": [
+              "fictional",
+              "target",
+              "2026-10-24",
+              "event-confirmation"
+            ],
+            "source_id": null
+          },
+          "known_at": null
+        },
+        "registries": [
+          {
+            "ledger": "common",
+            "read_state": "ok",
+            "coverage": {
+              "store": "lab_a",
+              "category": "fictional_rice",
+              "start_day": "2026-10-24",
+              "end_day": "2026-10-24"
+            },
+            "ref": {
+              "snapshot_id": "fictional-snapshot-a",
+              "local_locator": [
+                "fictional",
+                "target",
+                "2026-10-24",
+                "common"
+              ],
+              "source_id": null
+            },
+            "known_at": null,
+            "records": [],
+            "omission_rule": null
+          },
+          {
+            "ledger": "store",
+            "read_state": "ok",
+            "coverage": {
+              "store": "lab_a",
+              "category": "fictional_rice",
+              "start_day": "2026-10-24",
+              "end_day": "2026-10-24"
+            },
+            "ref": {
+              "snapshot_id": "fictional-snapshot-a",
+              "local_locator": [
+                "fictional",
+                "target",
+                "2026-10-24",
+                "store"
+              ],
+              "source_id": null
+            },
+            "known_at": null,
+            "records": [
+              {
+                "event_type": "unmapped",
+                "applicability": "applies",
+                "ref": {
+                  "snapshot_id": "fictional-snapshot-a",
+                  "local_locator": [
+                    "fictional",
+                    "target",
+                    "2026-10-24",
+                    "item"
+                  ],
+                  "source_id": "fictional-original-event"
+                },
+                "known_at": null
+              }
+            ],
+            "omission_rule": null
+          }
+        ]
+      }
+    },
+    {
+      "id": "unknown_applicability",
+      "evidence_edits": [
+        {
+          "path": [
+            "registries",
+            "store",
+            "records"
+          ],
+          "value": [
+            {
+              "event_type": "sale",
+              "applicability": "unknown",
+              "record_ref": {
+                "snapshot_id": "fictional-snapshot-a",
+                "local_locator": [
+                  "fictional",
+                  "target",
+                  "2026-10-24",
+                  "item"
+                ],
+                "source_id": "fictional-original-event"
+              },
+              "known_at": null
+            }
+          ]
+        }
+      ],
+      "expected": {
+        "outcome": "completed",
+        "eligibility": "undetermined",
+        "reason_codes": [
+          "applicability_unknown"
+        ]
+      },
+      "dto": {
+        "request": {
+          "kind": "FICTIONAL",
+          "schema_version": "fictional-forecast-conditions-v1",
+          "request_id": "fictional-request-a",
+          "snapshot_id": "fictional-snapshot-a",
+          "captured_at": "2026-10-23T10:58:00+09:00",
+          "scope": {
+            "store": "lab_a",
+            "category": "fictional_rice",
+            "trip": 1
+          },
+          "target_day": "2026-10-24",
+          "issued_at": "2026-10-23T10:59:00+09:00",
+          "purpose": "current_snapshot"
+        },
+        "policy": {
+          "id": "registered_conditions_only",
+          "version": "fictional-registered-conditions-v1",
+          "event_mapping": "fictional-all-registered-types-v1",
+          "allowed_omission_rules": []
+        },
+        "calendar": {
+          "state": "non_holiday",
+          "coverage": {
+            "store": "lab_a",
+            "category": "fictional_rice",
+            "start_day": "2026-10-24",
+            "end_day": "2026-10-24"
+          },
+          "ref": {
+            "snapshot_id": "fictional-snapshot-a",
+            "local_locator": [
+              "fictional",
+              "target",
+              "2026-10-24",
+              "calendar"
+            ],
+            "source_id": null
+          },
+          "known_at": "2026-10-23T10:00:00+09:00",
+          "version": "fictional-calendar-v1"
+        },
+        "sale": {
+          "state": "unknown",
+          "coverage": {
+            "store": "lab_a",
+            "category": "fictional_rice",
+            "start_day": "2026-10-24",
+            "end_day": "2026-10-24"
+          },
+          "ref": {
+            "snapshot_id": "fictional-snapshot-a",
+            "local_locator": [
+              "fictional",
+              "target",
+              "2026-10-24",
+              "sale-confirmation"
+            ],
+            "source_id": null
+          },
+          "known_at": null
+        },
+        "event": {
+          "state": "unknown",
+          "coverage": {
+            "store": "lab_a",
+            "category": "fictional_rice",
+            "start_day": "2026-10-24",
+            "end_day": "2026-10-24"
+          },
+          "ref": {
+            "snapshot_id": "fictional-snapshot-a",
+            "local_locator": [
+              "fictional",
+              "target",
+              "2026-10-24",
+              "event-confirmation"
+            ],
+            "source_id": null
+          },
+          "known_at": null
+        },
+        "registries": [
+          {
+            "ledger": "common",
+            "read_state": "ok",
+            "coverage": {
+              "store": "lab_a",
+              "category": "fictional_rice",
+              "start_day": "2026-10-24",
+              "end_day": "2026-10-24"
+            },
+            "ref": {
+              "snapshot_id": "fictional-snapshot-a",
+              "local_locator": [
+                "fictional",
+                "target",
+                "2026-10-24",
+                "common"
+              ],
+              "source_id": null
+            },
+            "known_at": null,
+            "records": [],
+            "omission_rule": null
+          },
+          {
+            "ledger": "store",
+            "read_state": "ok",
+            "coverage": {
+              "store": "lab_a",
+              "category": "fictional_rice",
+              "start_day": "2026-10-24",
+              "end_day": "2026-10-24"
+            },
+            "ref": {
+              "snapshot_id": "fictional-snapshot-a",
+              "local_locator": [
+                "fictional",
+                "target",
+                "2026-10-24",
+                "store"
+              ],
+              "source_id": null
+            },
+            "known_at": null,
+            "records": [
+              {
+                "event_type": "sale",
+                "applicability": "unknown",
+                "ref": {
+                  "snapshot_id": "fictional-snapshot-a",
+                  "local_locator": [
+                    "fictional",
+                    "target",
+                    "2026-10-24",
+                    "item"
+                  ],
+                  "source_id": "fictional-original-event"
+                },
+                "known_at": null
+              }
+            ],
+            "omission_rule": null
+          }
+        ]
+      }
+    },
+    {
+      "id": "conflict_applicability",
+      "evidence_edits": [
+        {
+          "path": [
+            "registries",
+            "store",
+            "records"
+          ],
+          "value": [
+            {
+              "event_type": "sale",
+              "applicability": "conflict",
+              "record_ref": {
+                "snapshot_id": "fictional-snapshot-a",
+                "local_locator": [
+                  "fictional",
+                  "target",
+                  "2026-10-24",
+                  "item"
+                ],
+                "source_id": "fictional-original-event"
+              },
+              "known_at": null
+            }
+          ]
+        }
+      ],
+      "expected": {
+        "outcome": "completed",
+        "eligibility": "undetermined",
+        "reason_codes": [
+          "applicability_conflict"
+        ]
+      },
+      "dto": {
+        "request": {
+          "kind": "FICTIONAL",
+          "schema_version": "fictional-forecast-conditions-v1",
+          "request_id": "fictional-request-a",
+          "snapshot_id": "fictional-snapshot-a",
+          "captured_at": "2026-10-23T10:58:00+09:00",
+          "scope": {
+            "store": "lab_a",
+            "category": "fictional_rice",
+            "trip": 1
+          },
+          "target_day": "2026-10-24",
+          "issued_at": "2026-10-23T10:59:00+09:00",
+          "purpose": "current_snapshot"
+        },
+        "policy": {
+          "id": "registered_conditions_only",
+          "version": "fictional-registered-conditions-v1",
+          "event_mapping": "fictional-all-registered-types-v1",
+          "allowed_omission_rules": []
+        },
+        "calendar": {
+          "state": "non_holiday",
+          "coverage": {
+            "store": "lab_a",
+            "category": "fictional_rice",
+            "start_day": "2026-10-24",
+            "end_day": "2026-10-24"
+          },
+          "ref": {
+            "snapshot_id": "fictional-snapshot-a",
+            "local_locator": [
+              "fictional",
+              "target",
+              "2026-10-24",
+              "calendar"
+            ],
+            "source_id": null
+          },
+          "known_at": "2026-10-23T10:00:00+09:00",
+          "version": "fictional-calendar-v1"
+        },
+        "sale": {
+          "state": "unknown",
+          "coverage": {
+            "store": "lab_a",
+            "category": "fictional_rice",
+            "start_day": "2026-10-24",
+            "end_day": "2026-10-24"
+          },
+          "ref": {
+            "snapshot_id": "fictional-snapshot-a",
+            "local_locator": [
+              "fictional",
+              "target",
+              "2026-10-24",
+              "sale-confirmation"
+            ],
+            "source_id": null
+          },
+          "known_at": null
+        },
+        "event": {
+          "state": "unknown",
+          "coverage": {
+            "store": "lab_a",
+            "category": "fictional_rice",
+            "start_day": "2026-10-24",
+            "end_day": "2026-10-24"
+          },
+          "ref": {
+            "snapshot_id": "fictional-snapshot-a",
+            "local_locator": [
+              "fictional",
+              "target",
+              "2026-10-24",
+              "event-confirmation"
+            ],
+            "source_id": null
+          },
+          "known_at": null
+        },
+        "registries": [
+          {
+            "ledger": "common",
+            "read_state": "ok",
+            "coverage": {
+              "store": "lab_a",
+              "category": "fictional_rice",
+              "start_day": "2026-10-24",
+              "end_day": "2026-10-24"
+            },
+            "ref": {
+              "snapshot_id": "fictional-snapshot-a",
+              "local_locator": [
+                "fictional",
+                "target",
+                "2026-10-24",
+                "common"
+              ],
+              "source_id": null
+            },
+            "known_at": null,
+            "records": [],
+            "omission_rule": null
+          },
+          {
+            "ledger": "store",
+            "read_state": "ok",
+            "coverage": {
+              "store": "lab_a",
+              "category": "fictional_rice",
+              "start_day": "2026-10-24",
+              "end_day": "2026-10-24"
+            },
+            "ref": {
+              "snapshot_id": "fictional-snapshot-a",
+              "local_locator": [
+                "fictional",
+                "target",
+                "2026-10-24",
+                "store"
+              ],
+              "source_id": null
+            },
+            "known_at": null,
+            "records": [
+              {
+                "event_type": "sale",
+                "applicability": "conflict",
+                "ref": {
+                  "snapshot_id": "fictional-snapshot-a",
+                  "local_locator": [
+                    "fictional",
+                    "target",
+                    "2026-10-24",
+                    "item"
+                  ],
+                  "source_id": "fictional-original-event"
+                },
+                "known_at": null
+              }
+            ],
+            "omission_rule": null
+          }
+        ]
+      }
+    },
+    {
+      "id": "not_applicable",
+      "evidence_edits": [
+        {
+          "path": [
+            "registries",
+            "store",
+            "records"
+          ],
+          "value": [
+            {
+              "event_type": "sale",
+              "applicability": "not_applies",
+              "record_ref": {
+                "snapshot_id": "fictional-snapshot-a",
+                "local_locator": [
+                  "fictional",
+                  "target",
+                  "2026-10-24",
+                  "item"
+                ],
+                "source_id": "fictional-original-event"
+              },
+              "known_at": null
+            }
+          ]
+        }
+      ],
+      "expected": {
+        "outcome": "completed",
+        "eligibility": "candidate",
+        "reason_codes": [
+          "registered_not_applicable"
+        ]
+      },
+      "dto": {
+        "request": {
+          "kind": "FICTIONAL",
+          "schema_version": "fictional-forecast-conditions-v1",
+          "request_id": "fictional-request-a",
+          "snapshot_id": "fictional-snapshot-a",
+          "captured_at": "2026-10-23T10:58:00+09:00",
+          "scope": {
+            "store": "lab_a",
+            "category": "fictional_rice",
+            "trip": 1
+          },
+          "target_day": "2026-10-24",
+          "issued_at": "2026-10-23T10:59:00+09:00",
+          "purpose": "current_snapshot"
+        },
+        "policy": {
+          "id": "registered_conditions_only",
+          "version": "fictional-registered-conditions-v1",
+          "event_mapping": "fictional-all-registered-types-v1",
+          "allowed_omission_rules": []
+        },
+        "calendar": {
+          "state": "non_holiday",
+          "coverage": {
+            "store": "lab_a",
+            "category": "fictional_rice",
+            "start_day": "2026-10-24",
+            "end_day": "2026-10-24"
+          },
+          "ref": {
+            "snapshot_id": "fictional-snapshot-a",
+            "local_locator": [
+              "fictional",
+              "target",
+              "2026-10-24",
+              "calendar"
+            ],
+            "source_id": null
+          },
+          "known_at": "2026-10-23T10:00:00+09:00",
+          "version": "fictional-calendar-v1"
+        },
+        "sale": {
+          "state": "unknown",
+          "coverage": {
+            "store": "lab_a",
+            "category": "fictional_rice",
+            "start_day": "2026-10-24",
+            "end_day": "2026-10-24"
+          },
+          "ref": {
+            "snapshot_id": "fictional-snapshot-a",
+            "local_locator": [
+              "fictional",
+              "target",
+              "2026-10-24",
+              "sale-confirmation"
+            ],
+            "source_id": null
+          },
+          "known_at": null
+        },
+        "event": {
+          "state": "unknown",
+          "coverage": {
+            "store": "lab_a",
+            "category": "fictional_rice",
+            "start_day": "2026-10-24",
+            "end_day": "2026-10-24"
+          },
+          "ref": {
+            "snapshot_id": "fictional-snapshot-a",
+            "local_locator": [
+              "fictional",
+              "target",
+              "2026-10-24",
+              "event-confirmation"
+            ],
+            "source_id": null
+          },
+          "known_at": null
+        },
+        "registries": [
+          {
+            "ledger": "common",
+            "read_state": "ok",
+            "coverage": {
+              "store": "lab_a",
+              "category": "fictional_rice",
+              "start_day": "2026-10-24",
+              "end_day": "2026-10-24"
+            },
+            "ref": {
+              "snapshot_id": "fictional-snapshot-a",
+              "local_locator": [
+                "fictional",
+                "target",
+                "2026-10-24",
+                "common"
+              ],
+              "source_id": null
+            },
+            "known_at": null,
+            "records": [],
+            "omission_rule": null
+          },
+          {
+            "ledger": "store",
+            "read_state": "ok",
+            "coverage": {
+              "store": "lab_a",
+              "category": "fictional_rice",
+              "start_day": "2026-10-24",
+              "end_day": "2026-10-24"
+            },
+            "ref": {
+              "snapshot_id": "fictional-snapshot-a",
+              "local_locator": [
+                "fictional",
+                "target",
+                "2026-10-24",
+                "store"
+              ],
+              "source_id": null
+            },
+            "known_at": null,
+            "records": [
+              {
+                "event_type": "sale",
+                "applicability": "not_applies",
+                "ref": {
+                  "snapshot_id": "fictional-snapshot-a",
+                  "local_locator": [
+                    "fictional",
+                    "target",
+                    "2026-10-24",
+                    "item"
+                  ],
+                  "source_id": "fictional-original-event"
+                },
+                "known_at": null
+              }
+            ],
+            "omission_rule": null
+          }
+        ]
+      }
+    },
+    {
+      "id": "ledger_unavailable",
+      "evidence_edits": [
+        {
+          "path": [
+            "registries",
+            "store",
+            "read_state"
+          ],
+          "value": "unavailable"
+        }
+      ],
+      "expected": {
+        "outcome": "completed",
+        "eligibility": "undetermined",
+        "reason_codes": [
+          "registry_unavailable"
+        ]
+      },
+      "dto": {
+        "request": {
+          "kind": "FICTIONAL",
+          "schema_version": "fictional-forecast-conditions-v1",
+          "request_id": "fictional-request-a",
+          "snapshot_id": "fictional-snapshot-a",
+          "captured_at": "2026-10-23T10:58:00+09:00",
+          "scope": {
+            "store": "lab_a",
+            "category": "fictional_rice",
+            "trip": 1
+          },
+          "target_day": "2026-10-24",
+          "issued_at": "2026-10-23T10:59:00+09:00",
+          "purpose": "current_snapshot"
+        },
+        "policy": {
+          "id": "registered_conditions_only",
+          "version": "fictional-registered-conditions-v1",
+          "event_mapping": "fictional-all-registered-types-v1",
+          "allowed_omission_rules": []
+        },
+        "calendar": {
+          "state": "non_holiday",
+          "coverage": {
+            "store": "lab_a",
+            "category": "fictional_rice",
+            "start_day": "2026-10-24",
+            "end_day": "2026-10-24"
+          },
+          "ref": {
+            "snapshot_id": "fictional-snapshot-a",
+            "local_locator": [
+              "fictional",
+              "target",
+              "2026-10-24",
+              "calendar"
+            ],
+            "source_id": null
+          },
+          "known_at": "2026-10-23T10:00:00+09:00",
+          "version": "fictional-calendar-v1"
+        },
+        "sale": {
+          "state": "unknown",
+          "coverage": {
+            "store": "lab_a",
+            "category": "fictional_rice",
+            "start_day": "2026-10-24",
+            "end_day": "2026-10-24"
+          },
+          "ref": {
+            "snapshot_id": "fictional-snapshot-a",
+            "local_locator": [
+              "fictional",
+              "target",
+              "2026-10-24",
+              "sale-confirmation"
+            ],
+            "source_id": null
+          },
+          "known_at": null
+        },
+        "event": {
+          "state": "unknown",
+          "coverage": {
+            "store": "lab_a",
+            "category": "fictional_rice",
+            "start_day": "2026-10-24",
+            "end_day": "2026-10-24"
+          },
+          "ref": {
+            "snapshot_id": "fictional-snapshot-a",
+            "local_locator": [
+              "fictional",
+              "target",
+              "2026-10-24",
+              "event-confirmation"
+            ],
+            "source_id": null
+          },
+          "known_at": null
+        },
+        "registries": [
+          {
+            "ledger": "common",
+            "read_state": "ok",
+            "coverage": {
+              "store": "lab_a",
+              "category": "fictional_rice",
+              "start_day": "2026-10-24",
+              "end_day": "2026-10-24"
+            },
+            "ref": {
+              "snapshot_id": "fictional-snapshot-a",
+              "local_locator": [
+                "fictional",
+                "target",
+                "2026-10-24",
+                "common"
+              ],
+              "source_id": null
+            },
+            "known_at": null,
+            "records": [],
+            "omission_rule": null
+          },
+          {
+            "ledger": "store",
+            "read_state": "unavailable",
+            "coverage": {
+              "store": "lab_a",
+              "category": "fictional_rice",
+              "start_day": "2026-10-24",
+              "end_day": "2026-10-24"
+            },
+            "ref": {
+              "snapshot_id": "fictional-snapshot-a",
+              "local_locator": [
+                "fictional",
+                "target",
+                "2026-10-24",
+                "store"
+              ],
+              "source_id": null
+            },
+            "known_at": null,
+            "records": [],
+            "omission_rule": null
+          }
+        ]
+      }
+    },
+    {
+      "id": "ledger_invalid",
+      "evidence_edits": [
+        {
+          "path": [
+            "registries",
+            "store",
+            "read_state"
+          ],
+          "value": "invalid"
+        }
+      ],
+      "expected": {
+        "outcome": "completed",
+        "eligibility": "undetermined",
+        "reason_codes": [
+          "registry_invalid"
+        ]
+      },
+      "dto": {
+        "request": {
+          "kind": "FICTIONAL",
+          "schema_version": "fictional-forecast-conditions-v1",
+          "request_id": "fictional-request-a",
+          "snapshot_id": "fictional-snapshot-a",
+          "captured_at": "2026-10-23T10:58:00+09:00",
+          "scope": {
+            "store": "lab_a",
+            "category": "fictional_rice",
+            "trip": 1
+          },
+          "target_day": "2026-10-24",
+          "issued_at": "2026-10-23T10:59:00+09:00",
+          "purpose": "current_snapshot"
+        },
+        "policy": {
+          "id": "registered_conditions_only",
+          "version": "fictional-registered-conditions-v1",
+          "event_mapping": "fictional-all-registered-types-v1",
+          "allowed_omission_rules": []
+        },
+        "calendar": {
+          "state": "non_holiday",
+          "coverage": {
+            "store": "lab_a",
+            "category": "fictional_rice",
+            "start_day": "2026-10-24",
+            "end_day": "2026-10-24"
+          },
+          "ref": {
+            "snapshot_id": "fictional-snapshot-a",
+            "local_locator": [
+              "fictional",
+              "target",
+              "2026-10-24",
+              "calendar"
+            ],
+            "source_id": null
+          },
+          "known_at": "2026-10-23T10:00:00+09:00",
+          "version": "fictional-calendar-v1"
+        },
+        "sale": {
+          "state": "unknown",
+          "coverage": {
+            "store": "lab_a",
+            "category": "fictional_rice",
+            "start_day": "2026-10-24",
+            "end_day": "2026-10-24"
+          },
+          "ref": {
+            "snapshot_id": "fictional-snapshot-a",
+            "local_locator": [
+              "fictional",
+              "target",
+              "2026-10-24",
+              "sale-confirmation"
+            ],
+            "source_id": null
+          },
+          "known_at": null
+        },
+        "event": {
+          "state": "unknown",
+          "coverage": {
+            "store": "lab_a",
+            "category": "fictional_rice",
+            "start_day": "2026-10-24",
+            "end_day": "2026-10-24"
+          },
+          "ref": {
+            "snapshot_id": "fictional-snapshot-a",
+            "local_locator": [
+              "fictional",
+              "target",
+              "2026-10-24",
+              "event-confirmation"
+            ],
+            "source_id": null
+          },
+          "known_at": null
+        },
+        "registries": [
+          {
+            "ledger": "common",
+            "read_state": "ok",
+            "coverage": {
+              "store": "lab_a",
+              "category": "fictional_rice",
+              "start_day": "2026-10-24",
+              "end_day": "2026-10-24"
+            },
+            "ref": {
+              "snapshot_id": "fictional-snapshot-a",
+              "local_locator": [
+                "fictional",
+                "target",
+                "2026-10-24",
+                "common"
+              ],
+              "source_id": null
+            },
+            "known_at": null,
+            "records": [],
+            "omission_rule": null
+          },
+          {
+            "ledger": "store",
+            "read_state": "invalid",
+            "coverage": {
+              "store": "lab_a",
+              "category": "fictional_rice",
+              "start_day": "2026-10-24",
+              "end_day": "2026-10-24"
+            },
+            "ref": {
+              "snapshot_id": "fictional-snapshot-a",
+              "local_locator": [
+                "fictional",
+                "target",
+                "2026-10-24",
+                "store"
+              ],
+              "source_id": null
+            },
+            "known_at": null,
+            "records": [],
+            "omission_rule": null
+          }
+        ]
+      }
+    },
+    {
+      "id": "ledger_omitted",
+      "evidence_edits": [
+        {
+          "path": [
+            "registries",
+            "store",
+            "read_state"
+          ],
+          "value": "omitted"
+        }
+      ],
+      "expected": {
+        "outcome": "completed",
+        "eligibility": "undetermined",
+        "reason_codes": [
+          "registry_omitted"
+        ]
+      },
+      "dto": {
+        "request": {
+          "kind": "FICTIONAL",
+          "schema_version": "fictional-forecast-conditions-v1",
+          "request_id": "fictional-request-a",
+          "snapshot_id": "fictional-snapshot-a",
+          "captured_at": "2026-10-23T10:58:00+09:00",
+          "scope": {
+            "store": "lab_a",
+            "category": "fictional_rice",
+            "trip": 1
+          },
+          "target_day": "2026-10-24",
+          "issued_at": "2026-10-23T10:59:00+09:00",
+          "purpose": "current_snapshot"
+        },
+        "policy": {
+          "id": "registered_conditions_only",
+          "version": "fictional-registered-conditions-v1",
+          "event_mapping": "fictional-all-registered-types-v1",
+          "allowed_omission_rules": []
+        },
+        "calendar": {
+          "state": "non_holiday",
+          "coverage": {
+            "store": "lab_a",
+            "category": "fictional_rice",
+            "start_day": "2026-10-24",
+            "end_day": "2026-10-24"
+          },
+          "ref": {
+            "snapshot_id": "fictional-snapshot-a",
+            "local_locator": [
+              "fictional",
+              "target",
+              "2026-10-24",
+              "calendar"
+            ],
+            "source_id": null
+          },
+          "known_at": "2026-10-23T10:00:00+09:00",
+          "version": "fictional-calendar-v1"
+        },
+        "sale": {
+          "state": "unknown",
+          "coverage": {
+            "store": "lab_a",
+            "category": "fictional_rice",
+            "start_day": "2026-10-24",
+            "end_day": "2026-10-24"
+          },
+          "ref": {
+            "snapshot_id": "fictional-snapshot-a",
+            "local_locator": [
+              "fictional",
+              "target",
+              "2026-10-24",
+              "sale-confirmation"
+            ],
+            "source_id": null
+          },
+          "known_at": null
+        },
+        "event": {
+          "state": "unknown",
+          "coverage": {
+            "store": "lab_a",
+            "category": "fictional_rice",
+            "start_day": "2026-10-24",
+            "end_day": "2026-10-24"
+          },
+          "ref": {
+            "snapshot_id": "fictional-snapshot-a",
+            "local_locator": [
+              "fictional",
+              "target",
+              "2026-10-24",
+              "event-confirmation"
+            ],
+            "source_id": null
+          },
+          "known_at": null
+        },
+        "registries": [
+          {
+            "ledger": "common",
+            "read_state": "ok",
+            "coverage": {
+              "store": "lab_a",
+              "category": "fictional_rice",
+              "start_day": "2026-10-24",
+              "end_day": "2026-10-24"
+            },
+            "ref": {
+              "snapshot_id": "fictional-snapshot-a",
+              "local_locator": [
+                "fictional",
+                "target",
+                "2026-10-24",
+                "common"
+              ],
+              "source_id": null
+            },
+            "known_at": null,
+            "records": [],
+            "omission_rule": null
+          },
+          {
+            "ledger": "store",
+            "read_state": "omitted",
+            "coverage": {
+              "store": "lab_a",
+              "category": "fictional_rice",
+              "start_day": "2026-10-24",
+              "end_day": "2026-10-24"
+            },
+            "ref": {
+              "snapshot_id": "fictional-snapshot-a",
+              "local_locator": [
+                "fictional",
+                "target",
+                "2026-10-24",
+                "store"
+              ],
+              "source_id": null
+            },
+            "known_at": null,
+            "records": [],
+            "omission_rule": null
+          }
+        ]
+      }
+    },
+    {
+      "id": "allowed_omission",
+      "evidence_edits": [
+        {
+          "path": [
+            "policy",
+            "allowed_omission_rules"
+          ],
+          "value": [
+            "fictional-legacy-optional-ledgers-v1"
+          ]
+        },
+        {
+          "path": [
+            "registries",
+            "common",
+            "read_state"
+          ],
+          "value": "omitted"
+        },
+        {
+          "path": [
+            "registries",
+            "common",
+            "omission_rule"
+          ],
+          "value": "fictional-legacy-optional-ledgers-v1"
+        }
+      ],
+      "expected": {
+        "outcome": "completed",
+        "eligibility": "candidate",
+        "reason_codes": []
+      },
+      "dto": {
+        "request": {
+          "kind": "FICTIONAL",
+          "schema_version": "fictional-forecast-conditions-v1",
+          "request_id": "fictional-request-a",
+          "snapshot_id": "fictional-snapshot-a",
+          "captured_at": "2026-10-23T10:58:00+09:00",
+          "scope": {
+            "store": "lab_a",
+            "category": "fictional_rice",
+            "trip": 1
+          },
+          "target_day": "2026-10-24",
+          "issued_at": "2026-10-23T10:59:00+09:00",
+          "purpose": "current_snapshot"
+        },
+        "policy": {
+          "id": "registered_conditions_only",
+          "version": "fictional-registered-conditions-v1",
+          "event_mapping": "fictional-all-registered-types-v1",
+          "allowed_omission_rules": [
+            "fictional-legacy-optional-ledgers-v1"
+          ]
+        },
+        "calendar": {
+          "state": "non_holiday",
+          "coverage": {
+            "store": "lab_a",
+            "category": "fictional_rice",
+            "start_day": "2026-10-24",
+            "end_day": "2026-10-24"
+          },
+          "ref": {
+            "snapshot_id": "fictional-snapshot-a",
+            "local_locator": [
+              "fictional",
+              "target",
+              "2026-10-24",
+              "calendar"
+            ],
+            "source_id": null
+          },
+          "known_at": "2026-10-23T10:00:00+09:00",
+          "version": "fictional-calendar-v1"
+        },
+        "sale": {
+          "state": "unknown",
+          "coverage": {
+            "store": "lab_a",
+            "category": "fictional_rice",
+            "start_day": "2026-10-24",
+            "end_day": "2026-10-24"
+          },
+          "ref": {
+            "snapshot_id": "fictional-snapshot-a",
+            "local_locator": [
+              "fictional",
+              "target",
+              "2026-10-24",
+              "sale-confirmation"
+            ],
+            "source_id": null
+          },
+          "known_at": null
+        },
+        "event": {
+          "state": "unknown",
+          "coverage": {
+            "store": "lab_a",
+            "category": "fictional_rice",
+            "start_day": "2026-10-24",
+            "end_day": "2026-10-24"
+          },
+          "ref": {
+            "snapshot_id": "fictional-snapshot-a",
+            "local_locator": [
+              "fictional",
+              "target",
+              "2026-10-24",
+              "event-confirmation"
+            ],
+            "source_id": null
+          },
+          "known_at": null
+        },
+        "registries": [
+          {
+            "ledger": "common",
+            "read_state": "omitted",
+            "coverage": {
+              "store": "lab_a",
+              "category": "fictional_rice",
+              "start_day": "2026-10-24",
+              "end_day": "2026-10-24"
+            },
+            "ref": {
+              "snapshot_id": "fictional-snapshot-a",
+              "local_locator": [
+                "fictional",
+                "target",
+                "2026-10-24",
+                "common"
+              ],
+              "source_id": null
+            },
+            "known_at": null,
+            "records": [],
+            "omission_rule": "fictional-legacy-optional-ledgers-v1"
+          },
+          {
+            "ledger": "store",
+            "read_state": "ok",
+            "coverage": {
+              "store": "lab_a",
+              "category": "fictional_rice",
+              "start_day": "2026-10-24",
+              "end_day": "2026-10-24"
+            },
+            "ref": {
+              "snapshot_id": "fictional-snapshot-a",
+              "local_locator": [
+                "fictional",
+                "target",
+                "2026-10-24",
+                "store"
+              ],
+              "source_id": null
+            },
+            "known_at": null,
+            "records": [],
+            "omission_rule": null
+          }
+        ]
+      }
+    },
+    {
+      "id": "uncovered_registry",
+      "evidence_edits": [
+        {
+          "path": [
+            "registries",
+            "store",
+            "coverage",
+            "start_day"
+          ],
+          "value": "2026-10-17"
+        },
+        {
+          "path": [
+            "registries",
+            "store",
+            "coverage",
+            "end_day"
+          ],
+          "value": "2026-10-18"
+        }
+      ],
+      "expected": {
+        "outcome": "completed",
+        "eligibility": "undetermined",
+        "reason_codes": [
+          "registry_scope_or_time_unknown"
+        ]
+      },
+      "dto": {
+        "request": {
+          "kind": "FICTIONAL",
+          "schema_version": "fictional-forecast-conditions-v1",
+          "request_id": "fictional-request-a",
+          "snapshot_id": "fictional-snapshot-a",
+          "captured_at": "2026-10-23T10:58:00+09:00",
+          "scope": {
+            "store": "lab_a",
+            "category": "fictional_rice",
+            "trip": 1
+          },
+          "target_day": "2026-10-24",
+          "issued_at": "2026-10-23T10:59:00+09:00",
+          "purpose": "current_snapshot"
+        },
+        "policy": {
+          "id": "registered_conditions_only",
+          "version": "fictional-registered-conditions-v1",
+          "event_mapping": "fictional-all-registered-types-v1",
+          "allowed_omission_rules": []
+        },
+        "calendar": {
+          "state": "non_holiday",
+          "coverage": {
+            "store": "lab_a",
+            "category": "fictional_rice",
+            "start_day": "2026-10-24",
+            "end_day": "2026-10-24"
+          },
+          "ref": {
+            "snapshot_id": "fictional-snapshot-a",
+            "local_locator": [
+              "fictional",
+              "target",
+              "2026-10-24",
+              "calendar"
+            ],
+            "source_id": null
+          },
+          "known_at": "2026-10-23T10:00:00+09:00",
+          "version": "fictional-calendar-v1"
+        },
+        "sale": {
+          "state": "unknown",
+          "coverage": {
+            "store": "lab_a",
+            "category": "fictional_rice",
+            "start_day": "2026-10-24",
+            "end_day": "2026-10-24"
+          },
+          "ref": {
+            "snapshot_id": "fictional-snapshot-a",
+            "local_locator": [
+              "fictional",
+              "target",
+              "2026-10-24",
+              "sale-confirmation"
+            ],
+            "source_id": null
+          },
+          "known_at": null
+        },
+        "event": {
+          "state": "unknown",
+          "coverage": {
+            "store": "lab_a",
+            "category": "fictional_rice",
+            "start_day": "2026-10-24",
+            "end_day": "2026-10-24"
+          },
+          "ref": {
+            "snapshot_id": "fictional-snapshot-a",
+            "local_locator": [
+              "fictional",
+              "target",
+              "2026-10-24",
+              "event-confirmation"
+            ],
+            "source_id": null
+          },
+          "known_at": null
+        },
+        "registries": [
+          {
+            "ledger": "common",
+            "read_state": "ok",
+            "coverage": {
+              "store": "lab_a",
+              "category": "fictional_rice",
+              "start_day": "2026-10-24",
+              "end_day": "2026-10-24"
+            },
+            "ref": {
+              "snapshot_id": "fictional-snapshot-a",
+              "local_locator": [
+                "fictional",
+                "target",
+                "2026-10-24",
+                "common"
+              ],
+              "source_id": null
+            },
+            "known_at": null,
+            "records": [],
+            "omission_rule": null
+          },
+          {
+            "ledger": "store",
+            "read_state": "ok",
+            "coverage": {
+              "store": "lab_a",
+              "category": "fictional_rice",
+              "start_day": "2026-10-17",
+              "end_day": "2026-10-18"
+            },
+            "ref": {
+              "snapshot_id": "fictional-snapshot-a",
+              "local_locator": [
+                "fictional",
+                "target",
+                "2026-10-24",
+                "store"
+              ],
+              "source_id": null
+            },
+            "known_at": null,
+            "records": [],
+            "omission_rule": null
+          }
+        ]
+      }
+    },
+    {
+      "id": "future_calendar",
+      "evidence_edits": [
+        {
+          "path": [
+            "calendar",
+            "known_at"
+          ],
+          "value": "2026-10-25T09:00:00+09:00"
+        }
+      ],
+      "expected": {
+        "outcome": "completed",
+        "eligibility": "undetermined",
+        "reason_codes": [
+          "calendar_not_known_at_issue"
+        ]
+      },
+      "dto": {
+        "request": {
+          "kind": "FICTIONAL",
+          "schema_version": "fictional-forecast-conditions-v1",
+          "request_id": "fictional-request-a",
+          "snapshot_id": "fictional-snapshot-a",
+          "captured_at": "2026-10-23T10:58:00+09:00",
+          "scope": {
+            "store": "lab_a",
+            "category": "fictional_rice",
+            "trip": 1
+          },
+          "target_day": "2026-10-24",
+          "issued_at": "2026-10-23T10:59:00+09:00",
+          "purpose": "current_snapshot"
+        },
+        "policy": {
+          "id": "registered_conditions_only",
+          "version": "fictional-registered-conditions-v1",
+          "event_mapping": "fictional-all-registered-types-v1",
+          "allowed_omission_rules": []
+        },
+        "calendar": {
+          "state": "non_holiday",
+          "coverage": {
+            "store": "lab_a",
+            "category": "fictional_rice",
+            "start_day": "2026-10-24",
+            "end_day": "2026-10-24"
+          },
+          "ref": {
+            "snapshot_id": "fictional-snapshot-a",
+            "local_locator": [
+              "fictional",
+              "target",
+              "2026-10-24",
+              "calendar"
+            ],
+            "source_id": null
+          },
+          "known_at": "2026-10-25T09:00:00+09:00",
+          "version": "fictional-calendar-v1"
+        },
+        "sale": {
+          "state": "unknown",
+          "coverage": {
+            "store": "lab_a",
+            "category": "fictional_rice",
+            "start_day": "2026-10-24",
+            "end_day": "2026-10-24"
+          },
+          "ref": {
+            "snapshot_id": "fictional-snapshot-a",
+            "local_locator": [
+              "fictional",
+              "target",
+              "2026-10-24",
+              "sale-confirmation"
+            ],
+            "source_id": null
+          },
+          "known_at": null
+        },
+        "event": {
+          "state": "unknown",
+          "coverage": {
+            "store": "lab_a",
+            "category": "fictional_rice",
+            "start_day": "2026-10-24",
+            "end_day": "2026-10-24"
+          },
+          "ref": {
+            "snapshot_id": "fictional-snapshot-a",
+            "local_locator": [
+              "fictional",
+              "target",
+              "2026-10-24",
+              "event-confirmation"
+            ],
+            "source_id": null
+          },
+          "known_at": null
+        },
+        "registries": [
+          {
+            "ledger": "common",
+            "read_state": "ok",
+            "coverage": {
+              "store": "lab_a",
+              "category": "fictional_rice",
+              "start_day": "2026-10-24",
+              "end_day": "2026-10-24"
+            },
+            "ref": {
+              "snapshot_id": "fictional-snapshot-a",
+              "local_locator": [
+                "fictional",
+                "target",
+                "2026-10-24",
+                "common"
+              ],
+              "source_id": null
+            },
+            "known_at": null,
+            "records": [],
+            "omission_rule": null
+          },
+          {
+            "ledger": "store",
+            "read_state": "ok",
+            "coverage": {
+              "store": "lab_a",
+              "category": "fictional_rice",
+              "start_day": "2026-10-24",
+              "end_day": "2026-10-24"
+            },
+            "ref": {
+              "snapshot_id": "fictional-snapshot-a",
+              "local_locator": [
+                "fictional",
+                "target",
+                "2026-10-24",
+                "store"
+              ],
+              "source_id": null
+            },
+            "known_at": null,
+            "records": [],
+            "omission_rule": null
+          }
+        ]
+      }
+    },
+    {
+      "id": "future_registry_item",
+      "evidence_edits": [
+        {
+          "path": [
+            "registries",
+            "store",
+            "records"
+          ],
+          "value": [
+            {
+              "event_type": "sale",
+              "applicability": "applies",
+              "record_ref": {
+                "snapshot_id": "fictional-snapshot-a",
+                "local_locator": [
+                  "fictional",
+                  "target",
+                  "2026-10-24",
+                  "item"
+                ],
+                "source_id": "fictional-original-event"
+              },
+              "known_at": "2026-10-23T10:58:01+09:00"
+            }
+          ]
+        }
+      ],
+      "expected": {
+        "outcome": "completed",
+        "eligibility": "undetermined",
+        "reason_codes": [
+          "registry_item_not_known_at_issue"
+        ]
+      },
+      "dto": {
+        "request": {
+          "kind": "FICTIONAL",
+          "schema_version": "fictional-forecast-conditions-v1",
+          "request_id": "fictional-request-a",
+          "snapshot_id": "fictional-snapshot-a",
+          "captured_at": "2026-10-23T10:58:00+09:00",
+          "scope": {
+            "store": "lab_a",
+            "category": "fictional_rice",
+            "trip": 1
+          },
+          "target_day": "2026-10-24",
+          "issued_at": "2026-10-23T10:59:00+09:00",
+          "purpose": "current_snapshot"
+        },
+        "policy": {
+          "id": "registered_conditions_only",
+          "version": "fictional-registered-conditions-v1",
+          "event_mapping": "fictional-all-registered-types-v1",
+          "allowed_omission_rules": []
+        },
+        "calendar": {
+          "state": "non_holiday",
+          "coverage": {
+            "store": "lab_a",
+            "category": "fictional_rice",
+            "start_day": "2026-10-24",
+            "end_day": "2026-10-24"
+          },
+          "ref": {
+            "snapshot_id": "fictional-snapshot-a",
+            "local_locator": [
+              "fictional",
+              "target",
+              "2026-10-24",
+              "calendar"
+            ],
+            "source_id": null
+          },
+          "known_at": "2026-10-23T10:00:00+09:00",
+          "version": "fictional-calendar-v1"
+        },
+        "sale": {
+          "state": "unknown",
+          "coverage": {
+            "store": "lab_a",
+            "category": "fictional_rice",
+            "start_day": "2026-10-24",
+            "end_day": "2026-10-24"
+          },
+          "ref": {
+            "snapshot_id": "fictional-snapshot-a",
+            "local_locator": [
+              "fictional",
+              "target",
+              "2026-10-24",
+              "sale-confirmation"
+            ],
+            "source_id": null
+          },
+          "known_at": null
+        },
+        "event": {
+          "state": "unknown",
+          "coverage": {
+            "store": "lab_a",
+            "category": "fictional_rice",
+            "start_day": "2026-10-24",
+            "end_day": "2026-10-24"
+          },
+          "ref": {
+            "snapshot_id": "fictional-snapshot-a",
+            "local_locator": [
+              "fictional",
+              "target",
+              "2026-10-24",
+              "event-confirmation"
+            ],
+            "source_id": null
+          },
+          "known_at": null
+        },
+        "registries": [
+          {
+            "ledger": "common",
+            "read_state": "ok",
+            "coverage": {
+              "store": "lab_a",
+              "category": "fictional_rice",
+              "start_day": "2026-10-24",
+              "end_day": "2026-10-24"
+            },
+            "ref": {
+              "snapshot_id": "fictional-snapshot-a",
+              "local_locator": [
+                "fictional",
+                "target",
+                "2026-10-24",
+                "common"
+              ],
+              "source_id": null
+            },
+            "known_at": null,
+            "records": [],
+            "omission_rule": null
+          },
+          {
+            "ledger": "store",
+            "read_state": "ok",
+            "coverage": {
+              "store": "lab_a",
+              "category": "fictional_rice",
+              "start_day": "2026-10-24",
+              "end_day": "2026-10-24"
+            },
+            "ref": {
+              "snapshot_id": "fictional-snapshot-a",
+              "local_locator": [
+                "fictional",
+                "target",
+                "2026-10-24",
+                "store"
+              ],
+              "source_id": null
+            },
+            "known_at": null,
+            "records": [
+              {
+                "event_type": "sale",
+                "applicability": "applies",
+                "ref": {
+                  "snapshot_id": "fictional-snapshot-a",
+                  "local_locator": [
+                    "fictional",
+                    "target",
+                    "2026-10-24",
+                    "item"
+                  ],
+                  "source_id": "fictional-original-event"
+                },
+                "known_at": "2026-10-23T10:58:01+09:00"
+              }
+            ],
+            "omission_rule": null
+          }
+        ]
+      }
+    },
+    {
+      "id": "holiday",
+      "evidence_edits": [
+        {
+          "path": [
+            "calendar",
+            "state"
+          ],
+          "value": "holiday"
+        }
+      ],
+      "expected": {
+        "outcome": "completed",
+        "eligibility": "not_candidate",
+        "reason_codes": [
+          "calendar_holiday"
+        ]
+      },
+      "dto": {
+        "request": {
+          "kind": "FICTIONAL",
+          "schema_version": "fictional-forecast-conditions-v1",
+          "request_id": "fictional-request-a",
+          "snapshot_id": "fictional-snapshot-a",
+          "captured_at": "2026-10-23T10:58:00+09:00",
+          "scope": {
+            "store": "lab_a",
+            "category": "fictional_rice",
+            "trip": 1
+          },
+          "target_day": "2026-10-24",
+          "issued_at": "2026-10-23T10:59:00+09:00",
+          "purpose": "current_snapshot"
+        },
+        "policy": {
+          "id": "registered_conditions_only",
+          "version": "fictional-registered-conditions-v1",
+          "event_mapping": "fictional-all-registered-types-v1",
+          "allowed_omission_rules": []
+        },
+        "calendar": {
+          "state": "holiday",
+          "coverage": {
+            "store": "lab_a",
+            "category": "fictional_rice",
+            "start_day": "2026-10-24",
+            "end_day": "2026-10-24"
+          },
+          "ref": {
+            "snapshot_id": "fictional-snapshot-a",
+            "local_locator": [
+              "fictional",
+              "target",
+              "2026-10-24",
+              "calendar"
+            ],
+            "source_id": null
+          },
+          "known_at": "2026-10-23T10:00:00+09:00",
+          "version": "fictional-calendar-v1"
+        },
+        "sale": {
+          "state": "unknown",
+          "coverage": {
+            "store": "lab_a",
+            "category": "fictional_rice",
+            "start_day": "2026-10-24",
+            "end_day": "2026-10-24"
+          },
+          "ref": {
+            "snapshot_id": "fictional-snapshot-a",
+            "local_locator": [
+              "fictional",
+              "target",
+              "2026-10-24",
+              "sale-confirmation"
+            ],
+            "source_id": null
+          },
+          "known_at": null
+        },
+        "event": {
+          "state": "unknown",
+          "coverage": {
+            "store": "lab_a",
+            "category": "fictional_rice",
+            "start_day": "2026-10-24",
+            "end_day": "2026-10-24"
+          },
+          "ref": {
+            "snapshot_id": "fictional-snapshot-a",
+            "local_locator": [
+              "fictional",
+              "target",
+              "2026-10-24",
+              "event-confirmation"
+            ],
+            "source_id": null
+          },
+          "known_at": null
+        },
+        "registries": [
+          {
+            "ledger": "common",
+            "read_state": "ok",
+            "coverage": {
+              "store": "lab_a",
+              "category": "fictional_rice",
+              "start_day": "2026-10-24",
+              "end_day": "2026-10-24"
+            },
+            "ref": {
+              "snapshot_id": "fictional-snapshot-a",
+              "local_locator": [
+                "fictional",
+                "target",
+                "2026-10-24",
+                "common"
+              ],
+              "source_id": null
+            },
+            "known_at": null,
+            "records": [],
+            "omission_rule": null
+          },
+          {
+            "ledger": "store",
+            "read_state": "ok",
+            "coverage": {
+              "store": "lab_a",
+              "category": "fictional_rice",
+              "start_day": "2026-10-24",
+              "end_day": "2026-10-24"
+            },
+            "ref": {
+              "snapshot_id": "fictional-snapshot-a",
+              "local_locator": [
+                "fictional",
+                "target",
+                "2026-10-24",
+                "store"
+              ],
+              "source_id": null
+            },
+            "known_at": null,
+            "records": [],
+            "omission_rule": null
+          }
+        ]
+      }
+    },
+    {
+      "id": "calendar_conflict",
+      "evidence_edits": [
+        {
+          "path": [
+            "calendar",
+            "state"
+          ],
+          "value": "conflict"
+        }
+      ],
+      "expected": {
+        "outcome": "completed",
+        "eligibility": "undetermined",
+        "reason_codes": [
+          "calendar_conflict"
+        ]
+      },
+      "dto": {
+        "request": {
+          "kind": "FICTIONAL",
+          "schema_version": "fictional-forecast-conditions-v1",
+          "request_id": "fictional-request-a",
+          "snapshot_id": "fictional-snapshot-a",
+          "captured_at": "2026-10-23T10:58:00+09:00",
+          "scope": {
+            "store": "lab_a",
+            "category": "fictional_rice",
+            "trip": 1
+          },
+          "target_day": "2026-10-24",
+          "issued_at": "2026-10-23T10:59:00+09:00",
+          "purpose": "current_snapshot"
+        },
+        "policy": {
+          "id": "registered_conditions_only",
+          "version": "fictional-registered-conditions-v1",
+          "event_mapping": "fictional-all-registered-types-v1",
+          "allowed_omission_rules": []
+        },
+        "calendar": {
+          "state": "conflict",
+          "coverage": {
+            "store": "lab_a",
+            "category": "fictional_rice",
+            "start_day": "2026-10-24",
+            "end_day": "2026-10-24"
+          },
+          "ref": {
+            "snapshot_id": "fictional-snapshot-a",
+            "local_locator": [
+              "fictional",
+              "target",
+              "2026-10-24",
+              "calendar"
+            ],
+            "source_id": null
+          },
+          "known_at": "2026-10-23T10:00:00+09:00",
+          "version": "fictional-calendar-v1"
+        },
+        "sale": {
+          "state": "unknown",
+          "coverage": {
+            "store": "lab_a",
+            "category": "fictional_rice",
+            "start_day": "2026-10-24",
+            "end_day": "2026-10-24"
+          },
+          "ref": {
+            "snapshot_id": "fictional-snapshot-a",
+            "local_locator": [
+              "fictional",
+              "target",
+              "2026-10-24",
+              "sale-confirmation"
+            ],
+            "source_id": null
+          },
+          "known_at": null
+        },
+        "event": {
+          "state": "unknown",
+          "coverage": {
+            "store": "lab_a",
+            "category": "fictional_rice",
+            "start_day": "2026-10-24",
+            "end_day": "2026-10-24"
+          },
+          "ref": {
+            "snapshot_id": "fictional-snapshot-a",
+            "local_locator": [
+              "fictional",
+              "target",
+              "2026-10-24",
+              "event-confirmation"
+            ],
+            "source_id": null
+          },
+          "known_at": null
+        },
+        "registries": [
+          {
+            "ledger": "common",
+            "read_state": "ok",
+            "coverage": {
+              "store": "lab_a",
+              "category": "fictional_rice",
+              "start_day": "2026-10-24",
+              "end_day": "2026-10-24"
+            },
+            "ref": {
+              "snapshot_id": "fictional-snapshot-a",
+              "local_locator": [
+                "fictional",
+                "target",
+                "2026-10-24",
+                "common"
+              ],
+              "source_id": null
+            },
+            "known_at": null,
+            "records": [],
+            "omission_rule": null
+          },
+          {
+            "ledger": "store",
+            "read_state": "ok",
+            "coverage": {
+              "store": "lab_a",
+              "category": "fictional_rice",
+              "start_day": "2026-10-24",
+              "end_day": "2026-10-24"
+            },
+            "ref": {
+              "snapshot_id": "fictional-snapshot-a",
+              "local_locator": [
+                "fictional",
+                "target",
+                "2026-10-24",
+                "store"
+              ],
+              "source_id": null
+            },
+            "known_at": null,
+            "records": [],
+            "omission_rule": null
+          }
+        ]
+      }
+    },
+    {
+      "id": "replay_unknown_times",
+      "envelope_edits": [
+        {
+          "path": [
+            "purpose"
+          ],
+          "value": "historical_replay"
+        }
+      ],
+      "expected": {
+        "outcome": "completed",
+        "eligibility": "undetermined",
+        "reason_codes": [
+          "registry_scope_or_time_unknown"
+        ]
+      },
+      "dto": {
+        "request": {
+          "kind": "FICTIONAL",
+          "schema_version": "fictional-forecast-conditions-v1",
+          "request_id": "fictional-request-a",
+          "snapshot_id": "fictional-snapshot-a",
+          "captured_at": "2026-10-23T10:58:00+09:00",
+          "scope": {
+            "store": "lab_a",
+            "category": "fictional_rice",
+            "trip": 1
+          },
+          "target_day": "2026-10-24",
+          "issued_at": "2026-10-23T10:59:00+09:00",
+          "purpose": "historical_replay"
+        },
+        "policy": {
+          "id": "registered_conditions_only",
+          "version": "fictional-registered-conditions-v1",
+          "event_mapping": "fictional-all-registered-types-v1",
+          "allowed_omission_rules": []
+        },
+        "calendar": {
+          "state": "non_holiday",
+          "coverage": {
+            "store": "lab_a",
+            "category": "fictional_rice",
+            "start_day": "2026-10-24",
+            "end_day": "2026-10-24"
+          },
+          "ref": {
+            "snapshot_id": "fictional-snapshot-a",
+            "local_locator": [
+              "fictional",
+              "target",
+              "2026-10-24",
+              "calendar"
+            ],
+            "source_id": null
+          },
+          "known_at": "2026-10-23T10:00:00+09:00",
+          "version": "fictional-calendar-v1"
+        },
+        "sale": {
+          "state": "unknown",
+          "coverage": {
+            "store": "lab_a",
+            "category": "fictional_rice",
+            "start_day": "2026-10-24",
+            "end_day": "2026-10-24"
+          },
+          "ref": {
+            "snapshot_id": "fictional-snapshot-a",
+            "local_locator": [
+              "fictional",
+              "target",
+              "2026-10-24",
+              "sale-confirmation"
+            ],
+            "source_id": null
+          },
+          "known_at": null
+        },
+        "event": {
+          "state": "unknown",
+          "coverage": {
+            "store": "lab_a",
+            "category": "fictional_rice",
+            "start_day": "2026-10-24",
+            "end_day": "2026-10-24"
+          },
+          "ref": {
+            "snapshot_id": "fictional-snapshot-a",
+            "local_locator": [
+              "fictional",
+              "target",
+              "2026-10-24",
+              "event-confirmation"
+            ],
+            "source_id": null
+          },
+          "known_at": null
+        },
+        "registries": [
+          {
+            "ledger": "common",
+            "read_state": "ok",
+            "coverage": {
+              "store": "lab_a",
+              "category": "fictional_rice",
+              "start_day": "2026-10-24",
+              "end_day": "2026-10-24"
+            },
+            "ref": {
+              "snapshot_id": "fictional-snapshot-a",
+              "local_locator": [
+                "fictional",
+                "target",
+                "2026-10-24",
+                "common"
+              ],
+              "source_id": null
+            },
+            "known_at": null,
+            "records": [],
+            "omission_rule": null
+          },
+          {
+            "ledger": "store",
+            "read_state": "ok",
+            "coverage": {
+              "store": "lab_a",
+              "category": "fictional_rice",
+              "start_day": "2026-10-24",
+              "end_day": "2026-10-24"
+            },
+            "ref": {
+              "snapshot_id": "fictional-snapshot-a",
+              "local_locator": [
+                "fictional",
+                "target",
+                "2026-10-24",
+                "store"
+              ],
+              "source_id": null
+            },
+            "known_at": null,
+            "records": [],
+            "omission_rule": null
+          }
+        ]
+      }
+    },
+    {
+      "id": "replay_known_times",
+      "envelope_edits": [
+        {
+          "path": [
+            "purpose"
+          ],
+          "value": "historical_replay"
+        }
+      ],
+      "evidence_edits": [
+        {
+          "path": [
+            "registries",
+            "common",
+            "known_at"
+          ],
+          "value": "2026-10-23T10:00:00+09:00"
+        },
+        {
+          "path": [
+            "registries",
+            "store",
+            "known_at"
+          ],
+          "value": "2026-10-23T10:00:00+09:00"
+        }
+      ],
+      "expected": {
+        "outcome": "completed",
+        "eligibility": "candidate",
+        "reason_codes": []
+      },
+      "dto": {
+        "request": {
+          "kind": "FICTIONAL",
+          "schema_version": "fictional-forecast-conditions-v1",
+          "request_id": "fictional-request-a",
+          "snapshot_id": "fictional-snapshot-a",
+          "captured_at": "2026-10-23T10:58:00+09:00",
+          "scope": {
+            "store": "lab_a",
+            "category": "fictional_rice",
+            "trip": 1
+          },
+          "target_day": "2026-10-24",
+          "issued_at": "2026-10-23T10:59:00+09:00",
+          "purpose": "historical_replay"
+        },
+        "policy": {
+          "id": "registered_conditions_only",
+          "version": "fictional-registered-conditions-v1",
+          "event_mapping": "fictional-all-registered-types-v1",
+          "allowed_omission_rules": []
+        },
+        "calendar": {
+          "state": "non_holiday",
+          "coverage": {
+            "store": "lab_a",
+            "category": "fictional_rice",
+            "start_day": "2026-10-24",
+            "end_day": "2026-10-24"
+          },
+          "ref": {
+            "snapshot_id": "fictional-snapshot-a",
+            "local_locator": [
+              "fictional",
+              "target",
+              "2026-10-24",
+              "calendar"
+            ],
+            "source_id": null
+          },
+          "known_at": "2026-10-23T10:00:00+09:00",
+          "version": "fictional-calendar-v1"
+        },
+        "sale": {
+          "state": "unknown",
+          "coverage": {
+            "store": "lab_a",
+            "category": "fictional_rice",
+            "start_day": "2026-10-24",
+            "end_day": "2026-10-24"
+          },
+          "ref": {
+            "snapshot_id": "fictional-snapshot-a",
+            "local_locator": [
+              "fictional",
+              "target",
+              "2026-10-24",
+              "sale-confirmation"
+            ],
+            "source_id": null
+          },
+          "known_at": null
+        },
+        "event": {
+          "state": "unknown",
+          "coverage": {
+            "store": "lab_a",
+            "category": "fictional_rice",
+            "start_day": "2026-10-24",
+            "end_day": "2026-10-24"
+          },
+          "ref": {
+            "snapshot_id": "fictional-snapshot-a",
+            "local_locator": [
+              "fictional",
+              "target",
+              "2026-10-24",
+              "event-confirmation"
+            ],
+            "source_id": null
+          },
+          "known_at": null
+        },
+        "registries": [
+          {
+            "ledger": "common",
+            "read_state": "ok",
+            "coverage": {
+              "store": "lab_a",
+              "category": "fictional_rice",
+              "start_day": "2026-10-24",
+              "end_day": "2026-10-24"
+            },
+            "ref": {
+              "snapshot_id": "fictional-snapshot-a",
+              "local_locator": [
+                "fictional",
+                "target",
+                "2026-10-24",
+                "common"
+              ],
+              "source_id": null
+            },
+            "known_at": "2026-10-23T10:00:00+09:00",
+            "records": [],
+            "omission_rule": null
+          },
+          {
+            "ledger": "store",
+            "read_state": "ok",
+            "coverage": {
+              "store": "lab_a",
+              "category": "fictional_rice",
+              "start_day": "2026-10-24",
+              "end_day": "2026-10-24"
+            },
+            "ref": {
+              "snapshot_id": "fictional-snapshot-a",
+              "local_locator": [
+                "fictional",
+                "target",
+                "2026-10-24",
+                "store"
+              ],
+              "source_id": null
+            },
+            "known_at": "2026-10-23T10:00:00+09:00",
+            "records": [],
+            "omission_rule": null
+          }
+        ]
+      }
+    },
+    {
+      "id": "confirmed_absent_but_registered",
+      "evidence_edits": [
+        {
+          "path": [
+            "sale",
+            "state"
+          ],
+          "value": "confirmed_absent"
+        },
+        {
+          "path": [
+            "registries",
+            "common",
+            "records"
+          ],
+          "value": [
+            {
+              "event_type": "sale",
+              "applicability": "applies",
+              "record_ref": {
+                "snapshot_id": "fictional-snapshot-a",
+                "local_locator": [
+                  "fictional",
+                  "target",
+                  "2026-10-24",
+                  "item"
+                ],
+                "source_id": "fictional-original-event"
+              },
+              "known_at": null
+            }
+          ]
+        }
+      ],
+      "expected": {
+        "outcome": "completed",
+        "eligibility": "not_candidate",
+        "reason_codes": [
+          "presence_evidence_conflict"
+        ]
+      },
+      "dto": {
+        "request": {
+          "kind": "FICTIONAL",
+          "schema_version": "fictional-forecast-conditions-v1",
+          "request_id": "fictional-request-a",
+          "snapshot_id": "fictional-snapshot-a",
+          "captured_at": "2026-10-23T10:58:00+09:00",
+          "scope": {
+            "store": "lab_a",
+            "category": "fictional_rice",
+            "trip": 1
+          },
+          "target_day": "2026-10-24",
+          "issued_at": "2026-10-23T10:59:00+09:00",
+          "purpose": "current_snapshot"
+        },
+        "policy": {
+          "id": "registered_conditions_only",
+          "version": "fictional-registered-conditions-v1",
+          "event_mapping": "fictional-all-registered-types-v1",
+          "allowed_omission_rules": []
+        },
+        "calendar": {
+          "state": "non_holiday",
+          "coverage": {
+            "store": "lab_a",
+            "category": "fictional_rice",
+            "start_day": "2026-10-24",
+            "end_day": "2026-10-24"
+          },
+          "ref": {
+            "snapshot_id": "fictional-snapshot-a",
+            "local_locator": [
+              "fictional",
+              "target",
+              "2026-10-24",
+              "calendar"
+            ],
+            "source_id": null
+          },
+          "known_at": "2026-10-23T10:00:00+09:00",
+          "version": "fictional-calendar-v1"
+        },
+        "sale": {
+          "state": "confirmed_absent",
+          "coverage": {
+            "store": "lab_a",
+            "category": "fictional_rice",
+            "start_day": "2026-10-24",
+            "end_day": "2026-10-24"
+          },
+          "ref": {
+            "snapshot_id": "fictional-snapshot-a",
+            "local_locator": [
+              "fictional",
+              "target",
+              "2026-10-24",
+              "sale-confirmation"
+            ],
+            "source_id": null
+          },
+          "known_at": null
+        },
+        "event": {
+          "state": "unknown",
+          "coverage": {
+            "store": "lab_a",
+            "category": "fictional_rice",
+            "start_day": "2026-10-24",
+            "end_day": "2026-10-24"
+          },
+          "ref": {
+            "snapshot_id": "fictional-snapshot-a",
+            "local_locator": [
+              "fictional",
+              "target",
+              "2026-10-24",
+              "event-confirmation"
+            ],
+            "source_id": null
+          },
+          "known_at": null
+        },
+        "registries": [
+          {
+            "ledger": "common",
+            "read_state": "ok",
+            "coverage": {
+              "store": "lab_a",
+              "category": "fictional_rice",
+              "start_day": "2026-10-24",
+              "end_day": "2026-10-24"
+            },
+            "ref": {
+              "snapshot_id": "fictional-snapshot-a",
+              "local_locator": [
+                "fictional",
+                "target",
+                "2026-10-24",
+                "common"
+              ],
+              "source_id": null
+            },
+            "known_at": null,
+            "records": [
+              {
+                "event_type": "sale",
+                "applicability": "applies",
+                "ref": {
+                  "snapshot_id": "fictional-snapshot-a",
+                  "local_locator": [
+                    "fictional",
+                    "target",
+                    "2026-10-24",
+                    "item"
+                  ],
+                  "source_id": "fictional-original-event"
+                },
+                "known_at": null
+              }
+            ],
+            "omission_rule": null
+          },
+          {
+            "ledger": "store",
+            "read_state": "ok",
+            "coverage": {
+              "store": "lab_a",
+              "category": "fictional_rice",
+              "start_day": "2026-10-24",
+              "end_day": "2026-10-24"
+            },
+            "ref": {
+              "snapshot_id": "fictional-snapshot-a",
+              "local_locator": [
+                "fictional",
+                "target",
+                "2026-10-24",
+                "store"
+              ],
+              "source_id": null
+            },
+            "known_at": null,
+            "records": [],
+            "omission_rule": null
+          }
+        ]
+      }
+    },
+    {
+      "id": "known_cutoff_equal",
+      "evidence_edits": [
+        {
+          "path": [
+            "registries",
+            "store",
+            "records"
+          ],
+          "value": [
+            {
+              "event_type": "sale",
+              "applicability": "applies",
+              "record_ref": {
+                "snapshot_id": "fictional-snapshot-a",
+                "local_locator": [
+                  "fictional",
+                  "target",
+                  "2026-10-24",
+                  "item"
+                ],
+                "source_id": "fictional-original-event"
+              },
+              "known_at": "2026-10-23T10:58:00+09:00"
+            }
+          ]
+        }
+      ],
+      "expected": {
+        "outcome": "completed",
+        "eligibility": "not_candidate",
+        "reason_codes": [
+          "registered_present"
+        ]
+      },
+      "dto": {
+        "request": {
+          "kind": "FICTIONAL",
+          "schema_version": "fictional-forecast-conditions-v1",
+          "request_id": "fictional-request-a",
+          "snapshot_id": "fictional-snapshot-a",
+          "captured_at": "2026-10-23T10:58:00+09:00",
+          "scope": {
+            "store": "lab_a",
+            "category": "fictional_rice",
+            "trip": 1
+          },
+          "target_day": "2026-10-24",
+          "issued_at": "2026-10-23T10:59:00+09:00",
+          "purpose": "current_snapshot"
+        },
+        "policy": {
+          "id": "registered_conditions_only",
+          "version": "fictional-registered-conditions-v1",
+          "event_mapping": "fictional-all-registered-types-v1",
+          "allowed_omission_rules": []
+        },
+        "calendar": {
+          "state": "non_holiday",
+          "coverage": {
+            "store": "lab_a",
+            "category": "fictional_rice",
+            "start_day": "2026-10-24",
+            "end_day": "2026-10-24"
+          },
+          "ref": {
+            "snapshot_id": "fictional-snapshot-a",
+            "local_locator": [
+              "fictional",
+              "target",
+              "2026-10-24",
+              "calendar"
+            ],
+            "source_id": null
+          },
+          "known_at": "2026-10-23T10:00:00+09:00",
+          "version": "fictional-calendar-v1"
+        },
+        "sale": {
+          "state": "unknown",
+          "coverage": {
+            "store": "lab_a",
+            "category": "fictional_rice",
+            "start_day": "2026-10-24",
+            "end_day": "2026-10-24"
+          },
+          "ref": {
+            "snapshot_id": "fictional-snapshot-a",
+            "local_locator": [
+              "fictional",
+              "target",
+              "2026-10-24",
+              "sale-confirmation"
+            ],
+            "source_id": null
+          },
+          "known_at": null
+        },
+        "event": {
+          "state": "unknown",
+          "coverage": {
+            "store": "lab_a",
+            "category": "fictional_rice",
+            "start_day": "2026-10-24",
+            "end_day": "2026-10-24"
+          },
+          "ref": {
+            "snapshot_id": "fictional-snapshot-a",
+            "local_locator": [
+              "fictional",
+              "target",
+              "2026-10-24",
+              "event-confirmation"
+            ],
+            "source_id": null
+          },
+          "known_at": null
+        },
+        "registries": [
+          {
+            "ledger": "common",
+            "read_state": "ok",
+            "coverage": {
+              "store": "lab_a",
+              "category": "fictional_rice",
+              "start_day": "2026-10-24",
+              "end_day": "2026-10-24"
+            },
+            "ref": {
+              "snapshot_id": "fictional-snapshot-a",
+              "local_locator": [
+                "fictional",
+                "target",
+                "2026-10-24",
+                "common"
+              ],
+              "source_id": null
+            },
+            "known_at": null,
+            "records": [],
+            "omission_rule": null
+          },
+          {
+            "ledger": "store",
+            "read_state": "ok",
+            "coverage": {
+              "store": "lab_a",
+              "category": "fictional_rice",
+              "start_day": "2026-10-24",
+              "end_day": "2026-10-24"
+            },
+            "ref": {
+              "snapshot_id": "fictional-snapshot-a",
+              "local_locator": [
+                "fictional",
+                "target",
+                "2026-10-24",
+                "store"
+              ],
+              "source_id": null
+            },
+            "known_at": null,
+            "records": [
+              {
+                "event_type": "sale",
+                "applicability": "applies",
+                "ref": {
+                  "snapshot_id": "fictional-snapshot-a",
+                  "local_locator": [
+                    "fictional",
+                    "target",
+                    "2026-10-24",
+                    "item"
+                  ],
+                  "source_id": "fictional-original-event"
+                },
+                "known_at": "2026-10-23T10:58:00+09:00"
+              }
+            ],
+            "omission_rule": null
+          }
+        ]
+      }
+    },
+    {
+      "id": "calendar_version_unknown",
+      "evidence_edits": [
+        {
+          "path": [
+            "calendar",
+            "version"
+          ],
+          "value": null
+        }
+      ],
+      "expected": {
+        "outcome": "completed",
+        "eligibility": "undetermined",
+        "reason_codes": [
+          "calendar_coverage_or_version_unknown"
+        ]
+      },
+      "dto": {
+        "request": {
+          "kind": "FICTIONAL",
+          "schema_version": "fictional-forecast-conditions-v1",
+          "request_id": "fictional-request-a",
+          "snapshot_id": "fictional-snapshot-a",
+          "captured_at": "2026-10-23T10:58:00+09:00",
+          "scope": {
+            "store": "lab_a",
+            "category": "fictional_rice",
+            "trip": 1
+          },
+          "target_day": "2026-10-24",
+          "issued_at": "2026-10-23T10:59:00+09:00",
+          "purpose": "current_snapshot"
+        },
+        "policy": {
+          "id": "registered_conditions_only",
+          "version": "fictional-registered-conditions-v1",
+          "event_mapping": "fictional-all-registered-types-v1",
+          "allowed_omission_rules": []
+        },
+        "calendar": {
+          "state": "non_holiday",
+          "coverage": {
+            "store": "lab_a",
+            "category": "fictional_rice",
+            "start_day": "2026-10-24",
+            "end_day": "2026-10-24"
+          },
+          "ref": {
+            "snapshot_id": "fictional-snapshot-a",
+            "local_locator": [
+              "fictional",
+              "target",
+              "2026-10-24",
+              "calendar"
+            ],
+            "source_id": null
+          },
+          "known_at": "2026-10-23T10:00:00+09:00",
+          "version": null
+        },
+        "sale": {
+          "state": "unknown",
+          "coverage": {
+            "store": "lab_a",
+            "category": "fictional_rice",
+            "start_day": "2026-10-24",
+            "end_day": "2026-10-24"
+          },
+          "ref": {
+            "snapshot_id": "fictional-snapshot-a",
+            "local_locator": [
+              "fictional",
+              "target",
+              "2026-10-24",
+              "sale-confirmation"
+            ],
+            "source_id": null
+          },
+          "known_at": null
+        },
+        "event": {
+          "state": "unknown",
+          "coverage": {
+            "store": "lab_a",
+            "category": "fictional_rice",
+            "start_day": "2026-10-24",
+            "end_day": "2026-10-24"
+          },
+          "ref": {
+            "snapshot_id": "fictional-snapshot-a",
+            "local_locator": [
+              "fictional",
+              "target",
+              "2026-10-24",
+              "event-confirmation"
+            ],
+            "source_id": null
+          },
+          "known_at": null
+        },
+        "registries": [
+          {
+            "ledger": "common",
+            "read_state": "ok",
+            "coverage": {
+              "store": "lab_a",
+              "category": "fictional_rice",
+              "start_day": "2026-10-24",
+              "end_day": "2026-10-24"
+            },
+            "ref": {
+              "snapshot_id": "fictional-snapshot-a",
+              "local_locator": [
+                "fictional",
+                "target",
+                "2026-10-24",
+                "common"
+              ],
+              "source_id": null
+            },
+            "known_at": null,
+            "records": [],
+            "omission_rule": null
+          },
+          {
+            "ledger": "store",
+            "read_state": "ok",
+            "coverage": {
+              "store": "lab_a",
+              "category": "fictional_rice",
+              "start_day": "2026-10-24",
+              "end_day": "2026-10-24"
+            },
+            "ref": {
+              "snapshot_id": "fictional-snapshot-a",
+              "local_locator": [
+                "fictional",
+                "target",
+                "2026-10-24",
+                "store"
+              ],
+              "source_id": null
+            },
+            "known_at": null,
+            "records": [],
+            "omission_rule": null
+          }
+        ]
+      }
+    },
+    {
+      "id": "source_id_omitted",
+      "evidence_edits": [
+        {
+          "path": [
+            "calendar",
+            "record_ref",
+            "source_id"
+          ],
+          "remove": true
+        }
+      ],
+      "expected": {
+        "outcome": "completed",
+        "eligibility": "candidate",
+        "reason_codes": []
+      },
+      "dto": {
+        "request": {
+          "kind": "FICTIONAL",
+          "schema_version": "fictional-forecast-conditions-v1",
+          "request_id": "fictional-request-a",
+          "snapshot_id": "fictional-snapshot-a",
+          "captured_at": "2026-10-23T10:58:00+09:00",
+          "scope": {
+            "store": "lab_a",
+            "category": "fictional_rice",
+            "trip": 1
+          },
+          "target_day": "2026-10-24",
+          "issued_at": "2026-10-23T10:59:00+09:00",
+          "purpose": "current_snapshot"
+        },
+        "policy": {
+          "id": "registered_conditions_only",
+          "version": "fictional-registered-conditions-v1",
+          "event_mapping": "fictional-all-registered-types-v1",
+          "allowed_omission_rules": []
+        },
+        "calendar": {
+          "state": "non_holiday",
+          "coverage": {
+            "store": "lab_a",
+            "category": "fictional_rice",
+            "start_day": "2026-10-24",
+            "end_day": "2026-10-24"
+          },
+          "ref": {
+            "snapshot_id": "fictional-snapshot-a",
+            "local_locator": [
+              "fictional",
+              "target",
+              "2026-10-24",
+              "calendar"
+            ],
+            "source_id": null
+          },
+          "known_at": "2026-10-23T10:00:00+09:00",
+          "version": "fictional-calendar-v1"
+        },
+        "sale": {
+          "state": "unknown",
+          "coverage": {
+            "store": "lab_a",
+            "category": "fictional_rice",
+            "start_day": "2026-10-24",
+            "end_day": "2026-10-24"
+          },
+          "ref": {
+            "snapshot_id": "fictional-snapshot-a",
+            "local_locator": [
+              "fictional",
+              "target",
+              "2026-10-24",
+              "sale-confirmation"
+            ],
+            "source_id": null
+          },
+          "known_at": null
+        },
+        "event": {
+          "state": "unknown",
+          "coverage": {
+            "store": "lab_a",
+            "category": "fictional_rice",
+            "start_day": "2026-10-24",
+            "end_day": "2026-10-24"
+          },
+          "ref": {
+            "snapshot_id": "fictional-snapshot-a",
+            "local_locator": [
+              "fictional",
+              "target",
+              "2026-10-24",
+              "event-confirmation"
+            ],
+            "source_id": null
+          },
+          "known_at": null
+        },
+        "registries": [
+          {
+            "ledger": "common",
+            "read_state": "ok",
+            "coverage": {
+              "store": "lab_a",
+              "category": "fictional_rice",
+              "start_day": "2026-10-24",
+              "end_day": "2026-10-24"
+            },
+            "ref": {
+              "snapshot_id": "fictional-snapshot-a",
+              "local_locator": [
+                "fictional",
+                "target",
+                "2026-10-24",
+                "common"
+              ],
+              "source_id": null
+            },
+            "known_at": null,
+            "records": [],
+            "omission_rule": null
+          },
+          {
+            "ledger": "store",
+            "read_state": "ok",
+            "coverage": {
+              "store": "lab_a",
+              "category": "fictional_rice",
+              "start_day": "2026-10-24",
+              "end_day": "2026-10-24"
+            },
+            "ref": {
+              "snapshot_id": "fictional-snapshot-a",
+              "local_locator": [
+                "fictional",
+                "target",
+                "2026-10-24",
+                "store"
+              ],
+              "source_id": null
+            },
+            "known_at": null,
+            "records": [],
+            "omission_rule": null
+          }
+        ]
+      }
+    },
+    {
+      "id": "bridge_snapshot_mismatch",
+      "evidence_edits": [
+        {
+          "path": [
+            "calendar",
+            "record_ref",
+            "snapshot_id"
+          ],
+          "value": "other-snapshot"
+        }
+      ],
+      "expected": {
+        "bridge_error": "invalid_record_ref"
+      }
+    },
+    {
+      "id": "bridge_duplicate_locator",
+      "evidence_edits": [
+        {
+          "path": [
+            "sale",
+            "record_ref",
+            "local_locator"
+          ],
+          "value": [
+            "fictional",
+            "target",
+            "2026-10-24",
+            "calendar"
+          ]
+        }
+      ],
+      "expected": {
+        "bridge_error": "duplicate_record_ref"
+      }
+    },
+    {
+      "id": "bridge_missing_coverage",
+      "evidence_edits": [
+        {
+          "path": [
+            "calendar",
+            "coverage"
+          ],
+          "remove": true
+        }
+      ],
+      "expected": {
+        "bridge_error": "invalid_target_evidence"
+      }
+    },
+    {
+      "id": "bridge_other_store",
+      "evidence_edits": [
+        {
+          "path": [
+            "scope",
+            "store_id"
+          ],
+          "value": "lab_b"
+        }
+      ],
+      "expected": {
+        "bridge_error": "target_evidence_scope_or_shape"
+      }
+    },
+    {
+      "id": "bridge_invalid_time",
+      "evidence_edits": [
+        {
+          "path": [
+            "calendar",
+            "known_at"
+          ],
+          "value": "2026-10-23T25:00:00+09:00"
+        }
+      ],
+      "expected": {
+        "bridge_error": "invalid_target_evidence"
+      }
+    },
+    {
+      "id": "dto_snapshot_mismatch",
+      "dto_edits": [
+        {
+          "path": [
+            "calendar",
+            "ref",
+            "snapshot_id"
+          ],
+          "value": "other-snapshot"
+        }
+      ],
+      "expected": {
+        "outcome": "rejected",
+        "eligibility": null,
+        "reason_codes": [
+          "evidence_snapshot_mismatch"
+        ]
+      },
+      "dto": {
+        "request": {
+          "kind": "FICTIONAL",
+          "schema_version": "fictional-forecast-conditions-v1",
+          "request_id": "fictional-request-a",
+          "snapshot_id": "fictional-snapshot-a",
+          "captured_at": "2026-10-23T10:58:00+09:00",
+          "scope": {
+            "store": "lab_a",
+            "category": "fictional_rice",
+            "trip": 1
+          },
+          "target_day": "2026-10-24",
+          "issued_at": "2026-10-23T10:59:00+09:00",
+          "purpose": "current_snapshot"
+        },
+        "policy": {
+          "id": "registered_conditions_only",
+          "version": "fictional-registered-conditions-v1",
+          "event_mapping": "fictional-all-registered-types-v1",
+          "allowed_omission_rules": []
+        },
+        "calendar": {
+          "state": "non_holiday",
+          "coverage": {
+            "store": "lab_a",
+            "category": "fictional_rice",
+            "start_day": "2026-10-24",
+            "end_day": "2026-10-24"
+          },
+          "ref": {
+            "snapshot_id": "other-snapshot",
+            "local_locator": [
+              "fictional",
+              "target",
+              "2026-10-24",
+              "calendar"
+            ],
+            "source_id": null
+          },
+          "known_at": "2026-10-23T10:00:00+09:00",
+          "version": "fictional-calendar-v1"
+        },
+        "sale": {
+          "state": "unknown",
+          "coverage": {
+            "store": "lab_a",
+            "category": "fictional_rice",
+            "start_day": "2026-10-24",
+            "end_day": "2026-10-24"
+          },
+          "ref": {
+            "snapshot_id": "fictional-snapshot-a",
+            "local_locator": [
+              "fictional",
+              "target",
+              "2026-10-24",
+              "sale-confirmation"
+            ],
+            "source_id": null
+          },
+          "known_at": null
+        },
+        "event": {
+          "state": "unknown",
+          "coverage": {
+            "store": "lab_a",
+            "category": "fictional_rice",
+            "start_day": "2026-10-24",
+            "end_day": "2026-10-24"
+          },
+          "ref": {
+            "snapshot_id": "fictional-snapshot-a",
+            "local_locator": [
+              "fictional",
+              "target",
+              "2026-10-24",
+              "event-confirmation"
+            ],
+            "source_id": null
+          },
+          "known_at": null
+        },
+        "registries": [
+          {
+            "ledger": "common",
+            "read_state": "ok",
+            "coverage": {
+              "store": "lab_a",
+              "category": "fictional_rice",
+              "start_day": "2026-10-24",
+              "end_day": "2026-10-24"
+            },
+            "ref": {
+              "snapshot_id": "fictional-snapshot-a",
+              "local_locator": [
+                "fictional",
+                "target",
+                "2026-10-24",
+                "common"
+              ],
+              "source_id": null
+            },
+            "known_at": null,
+            "records": [],
+            "omission_rule": null
+          },
+          {
+            "ledger": "store",
+            "read_state": "ok",
+            "coverage": {
+              "store": "lab_a",
+              "category": "fictional_rice",
+              "start_day": "2026-10-24",
+              "end_day": "2026-10-24"
+            },
+            "ref": {
+              "snapshot_id": "fictional-snapshot-a",
+              "local_locator": [
+                "fictional",
+                "target",
+                "2026-10-24",
+                "store"
+              ],
+              "source_id": null
+            },
+            "known_at": null,
+            "records": [],
+            "omission_rule": null
+          }
+        ]
+      }
+    },
+    {
+      "id": "dto_duplicate_locator",
+      "dto_edits": [
+        {
+          "path": [
+            "sale",
+            "ref",
+            "local_locator"
+          ],
+          "value": [
+            "fictional",
+            "target",
+            "2026-10-24",
+            "calendar"
+          ]
+        }
+      ],
+      "expected": {
+        "outcome": "rejected",
+        "eligibility": null,
+        "reason_codes": [
+          "duplicate_record_ref"
+        ]
+      },
+      "dto": {
+        "request": {
+          "kind": "FICTIONAL",
+          "schema_version": "fictional-forecast-conditions-v1",
+          "request_id": "fictional-request-a",
+          "snapshot_id": "fictional-snapshot-a",
+          "captured_at": "2026-10-23T10:58:00+09:00",
+          "scope": {
+            "store": "lab_a",
+            "category": "fictional_rice",
+            "trip": 1
+          },
+          "target_day": "2026-10-24",
+          "issued_at": "2026-10-23T10:59:00+09:00",
+          "purpose": "current_snapshot"
+        },
+        "policy": {
+          "id": "registered_conditions_only",
+          "version": "fictional-registered-conditions-v1",
+          "event_mapping": "fictional-all-registered-types-v1",
+          "allowed_omission_rules": []
+        },
+        "calendar": {
+          "state": "non_holiday",
+          "coverage": {
+            "store": "lab_a",
+            "category": "fictional_rice",
+            "start_day": "2026-10-24",
+            "end_day": "2026-10-24"
+          },
+          "ref": {
+            "snapshot_id": "fictional-snapshot-a",
+            "local_locator": [
+              "fictional",
+              "target",
+              "2026-10-24",
+              "calendar"
+            ],
+            "source_id": null
+          },
+          "known_at": "2026-10-23T10:00:00+09:00",
+          "version": "fictional-calendar-v1"
+        },
+        "sale": {
+          "state": "unknown",
+          "coverage": {
+            "store": "lab_a",
+            "category": "fictional_rice",
+            "start_day": "2026-10-24",
+            "end_day": "2026-10-24"
+          },
+          "ref": {
+            "snapshot_id": "fictional-snapshot-a",
+            "local_locator": [
+              "fictional",
+              "target",
+              "2026-10-24",
+              "calendar"
+            ],
+            "source_id": null
+          },
+          "known_at": null
+        },
+        "event": {
+          "state": "unknown",
+          "coverage": {
+            "store": "lab_a",
+            "category": "fictional_rice",
+            "start_day": "2026-10-24",
+            "end_day": "2026-10-24"
+          },
+          "ref": {
+            "snapshot_id": "fictional-snapshot-a",
+            "local_locator": [
+              "fictional",
+              "target",
+              "2026-10-24",
+              "event-confirmation"
+            ],
+            "source_id": null
+          },
+          "known_at": null
+        },
+        "registries": [
+          {
+            "ledger": "common",
+            "read_state": "ok",
+            "coverage": {
+              "store": "lab_a",
+              "category": "fictional_rice",
+              "start_day": "2026-10-24",
+              "end_day": "2026-10-24"
+            },
+            "ref": {
+              "snapshot_id": "fictional-snapshot-a",
+              "local_locator": [
+                "fictional",
+                "target",
+                "2026-10-24",
+                "common"
+              ],
+              "source_id": null
+            },
+            "known_at": null,
+            "records": [],
+            "omission_rule": null
+          },
+          {
+            "ledger": "store",
+            "read_state": "ok",
+            "coverage": {
+              "store": "lab_a",
+              "category": "fictional_rice",
+              "start_day": "2026-10-24",
+              "end_day": "2026-10-24"
+            },
+            "ref": {
+              "snapshot_id": "fictional-snapshot-a",
+              "local_locator": [
+                "fictional",
+                "target",
+                "2026-10-24",
+                "store"
+              ],
+              "source_id": null
+            },
+            "known_at": null,
+            "records": [],
+            "omission_rule": null
+          }
+        ]
+      }
+    },
+    {
+      "id": "dto_unsupported_schema",
+      "dto_edits": [
+        {
+          "path": [
+            "request",
+            "schema_version"
+          ],
+          "value": "other"
+        }
+      ],
+      "expected": {
+        "outcome": "rejected",
+        "eligibility": null,
+        "reason_codes": [
+          "unsupported_schema"
+        ]
+      },
+      "dto": {
+        "request": {
+          "kind": "FICTIONAL",
+          "schema_version": "other",
+          "request_id": "fictional-request-a",
+          "snapshot_id": "fictional-snapshot-a",
+          "captured_at": "2026-10-23T10:58:00+09:00",
+          "scope": {
+            "store": "lab_a",
+            "category": "fictional_rice",
+            "trip": 1
+          },
+          "target_day": "2026-10-24",
+          "issued_at": "2026-10-23T10:59:00+09:00",
+          "purpose": "current_snapshot"
+        },
+        "policy": {
+          "id": "registered_conditions_only",
+          "version": "fictional-registered-conditions-v1",
+          "event_mapping": "fictional-all-registered-types-v1",
+          "allowed_omission_rules": []
+        },
+        "calendar": {
+          "state": "non_holiday",
+          "coverage": {
+            "store": "lab_a",
+            "category": "fictional_rice",
+            "start_day": "2026-10-24",
+            "end_day": "2026-10-24"
+          },
+          "ref": {
+            "snapshot_id": "fictional-snapshot-a",
+            "local_locator": [
+              "fictional",
+              "target",
+              "2026-10-24",
+              "calendar"
+            ],
+            "source_id": null
+          },
+          "known_at": "2026-10-23T10:00:00+09:00",
+          "version": "fictional-calendar-v1"
+        },
+        "sale": {
+          "state": "unknown",
+          "coverage": {
+            "store": "lab_a",
+            "category": "fictional_rice",
+            "start_day": "2026-10-24",
+            "end_day": "2026-10-24"
+          },
+          "ref": {
+            "snapshot_id": "fictional-snapshot-a",
+            "local_locator": [
+              "fictional",
+              "target",
+              "2026-10-24",
+              "sale-confirmation"
+            ],
+            "source_id": null
+          },
+          "known_at": null
+        },
+        "event": {
+          "state": "unknown",
+          "coverage": {
+            "store": "lab_a",
+            "category": "fictional_rice",
+            "start_day": "2026-10-24",
+            "end_day": "2026-10-24"
+          },
+          "ref": {
+            "snapshot_id": "fictional-snapshot-a",
+            "local_locator": [
+              "fictional",
+              "target",
+              "2026-10-24",
+              "event-confirmation"
+            ],
+            "source_id": null
+          },
+          "known_at": null
+        },
+        "registries": [
+          {
+            "ledger": "common",
+            "read_state": "ok",
+            "coverage": {
+              "store": "lab_a",
+              "category": "fictional_rice",
+              "start_day": "2026-10-24",
+              "end_day": "2026-10-24"
+            },
+            "ref": {
+              "snapshot_id": "fictional-snapshot-a",
+              "local_locator": [
+                "fictional",
+                "target",
+                "2026-10-24",
+                "common"
+              ],
+              "source_id": null
+            },
+            "known_at": null,
+            "records": [],
+            "omission_rule": null
+          },
+          {
+            "ledger": "store",
+            "read_state": "ok",
+            "coverage": {
+              "store": "lab_a",
+              "category": "fictional_rice",
+              "start_day": "2026-10-24",
+              "end_day": "2026-10-24"
+            },
+            "ref": {
+              "snapshot_id": "fictional-snapshot-a",
+              "local_locator": [
+                "fictional",
+                "target",
+                "2026-10-24",
+                "store"
+              ],
+              "source_id": null
+            },
+            "known_at": null,
+            "records": [],
+            "omission_rule": null
+          }
+        ]
+      }
+    },
+    {
+      "id": "dto_invalid_day",
+      "dto_edits": [
+        {
+          "path": [
+            "request",
+            "target_day"
+          ],
+          "value": "2026-02-30"
+        }
+      ],
+      "expected": {
+        "outcome": "rejected",
+        "eligibility": null,
+        "reason_codes": [
+          "invalid_contract"
+        ]
+      },
+      "dto": {
+        "request": {
+          "kind": "FICTIONAL",
+          "schema_version": "fictional-forecast-conditions-v1",
+          "request_id": "fictional-request-a",
+          "snapshot_id": "fictional-snapshot-a",
+          "captured_at": "2026-10-23T10:58:00+09:00",
+          "scope": {
+            "store": "lab_a",
+            "category": "fictional_rice",
+            "trip": 1
+          },
+          "target_day": "2026-02-30",
+          "issued_at": "2026-10-23T10:59:00+09:00",
+          "purpose": "current_snapshot"
+        },
+        "policy": {
+          "id": "registered_conditions_only",
+          "version": "fictional-registered-conditions-v1",
+          "event_mapping": "fictional-all-registered-types-v1",
+          "allowed_omission_rules": []
+        },
+        "calendar": {
+          "state": "non_holiday",
+          "coverage": {
+            "store": "lab_a",
+            "category": "fictional_rice",
+            "start_day": "2026-10-24",
+            "end_day": "2026-10-24"
+          },
+          "ref": {
+            "snapshot_id": "fictional-snapshot-a",
+            "local_locator": [
+              "fictional",
+              "target",
+              "2026-10-24",
+              "calendar"
+            ],
+            "source_id": null
+          },
+          "known_at": "2026-10-23T10:00:00+09:00",
+          "version": "fictional-calendar-v1"
+        },
+        "sale": {
+          "state": "unknown",
+          "coverage": {
+            "store": "lab_a",
+            "category": "fictional_rice",
+            "start_day": "2026-10-24",
+            "end_day": "2026-10-24"
+          },
+          "ref": {
+            "snapshot_id": "fictional-snapshot-a",
+            "local_locator": [
+              "fictional",
+              "target",
+              "2026-10-24",
+              "sale-confirmation"
+            ],
+            "source_id": null
+          },
+          "known_at": null
+        },
+        "event": {
+          "state": "unknown",
+          "coverage": {
+            "store": "lab_a",
+            "category": "fictional_rice",
+            "start_day": "2026-10-24",
+            "end_day": "2026-10-24"
+          },
+          "ref": {
+            "snapshot_id": "fictional-snapshot-a",
+            "local_locator": [
+              "fictional",
+              "target",
+              "2026-10-24",
+              "event-confirmation"
+            ],
+            "source_id": null
+          },
+          "known_at": null
+        },
+        "registries": [
+          {
+            "ledger": "common",
+            "read_state": "ok",
+            "coverage": {
+              "store": "lab_a",
+              "category": "fictional_rice",
+              "start_day": "2026-10-24",
+              "end_day": "2026-10-24"
+            },
+            "ref": {
+              "snapshot_id": "fictional-snapshot-a",
+              "local_locator": [
+                "fictional",
+                "target",
+                "2026-10-24",
+                "common"
+              ],
+              "source_id": null
+            },
+            "known_at": null,
+            "records": [],
+            "omission_rule": null
+          },
+          {
+            "ledger": "store",
+            "read_state": "ok",
+            "coverage": {
+              "store": "lab_a",
+              "category": "fictional_rice",
+              "start_day": "2026-10-24",
+              "end_day": "2026-10-24"
+            },
+            "ref": {
+              "snapshot_id": "fictional-snapshot-a",
+              "local_locator": [
+                "fictional",
+                "target",
+                "2026-10-24",
+                "store"
+              ],
+              "source_id": null
+            },
+            "known_at": null,
+            "records": [],
+            "omission_rule": null
+          }
+        ]
+      }
+    },
+    {
+      "id": "dto_registry_records_mismatch",
+      "dto_edits": [
+        {
+          "path": [
+            "registries",
+            "0",
+            "read_state"
+          ],
+          "value": "invalid"
+        },
+        {
+          "path": [
+            "registries",
+            "0",
+            "records"
+          ],
+          "value": [
+            {
+              "event_type": "sale",
+              "applicability": "applies",
+              "ref": {
+                "snapshot_id": "fictional-snapshot-a",
+                "local_locator": [
+                  "fictional",
+                  "target",
+                  "2026-10-24",
+                  "dto-item"
+                ],
+                "source_id": null
+              },
+              "known_at": null
+            }
+          ]
+        }
+      ],
+      "expected": {
+        "outcome": "rejected",
+        "eligibility": null,
+        "reason_codes": [
+          "registry_state_records_mismatch"
+        ]
+      },
+      "dto": {
+        "request": {
+          "kind": "FICTIONAL",
+          "schema_version": "fictional-forecast-conditions-v1",
+          "request_id": "fictional-request-a",
+          "snapshot_id": "fictional-snapshot-a",
+          "captured_at": "2026-10-23T10:58:00+09:00",
+          "scope": {
+            "store": "lab_a",
+            "category": "fictional_rice",
+            "trip": 1
+          },
+          "target_day": "2026-10-24",
+          "issued_at": "2026-10-23T10:59:00+09:00",
+          "purpose": "current_snapshot"
+        },
+        "policy": {
+          "id": "registered_conditions_only",
+          "version": "fictional-registered-conditions-v1",
+          "event_mapping": "fictional-all-registered-types-v1",
+          "allowed_omission_rules": []
+        },
+        "calendar": {
+          "state": "non_holiday",
+          "coverage": {
+            "store": "lab_a",
+            "category": "fictional_rice",
+            "start_day": "2026-10-24",
+            "end_day": "2026-10-24"
+          },
+          "ref": {
+            "snapshot_id": "fictional-snapshot-a",
+            "local_locator": [
+              "fictional",
+              "target",
+              "2026-10-24",
+              "calendar"
+            ],
+            "source_id": null
+          },
+          "known_at": "2026-10-23T10:00:00+09:00",
+          "version": "fictional-calendar-v1"
+        },
+        "sale": {
+          "state": "unknown",
+          "coverage": {
+            "store": "lab_a",
+            "category": "fictional_rice",
+            "start_day": "2026-10-24",
+            "end_day": "2026-10-24"
+          },
+          "ref": {
+            "snapshot_id": "fictional-snapshot-a",
+            "local_locator": [
+              "fictional",
+              "target",
+              "2026-10-24",
+              "sale-confirmation"
+            ],
+            "source_id": null
+          },
+          "known_at": null
+        },
+        "event": {
+          "state": "unknown",
+          "coverage": {
+            "store": "lab_a",
+            "category": "fictional_rice",
+            "start_day": "2026-10-24",
+            "end_day": "2026-10-24"
+          },
+          "ref": {
+            "snapshot_id": "fictional-snapshot-a",
+            "local_locator": [
+              "fictional",
+              "target",
+              "2026-10-24",
+              "event-confirmation"
+            ],
+            "source_id": null
+          },
+          "known_at": null
+        },
+        "registries": [
+          {
+            "ledger": "common",
+            "read_state": "invalid",
+            "coverage": {
+              "store": "lab_a",
+              "category": "fictional_rice",
+              "start_day": "2026-10-24",
+              "end_day": "2026-10-24"
+            },
+            "ref": {
+              "snapshot_id": "fictional-snapshot-a",
+              "local_locator": [
+                "fictional",
+                "target",
+                "2026-10-24",
+                "common"
+              ],
+              "source_id": null
+            },
+            "known_at": null,
+            "records": [
+              {
+                "event_type": "sale",
+                "applicability": "applies",
+                "ref": {
+                  "snapshot_id": "fictional-snapshot-a",
+                  "local_locator": [
+                    "fictional",
+                    "target",
+                    "2026-10-24",
+                    "dto-item"
+                  ],
+                  "source_id": null
+                },
+                "known_at": null
+              }
+            ],
+            "omission_rule": null
+          },
+          {
+            "ledger": "store",
+            "read_state": "ok",
+            "coverage": {
+              "store": "lab_a",
+              "category": "fictional_rice",
+              "start_day": "2026-10-24",
+              "end_day": "2026-10-24"
+            },
+            "ref": {
+              "snapshot_id": "fictional-snapshot-a",
+              "local_locator": [
+                "fictional",
+                "target",
+                "2026-10-24",
+                "store"
+              ],
+              "source_id": null
+            },
+            "known_at": null,
+            "records": [],
+            "omission_rule": null
+          }
+        ]
+      }
+    }
+  ]
+}
