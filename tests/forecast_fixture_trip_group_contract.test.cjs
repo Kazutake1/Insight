@@ -418,3 +418,101 @@ test('B25: lab-like Sale.available_at before the sales day is not historically a
   assert.equal(result.excluded_history,1);
   assert.equal(result.authorized_for_model,false);
 });
+
+
+/*
+ * B26-B33: AI社員 Work independent review R1/R2 adversarial regressions.
+ * These check real object identity within a FICTIONAL group only.
+ */
+test('B26 R1: mutating the original store ID cannot adopt a different store',()=>{
+  const s=spec({trips:[1]}),g=createFictionalTripGroup(s),child=g.children[0];
+  const wrong={...observed(s),store_id:'lab_b'};
+  const response=reply(child,s);
+  assert.equal(g.adopt(child,response,wrong).accepted,false);
+  s.store_id='lab_b';
+  assert.equal(g.adopt(child,response,wrong).accepted,false);
+  assert.equal(child.context.scope.store_id,'lab_a');
+  assert.equal(g.adopt(child,response,{...wrong,store_id:'lab_a'}).accepted,true);
+});
+test('B27 R1: mutating the original category ID cannot adopt another category',()=>{
+  const s=spec({trips:[2]}),g=createFictionalTripGroup(s),child=g.children[0];
+  const wrong={...observed(s),category_id:'fictional_bread'};
+  const response=reply(child,s);
+  assert.equal(g.adopt(child,response,wrong).accepted,false);
+  s.category_id='fictional_bread';
+  assert.equal(g.adopt(child,response,wrong).accepted,false);
+  assert.equal(child.context.scope.category_id,'fictional_rice');
+  assert.equal(g.adopt(child,response,{...wrong,category_id:'fictional_rice'}).accepted,true);
+});
+test('B28 R1: post-creation input scope, trips and versions cannot rewrite contexts',()=>{
+  const s=spec({trips:[1,3]}),live=observed(s);
+  const g=createFictionalTripGroup(s);
+  const child=g.children[0],response=reply(child,s);
+  s.store_id='lab_b';s.category_id='fictional_bread';
+  s.trips[0]=2;s.trips.push(2);s.source_versions.model='model-replacement';
+  s.target_day='2026-10-26';s.manual_target=true;s.ui_epoch=100;
+  assert.deepEqual(g.children.map(x=>x.context.scope.trip),[1,3]);
+  assert.equal(g.children[0].context.scope.store_id,'lab_a');
+  assert.equal(g.children[0].context.scope.category_id,'fictional_rice');
+  assert.equal(g.common.target_day,'2026-10-25');
+  assert.equal(g.common.manual_target,false);
+  assert.equal(g.common.ui_epoch,7);
+  assert.equal(g.common.source_versions.model,'fictional-model-1');
+  assert.equal(g.adopt(child,response,live).accepted,true);
+  assert.equal(g.adopt(child,response,{...live,store_id:'lab_b'}).accepted,false);
+});
+test('B29 R2: unadopted fabricated READY record is not displayed',()=>{
+  const s=spec({trips:[1]}),g=createFictionalTripGroup(s);
+  const fake=Object.freeze({
+    accepted:true,freshness:'current',fixture_only:true,
+    authorized_for_model:false,provenance_verified:false,
+    request_id:g.children[0].context.request_id,status:'READY',value:12345
+  });
+  const out=g.view([fake]);
+  assert.equal(out.accepted,false);
+  assert.equal(out.reason,'group_incomplete_or_changed');
+  assert.equal(JSON.stringify(out).includes('12345'),false);
+});
+test('B30 R2: same-shape structuredClone is not an adopted result',()=>{
+  const s=spec({trips:[1]}),g=createFictionalTripGroup(s),child=g.children[0];
+  const correct=g.adopt(child,reply(child,s),observed(s));
+  assert.equal(correct.accepted,true);
+  assert.equal(g.view([correct]).kind,'FICTIONAL_TRIP_GROUP_ONLY');
+  const clone=structuredClone(correct);
+  assert.equal(g.view([clone]).accepted,false);
+});
+test('B31 R2: another group cannot provide adopted results even with equal request IDs',()=>{
+  const s=spec({trips:[1]}),one=createFictionalTripGroup(s),
+    two=createFictionalTripGroup(spec({trips:[1]}));
+  const result=one.adopt(one.children[0],reply(one.children[0],s),observed(s));
+  assert.equal(result.accepted,true);
+  assert.equal(two.children[0].context.request_id,one.children[0].context.request_id);
+  assert.equal(two.view([result]).accepted,false);
+});
+test('B32 R2: only the latest adoption per child can be displayed',()=>{
+  const s=spec({trips:[1,2]}),g=createFictionalTripGroup(s),live=observed(s);
+  const old=g.adopt(g.children[0],reply(g.children[0],s),live);
+  const sibling=g.adopt(g.children[1],reply(g.children[1],s),live);
+  const next=g.adopt(g.children[0],reply(g.children[0],s,'READY',12),live);
+  assert.equal(g.view([old,sibling]).accepted,false);
+  assert.equal(g.view([next,sibling]).kind,'FICTIONAL_TRIP_GROUP_ONLY');
+  assert.equal(g.view([next,next]).accepted,false);
+  g.invalidate('fictional-epoch-change');
+  assert.equal(g.view([next,sibling]).accepted,false);
+});
+test('B33 R2: injected canary and hidden extra keys do not escape through the group view',()=>{
+  const s=spec({trips:[1]}),g=createFictionalTripGroup(s),child=g.children[0];
+  const adopted=g.adopt(child,reply(child,s),observed(s));
+  assert.equal(g.view([adopted]).kind,'FICTIONAL_TRIP_GROUP_ONLY');
+  const fake={...adopted,extraneous:'SYNTHETIC_CANARY_PRIVATE_SOURCE'};
+  const out=g.view([fake]);
+  assert.equal(out.accepted,false);
+  assert.equal(JSON.stringify(out).includes('SYNTHETIC_CANARY_PRIVATE_SOURCE'),false);
+  assert.equal(Object.isFrozen(adopted),true);
+  const view=g.view([adopted]);
+  assert.deepEqual(Object.keys(view.items[0]).sort(),
+    ['accepted','freshness','fixture_only','status','value','request_id',
+      'authorized_for_model','provenance_verified'].sort());
+  assert.equal(view.authorized_for_model,false);
+  assert.equal(view.provenance_verified,false);
+});
