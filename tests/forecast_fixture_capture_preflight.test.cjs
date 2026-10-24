@@ -211,12 +211,17 @@ test('C20: non-plain Date objects must not be mistaken for saved timestamp text'
   assert.equal(f.gate.capture(f.request()).reason,'fixture_evidence_unavailable');
 });
 test('C21: incomplete source-version evidence cannot mint a capture ticket',()=>{
-  for(const patch of [{weather:''},{calendar:null},{registry:undefined},{policy:0}]){
+  for(const [patch,expectedReason] of [
+    [{weather:''},'storage_not_ready'],
+    [{calendar:null},'storage_not_ready'],
+    [{registry:undefined},'fixture_evidence_unavailable'],
+    [{policy:0},'storage_not_ready']
+  ]){
     const f=harness();
     f.gate.event('auto-delivery');
     Object.assign(f.data.report.versions,patch);
     const blocked=f.gate.capture(f.request());
     assert.equal(blocked.ok,false);
-    assert.equal(blocked.reason,'storage_not_ready');
+    assert.equal(blocked.reason,expectedReason);
   }
 });
