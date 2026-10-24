@@ -132,4 +132,97 @@ function assessFictionalTemporalEvidence(evidence,issuedAt){
     return stable({eligible:false,reason:'unverified_or_unknown_time'});
   return stable({eligible:true,reason:null});
 }
-module.exports=stable({createFictionalTripGroup,assessFictionalTemporalEvidence});
+
+/*
+ * Fictional-only screening of historical fact availability and numeric Context.
+ * A lab ConditionDecision candidate verifies registered records only; it never
+ * establishes real-world absence, forecast READY or historical availability.
+ */
+function screenFictionalPredictionEvidence(input){
+  const blocked=(reason)=>stable({screened:false,reason,
+    target_status:'HELD',eligible_history:0,eligible_zero:0,excluded_history:0,
+    authorized_for_model:false,provenance_verified:false});
+  try{
+    // Reject properties that JSON would erase or getter/toJSON would transform.
+    let examined=0;
+    const seen=new Set();
+    function safe(v,depth){
+      if(++examined>1500||depth>16)return false;
+      if(v===null||typeof v==='string'||typeof v==='boolean')return true;
+      if(typeof v==='number')return Number.isSafeInteger(v)&&!Object.is(v,-0);
+      if(typeof v!=='object'||seen.has(v))return false;
+      if(Array.isArray(v)&&Object.getPrototypeOf(v)!==Array.prototype)return false;
+      if(!Array.isArray(v)&&Object.getPrototypeOf(v)!==Object.prototype)return false;
+      seen.add(v);
+      const descriptors=Object.getOwnPropertyDescriptors(v);
+      const keys=Reflect.ownKeys(descriptors);
+      if(keys.some(k=>typeof k!=='string'||['__proto__','constructor','prototype','toJSON'].includes(k)))return false;
+      if(Array.isArray(v)){
+        if(keys.length!==v.length+1)return false;
+        for(let i=0;i<v.length;i++)if(!Object.hasOwn(descriptors,i))return false;
+      }
+      for(const k of keys){
+        if(!Object.hasOwn(descriptors[k],'value')||!safe(descriptors[k].value,depth+1))return false;
+      }
+      seen.delete(v);return true;
+    }
+    if(!safe(input,0))return blocked('invalid_fixture_evidence');
+    if(input?.fixture!==true||!input.request||!input.condition_decision||
+      !input.target||!Array.isArray(input.history)||input.history.length>366)
+      return blocked('invalid_fixture_contract');
+    const r=input.request,d=input.condition_decision,t=input.target;
+    if(!STORE_IDS.has(r.scope?.store_id)||!CATEGORY_IDS.has(r.scope?.category_id)||
+      !Number.isInteger(r.scope.trip)||r.scope.trip<1||r.scope.trip>3||
+      !id(r.snapshot_id)||!day(r.target_day)||!jst(r.issued_at)||
+      !['current_snapshot','historical_replay'].includes(r.purpose))
+      return blocked('invalid_scope_or_request');
+    const eqScope=(x)=>!!x&&x.store_id===r.scope.store_id&&
+      x.category_id===r.scope.category_id&&x.trip===r.scope.trip;
+    const dr=d.request;
+    if(d.outcome!=='completed'||d.eligibility!=='candidate'||
+      !dr||!eqScope(dr.scope)||dr.snapshot_id!==r.snapshot_id||
+      dr.target_day!==r.target_day||dr.issued_at!==r.issued_at||
+      dr.purpose!==r.purpose||
+      !Array.isArray(d.basis)||d.basis.length!==2||
+      !['sale','event'].every(kind=>d.basis.some(b=>b.condition===kind&&
+        b.absence_scope==='registered_records_only'))||
+      !Array.isArray(d.conditions)||!['sale','event','holiday'].every(kind=>
+        d.conditions.some(c=>Array.isArray(c)&&c.length===2&&
+          c[0]===kind&&c[1]==='candidate')))
+      return blocked('candidate_not_numeric_confirmation');
+    const timeOk=(v)=>jst(v)&&Date.parse(v)<=Date.parse(r.issued_at);
+    if(!eqScope(t.scope)||t.day!==r.target_day)return blocked('target_mismatch');
+    const state=t.trip_status,holiday=t.holiday,special=t.special;
+    if(state?.status!=='active'||!timeOk(state.known_at)||
+      holiday?.status!=='confirmed_non_holiday'||
+      holiday.origin!=='verified_calendar'||!timeOk(holiday.known_at)||
+      special?.status!=='confirmed_none'||
+      special.origin!=='independent_check'||!timeOk(special.known_at))
+      return blocked('target_context_unconfirmed');
+    // Individual rows with unknown availability are excluded, not invented.
+    let eligible=0,zeros=0,excluded=0;
+    const seenDays=new Set();
+    for(const row of input.history){
+      if(!eqScope(row.scope)||!day(row.day)||row.day>=r.target_day||
+        seenDays.has(row.day))return blocked('history_scope_or_day_invalid');
+      seenDays.add(row.day);
+      const context=row.context;
+      const allowed=day(row.day)&&row.day<r.issued_at.slice(0,10)&&
+        Number.isSafeInteger(row.count)&&row.count>=0&&
+        timeOk(row.available_at)&&
+        context?.active===true&&context?.holiday===false&&
+        context?.event===false&&timeOk(context.known_at)&&
+        context.origin==='independent_verified';
+      if(allowed){eligible++;if(row.count===0)zeros++;}
+      else excluded++;
+    }
+    return stable({screened:true,reason:null,target_status:'FICTIONAL_CONTEXT_SCREENED',
+      eligible_history:eligible,eligible_zero:zeros,excluded_history:excluded,
+      authorized_for_model:false,provenance_verified:false});
+  }catch(_){
+    // No exception or source value is included in the result.
+    return blocked('fixture_inspection_failed');
+  }
+}
+
+module.exports=stable({createFictionalTripGroup,assessFictionalTemporalEvidence,screenFictionalPredictionEvidence});
