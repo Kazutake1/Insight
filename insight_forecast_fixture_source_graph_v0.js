@@ -116,12 +116,16 @@ function coverage(c){
 function covers(c,anchor,atDay){
   const req={store:anchor.scope.store_id,category:anchor.scope.category_id,
     trip:anchor.scope.trip};
+  let unknown=false;
+  // Every known dimension and the known date interval must be checked:
+  // an earlier unknown must never hide a known scope/date mismatch.
   for(const k of Object.keys(req)){
-    if(c[k].mode==='unknown')return 'unknown';
-    if(c[k].mode==='exact'&&c[k].value!==req[k])return 'mismatch';
+    if(c[k].mode==='unknown')unknown=true;
+    else if(c[k].mode==='exact'&&c[k].value!==req[k])return 'mismatch';
   }
-  if(c.start_day===null)return 'unknown';
-  return c.start_day<=atDay&&atDay<=c.end_day?'ok':'mismatch';
+  if(c.start_day===null)unknown=true;
+  else if(atDay<c.start_day||atDay>c.end_day)return 'mismatch';
+  return unknown?'unknown':'ok';
 }
 function fact(role,f){
   if(role==='target_trip'){
@@ -247,7 +251,14 @@ function structural(input){
   for(const [r,role] of rootRoles){
     const id=input.roots[r];if(id!==null&&byRef.get(id)?.role!==role)fail();
   }
-  for(const ref of input.roots.history)if(byRef.get(ref)?.role!=='history_row')fail();
+  const historyDays=new Set();
+  for(const ref of input.roots.history){
+    const row=byRef.get(ref);
+    if(row?.role!=='history_row'||historyDays.has(row.day))fail();
+    // The anchor already fixes one store/category/trip. A second history
+    // root with the same day is a duplicate sale, regardless of its ref.
+    historyDays.add(row.day);
+  }
   const get=(id)=>{const node=byRef.get(id);if(!node)fail();return node;};
   const edges=new Map();
   for(const n of input.nodes){
@@ -361,12 +372,20 @@ function evaluate(input){
       // Current registered-only candidate can have unknown registry known_at.
       const refs=cr.dependencies.map(node),registryRefs=refs.filter(n=>
         ['common_registry_binding','store_registry_binding'].includes(n.role));
-      const canSkip=registryRefs.length===2&&registryRefs.every(b=>{
-        const s=node(b.source_ref);
-        return s.read_state==='ok'&&s.source_version.state==='known'&&
-          s.times.known_at.state==='unknown'&&
-          b.rule_version.state==='known'&&knownBefore(b.known_at,cutoff);
-      })&&refs.filter(n=>!registryRefs.includes(n)).every(n=>usable(n.ref));
+      // The legacy CURRENT candidate allows unknown registry known_at ONLY.
+      // Rule/version, issue cutoff, binding and complete coverage are still
+      // mandatory; each registry is checked independently so one may be known.
+      const canSkip=cr.rule_version.state==='known'&&
+        knownBefore(cr.effective_at,cutoff)&&registryRefs.length===2&&
+        registryRefs.every(b=>{
+          const s=node(b.source_ref);
+          const state=covers(s.coverage,a,b.applied_day);
+          return state==='ok'&&s.read_state==='ok'&&
+            s.source_version.state==='known'&&
+            b.rule_version.state==='known'&&knownBefore(b.known_at,cutoff)&&
+            (s.times.known_at.state==='unknown'||
+              knownBefore(s.times.known_at,cutoff));
+        })&&refs.filter(n=>!registryRefs.includes(n)).every(n=>usable(n.ref));
       if(canSkip){
         const cal=f(cr.ref,'target_calendar_binding');
         const common=f(cr.ref,'common_registry_binding');
@@ -408,7 +427,16 @@ function evaluate(input){
       const w=derived(roots.weather);
       const wbind=child(w,'weather_report_binding');
       const report=factFor(wbind);
-      weatherStatus=usable(w.ref)&&report.day===a.target_day?'SCREENED':'HELD';
+      const reportNode=node(wbind.source_ref);
+      const policyBinding=child(w,'weather_policy_binding');
+      const weatherPolicy=factFor(policyBinding);
+      // Freshness is measured from the report's publication time to the
+      // request evidence cutoff (captured_at for current; issued_at for replay).
+      const age=cutoff-Date.parse(reportNode.times.published_at.value);
+      const fresh=reportNode.times.published_at.state==='known'&&
+        age>=0&&age<=weatherPolicy.max_age_seconds*1000;
+      weatherStatus=usable(w.ref)&&report.day===a.target_day&&fresh?
+        'SCREENED':'HELD';
     }
     const model=derived(roots.model);
     const policy=f(model.ref,'model_policy_binding');
