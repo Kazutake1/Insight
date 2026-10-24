@@ -289,6 +289,98 @@ test('S06: disposed coordinator rejects and aborts pending work', async () => {
   assert.equal((await task).accepted, false);
   assert.equal((await coord.request(req())).reason, 'disposed');
 });
+test('S09: fake unsaved live changes block read before fixture access', () => {
+  const src = fixture();
+  let liveMatchesSaved = true;
+  const inspect = src.inspect.bind(src);
+  src.inspect = () => {
+    const state = inspect();
+    if (!liveMatchesSaved) state.held = true; // synthetic guard, not an InsightStorage adapter
+    return state;
+  };
+  const reader = createFixtureSnapshotReader(src);
+  const snap = reader.read(req());
+  liveMatchesSaved = false;
+  assert.equal(reader.isCurrent(snap), false);
+  assert.throws(() => reader.read(req()), /source_not_ready/);
+  assert.equal(src.reads, 1);
+});
+test('S09: fake same-scope A-B-A UI selection events discard old READY', async () => {
+  const src = fixture(); const reader = createFixtureSnapshotReader(src);
+  const deferredResults = [deferred(), deferred()];
+  let index = 0;
+  const coord = createFixtureRequestCoordinator({
+    reader, session_id: 'fixture-ui-session', evaluate: () => deferredResults[index++].promise
+  });
+  // A UI event is a separate signal: a data fingerprint need not change on A-B-A.
+  const fingerprint = src.state.raw_fingerprint;
+  const initial = coord.request(req());
+  coord.invalidate('fake-store-selected-B');
+  coord.invalidate('fake-store-selected-A');
+  const latest = coord.request(req());
+  deferredResults[0].resolve({ outcome: 'completed', forecast: 'READY' });
+  deferredResults[1].resolve({ outcome: 'completed', forecast: 'HELD' });
+  const old = await initial, current = await latest;
+  assert.equal(src.state.raw_fingerprint, fingerprint);
+  assert.equal(old.accepted, false);
+  assert.equal(old.result, undefined);
+  assert.equal(current.accepted, true);
+  assert.equal(current.result.forecast, 'HELD');
+  assert.equal(coord.getEpoch(), 4);
+});
+test('S09: fake save failure and restore to identical raw still invalidate', async () => {
+  const src = fixture(); const reader = createFixtureSnapshotReader(src);
+  const pending = deferred();
+  const coord = createFixtureRequestCoordinator({
+    reader, session_id: 'fixture-save-session', evaluate: () => pending.promise
+  });
+  const old = coord.request(req());
+  const originalFingerprint = src.state.raw_fingerprint;
+  src.state.pending = 1;
+  coord.invalidate('fake-save-begin');
+  src.state.pending = 0;
+  src.state.held = true;
+  coord.invalidate('fake-save-failed');
+  src.state.held = false; // simulated manual recovery, no actual storage mutation
+  coord.invalidate('fake-restore-identical-raw');
+  pending.resolve({ forecast: 'READY', outcome: 'completed' });
+  const response = await old;
+  assert.equal(src.state.raw_fingerprint, originalFingerprint);
+  assert.equal(response.accepted, false);
+  assert.equal(response.result, undefined);
+  assert.equal(coord.getEpoch(), 4);
+});
+test('S09: fake clock 11am boundary discards old automatic delivery request', async () => {
+  const src = fixture(); const reader = createFixtureSnapshotReader(src);
+  const pending = deferred();
+  let calls = 0;
+  const coord = createFixtureRequestCoordinator({
+    reader, session_id: 'fixture-clock-session',
+    evaluate: () => ++calls === 1 ? pending.promise : Promise.resolve({ forecast: 'HELD' })
+  });
+  const old = coord.request(req());
+  coord.invalidate('fake-clock-crossed-11am');
+  src.payload.target_evidence.day = '2026-10-26';
+  const newTarget = await coord.request(req({
+    target_day: '2026-10-26', request_issued_at: '2026-10-24T11:00:00+09:00'
+  }));
+  pending.resolve({ forecast: 'READY' });
+  const oldTarget = await old;
+  assert.equal(oldTarget.accepted, false);
+  assert.equal(oldTarget.result, undefined);
+  assert.equal(newTarget.accepted, true);
+  assert.equal(newTarget.context.target_day, '2026-10-26');
+});
+test('S09: fake replay unknown known_at remains unknown, never inferred as issued', () => {
+  const src = fixture();
+  src.payload.target_evidence.day = '2026-10-24';
+  const requested = req({ purpose: 'historical_replay', manual_target: true, target_day: '2026-10-24' });
+  const snapshot = createFixtureSnapshotReader(src).read(requested);
+  assert.equal(snapshot.request.purpose, 'historical_replay');
+  assert.equal(snapshot.history[0].weather.known_at, null);
+  assert.equal(snapshot.target_evidence.known_at, null);
+  assert.equal(src.payload.history[0].weather.known_at, null);
+});
 test('S07/S08: prototypes do not import app storage, workers, forecast evaluator or network', () => {
   for (const filename of ['insight_forecast_fixture_snapshot_reader_v0.js', 'insight_forecast_fixture_request_coordinator_v0.js']) {
     const body = fs.readFileSync(path.join(__dirname, '..', filename), 'utf8');
