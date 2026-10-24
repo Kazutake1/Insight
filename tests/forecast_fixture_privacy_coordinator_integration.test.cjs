@@ -7,6 +7,9 @@
  */
 const test=require('node:test');
 const assert=require('node:assert/strict');
+const vm=require('node:vm');
+const fs=require('node:fs');
+const path=require('node:path');
 const {createFixtureSnapshotReader}=require('../insight_forecast_fixture_snapshot_reader_v0.js');
 const {createFixtureRequestCoordinator}=require('../insight_forecast_fixture_request_coordinator_v0.js');
 const {projectFictionalNormalizerForLocalAI}=require('../insight_forecast_fictional_privacy_handoff_v0.js');
@@ -139,4 +142,99 @@ test('S04: synthetic private exception is suppressed by actual fictional Coordin
   assert.equal(reply.result,undefined);
   assert.equal(JSON.stringify(reply).includes(SECRET),false);
   coord.dispose();
+});
+
+
+/*
+ * STEP4 G1/G2/G8 observations against the ACTUAL InsightStorage/OrderForecast
+ * source, loaded exclusively in a sandbox with fictional localStorage values.
+ * This is test-only verification of missing production preflight contracts.
+ * Nothing writes to browser storage, and there is no production UI adapter.
+ */
+function syntheticStorageRuntime(){
+  const initial=JSON.stringify({schemaVersion:1,current:'lab_a',
+    stores:{lab_a:{value:0}}});
+  const values=new Map([['insight_v11',initial]]),events=new Map();
+  const live={schemaVersion:1,current:'lab_a',stores:{lab_a:{value:0}}};
+  const root={
+    SK:'insight_v11',
+    localStorage:{
+      getItem(k){return values.has(k)?values.get(k):null;},
+      setItem(k,v){values.set(k,String(v));}
+    },
+    addEventListener(event,handler){events.set(event,handler);}
+  };
+  const ctx={window:root,globalThis:root,SK:'insight_v11',allStores:live,JSON,Error,console};
+  vm.createContext(ctx);
+  const sourceText=fs.readFileSync(path.join(__dirname,'..','insight_storage_v1.js'),'utf8');
+  vm.runInContext(sourceText,ctx);
+  return {storage:root.InsightStorage,root,values,events,live};
+}
+test('G2: actual InsightStorage reportState misses unsaved UI edits even when its flags are clear',()=>{
+  const fixture=syntheticStorageRuntime(),storage=fixture.storage;
+  const before={...storage.reportState()};
+  assert.deepEqual(before,{revision:0,pending:0,held:false,conflict:false});
+  fixture.live.stores.lab_a.value=19;
+  const after={...storage.reportState()};
+  assert.deepEqual(after,before,'No save event means reportState does not change');
+  assert.equal(storage.readSnapshot().stores.lab_a.value,0);
+  assert.notEqual(JSON.stringify(fixture.live),JSON.stringify(storage.readSnapshot()));
+  assert.equal(fixture.values.get('insight_v11').includes('"value":19'),false);
+  // Production Reader MUST separately attest live UI versus raw persisted data.
+});
+
+test('G8: actual InsightStorage save generation revokes a pending fictional privacy response',async()=>{
+  const fixture=syntheticStorageRuntime(),fake=source(),late=deferred();
+  const reader=createFixtureSnapshotReader({
+    fixture:true,
+    inspect(){
+      const state=fixture.storage.reportState();
+      return {pending:state.pending,held:state.held,conflict:state.conflict,
+        report_revision:state.revision,
+        raw_fingerprint:'static-synthetic-label-only',versions:fake.state.versions};
+    },
+    readFixture(){return structuredClone(fake.payload);}
+  });
+  const coordinator=createFixtureRequestCoordinator({
+    reader,session_id:'fictional-saved-generation',
+    evaluate(snapshot){privacyProbe(snapshot);return late.promise;}
+  });
+  const pending=coordinator.request(request());
+  const first=fixture.storage.reportState().revision;
+  fixture.storage.writeSnapshot({schemaVersion:1,current:'lab_a',
+    stores:{lab_a:{value:1}}});
+  assert.ok(fixture.storage.reportState().revision>first);
+  late.resolve({kind:'FICTIONAL_PROBE_ONLY',value:SECRET});
+  const result=await pending;
+  assert.equal(result.accepted,false);
+  assert.equal(result.freshness,'stale');
+  assert.equal(result.result,undefined);
+  assert.equal(JSON.stringify(result).includes(SECRET),false);
+  coordinator.dispose();
+});
+
+test('G8: actual InsightStorage external storage event marks conflict even if raw returns to original',()=>{
+  const fixture=syntheticStorageRuntime();
+  const original=fixture.values.get('insight_v11');
+  const external=JSON.stringify({schemaVersion:1,current:'lab_a',
+    stores:{lab_a:{value:4}}});
+  fixture.values.set('insight_v11',external);
+  fixture.events.get('storage')({key:'insight_v11',newValue:external});
+  assert.equal(fixture.storage.reportState().conflict,true);
+  fixture.values.set('insight_v11',original);
+  fixture.events.get('storage')({key:'insight_v11',newValue:original});
+  assert.equal(fixture.storage.readSnapshot().stores.lab_a.value,0);
+  assert.equal(fixture.storage.reportState().conflict,true);
+  // A same-value restore is not a reason to resurrect a prior snapshot.
+});
+
+test('G1: real OrderForecast exposes 11:00 boundary but not genuine manual selection intent',()=>{
+  const forecast=require('../insight_order_forecast_v1.js');
+  assert.equal(forecast.defaultDelivery(new Date('2026-10-24T01:59:00Z')),'2026-10-25');
+  assert.equal(forecast.defaultDelivery(new Date('2026-10-24T02:00:00Z')),'2026-10-26');
+  const sourceText=fs.readFileSync(path.join(__dirname,'..','insight_order_forecast_v1.js'),'utf8');
+  assert.match(sourceText,/autoDelivery=true/);
+  assert.match(sourceText,/autoDelivery=false;state\.delivery=e\.target\.value/);
+  assert.match(sourceText,/model\.getState=function\(\)\{return Object\.assign\(\{\},state\);\}/);
+  // This is source inspection; no running UI event provenance is attested.
 });
