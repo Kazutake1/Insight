@@ -142,9 +142,43 @@ test('Index.htmlは必要先だけを許可するCSPを定義する',()=>{
 test('shell loaderの読み込み失敗表示はinline styleを生成しない',()=>{
   const loader=read('insight_shell_loader_v1.js');
   const shellCss=read('insight_shell_v1.css');
-  assert.match(loader,/class="insight-load-failure"/);
+  assert.match(loader,/box\.className='insight-load-failure'/);
+  assert.match(loader,/small\.textContent=String\(/);
+  assert.doesNotMatch(loader,/function fail\(e\)[\s\S]*?document\.body\.innerHTML/);
   assert.doesNotMatch(loader,/function fail\(e\).*style=/);
   assert.match(shellCss,/\.insight-load-failure\{[^}]*padding:24px[^}]*color:#b42318[^}]*\}/);
+});
+
+
+test('shell loaderの異常メッセージはHTMLとして実行・解釈されない',()=>{
+  const loader=read('insight_shell_loader_v1.js');
+  const malicious='<img src=x onerror="globalThis.__injected=1">';
+  const created=[],appended=[];
+  const document={
+    createElement(tag){
+      created.push(tag);
+      return {
+        tagName:tag,children:[],className:'',textContent:'',
+        appendChild(node){this.children.push(node);}
+      };
+    },
+    createTextNode(value){return {nodeType:3,textContent:String(value)};},
+    body:{
+      replaceChildren(node){appended.splice(0,appended.length,node);},
+      set innerHTML(_){assert.fail('失敗表示にinnerHTMLを使用しないこと');}
+    }
+  };
+  function FakeError(){this.message=malicious;}
+  const context={document,Chart:undefined,Error:FakeError,String};
+  vm.runInNewContext(loader,context,{timeout:1000});
+  assert.deepEqual(created,['div','br','small']);
+  assert.equal(appended.length,1);
+  assert.equal(appended[0].className,'insight-load-failure');
+  assert.equal(appended[0].children[0].textContent,'Insightの読み込みに失敗しました。');
+  assert.equal(appended[0].children[1].tagName,'br');
+  assert.equal(appended[0].children[2].tagName,'small');
+  assert.equal(appended[0].children[2].textContent,malicious);
+  assert.equal(context.__injected,undefined);
 });
 
 test('販売数入力は不正値の保存と同じページの再読込を防ぐ',()=>{
