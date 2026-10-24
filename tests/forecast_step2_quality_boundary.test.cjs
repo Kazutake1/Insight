@@ -135,7 +135,7 @@ test('Q07: historical trip conflict is counted for review, even if saved zero ex
   assert.equal(row.sales.state,'entered');
   assert.equal(row.sales.value,0);
   assert.equal(row.trip_resolution.conflict,true);
-  assert.equal(row.trip_resolution.needsDateReview,false);
+  assert.equal(row.trip_resolution.needsDateReview,true);
 });
 test('Q08: summary counts cannot serve as target-day condition evidence or timestamps',()=>{
   const snapshot=synthetic();
