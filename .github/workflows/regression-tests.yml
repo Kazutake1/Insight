@@ -59,6 +59,7 @@ jobs:
           - analysis_history.test.cjs
           - ai_context.test.cjs
           - local_ai_privacy.test.cjs
+          - forecast_fictional_privacy_handoff.test.cjs
           - secure_backup_crypto.test.cjs
           - ai_interpretation.test.cjs
           - ai_visual.test.cjs
