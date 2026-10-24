@@ -54,6 +54,17 @@ function assertKnownAt(value, issuedAt) {
   if (typeof value !== 'string' || !/^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}(?:\\.\\d+)?(?:Z|[+-]\\d{2}:\\d{2})$/.test(value) || !Number.isFinite(Date.parse(value))) reject('invalid_known_at');
   if (Date.parse(value) > Date.parse(issuedAt)) reject('future_knowledge');
 }
+function assertNestedKnownAt(value, issuedAt) {
+  if (!value || typeof value !== 'object') return;
+  if (Array.isArray(value)) {
+    for (const child of value) assertNestedKnownAt(child, issuedAt);
+    return;
+  }
+  for (const [key, child] of Object.entries(value)) {
+    if (key === 'known_at') assertKnownAt(child, issuedAt);
+    else assertNestedKnownAt(child, issuedAt);
+  }
+}
 function automaticTargetDay(issuedAt) {
   jst(issuedAt);
   const utc = new Date(day(issuedAt.slice(0, 10)) + 'T00:00:00Z');
@@ -104,13 +115,15 @@ function assertFixture(payload, request) {
   for (const record of payload.history) {
     if (!record || !sameScope(record.scope, request.scope)) reject('scope_mismatch');
     const recordDay = day(record.day);
-    if (seen.has(recordDay) || recordDay >= request.target_day || recordDay > issuedDay) reject('history_boundary');
+    const earliest = new Date(request.target_day + 'T00:00:00Z');
+    earliest.setUTCDate(earliest.getUTCDate() - request.history_days);
+    if (seen.has(recordDay) || recordDay >= request.target_day || recordDay > issuedDay || recordDay < earliest.toISOString().slice(0, 10)) reject('history_boundary');
     seen.add(recordDay);
-    assertKnownAt(record.known_at, request.request_issued_at);
+    assertNestedKnownAt(record, request.request_issued_at);
   }
   if (payload.target_evidence !== null && payload.target_evidence !== undefined) {
     if (!sameScope(payload.target_evidence.scope, request.scope) || day(payload.target_evidence.day) !== request.target_day) reject('target_evidence_mismatch');
-    assertKnownAt(payload.target_evidence.known_at, request.request_issued_at);
+    assertNestedKnownAt(payload.target_evidence, request.request_issued_at);
   }
 }
 function createFixtureSnapshotReader(source) {
