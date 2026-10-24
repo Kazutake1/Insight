@@ -92,17 +92,17 @@ test('Q04: valid 0C and negative temperature remain valid in STEP2 and STEP4',()
   assert.equal(rows[0].weather.temp_min.available_at,null);
 });
 test('Q05: reversed, invalid, and missing temperature are not silently accepted as valid',()=>{
-  for(const [mutate,step2Key,step4Status] of [
-    [s=>{s.stores.lab_a.data[2026]['10月'][17].tempMaxC=-5;},'temperatureReversed','reversed'],
-    [s=>{s.stores.lab_a.data[2026]['10月'][17].tempMaxC='bad';},'temperatureInvalid','unknown'],
-    [s=>{s.stores.lab_a.data[2026]['10月'][17].tempMaxC='   ';},'temperatureMissing','unknown']
+  for(const [mutate,step2Key,step4Status,maxStatus] of [
+    [s=>{s.stores.lab_a.data[2026]['10月'][17].tempMaxC=-5;},'temperatureReversed','reversed','entered'],
+    [s=>{s.stores.lab_a.data[2026]['10月'][17].tempMaxC='bad';},'temperatureInvalid','unknown','invalid'],
+    [s=>{s.stores.lab_a.data[2026]['10月'][17].tempMaxC='   ';},'temperatureMissing','unknown','missing']
   ]){
     const snapshot=synthetic();mutate(snapshot);
     const summary=examine(snapshot,'2026-10-18','2026-10-18').stores[0];
     const row=normalize(snapshot,['2026-10-18']).history[0];
     assert.equal(summary[step2Key],1);
     assert.equal(row.weather.temperature_pair_state,step4Status);
-    assert.notEqual(row.weather.temp_max.state,'entered'===step4Status?'missing':'entered');
+    assert.equal(row.weather.temp_max.state,maxStatus);
   }
 });
 test('Q06: date-position vs explicit d lookup can diverge on a malformed unsorted saved weather array',()=>{
