@@ -1,0 +1,539 @@
+'use strict';
+const test = require('node:test');
+const assert = require('node:assert/strict');
+const fs = require('node:fs');
+const path = require('node:path');
+const { automaticTargetDay, createFixtureSnapshotReader } = require('../insight_forecast_fixture_snapshot_reader_v0.js');
+const { createFixtureRequestCoordinator } = require('../insight_forecast_fixture_request_coordinator_v0.js');
+const { validateFixtureHandoff } = require('../insight_forecast_fixture_contract_handoff_v0.js');
+
+const scope = Object.freeze({ store_id: 'lab_a', category_id: 'fictional_rice', trip: 1 });
+function req(overrides = {}) {
+  return {
+    scope: { ...scope }, target_day: '2026-10-25',
+    request_issued_at: '2026-10-24T10:59:00+09:00',
+    manual_target: false, purpose: 'current_snapshot', history_days: 84,
+    ...overrides
+  };
+}
+function fixture() {
+  const state = {
+    pending: 0, held: false, conflict: false, report_revision: 1,
+    raw_fingerprint: 'fake-raw-v1',
+    versions: { calendar: 'fake-calendar-1', weather: 'fake-weather-1', policy: 'fake-policy-1', registry: null }
+  };
+  const payload = {
+    history: [
+      { scope: { ...scope }, day: '2026-10-23', sales: { state: 'entered', value: 0 }, delivery: { state: 'missing', value: null }, weather: { known_at: null, source: 'saved' } },
+      { scope: { ...scope }, day: '2026-10-22', sales: { state: 'invalid', value: null }, trip: { status: 'unknown', inferred: true }, event: { confirmation: 'unknown' } }
+    ],
+    target_evidence: { scope: { ...scope }, day: '2026-10-25', known_at: null, sale: 'unknown', event: 'unknown' }
+  };
+  let reads = 0;
+  let inspections = 0;
+  return {
+    fixture: true,
+    state, payload,
+    get reads() { return reads; },
+    get inspections() { return inspections; },
+    inspect() { inspections++; return structuredClone(state); },
+    readFixture() { reads++; return structuredClone(payload); }
+  };
+}
+function deferred() {
+  let resolve, reject;
+  const promise = new Promise((ok, bad) => { resolve = ok; reject = bad; });
+  return { promise, resolve, reject };
+}
+
+test('S01: clone is frozen and source data, explicit zero and missing are unchanged', () => {
+  const src = fixture();
+  const before = structuredClone(src.payload);
+  const reader = createFixtureSnapshotReader(src);
+  const snap = reader.read(req());
+  assert.equal(src.reads, 1);
+  assert.equal(src.inspections, 2);
+  assert.deepEqual(src.payload, before);
+  assert.equal(snap.history[0].sales.value, 0);
+  assert.equal(snap.history[0].delivery.value, null);
+  assert.equal(snap.history[1].trip.status, 'unknown');
+  assert.equal(snap.target_evidence.event, 'unknown');
+  assert.ok(Object.isFrozen(snap.history[0].sales));
+  assert.throws(() => { snap.history[0].sales.value = 99; }, TypeError);
+  assert.equal(reader.isCurrent(snap), true);
+});
+test('S02: mismatched store/category/trip and invalid identifiers fail closed', () => {
+  for (const changed of [{ store_id: 'lab_b' }, { category_id: 'fictional_bread' }, { trip: 2 }]) {
+    const src = fixture();
+    src.payload.history[0].scope = { ...scope, ...changed };
+    assert.throws(() => createFixtureSnapshotReader(src).read(req()), /scope_mismatch/);
+  }
+  for (const bad of [0, 4, '1', true, 1.5]) assert.throws(() => createFixtureSnapshotReader(fixture()).read(req({ scope: { ...scope, trip: bad } })), /invalid_scope/);
+});
+test('S03: 10:59 JST is next day, 11:00 is day after, manual flag remains explicit', () => {
+  assert.equal(automaticTargetDay('2026-10-24T10:59:59+09:00'), '2026-10-25');
+  assert.equal(automaticTargetDay('2026-10-24T11:00:00+09:00'), '2026-10-26');
+  assert.throws(() => createFixtureSnapshotReader(fixture()).read(req({ request_issued_at: '2026-10-24T11:00:00+09:00' })), /automatic_target_mismatch/);
+  assert.equal(createFixtureSnapshotReader(fixture()).read(req({ manual_target: true })).request.manual_target, true);
+  assert.throws(() => createFixtureSnapshotReader(fixture()).read(req({ manual_target: null })), /manual_target_required/);
+});
+test('S04: omissions, unknown event categories, and missing registry evidence are not promoted', () => {
+  const snap = createFixtureSnapshotReader(fixture()).read(req());
+  assert.equal(snap.source_versions.registry, null);
+  assert.equal(snap.history[1].event.confirmation, 'unknown');
+  assert.equal(snap.target_evidence.sale, 'unknown');
+  assert.equal(snap.history[1].sales.state, 'invalid');
+});
+test('S05: historical known_at unknown remains unknown; future-known records rejected', () => {
+  const src = fixture();
+  src.payload.history[0].known_at = null;
+  assert.equal(createFixtureSnapshotReader(src).read(req()).history[0].known_at, null);
+  src.payload.history[0].known_at = '2026-10-26T09:00:00+09:00';
+  assert.throws(() => createFixtureSnapshotReader(src).read(req()), /future_knowledge/);
+  src.payload.history[0].known_at = null;
+  src.payload.history[0].day = '2026-10-25';
+  assert.throws(() => createFixtureSnapshotReader(src).read(req()), /history_boundary/);
+});
+test('S01/S06: report state pending, held and conflict all block read', () => {
+  for (const [field, bad] of [['pending', 1], ['held', true], ['conflict', true]]) {
+    const src = fixture(); src.state[field] = bad;
+    assert.throws(() => createFixtureSnapshotReader(src).read(req()), /source_not_ready/);
+    assert.equal(src.reads, 0);
+  }
+});
+test('S06: source changes during read discard entire snapshot', () => {
+  const src = fixture(); const originalRead = src.readFixture;
+  src.readFixture = (...args) => { const result = originalRead(...args); src.state.raw_fingerprint = 'fake-raw-v2'; return result; };
+  assert.throws(() => createFixtureSnapshotReader(src).read(req()), /source_changed_during_read/);
+});
+test('S06: revision, raw fingerprint, versions, and unsafe state invalidate snapshot', () => {
+  for (const update of [
+    s => { s.report_revision++; }, s => { s.raw_fingerprint += '-changed'; },
+    s => { s.versions.weather = 'fake-new'; }, s => { s.pending = 1; },
+    s => { s.held = true; }, s => { s.conflict = true; }
+  ]) {
+    const src = fixture(); const reader = createFixtureSnapshotReader(src);
+    const snap = reader.read(req());
+    update(src.state);
+    assert.equal(reader.isCurrent(snap), false);
+  }
+});
+test('S02: malformed scope, date, period, source data and nonfinite counts rejected', () => {
+  for (const overrides of [
+    { target_day: '2026-02-30' },
+    { request_issued_at: '2026-10-24T10:59:00Z' },
+    { history_days: 0 }, { history_days: 367 },
+    { purpose: 'unexpected' }
+  ]) assert.throws(() => createFixtureSnapshotReader(fixture()).read(req(overrides)));
+  const src = fixture(); src.payload.history[0].sales.value = NaN;
+  assert.throws(() => createFixtureSnapshotReader(src).read(req()), /non_finite_fixture_value/);
+});
+test('S03/S05: normalized but impossible timestamps fail closed', () => {
+  for (const request_issued_at of [
+    '2026-02-30T10:59:00+09:00',
+    '2026-10-24T24:00:00+09:00',
+    '2026-10-24T10:59:00+24:00'
+  ]) {
+    assert.throws(
+      () => createFixtureSnapshotReader(fixture()).read(req({ manual_target: true, request_issued_at })),
+      /invalid_jst_timestamp/
+    );
+  }
+  for (const known_at of [
+    '2026-02-30T08:00:00+09:00',
+    '2026-10-24T24:00:00+09:00',
+    '2026-10-24T08:00:00+25:00'
+  ]) {
+    const source = fixture();
+    source.payload.history[0].weather.known_at = known_at;
+    assert.throws(() => createFixtureSnapshotReader(source).read(req()), /invalid_known_at/);
+  }
+});
+test('S05: malformed known_at cannot silently become unknown', () => {
+  const src = fixture();
+  src.payload.history[0].known_at = 'unparseable';
+  assert.throws(() => createFixtureSnapshotReader(src).read(req()), /invalid_known_at/);
+});
+test('S02: sparse arrays never silently turn missing into explicit null', () => {
+  const src = fixture();
+  src.payload.history[0].sales.samples = new Array(1);
+  assert.throws(() => createFixtureSnapshotReader(src).read(req()), /sparse_fixture_array/);
+});
+test('S06: a different reader cannot attest this reader\'s snapshot', () => {
+  const first = createFixtureSnapshotReader(fixture());
+  const second = createFixtureSnapshotReader(fixture());
+  const snap = first.read(req());
+  assert.equal(first.isCurrent(snap), true);
+  assert.equal(second.isCurrent(snap), false);
+});
+test('S05: nested weather/forecast known_at after issue is rejected', () => {
+  const src = fixture();
+  src.payload.history[0].weather.known_at = '2026-10-24T11:00:00+09:00';
+  assert.throws(() => createFixtureSnapshotReader(src).read(req()), /future_knowledge/);
+  src.payload.history[0].weather.known_at = null;
+  src.payload.target_evidence.events = [{ kind: 'unknown_kind', known_at: '2026-10-25T00:00:00+09:00' }];
+  assert.throws(() => createFixtureSnapshotReader(src).read(req()), /future_knowledge/);
+});
+test('S02: out-of-window history is rejected instead of silently included', () => {
+  const src = fixture();
+  src.payload.history[0].day = '2025-10-23';
+  assert.throws(() => createFixtureSnapshotReader(src).read(req()), /history_boundary/);
+});
+test('S06: latest async result is adopted only with unchanged scope and source', async () => {
+  const src = fixture(); const reader = createFixtureSnapshotReader(src);
+  const coord = createFixtureRequestCoordinator({ reader, session_id: 'fake-session', evaluate: async () => ({ outcome: 'completed', conditions: 'candidate', forecast: 'HELD' }) });
+  const response = await coord.request(req());
+  assert.equal(response.accepted, true);
+  assert.equal(response.freshness, 'current');
+  assert.equal(response.result.forecast, 'HELD');
+  assert.equal(response.context.target_day, '2026-10-25');
+  assert.equal(response.context.source_versions.policy, 'fake-policy-1');
+});
+test('S06: A -> B -> A increases epoch and never revives old response', async () => {
+  const src = fixture(); const reader = createFixtureSnapshotReader(src);
+  const pending = [deferred(), deferred(), deferred()];
+  let i = 0;
+  const coord = createFixtureRequestCoordinator({ reader, session_id: 'fake-session', evaluate: () => pending[i++].promise });
+  const oldA = coord.request(req());
+  const B = coord.request(req({ scope: { ...scope, store_id: 'lab_b' } }));
+  // B is not present in the fixture and must fail before evaluation.
+  assert.equal((await B).accepted, false);
+  const newA = coord.request(req());
+  pending[0].resolve({ forecast: 'READY', evidence: 'old' });
+  pending[1].resolve({ forecast: 'HELD', evidence: 'new' });
+  assert.equal((await oldA).accepted, false);
+  assert.equal((await newA).accepted, true);
+  assert.equal(coord.getEpoch(), 3);
+});
+test('S06: storage, restore, policy and forecast changes invalidate in-flight output', async () => {
+  for (const cause of ['storage-event', 'save-start', 'save-failed', 'restore', 'forecast-refetched', 'policy-changed', 'selection-changed']) {
+    const pending = deferred();
+    const coord = createFixtureRequestCoordinator({
+      reader: createFixtureSnapshotReader(fixture()),
+      session_id: 'fake-session', evaluate: () => pending.promise
+    });
+    const task = coord.request(req());
+    coord.invalidate(cause);
+    pending.resolve({ outcome: 'completed', forecast: 'READY' });
+    const result = await task;
+    assert.equal(result.accepted, false);
+    assert.equal(result.result, undefined);
+    assert.equal(result.freshness, 'stale');
+  }
+});
+test('S06: invalidation settles a non-cooperative evaluator that never resolves', async () => {
+  const coord = createFixtureRequestCoordinator({
+    reader: createFixtureSnapshotReader(fixture()), session_id: 'fake-session',
+    evaluate: () => new Promise(() => {})
+  });
+  const old = coord.request(req());
+  const epoch = coord.invalidate('storage-event');
+  const result = await old;
+  assert.equal(epoch, 2);
+  assert.equal(result.accepted, false);
+  assert.equal(result.freshness, 'stale');
+  assert.equal(result.result, undefined);
+});
+test('S06: second request can complete when the first ignores cancellation forever', async () => {
+  let calls = 0;
+  const coord = createFixtureRequestCoordinator({
+    reader: createFixtureSnapshotReader(fixture()), session_id: 'fake-session',
+    evaluate: () => ++calls === 1 ? new Promise(() => {}) : Promise.resolve({ outcome: 'completed', forecast: 'HELD' })
+  });
+  const first = coord.request(req());
+  const second = coord.request(req());
+  assert.equal((await first).accepted, false);
+  const fresh = await second;
+  assert.equal(fresh.accepted, true);
+  assert.equal(fresh.result.forecast, 'HELD');
+  assert.equal(coord.getEpoch(), 2);
+});
+test('S06: source freshness inspection throwing before evaluation is sanitized', async () => {
+  const base = createFixtureSnapshotReader(fixture());
+  let evaluated = false;
+  const coord = createFixtureRequestCoordinator({
+    reader: { read: base.read, isCurrent: () => { throw Error('fictional-secret-should-not-escape'); } },
+    session_id: 'fake-session',
+    evaluate: () => { evaluated = true; return { forecast: 'READY' }; }
+  });
+  const output = await coord.request(req());
+  assert.equal(output.accepted, false);
+  assert.equal(output.reason, 'snapshot_unavailable');
+  assert.equal(evaluated, false);
+  assert.doesNotMatch(JSON.stringify(output), /fictional-secret/);
+});
+test('S06: source mutating after async start discards even an otherwise READY result', async () => {
+  const src = fixture(); const pending = deferred();
+  const coord = createFixtureRequestCoordinator({ reader: createFixtureSnapshotReader(src), session_id: 'fake-session', evaluate: () => pending.promise });
+  const task = coord.request(req());
+  src.state.raw_fingerprint = 'fake-changed';
+  pending.resolve({ forecast: 'READY' });
+  const result = await task;
+  assert.equal(result.accepted, false);
+  assert.equal(result.result, undefined);
+});
+test('S06: failure text never leaks returned error to caller', async () => {
+  const coord = createFixtureRequestCoordinator({
+    reader: createFixtureSnapshotReader(fixture()), session_id: 'fake-session',
+    evaluate: async () => { throw Error('synthetic-sensitive-do-not-print'); }
+  });
+  const response = await coord.request(req());
+  assert.equal(response.accepted, false);
+  assert.ok(!JSON.stringify(response).includes('synthetic-sensitive'));
+});
+test('S06: disposed coordinator rejects and aborts pending work', async () => {
+  const pending = deferred();
+  const coord = createFixtureRequestCoordinator({ reader: createFixtureSnapshotReader(fixture()), session_id: 'fake-session', evaluate: () => pending.promise });
+  const task = coord.request(req());
+  coord.dispose();
+  pending.resolve({ forecast: 'READY' });
+  assert.equal((await task).accepted, false);
+  assert.equal((await coord.request(req())).reason, 'disposed');
+});
+test('S09: fake unsaved live changes block read before fixture access', () => {
+  const src = fixture();
+  let liveMatchesSaved = true;
+  const inspect = src.inspect.bind(src);
+  src.inspect = () => {
+    const state = inspect();
+    if (!liveMatchesSaved) state.held = true; // synthetic guard, not an InsightStorage adapter
+    return state;
+  };
+  const reader = createFixtureSnapshotReader(src);
+  const snap = reader.read(req());
+  liveMatchesSaved = false;
+  assert.equal(reader.isCurrent(snap), false);
+  assert.throws(() => reader.read(req()), /source_not_ready/);
+  assert.equal(src.reads, 1);
+});
+test('S09: fake same-scope A-B-A UI selection events discard old READY', async () => {
+  const src = fixture(); const reader = createFixtureSnapshotReader(src);
+  const deferredResults = [deferred(), deferred()];
+  let index = 0;
+  const coord = createFixtureRequestCoordinator({
+    reader, session_id: 'fixture-ui-session', evaluate: () => deferredResults[index++].promise
+  });
+  // A UI event is a separate signal: a data fingerprint need not change on A-B-A.
+  const fingerprint = src.state.raw_fingerprint;
+  const initial = coord.request(req());
+  coord.invalidate('fake-store-selected-B');
+  coord.invalidate('fake-store-selected-A');
+  const latest = coord.request(req());
+  deferredResults[0].resolve({ outcome: 'completed', forecast: 'READY' });
+  deferredResults[1].resolve({ outcome: 'completed', forecast: 'HELD' });
+  const old = await initial, current = await latest;
+  assert.equal(src.state.raw_fingerprint, fingerprint);
+  assert.equal(old.accepted, false);
+  assert.equal(old.result, undefined);
+  assert.equal(current.accepted, true);
+  assert.equal(current.result.forecast, 'HELD');
+  assert.equal(coord.getEpoch(), 4);
+});
+test('S09: fake save failure and restore to identical raw still invalidate', async () => {
+  const src = fixture(); const reader = createFixtureSnapshotReader(src);
+  const pending = deferred();
+  const coord = createFixtureRequestCoordinator({
+    reader, session_id: 'fixture-save-session', evaluate: () => pending.promise
+  });
+  const old = coord.request(req());
+  const originalFingerprint = src.state.raw_fingerprint;
+  src.state.pending = 1;
+  coord.invalidate('fake-save-begin');
+  src.state.pending = 0;
+  src.state.held = true;
+  coord.invalidate('fake-save-failed');
+  src.state.held = false; // simulated manual recovery, no actual storage mutation
+  coord.invalidate('fake-restore-identical-raw');
+  pending.resolve({ forecast: 'READY', outcome: 'completed' });
+  const response = await old;
+  assert.equal(src.state.raw_fingerprint, originalFingerprint);
+  assert.equal(response.accepted, false);
+  assert.equal(response.result, undefined);
+  assert.equal(coord.getEpoch(), 4);
+});
+test('S09: fake clock 11am boundary discards old automatic delivery request', async () => {
+  const src = fixture(); const reader = createFixtureSnapshotReader(src);
+  const pending = deferred();
+  let calls = 0;
+  const coord = createFixtureRequestCoordinator({
+    reader, session_id: 'fixture-clock-session',
+    evaluate: () => ++calls === 1 ? pending.promise : Promise.resolve({ forecast: 'HELD' })
+  });
+  const old = coord.request(req());
+  coord.invalidate('fake-clock-crossed-11am');
+  src.payload.target_evidence.day = '2026-10-26';
+  const newTarget = await coord.request(req({
+    target_day: '2026-10-26', request_issued_at: '2026-10-24T11:00:00+09:00'
+  }));
+  pending.resolve({ forecast: 'READY' });
+  const oldTarget = await old;
+  assert.equal(oldTarget.accepted, false);
+  assert.equal(oldTarget.result, undefined);
+  assert.equal(newTarget.accepted, true);
+  assert.equal(newTarget.context.target_day, '2026-10-26');
+});
+test('S09: fake replay unknown known_at remains unknown, never inferred as issued', () => {
+  const src = fixture();
+  src.payload.target_evidence.day = '2026-10-24';
+  const requested = req({ purpose: 'historical_replay', manual_target: true, target_day: '2026-10-24' });
+  const snapshot = createFixtureSnapshotReader(src).read(requested);
+  assert.equal(snapshot.request.purpose, 'historical_replay');
+  assert.equal(snapshot.history[0].weather.known_at, null);
+  assert.equal(snapshot.target_evidence.known_at, null);
+  assert.equal(src.payload.history[0].weather.known_at, null);
+});
+
+function fictionalHandoff() {
+  const source=fixture();
+  // The handoff contract does not convert an omitted field into an asserted missing value.
+  // Supply explicit missing evidence in this entirely fictional positive fixture.
+  source.payload.history[1].delivery={state:'missing',value:null};
+  const reader=createFixtureSnapshotReader(source),snapshot=reader.read(req());
+  const envelope={
+    kind:'FICTIONAL',schema_version:'fictional-insight-input-v0',
+    session_id:'fixture-session',request_id:'fixture-session:1',
+    scope:{...scope},target_day:snapshot.request.target_day,
+    issued_at:snapshot.request.request_issued_at,
+    manual_target:snapshot.request.manual_target,purpose:snapshot.request.purpose,
+    snapshot:{snapshot_id:snapshot.snapshot_id,captured_at:'2026-10-24T10:58:00+09:00',
+      revision:1,pending:false,held:false,conflict:false},
+    history:snapshot.history.map(r=>({
+      date:r.day,scope:{...r.scope},
+      sales:structuredClone(r.sales),delivery:structuredClone(r.delivery),
+      trip_resolution:{status:r.trip?.status||'unknown'},
+      weather:{kind:'saved_unspecified',known_at:r.weather?.known_at??null}
+    }))
+  };
+  const recordRef=(name)=>({snapshot_id:snapshot.snapshot_id,local_locator:['synthetic','target',name],source_id:null});
+  const coverage={store:scope.store_id,category:scope.category_id,start_day:snapshot.request.target_day,end_day:snapshot.request.target_day};
+  const reg=(ledger)=>({ledger,read_state:'unavailable',coverage,record_ref:recordRef('registry-'+ledger),
+    known_at:null,records:[],omission_rule:null});
+  const target_evidence={
+    kind:'FICTIONAL_TARGET_EVIDENCE_V0',scope:{...scope},target_day:snapshot.request.target_day,
+    calendar:{state:'unknown',version:null,coverage,record_ref:recordRef('calendar'),known_at:null},
+    sale:{state:'unknown',coverage,record_ref:recordRef('sale'),known_at:null},
+    event:{state:'unknown',coverage,record_ref:recordRef('event'),known_at:null},
+    registries:{common:reg('common'),store:reg('store')},
+    policy:{allowed_omission_rules:[]}
+  };
+  return {source,reader,snapshot,envelope,target_evidence};
+}
+test('S10: explicitly supplied fictional envelope and unknown target evidence agree on shape',()=>{
+  const data=fictionalHandoff();
+  const check=validateFixtureHandoff(data);
+  assert.equal(check.compatible_shape,true);
+  assert.equal(check.provenance_verified,false);
+  assert.equal(check.history_count,2);
+  assert.equal(check.snapshot_id,data.snapshot.snapshot_id);
+  assert.equal(data.envelope.history[0].sales.value,0);
+  assert.equal(data.envelope.history[0].delivery.state,'missing');
+  assert.equal(data.target_evidence.sale.state,'unknown');
+  assert.equal(data.target_evidence.event.state,'unknown');
+});
+test('S10: untrusted schema, scope and snapshot identity are refused',()=>{
+  for(const mutate of [
+    d=>{d.envelope.schema_version='other';},
+    d=>{d.envelope.scope.store_id='lab_b';},
+    d=>{d.envelope.scope.category_id='fictional_bread';},
+    d=>{d.envelope.snapshot.snapshot_id='not-the-reader-snapshot';},
+    d=>{d.target_evidence.scope.trip=2;},
+    d=>{d.target_evidence.kind='REAL_TARGET_EVIDENCE';},
+    d=>{d.envelope.scope.store_id='real_store';}
+  ]) {
+    const data=fictionalHandoff();mutate(data);
+    assert.throws(()=>validateFixtureHandoff(data),/fictional_handoff_unavailable/);
+  }
+});
+test('S10: timestamps, manual flag and issued-at contract cannot be inferred',()=>{
+  for(const mutate of [
+    d=>{delete d.envelope.manual_target;},
+    d=>{d.envelope.manual_target=true;},
+    d=>{d.envelope.issued_at='2026-10-24T11:00:00+09:00';},
+    d=>{d.envelope.snapshot.captured_at='2026-10-24T11:00:00+09:00';},
+    d=>{d.envelope.snapshot.captured_at='2026-02-30T10:58:00+09:00';},
+    d=>{d.envelope.snapshot.held=true;},
+    d=>{d.envelope.snapshot.conflict=true;},
+    d=>{d.envelope.snapshot.revision=-1;}
+  ]){
+    const data=fictionalHandoff();mutate(data);
+    assert.throws(()=>validateFixtureHandoff(data),/fictional_handoff_unavailable/);
+  }
+});
+test('S10: explicit 0, missing, invalid and every date must be preserved',()=>{
+  for(const mutate of [
+    d=>{d.envelope.history[0].sales.value=1;},
+    d=>{d.envelope.history[0].sales.state='missing';},
+    d=>{d.envelope.history[0].delivery.state='entered';d.envelope.history[0].delivery.value=0;},
+    d=>{d.envelope.history[1].sales.state='missing';},
+    d=>{d.envelope.history.pop();},
+    d=>{d.envelope.history[1].date=d.envelope.history[0].date;},
+    d=>{d.envelope.history[1].date='2026-10-21';},
+    d=>{d.envelope.history[1].trip_resolution.status='inactive';}
+  ]){
+    const data=fictionalHandoff();mutate(data);
+    assert.throws(()=>validateFixtureHandoff(data),/fictional_handoff_unavailable/);
+  }
+});
+test('S10: unknown sale/event/calendar and registry are never promoted to absence',()=>{
+  for(const mutate of [
+    d=>{d.target_evidence.sale.state='confirmed_absent';},
+    d=>{d.target_evidence.event.state='confirmed_absent';},
+    d=>{d.target_evidence.calendar.state='non_holiday';},
+    d=>{d.target_evidence.registries.common.read_state='ok';},
+    d=>{d.target_evidence.registries.store.records=[{event_type:'sale'}];},
+    d=>{d.target_evidence.policy.allowed_omission_rules=['fictional-legacy-optional-ledgers-v1'];}
+  ]){
+    const data=fictionalHandoff();mutate(data);
+    assert.throws(()=>validateFixtureHandoff(data),/fictional_handoff_unavailable/);
+  }
+});
+test('S10: explicit coverage and record refs must match the same day, scope and snapshot',()=>{
+  for(const mutate of [
+    d=>{d.target_evidence.calendar.coverage.store='lab_b';},
+    d=>{d.target_evidence.sale.coverage.category='fictional_bread';},
+    d=>{d.target_evidence.event.coverage.start_day='2026-10-26';},
+    d=>{d.target_evidence.sale.record_ref.snapshot_id='other-snapshot';},
+    d=>{d.target_evidence.calendar.record_ref.local_locator=[];},
+    d=>{d.target_evidence.registries.common.ledger='store';},
+    d=>{d.target_evidence.registries.store.record_ref.snapshot_id='other-snapshot';},
+    d=>{d.target_evidence.registries.store.omission_rule='fictional-legacy-optional-ledgers-v1';}
+  ]){
+    const data=fictionalHandoff();mutate(data);
+    assert.throws(()=>validateFixtureHandoff(data),/fictional_handoff_unavailable/);
+  }
+});
+
+test('S10: future known_at of target or historical row never passes',()=>{
+  for(const mutate of [
+    d=>{d.target_evidence.sale.known_at='2026-10-25T00:00:00+09:00';},
+    d=>{d.target_evidence.event.known_at='2026-10-24T11:00:00+09:00';},
+    d=>{d.envelope.history[0].weather.known_at='2026-10-26T00:00:00+09:00';}
+  ]){
+    const data=fictionalHandoff();mutate(data);
+    assert.throws(()=>validateFixtureHandoff(data),/fictional_handoff_unavailable/);
+  }
+});
+test('S10: Reader change, foreign Reader, or failing freshness inspection refuse handoff',()=>{
+  const data=fictionalHandoff();
+  data.source.state.versions.weather='changed-fixture-weather-version';
+  assert.throws(()=>validateFixtureHandoff(data),/fictional_handoff_unavailable/);
+  const next=fictionalHandoff();
+  assert.throws(()=>validateFixtureHandoff({...next,reader:createFixtureSnapshotReader(fixture())}),/fictional_handoff_unavailable/);
+  assert.throws(()=>validateFixtureHandoff({...next,reader:{isCurrent(){throw Error('secret')} }}),/fictional_handoff_unavailable/);
+});
+test('S10: contract validator never imports InsightStorage, draft adapters or network',()=>{
+  const code=fs.readFileSync(path.join(__dirname,'..','insight_forecast_fixture_contract_handoff_v0.js'),'utf8');
+  assert.doesNotMatch(code,/\brequire\s*\(/);
+  assert.doesNotMatch(code,/\b(?:fetch|XMLHttpRequest|localStorage|sessionStorage|WebSocket|Worker)\s*\(/);
+  const result=validateFixtureHandoff(fictionalHandoff());
+  assert.equal(result.provenance_verified,false);
+  assert.equal(Object.isFrozen(result),true);
+});
+
+test('S07/S08: prototypes do not import app storage, workers, forecast evaluator or network', () => {
+  for (const filename of ['insight_forecast_fixture_snapshot_reader_v0.js', 'insight_forecast_fixture_request_coordinator_v0.js']) {
+    const body = fs.readFileSync(path.join(__dirname, '..', filename), 'utf8');
+    assert.doesNotMatch(body, /\brequire\s*\(/);
+    assert.doesNotMatch(body, /\b(?:fetch|XMLHttpRequest|localStorage|sessionStorage|WebSocket|Worker)\s*\(/);
+  }
+});
