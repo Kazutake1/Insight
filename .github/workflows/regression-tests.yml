@@ -67,6 +67,7 @@ jobs:
           - data_health.test.cjs
           - prediction_data_health.test.cjs
           - forecast_fixture_snapshot_coordinator.test.cjs
+          - forecast_real_proto_handoff.test.cjs
           - css_structure.test.cjs
           - daily_anomaly.test.cjs
           - hook_bridge.test.cjs
