@@ -12,17 +12,61 @@ const EVENT_TYPES=new Set([
 ]);
 function blocked(reason){return Object.freeze({ok:false,status:'CAPTURE_BLOCKED',reason,
   provenance_verified:false,authorized_for_model:false});}
+// A stringify-only equality comparison is unsafe: JSON silently drops undefined
+// object fields, converts NaN/Infinity to null, and calls toJSON/getters.
+// Fixture evidence must be plain, dense, fully enumerable, finite JSON data.
+function assertJsonEvidence(value,seen=new Set()){
+  const kind=typeof value;
+  if(value===null||kind==='string'||kind==='boolean')return;
+  if(kind==='number'){
+    if(!Number.isFinite(value)||Object.is(value,-0)||
+      (Number.isInteger(value)&&!Number.isSafeInteger(value)))
+      throw new Error('lossy_fixture_evidence');
+    return;
+  }
+  if(kind!=='object'||seen.has(value))throw new Error('non_json_fixture_evidence');
+  const array=Array.isArray(value),proto=Object.getPrototypeOf(value);
+  if(array?proto!==Array.prototype:(proto!==Object.prototype&&proto!==null))
+    throw new Error('non_json_fixture_evidence');
+  seen.add(value);
+  const keys=Reflect.ownKeys(value);
+  if(array){
+    // JSON would hide extra array properties and encode holes as null.
+    if(keys.length!==value.length+1)throw new Error('lossy_fixture_evidence');
+    for(let i=0;i<value.length;i++){
+      const descriptor=Object.getOwnPropertyDescriptor(value,String(i));
+      if(!descriptor||descriptor.enumerable!==true||
+        !Object.hasOwn(descriptor,'value'))throw new Error('lossy_fixture_evidence');
+      assertJsonEvidence(descriptor.value,seen);
+    }
+  }else for(const key of keys){
+    if(typeof key!=='string'||key==='__proto__'||key==='constructor'||
+      key==='prototype')throw new Error('non_json_fixture_evidence');
+    const descriptor=Object.getOwnPropertyDescriptor(value,key);
+    if(!descriptor||descriptor.enumerable!==true||
+      !Object.hasOwn(descriptor,'value'))throw new Error('lossy_fixture_evidence');
+    assertJsonEvidence(descriptor.value,seen);
+  }
+  seen.delete(value);
+}
+function plainRecord(value){
+  if(!value||typeof value!=='object'||Array.isArray(value))return false;
+  const proto=Object.getPrototypeOf(value);
+  return proto===Object.prototype||proto===null;
+}
 function serialize(value){
-  if(value===undefined)throw new Error('missing_fixture_evidence');
+  assertJsonEvidence(value);
   const out=JSON.stringify(value);
   if(typeof out!=='string')throw new Error('invalid_fixture_evidence');
   return out;
 }
 function safe(report){
-  return report&&typeof report==='object'&&!Array.isArray(report)&&
+  return plainRecord(report)&&
     Number.isSafeInteger(report.revision)&&report.revision>=0&&
     report.pending===0&&report.held===false&&report.conflict===false&&
-    report.versions&&typeof report.versions==='object'&&!Array.isArray(report.versions);
+    plainRecord(report.versions)&&
+    ['weather','calendar','registry','policy'].every(k=>
+      typeof report.versions[k]==='string'&&report.versions[k].length>0);
 }
 function createFixtureCapturePreflight(source){
   if(!source||source.fixture!==true||
@@ -42,10 +86,14 @@ function createFixtureCapturePreflight(source){
     const startEpoch=epoch;
     const first=source.inspect();
     const firstText=serialize(first);
-    const firstSelection=serialize(source.readSelection());
-    const saved=serialize(source.readSaved());
-    const live=serialize(source.readLive());
-    const lastSelection=serialize(source.readSelection());
+    const selectedBefore=source.readSelection(),savedEvidence=source.readSaved();
+    const liveEvidence=source.readLive(),selectedAfter=source.readSelection();
+    if(![selectedBefore,savedEvidence,liveEvidence,selectedAfter].every(plainRecord))
+      throw new Error('non_object_fixture_evidence');
+    const firstSelection=serialize(selectedBefore);
+    const saved=serialize(savedEvidence);
+    const live=serialize(liveEvidence);
+    const lastSelection=serialize(selectedAfter);
     const last=source.inspect();
     const lastText=serialize(last);
     if(startEpoch!==epoch||firstText!==lastText||firstSelection!==lastSelection)
