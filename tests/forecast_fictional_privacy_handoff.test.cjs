@@ -130,3 +130,37 @@ test('S02: no storage/network/worker/real Normalizer imports or leak-bearing err
   assert.equal(error.message,'fictional_privacy_handoff_unavailable');
   assert.equal(JSON.stringify(error).includes(SECRET),false);
 });
+
+test('S03 GAP: pure projection is not a freshness attestation after fake source or selection changes',()=>{
+  const x=input();
+  const fakeSource={epoch:7,raw_revision:13,selected_store:'lab_a'};
+  const before=project(x);
+  const initial={...fakeSource};
+  fakeSource.selected_store='lab_b';
+  fakeSource.selected_store='lab_a';
+  fakeSource.epoch++;
+  fakeSource.raw_revision++;
+  const after=project(x);
+  assert.deepEqual(after.slice,before.slice,'Projection has no source epoch identity');
+  assert.equal(before.authorized_for_model,false);
+  assert.equal(after.authorized_for_model,false);
+  assert.notDeepEqual(fakeSource,initial,'An external freshness gate is required');
+  // A successful shape projection MUST NOT be interpreted as an accepted READY.
+});
+
+test('S04: synthetic sensitive metadata never enters the projection, even for nested evidence',()=>{
+  const x=input();
+  const privateMarker='SYNTHETIC_PRIVATE_CANARY_92831';
+  x.snapshot.private_token=privateMarker;
+  x.history[0].sales.private_record={access_token:privateMarker};
+  x.history[1].weather.private_location={address:privateMarker};
+  x.history[1].registries.push({ledger:'store',secret:{staff:privateMarker}});
+  x.history[0].private_notes=[{person:privateMarker}];
+  const before=JSON.stringify(x),result=project(x);
+  const output=JSON.stringify(result);
+  assert.equal(output.includes(privateMarker),false);
+  assert.equal(JSON.stringify(x),before,'Read-only projection must not mutate source');
+  assert.equal(result.authorized_for_model,false);
+  assert.equal(result.provenance_verified,false);
+  // This is data minimization only, not runtime network/DOM/console monitoring.
+});
