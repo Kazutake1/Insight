@@ -228,6 +228,9 @@ test('G07: known non-covering day, area, store REJECT; explicitly unknown covera
   find(u,'calendar_source').coverage.end_day=null;
   const r=outcome(u,'FICTIONAL_SCREENING_ONLY');
   assert.equal(r.target_status,'HELD');
+  const unknownArea=graph();
+  find(unknownArea,'calendar_source').coverage.area=dim('unknown');
+  assert.equal(outcome(unknownArea,'FICTIONAL_SCREENING_ONLY').target_status,'HELD');
 });
 test('G08: broad source coverage is preserved, binding limits it to one trip',()=>{
   const g=graph();
@@ -325,10 +328,14 @@ test('G18: removing any mandatory sale/event/registry/model parent REJECT',()=>{
 test('G19: weather missing site/time/version HELD, but current required versions unchanged',()=>{
   const good=addWeather(graph());
   assert.equal(outcome(good,'FICTIONAL_SCREENING_ONLY').weather_status,'SCREENED');
+  const reversed=addWeather(graph());
+  find(reversed,'weather_record').times.published_at=KNOWN('2026-10-25T09:01:00+09:00');
+  outcome(reversed,'REJECT');
   for(const edit of [
     g=>find(g,'weather_record').times.received_at=UNKNOWN(),
     g=>find(g,'weather_record').source_version=UNKNOWN(),
-    g=>find(g,'weather_site_source').read_state='unavailable'
+    g=>find(g,'weather_site_source').read_state='unavailable',
+    g=>find(g,'weather_record').coverage.site=dim('unknown')
   ]){
     const g=addWeather(graph());edit(g);
     assert.equal(outcome(g,'FICTIONAL_SCREENING_ONLY').weather_status,'HELD');
