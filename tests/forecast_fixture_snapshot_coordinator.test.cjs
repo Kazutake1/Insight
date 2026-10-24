@@ -5,6 +5,7 @@ const fs = require('node:fs');
 const path = require('node:path');
 const { automaticTargetDay, createFixtureSnapshotReader } = require('../insight_forecast_fixture_snapshot_reader_v0.js');
 const { createFixtureRequestCoordinator } = require('../insight_forecast_fixture_request_coordinator_v0.js');
+const { validateFixtureHandoff } = require('../insight_forecast_fixture_contract_handoff_v0.js');
 
 const scope = Object.freeze({ store_id: 'lab_a', category_id: 'fictional_rice', trip: 1 });
 function req(overrides = {}) {
@@ -381,6 +382,134 @@ test('S09: fake replay unknown known_at remains unknown, never inferred as issue
   assert.equal(snapshot.target_evidence.known_at, null);
   assert.equal(src.payload.history[0].weather.known_at, null);
 });
+
+function fictionalHandoff() {
+  const source=fixture(),reader=createFixtureSnapshotReader(source),snapshot=reader.read(req());
+  const envelope={
+    kind:'FICTIONAL',schema_version:'fictional-insight-input-v0',
+    session_id:'fixture-session',request_id:'fixture-session:1',
+    scope:{...scope},target_day:snapshot.request.target_day,
+    issued_at:snapshot.request.request_issued_at,
+    manual_target:snapshot.request.manual_target,purpose:snapshot.request.purpose,
+    snapshot:{snapshot_id:snapshot.snapshot_id,captured_at:'2026-10-24T10:58:00+09:00',
+      revision:1,pending:false,held:false,conflict:false},
+    history:snapshot.history.map(r=>({
+      date:r.day,scope:{...r.scope},
+      sales:structuredClone(r.sales),delivery:structuredClone(r.delivery),
+      trip_resolution:{status:r.trip?.status||'unknown'},
+      weather:{kind:'saved_unspecified',known_at:r.weather?.known_at??null}
+    }))
+  };
+  const recordRef=(name)=>({snapshot_id:snapshot.snapshot_id,local_locator:['synthetic','target',name],source_id:null});
+  const coverage={store:scope.store_id,category:scope.category_id,start_day:snapshot.request.target_day,end_day:snapshot.request.target_day};
+  const reg=(ledger)=>({ledger,read_state:'unavailable',coverage,record_ref:recordRef('registry-'+ledger),
+    known_at:null,records:[],omission_rule:null});
+  const target_evidence={
+    kind:'FICTIONAL_TARGET_EVIDENCE_V0',scope:{...scope},target_day:snapshot.request.target_day,
+    calendar:{state:'unknown',version:null,coverage,record_ref:recordRef('calendar'),known_at:null},
+    sale:{state:'unknown',coverage,record_ref:recordRef('sale'),known_at:null},
+    event:{state:'unknown',coverage,record_ref:recordRef('event'),known_at:null},
+    registries:{common:reg('common'),store:reg('store')},
+    policy:{allowed_omission_rules:[]}
+  };
+  return {source,reader,snapshot,envelope,target_evidence};
+}
+test('S10: explicitly supplied fictional envelope and unknown target evidence agree on shape',()=>{
+  const data=fictionalHandoff();
+  const check=validateFixtureHandoff(data);
+  assert.equal(check.compatible_shape,true);
+  assert.equal(check.provenance_verified,false);
+  assert.equal(check.history_count,2);
+  assert.equal(check.snapshot_id,data.snapshot.snapshot_id);
+  assert.equal(data.envelope.history[0].sales.value,0);
+  assert.equal(data.envelope.history[0].delivery.state,'missing');
+  assert.equal(data.target_evidence.sale.state,'unknown');
+  assert.equal(data.target_evidence.event.state,'unknown');
+});
+test('S10: untrusted schema, scope and snapshot identity are refused',()=>{
+  for(const mutate of [
+    d=>{d.envelope.schema_version='other';},
+    d=>{d.envelope.scope.store_id='lab_b';},
+    d=>{d.envelope.scope.category_id='fictional_bread';},
+    d=>{d.envelope.snapshot.snapshot_id='not-the-reader-snapshot';},
+    d=>{d.target_evidence.scope.trip=2;},
+    d=>{d.target_evidence.kind='REAL_TARGET_EVIDENCE';},
+    d=>{d.envelope.scope.store_id='real_store';}
+  ]) {
+    const data=fictionalHandoff();mutate(data);
+    assert.throws(()=>validateFixtureHandoff(data),/fictional_handoff_unavailable/);
+  }
+});
+test('S10: timestamps, manual flag and issued-at contract cannot be inferred',()=>{
+  for(const mutate of [
+    d=>{delete d.envelope.manual_target;},
+    d=>{d.envelope.manual_target=true;},
+    d=>{d.envelope.issued_at='2026-10-24T11:00:00+09:00';},
+    d=>{d.envelope.snapshot.captured_at='2026-10-24T11:00:00+09:00';},
+    d=>{d.envelope.snapshot.captured_at='2026-02-30T10:58:00+09:00';},
+    d=>{d.envelope.snapshot.held=true;},
+    d=>{d.envelope.snapshot.conflict=true;},
+    d=>{d.envelope.snapshot.revision=-1;}
+  ]){
+    const data=fictionalHandoff();mutate(data);
+    assert.throws(()=>validateFixtureHandoff(data),/fictional_handoff_unavailable/);
+  }
+});
+test('S10: explicit 0, missing, invalid and every date must be preserved',()=>{
+  for(const mutate of [
+    d=>{d.envelope.history[0].sales.value=1;},
+    d=>{d.envelope.history[0].sales.state='missing';},
+    d=>{d.envelope.history[0].delivery.state='entered';d.envelope.history[0].delivery.value=0;},
+    d=>{d.envelope.history[1].sales.state='missing';},
+    d=>{d.envelope.history.pop();},
+    d=>{d.envelope.history[1].date=d.envelope.history[0].date;},
+    d=>{d.envelope.history[1].date='2026-10-21';},
+    d=>{d.envelope.history[1].trip_resolution.status='inactive';}
+  ]){
+    const data=fictionalHandoff();mutate(data);
+    assert.throws(()=>validateFixtureHandoff(data),/fictional_handoff_unavailable/);
+  }
+});
+test('S10: unknown sale/event/calendar and registry are never promoted to absence',()=>{
+  for(const mutate of [
+    d=>{d.target_evidence.sale.state='confirmed_absent';},
+    d=>{d.target_evidence.event.state='confirmed_absent';},
+    d=>{d.target_evidence.calendar.state='non_holiday';},
+    d=>{d.target_evidence.registries.common.read_state='ok';},
+    d=>{d.target_evidence.registries.store.records=[{event_type:'sale'}];},
+    d=>{d.target_evidence.policy.allowed_omission_rules=['fictional-legacy-optional-ledgers-v1'];}
+  ]){
+    const data=fictionalHandoff();mutate(data);
+    assert.throws(()=>validateFixtureHandoff(data),/fictional_handoff_unavailable/);
+  }
+});
+test('S10: future known_at of target or historical row never passes',()=>{
+  for(const mutate of [
+    d=>{d.target_evidence.sale.known_at='2026-10-25T00:00:00+09:00';},
+    d=>{d.target_evidence.event.known_at='2026-10-24T11:00:00+09:00';},
+    d=>{d.envelope.history[0].weather.known_at='2026-10-26T00:00:00+09:00';}
+  ]){
+    const data=fictionalHandoff();mutate(data);
+    assert.throws(()=>validateFixtureHandoff(data),/fictional_handoff_unavailable/);
+  }
+});
+test('S10: Reader change, foreign Reader, or failing freshness inspection refuse handoff',()=>{
+  const data=fictionalHandoff();
+  data.source.state.versions.weather='changed-fixture-weather-version';
+  assert.throws(()=>validateFixtureHandoff(data),/fictional_handoff_unavailable/);
+  const next=fictionalHandoff();
+  assert.throws(()=>validateFixtureHandoff({...next,reader:createFixtureSnapshotReader(fixture())}),/fictional_handoff_unavailable/);
+  assert.throws(()=>validateFixtureHandoff({...next,reader:{isCurrent(){throw Error('secret')} }}),/fictional_handoff_unavailable/);
+});
+test('S10: contract validator never imports InsightStorage, draft adapters or network',()=>{
+  const code=fs.readFileSync(path.join(__dirname,'..','insight_forecast_fixture_contract_handoff_v0.js'),'utf8');
+  assert.doesNotMatch(code,/\brequire\s*\(/);
+  assert.doesNotMatch(code,/\b(?:fetch|XMLHttpRequest|localStorage|sessionStorage|WebSocket|Worker)\s*\(/);
+  const result=validateFixtureHandoff(fictionalHandoff());
+  assert.equal(result.provenance_verified,false);
+  assert.equal(Object.isFrozen(result),true);
+});
+
 test('S07/S08: prototypes do not import app storage, workers, forecast evaluator or network', () => {
   for (const filename of ['insight_forecast_fixture_snapshot_reader_v0.js', 'insight_forecast_fixture_request_coordinator_v0.js']) {
     const body = fs.readFileSync(path.join(__dirname, '..', filename), 'utf8');
