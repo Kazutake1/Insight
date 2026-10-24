@@ -40,6 +40,7 @@ test('optional encrypted backup exports ciphertext, rejects wrong passphrase and
   await expect(page.locator('#insightSecureExportPass')).toHaveValue('');
   await expect(page.locator('#insightSecureExportConfirm')).toHaveValue('');
   const existing=await page.evaluate(()=>localStorage.getItem('insight_v11'));
+  const originalStoreName=await page.evaluate(()=>allStores.stores[allStores.current].name);
   const encryptedUpload={name:'test.insight.enc.json',mimeType:'application/json',buffer:Buffer.from(contents,'utf8')};
 
   await page.locator('#insightSecureRestoreFile').setInputFiles(encryptedUpload);
@@ -59,6 +60,17 @@ test('optional encrypted backup exports ciphertext, rejects wrong passphrase and
   await expect(page.locator('#insightSecureRestoreStatus')).toContainText('復号できません');
   expect(await page.evaluate(()=>localStorage.getItem('insight_v11'))).toBe(existing);
 
+  // Change only the isolated Playwright fixture, proving restore actually recovers prior data.
+  const changedName='架空テスト・復元前に変更した店舗名';
+  await page.evaluate(name=>{
+    allStores.stores[allStores.current].name=name;
+    window.InsightStorage.persistCurrent(allStores);
+  },changedName);
+  await expect.poll(()=>page.evaluate(()=>{
+    const snapshot=window.InsightStorage.readSnapshot();
+    return snapshot.stores[snapshot.current].name;
+  })).toBe(changedName);
+
   const dialogs=[];
   page.on('dialog',async dialog=>{dialogs.push(dialog.message());await dialog.accept();});
   await page.locator('#insightSecureRestoreFile').setInputFiles(encryptedUpload);
@@ -69,11 +81,15 @@ test('optional encrypted backup exports ciphertext, rejects wrong passphrase and
   expect(safeguard.suggestedFilename()).toMatch(/^Insight_pre_restore_\d{8}_\d{6}\.json$/);
   const plainPreRestore=JSON.parse(await fs.readFile(await safeguard.path(),'utf8'));
   expect(plainPreRestore.backupInfo.backupType).toBe('preRestore');
+  expect(plainPreRestore.data.stores[plainPreRestore.data.current].name).toBe(changedName);
   expect(dialogs.length).toBe(2);
   expect(dialogs[0]).toContain('平文JSON');
   expect(dialogs[1]).toContain('現在の全データは上書き');
   await expect(page.locator('#insightSecureRestorePass')).toHaveValue('');
-  await expect.poll(()=>page.evaluate(()=>!!localStorage.getItem('insight_v11'))).toBe(true);
+  await expect.poll(()=>page.evaluate(()=>{
+    const snapshot=window.InsightStorage.readSnapshot();
+    return snapshot.stores[snapshot.current].name;
+  })).toBe(originalStoreName);
   expect(networkSensitive).toEqual([]);
   expect(csp).toEqual([]);
   expect(failures).toEqual([]);
