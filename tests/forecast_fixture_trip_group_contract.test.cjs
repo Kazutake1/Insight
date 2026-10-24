@@ -407,3 +407,14 @@ test('B24: invalid envelope and synthetic secret error never escape as source co
   assert.equal(out.reason,'invalid_fixture_evidence');
   assert.equal(JSON.stringify(out).includes('SYNTHETIC_PRIVATE_CANARY'),false);
 });
+
+test('B25: lab-like Sale.available_at before the sales day is not historically admissible',()=>{
+  const f=screening();
+  f.history[0].available_at='2026-10-17T23:00:00+09:00';
+  const result=screenFictionalPredictionEvidence(f);
+  assert.equal(result.screened,true);
+  assert.equal(result.eligible_history,1);
+  assert.equal(result.eligible_zero,0);
+  assert.equal(result.excluded_history,1);
+  assert.equal(result.authorized_for_model,false);
+});
