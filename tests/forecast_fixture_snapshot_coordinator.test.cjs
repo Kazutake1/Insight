@@ -144,6 +144,19 @@ test('S06: a different reader cannot attest this reader\'s snapshot', () => {
   assert.equal(first.isCurrent(snap), true);
   assert.equal(second.isCurrent(snap), false);
 });
+test('S05: nested weather/forecast known_at after issue is rejected', () => {
+  const src = fixture();
+  src.payload.history[0].weather.known_at = '2026-10-24T11:00:00+09:00';
+  assert.throws(() => createFixtureSnapshotReader(src).read(req()), /future_knowledge/);
+  src.payload.history[0].weather.known_at = null;
+  src.payload.target_evidence.events = [{ kind: 'unknown_kind', known_at: '2026-10-25T00:00:00+09:00' }];
+  assert.throws(() => createFixtureSnapshotReader(src).read(req()), /future_knowledge/);
+});
+test('S02: out-of-window history is rejected instead of silently included', () => {
+  const src = fixture();
+  src.payload.history[0].day = '2025-10-23';
+  assert.throws(() => createFixtureSnapshotReader(src).read(req()), /history_boundary/);
+});
 test('S06: latest async result is adopted only with unchanged scope and source', async () => {
   const src = fixture(); const reader = createFixtureSnapshotReader(src);
   const coord = createFixtureRequestCoordinator({ reader, session_id: 'fake-session', evaluate: async () => ({ outcome: 'completed', conditions: 'candidate', forecast: 'HELD' }) });
