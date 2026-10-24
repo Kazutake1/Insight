@@ -6,7 +6,7 @@
  */
 const test=require('node:test');
 const assert=require('node:assert/strict');
-const {createFictionalTripGroup,assessFictionalTemporalEvidence}=
+const {createFictionalTripGroup,assessFictionalTemporalEvidence,screenFictionalPredictionEvidence}=
   require('../insight_forecast_fixture_trip_group_v0.js');
 const {createFixtureSnapshotReader}=
   require('../insight_forecast_fixture_snapshot_reader_v0.js');
@@ -227,4 +227,183 @@ test('B11: existing real fixture Reader and Coordinator accept only independent 
   assert.deepEqual(generated,[2,3]);
   assert.equal(new Set(results.map(r=>r.context.request_id)).size,2);
   coordinator.dispose();
+});
+
+
+/*
+ * B12-B24: fictional numeric-context/sale-availability screening ONLY.
+ * The lab condition decision is represented as an explicit fixture-normalized
+ * envelope, not a runtime call or a claim that the Python code is connected.
+ */
+function screening(overrides={}){
+  const scope={store_id:'lab_a',category_id:'fictional_rice',trip:1};
+  const request={scope,snapshot_id:'fictional-snapshot-1',
+    target_day:'2026-10-25',issued_at:'2026-10-24T10:59:00+09:00',
+    purpose:'current_snapshot'};
+  const condition_decision={
+    outcome:'completed',eligibility:'candidate',
+    request:{...request,scope:{...scope}},
+    conditions:[['holiday','candidate'],['sale','candidate'],['event','candidate']],
+    basis:[
+      {condition:'sale',confirmed_state:'unknown',registry_presence:'absent',
+        absence_scope:'registered_records_only'},
+      {condition:'event',confirmed_state:'unknown',registry_presence:'absent',
+        absence_scope:'registered_records_only'}
+    ]
+  };
+  const target={scope:{...scope},day:request.target_day,
+    trip_status:{status:'active',known_at:'2026-10-24T09:00:00+09:00'},
+    holiday:{status:'confirmed_non_holiday',origin:'verified_calendar',
+      known_at:'2026-10-23T14:00:00+09:00'},
+    special:{status:'confirmed_none',origin:'independent_check',
+      known_at:'2026-10-24T09:01:00+09:00'}};
+  const history=[
+    {scope:{...scope},day:'2026-10-18',count:0,
+      available_at:'2026-10-19T09:00:00+09:00',
+      context:{active:true,holiday:false,event:false,
+        known_at:'2026-10-19T08:00:00+09:00',origin:'independent_verified'}},
+    {scope:{...scope},day:'2026-10-11',count:12,
+      available_at:'2026-10-12T09:00:00+09:00',
+      context:{active:true,holiday:false,event:false,
+        known_at:'2026-10-12T08:00:00+09:00',origin:'independent_verified'}}
+  ];
+  return {fixture:true,request,condition_decision,target,history,...overrides};
+}
+test('B12: independently verified target and timestamped fictional rows can be screened, never authorized',()=>{
+  const result=screenFictionalPredictionEvidence(screening());
+  assert.deepEqual(result,{screened:true,reason:null,target_status:'FICTIONAL_CONTEXT_SCREENED',
+    eligible_history:2,eligible_zero:1,excluded_history:0,
+    authorized_for_model:false,provenance_verified:false});
+  assert.equal(Object.hasOwn(result,'value'),false,'no forecast quantity returned');
+});
+test('B13: a registered-only normal-day candidate does not confirm real-world absence',()=>{
+  const f=screening();
+  f.target.special={status:'unknown',origin:'registered_records_only',
+    known_at:'2026-10-24T09:00:00+09:00'};
+  const result=screenFictionalPredictionEvidence(f);
+  assert.equal(result.screened,false);
+  assert.equal(result.reason,'target_context_unconfirmed');
+  assert.equal(result.target_status,'HELD');
+});
+test('B14: unknown target context known_at is HELD, even for current_snapshot',()=>{
+  for(const field of ['trip_status','holiday','special']){
+    const f=screening();f.target[field].known_at=null;
+    assert.equal(screenFictionalPredictionEvidence(f).reason,'target_context_unconfirmed',field);
+  }
+});
+test('B15: target context later than issued_at is never backdated',()=>{
+  for(const field of ['trip_status','holiday','special']){
+    const f=screening();f.target[field].known_at='2026-10-24T11:00:00+09:00';
+    assert.equal(screenFictionalPredictionEvidence(f).reason,'target_context_unconfirmed',field);
+  }
+});
+test('B16: one historical unknown available_at excludes only that row, not the usable zero',()=>{
+  const f=screening();f.history[1].available_at=null;
+  const result=screenFictionalPredictionEvidence(f);
+  assert.equal(result.screened,true);
+  assert.deepEqual([result.eligible_history,result.eligible_zero,result.excluded_history],[1,1,1]);
+  assert.equal(result.authorized_for_model,false);
+});
+test('B17: future timestamps, missing counts and historical unknown contexts are excluded',()=>{
+  for(const edit of [
+    r=>{r.available_at='2026-10-25T11:00:00+09:00';},
+    r=>{r.available_at=null;},
+    r=>{r.count=null;},
+    r=>{r.context.known_at=null;},
+    r=>{r.context.event=null;},
+    r=>{r.context.origin='registered_records_only';}
+  ]){
+    const f=screening();edit(f.history[0]);
+    const result=screenFictionalPredictionEvidence(f);
+    assert.equal(result.screened,true);
+    assert.deepEqual([result.eligible_history,result.excluded_history],[1,1]);
+    assert.equal(result.eligible_zero,0);
+  }
+});
+test('B18: record scope or day mix-ups block screening rather than mixing stores/trips',()=>{
+  for(const edit of [
+    f=>{f.history[0].scope.store_id='lab_b';},
+    f=>{f.history[0].scope.trip=2;},
+    f=>{f.history[0].day='2026-10-25';},
+    f=>{f.history[1].day=f.history[0].day;},
+    f=>{f.target.scope.category_id='fictional_bread';},
+    f=>{f.target.day='2026-10-26';}
+  ]){
+    const f=screening();edit(f);
+    const result=screenFictionalPredictionEvidence(f);
+    assert.equal(result.screened,false);
+    assert.ok(['history_scope_or_day_invalid','target_mismatch'].includes(result.reason));
+  }
+});
+test('B19: candidate decision identity, scope, period and purpose must match fixed request',()=>{
+  for(const edit of [
+    d=>{d.eligibility='not_candidate';},
+    d=>{d.outcome='rejected';},
+    d=>{d.request.snapshot_id='other';},
+    d=>{d.request.scope.trip=2;},
+    d=>{d.request.target_day='2026-10-26';},
+    d=>{d.request.purpose='historical_replay';},
+    d=>{d.request.issued_at='2026-10-24T09:59:00+09:00';},
+    d=>{d.conditions[2]=['event','undetermined'];}
+  ]){
+    const f=screening();edit(f.condition_decision);
+    const result=screenFictionalPredictionEvidence(f);
+    assert.equal(result.reason,'candidate_not_numeric_confirmation');
+  }
+});
+test('B20: candidate cannot replace independent verification even with a false holiday flag',()=>{
+  const f=screening();
+  f.target.holiday.origin='registered_records_only';
+  assert.equal(screenFictionalPredictionEvidence(f).reason,'target_context_unconfirmed');
+  f.target.holiday.origin='verified_calendar';
+  f.target.special.origin='registered_records_only';
+  assert.equal(screenFictionalPredictionEvidence(f).reason,'target_context_unconfirmed');
+});
+test('B21: historical_replay is not rescued by current_snapshot candidate or unknown timestamps',()=>{
+  const f=screening();
+  f.request.purpose='historical_replay';
+  f.condition_decision.request.purpose='historical_replay';
+  f.history[0].available_at=null;
+  assert.deepEqual([
+    screenFictionalPredictionEvidence(f).eligible_history,
+    screenFictionalPredictionEvidence(f).excluded_history
+  ],[1,1]);
+  f.target.special.known_at=null;
+  assert.equal(screenFictionalPredictionEvidence(f).target_status,'HELD');
+});
+test('B22: JSON-lossy evidence and accessor/canary are not executed or leaked',()=>{
+  const f=screening(),CANARY='SYNTHETIC_PRIVATE_CANARY_NEVER_PUBLISH';
+  let getterCalls=0;
+  Object.defineProperty(f.history[0], 'privateValue',{
+    enumerable:true,get(){getterCalls++;throw Error(CANARY);}
+  });
+  const result=screenFictionalPredictionEvidence(f);
+  assert.equal(result.screened,false);
+  assert.equal(result.reason,'invalid_fixture_evidence');
+  assert.equal(getterCalls,0);
+  assert.equal(JSON.stringify(result).includes(CANARY),false);
+  const g=screening();g.history[0].count=NaN;
+  assert.equal(screenFictionalPredictionEvidence(g).reason,'invalid_fixture_evidence');
+  const h=screening();h.history[0].toJSON=()=>({count:0});
+  assert.equal(screenFictionalPredictionEvidence(h).reason,'invalid_fixture_evidence');
+});
+test('B23: future/excluded rows do not lower the model minimum-sample rule',()=>{
+  const f=screening();
+  f.history[1].available_at=null;
+  const result=screenFictionalPredictionEvidence(f);
+  assert.equal(result.eligible_history,1);
+  assert.equal(Object.hasOwn(result,'min_samples'),false);
+  assert.equal(Object.hasOwn(result,'forecast_ready'),false);
+  assert.equal(result.authorized_for_model,false);
+});
+test('B24: invalid envelope and synthetic secret error never escape as source content',()=>{
+  const f=screening({fixture:false});
+  const res=screenFictionalPredictionEvidence(f);
+  assert.equal(res.screened,false);
+  assert.equal(res.reason,'invalid_fixture_contract');
+  const bad=screening();
+  bad.target.special.known_at=undefined;
+  const out=screenFictionalPredictionEvidence(bad);
+  assert.equal(out.reason,'invalid_fixture_evidence');
+  assert.equal(JSON.stringify(out).includes('SYNTHETIC_PRIVATE_CANARY'),false);
 });
