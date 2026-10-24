@@ -210,6 +210,7 @@ function screenFictionalPredictionEvidence(input){
       const allowed=day(row.day)&&row.day<r.issued_at.slice(0,10)&&
         Number.isSafeInteger(row.count)&&row.count>=0&&
         timeOk(row.available_at)&&
+        Date.parse(row.available_at)>=Date.parse(row.day+'T00:00:00+09:00')&&
         context?.active===true&&context?.holiday===false&&
         context?.event===false&&timeOk(context.known_at)&&
         context.origin==='independent_verified';
