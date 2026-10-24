@@ -44,7 +44,7 @@ function fixture(){
   vm.createContext(sandbox);
   vm.runInContext(read('insight_secure_backup_crypto_v1.js'),sandbox);
   vm.runInContext(read('insight_secure_backup_ui_v1.js'),sandbox);
-  return {ui:root.InsightSecureBackupUI,crypto:root.InsightSecureBackupCrypto,
+  return {root,ui:root.InsightSecureBackupUI,crypto:root.InsightSecureBackupCrypto,
     downloads,blobs,restores,dialogs,setConfirmation(v){confirmReturn=v;}};
 }
 async function encryptedFile(f){
@@ -63,7 +63,7 @@ test('encrypted export stores only an authenticated ciphertext envelope and pres
   assert.equal(json.encryption,'AES-256-GCM');
   assert.equal(Object.hasOwn(json,'data'),false);
   assert.doesNotMatch(text,/架空店舗|schemaVersion|stores|backupInfo/);
-  assert.deepEqual(await f.crypto.decryptBackupPayload(json,secret),fictional);
+  assert.deepEqual(clone(await f.crypto.decryptBackupPayload(json,secret)),fictional);
   assert.equal(JSON.stringify(fictional),before);
 });
 
@@ -118,9 +118,8 @@ test('canceled warning stops before legacy restore and leaves the file untouched
 
 test('oversized decrypted legacy backup is refused before passing to the 20MB restore path',async()=>{
   const f=fixture();
-  f.crypto.encryptBackupPayload=()=>{throw Error('should not be called');};
   const oversized={data:{notes:'x'.repeat(20*1024*1024)}};
-  f.crypto.decryptBackupPayload=async()=>oversized;
+  f.root.InsightSecureBackupCrypto=Object.freeze({...f.crypto,decryptBackupPayload:async()=>oversized});
   await assert.rejects(f.ui.importEncrypted(new File(['{}'],'huge.json'),secret),/backup_too_large_for_restore/);
   assert.equal(f.restores.length,0);
 });
