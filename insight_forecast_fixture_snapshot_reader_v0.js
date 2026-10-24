@@ -51,7 +51,7 @@ function jst(value) {
 }
 function assertKnownAt(value, issuedAt) {
   if (value === null || value === undefined) return;
-  if (typeof value !== 'string' || !/^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}(?:\\.\\d+)?(?:Z|[+-]\\d{2}:\\d{2})$/.test(value) || !Number.isFinite(Date.parse(value))) reject('invalid_known_at');
+  if (typeof value !== 'string' || !/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d+)?(?:Z|[+-]\d{2}:\d{2})$/.test(value) || !Number.isFinite(Date.parse(value))) reject('invalid_known_at');
   if (Date.parse(value) > Date.parse(issuedAt)) reject('future_knowledge');
 }
 function assertNestedKnownAt(value, issuedAt) {
