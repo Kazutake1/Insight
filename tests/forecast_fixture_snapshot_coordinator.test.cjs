@@ -483,6 +483,22 @@ test('S10: unknown sale/event/calendar and registry are never promoted to absenc
     assert.throws(()=>validateFixtureHandoff(data),/fictional_handoff_unavailable/);
   }
 });
+test('S10: explicit coverage and record refs must match the same day, scope and snapshot',()=>{
+  for(const mutate of [
+    d=>{d.target_evidence.calendar.coverage.store='lab_b';},
+    d=>{d.target_evidence.sale.coverage.category='fictional_bread';},
+    d=>{d.target_evidence.event.coverage.start_day='2026-10-26';},
+    d=>{d.target_evidence.sale.record_ref.snapshot_id='other-snapshot';},
+    d=>{d.target_evidence.calendar.record_ref.local_locator=[];},
+    d=>{d.target_evidence.registries.common.ledger='store';},
+    d=>{d.target_evidence.registries.store.record_ref.snapshot_id='other-snapshot';},
+    d=>{d.target_evidence.registries.store.omission_rule='fictional-legacy-optional-ledgers-v1';}
+  ]){
+    const data=fictionalHandoff();mutate(data);
+    assert.throws(()=>validateFixtureHandoff(data),/fictional_handoff_unavailable/);
+  }
+});
+
 test('S10: future known_at of target or historical row never passes',()=>{
   for(const mutate of [
     d=>{d.target_evidence.sale.known_at='2026-10-25T00:00:00+09:00';},
