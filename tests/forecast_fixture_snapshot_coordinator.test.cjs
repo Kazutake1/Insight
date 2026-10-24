@@ -127,6 +127,27 @@ test('S02: malformed scope, date, period, source data and nonfinite counts rejec
   const src = fixture(); src.payload.history[0].sales.value = NaN;
   assert.throws(() => createFixtureSnapshotReader(src).read(req()), /non_finite_fixture_value/);
 });
+test('S03/S05: normalized but impossible timestamps fail closed', () => {
+  for (const request_issued_at of [
+    '2026-02-30T10:59:00+09:00',
+    '2026-10-24T24:00:00+09:00',
+    '2026-10-24T10:59:00+24:00'
+  ]) {
+    assert.throws(
+      () => createFixtureSnapshotReader(fixture()).read(req({ manual_target: true, request_issued_at })),
+      /invalid_jst_timestamp/
+    );
+  }
+  for (const known_at of [
+    '2026-02-30T08:00:00+09:00',
+    '2026-10-24T24:00:00+09:00',
+    '2026-10-24T08:00:00+25:00'
+  ]) {
+    const source = fixture();
+    source.payload.history[0].weather.known_at = known_at;
+    assert.throws(() => createFixtureSnapshotReader(source).read(req()), /invalid_known_at/);
+  }
+});
 test('S05: malformed known_at cannot silently become unknown', () => {
   const src = fixture();
   src.payload.history[0].known_at = 'unparseable';
