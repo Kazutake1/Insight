@@ -1,0 +1,80 @@
+'use strict';
+const {test,expect}=require('@playwright/test');
+const fs=require('node:fs/promises');
+
+test('optional encrypted backup exports ciphertext, rejects wrong passphrase and safely restores via legacy flow',async({page})=>{
+  const csp=[],failures=[],networkSensitive=[];
+  const pass='test-fictional-passphrase-2026!';
+  page.on('console',msg=>{
+    if(/content security policy|refused to (execute|load|apply)/i.test(msg.text()))csp.push(msg.text());
+    if(msg.text().includes(pass))networkSensitive.push('console');
+  });
+  page.on('pageerror',err=>failures.push(err.message));
+  page.on('request',request=>{
+    if(request.url().includes(pass)||(request.postData()||'').includes(pass))
+      networkSensitive.push('network');
+  });
+  await page.route('**/Index.html*',async route=>{
+    const response=await route.fetch();
+    const body=(await response.text()).replace(/;?\s*upgrade-insecure-requests/g,'');
+    await route.fulfill({response,body});
+  });
+  await page.goto('/Index.html',{waitUntil:'domcontentloaded'});
+  await expect(page.locator('#navSettings')).toBeVisible();
+  await page.locator('#navSettings').click();
+  await expect(page.locator('#insightEncryptedBackup')).toBeVisible();
+  await expect(page.locator('#insightSecureExport')).toBeVisible();
+  await expect(page.locator('#insightSecureRestore')).toBeVisible();
+  await expect.poll(()=>page.evaluate(()=>Boolean(window.InsightSecureBackupCrypto&&window.InsightBackupGuard))).toBe(true);
+  await page.locator('#insightSecureExportPass').fill(pass);
+  await page.locator('#insightSecureExportConfirm').fill(pass);
+  const downloadPromise=page.waitForEvent('download');
+  await page.locator('#insightSecureExport').click();
+  const download=await downloadPromise;
+  expect(download.suggestedFilename()).toMatch(/\.insight\.enc\.json$/);
+  const contents=await fs.readFile(await download.path(),'utf8');
+  const envelope=JSON.parse(contents);
+  expect(envelope.format).toBe('insight-encrypted-backup');
+  expect(envelope.encryption).toBe('AES-256-GCM');
+  expect(contents).not.toContain('"stores"');
+  await expect(page.locator('#insightSecureExportPass')).toHaveValue('');
+  await expect(page.locator('#insightSecureExportConfirm')).toHaveValue('');
+  const existing=await page.evaluate(()=>localStorage.getItem('insight_v11'));
+  const encryptedUpload={name:'test.insight.enc.json',mimeType:'application/json',buffer:Buffer.from(contents,'utf8')};
+
+  await page.locator('#insightSecureRestoreFile').setInputFiles(encryptedUpload);
+  await page.locator('#insightSecureRestorePass').fill('incorrect passphrase testing 2026');
+  await page.locator('#insightSecureRestore').click();
+  await expect(page.locator('#insightSecureRestoreStatus')).toContainText('復号できません');
+  expect(await page.evaluate(()=>localStorage.getItem('insight_v11'))).toBe(existing);
+  await expect(page.locator('#insightSecureRestorePass')).toHaveValue('');
+
+  const corrupted={...envelope,ciphertext:(envelope.ciphertext[0]==='A'?'B':'A')+envelope.ciphertext.slice(1)};
+  await page.locator('#insightSecureRestoreFile').setInputFiles({
+    name:'tampered.insight.enc.json',mimeType:'application/json',
+    buffer:Buffer.from(JSON.stringify(corrupted),'utf8')
+  });
+  await page.locator('#insightSecureRestorePass').fill(pass);
+  await page.locator('#insightSecureRestore').click();
+  await expect(page.locator('#insightSecureRestoreStatus')).toContainText('復号できません');
+  expect(await page.evaluate(()=>localStorage.getItem('insight_v11'))).toBe(existing);
+
+  const dialogs=[];
+  page.on('dialog',async dialog=>{dialogs.push(dialog.message());await dialog.accept();});
+  await page.locator('#insightSecureRestoreFile').setInputFiles(encryptedUpload);
+  await page.locator('#insightSecureRestorePass').fill(pass);
+  const beforeRestoreDownload=page.waitForEvent('download');
+  await page.locator('#insightSecureRestore').click();
+  const safeguard=await beforeRestoreDownload;
+  expect(safeguard.suggestedFilename()).toMatch(/^Insight_pre_restore_\d{8}_\d{6}\.json$/);
+  const plainPreRestore=JSON.parse(await fs.readFile(await safeguard.path(),'utf8'));
+  expect(plainPreRestore.backupInfo.backupType).toBe('preRestore');
+  expect(dialogs.length).toBe(2);
+  expect(dialogs[0]).toContain('平文JSON');
+  expect(dialogs[1]).toContain('現在の全データは上書き');
+  await expect(page.locator('#insightSecureRestorePass')).toHaveValue('');
+  await expect.poll(()=>page.evaluate(()=>!!localStorage.getItem('insight_v11'))).toBe(true);
+  expect(networkSensitive).toEqual([]);
+  expect(csp).toEqual([]);
+  expect(failures).toEqual([]);
+});
