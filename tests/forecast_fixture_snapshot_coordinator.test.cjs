@@ -199,6 +199,47 @@ test('S06: storage, restore, policy and forecast changes invalidate in-flight ou
     assert.equal(result.freshness, 'stale');
   }
 });
+test('S06: invalidation settles a non-cooperative evaluator that never resolves', async () => {
+  const coord = createFixtureRequestCoordinator({
+    reader: createFixtureSnapshotReader(fixture()), session_id: 'fake-session',
+    evaluate: () => new Promise(() => {})
+  });
+  const old = coord.request(req());
+  const epoch = coord.invalidate('storage-event');
+  const result = await old;
+  assert.equal(epoch, 2);
+  assert.equal(result.accepted, false);
+  assert.equal(result.freshness, 'stale');
+  assert.equal(result.result, undefined);
+});
+test('S06: second request can complete when the first ignores cancellation forever', async () => {
+  let calls = 0;
+  const coord = createFixtureRequestCoordinator({
+    reader: createFixtureSnapshotReader(fixture()), session_id: 'fake-session',
+    evaluate: () => ++calls === 1 ? new Promise(() => {}) : Promise.resolve({ outcome: 'completed', forecast: 'HELD' })
+  });
+  const first = coord.request(req());
+  const second = coord.request(req());
+  assert.equal((await first).accepted, false);
+  const fresh = await second;
+  assert.equal(fresh.accepted, true);
+  assert.equal(fresh.result.forecast, 'HELD');
+  assert.equal(coord.getEpoch(), 2);
+});
+test('S06: source freshness inspection throwing before evaluation is sanitized', async () => {
+  const base = createFixtureSnapshotReader(fixture());
+  let evaluated = false;
+  const coord = createFixtureRequestCoordinator({
+    reader: { read: base.read, isCurrent: () => { throw Error('fictional-secret-should-not-escape'); } },
+    session_id: 'fake-session',
+    evaluate: () => { evaluated = true; return { forecast: 'READY' }; }
+  });
+  const output = await coord.request(req());
+  assert.equal(output.accepted, false);
+  assert.equal(output.reason, 'snapshot_unavailable');
+  assert.equal(evaluated, false);
+  assert.doesNotMatch(JSON.stringify(output), /fictional-secret/);
+});
 test('S06: source mutating after async start discards even an otherwise READY result', async () => {
   const src = fixture(); const pending = deferred();
   const coord = createFixtureRequestCoordinator({ reader: createFixtureSnapshotReader(src), session_id: 'fake-session', evaluate: () => pending.promise });
