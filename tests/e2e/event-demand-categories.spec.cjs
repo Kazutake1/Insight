@@ -96,7 +96,7 @@ test('過去便の推定・手動確定はセール実績と単日／複数日�
     await route.fulfill({response,body:(await response.text()).replace(/;?\s*upgrade-insecure-requests/g,'')});
   });
   await page.goto('/Index.html',{waitUntil:'domcontentloaded'});
-  await page.waitForFunction(()=>window.InsightSaleResults&&window.InsightEventResults&&window.InsightTripHistoryResolver);
+  await page.waitForFunction(()=>window.InsightSaleResults&&window.InsightEventResults&&window.InsightTripHistoryResolver&&typeof allStores!=='undefined'&&allStores?.salesCountManagement?.categories?.length&&typeof window.InsightEventResults.render==='function');
   const setup=await page.evaluate(()=>{
     const storeId=allStores.current,store=allStores.stores[storeId];
     const category=allStores.salesCountManagement.categories.find(item=>!item.hidden);
@@ -177,7 +177,7 @@ test('セール実績の通常日比は店舗・全店イベントと別カテ�
     await route.fulfill({response,body:(await response.text()).replace(/;?\s*upgrade-insecure-requests/g,'')});
   });
   await page.goto('/Index.html',{waitUntil:'domcontentloaded'});
-  await page.waitForFunction(()=>window.InsightSaleResults&&window.InsightEvents&&window.InsightSalesCount);
+  await page.waitForFunction(()=>window.InsightSaleResults&&window.InsightEvents&&window.InsightSalesCount&&typeof allStores!=='undefined'&&allStores?.salesCountManagement?.categories?.length);
   const fixture=await page.evaluate(()=>{
     const storeId=allStores.current,store=allStores.stores[storeId];
     const categories=allStores.salesCountManagement.categories;
@@ -232,7 +232,7 @@ test('近隣イベントは共通名で開催履歴を集約し補足の演者�
     await route.fulfill({response,body:(await response.text()).replace(/;?\s*upgrade-insecure-requests/g,'')});
   });
   await page.goto('/Index.html',{waitUntil:'domcontentloaded'});
-  await page.waitForFunction(()=>window.InsightEventResults&&window.InsightAnalysisContext);
+  await page.waitForFunction(()=>window.InsightEventResults&&window.InsightAnalysisContext&&typeof allStores!=='undefined'&&allStores?.stores?.[allStores.current]&&typeof window.InsightEventResults.render==='function');
   const saved=await page.evaluate(()=>{
     const store=allStores.stores[allStores.current];
     const mk=(id,title,note,date)=>({

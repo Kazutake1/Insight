@@ -277,4 +277,12 @@ restoreData=function(e){
       :"バックアップを復元できませんでした。\n"+detail+"\n\n現在のデータは変更されていません。");
   }e.target.value="";};reader.onerror=function(){alert("ファイルを読み込めませんでした。\n現在のデータは変更されていません。");e.target.value="";};reader.readAsText(file);
 };
+// Read-only export bridge for opt-in encryption. The legacy JSON flows above stay unchanged.
+window.InsightBackupGuard=Object.freeze({
+  buildExportPayload:function(){
+    if(!window.InsightStorage)throw new Error("保存機能を初期化できませんでした");
+    var snapshot=window.InsightStorage.migrateSnapshot(allStores),now=new Date();
+    return {backupInfo:buildBackupInfo(snapshot,now),data:snapshot};
+  }
+});
 })();

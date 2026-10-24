@@ -60,6 +60,7 @@ jobs:
           - ai_context.test.cjs
           - local_ai_privacy.test.cjs
           - secure_backup_crypto.test.cjs
+          - secure_backup_ui.test.cjs
           - ai_interpretation.test.cjs
           - ai_visual.test.cjs
           - analysis_period_lock.test.cjs
