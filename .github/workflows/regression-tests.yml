@@ -64,6 +64,7 @@ jobs:
           - forecast_fixture_capture_preflight.test.cjs
           - forecast_order_ui_isolated_events.test.cjs
           - forecast_fixture_trip_group_contract.test.cjs
+          - forecast_fixture_source_graph_contract.test.cjs
           - secure_backup_crypto.test.cjs
           - ai_interpretation.test.cjs
           - ai_visual.test.cjs
