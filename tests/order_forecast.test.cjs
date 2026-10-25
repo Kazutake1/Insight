@@ -379,12 +379,18 @@ function fictionalOrderSelectionUI(){
     enter(){root.gotoNav('orderForecast');},
     get saves(){return saves;},get traffic(){return traffic;}};
 }
-test('P4c-2: unavailable before init; successful UI entry gives frozen three-field auto metadata',()=>{
+async function settleForecast(){
+  // Flush the original rejected-fictional-network fetch and load.finally
+  // without a real timer or a real network connection.
+  await new Promise(resolve=>setImmediate(resolve));
+  await new Promise(resolve=>setImmediate(resolve));
+}
+test('P4c-2: unavailable before init; successful UI entry gives frozen three-field auto metadata',async()=>{
   const f=fictionalOrderSelectionUI();
   assert.deepEqual(f.status(),{initialized:false,manualIntent:null,epoch:null});
   f.init();
   assert.deepEqual(f.status(),{initialized:false,manualIntent:null,epoch:null});
-  f.enter();
+  f.enter();await settleForecast();
   const status=f.model.getForecastSelectionStatus();
   assert.deepEqual(Object.keys(status),['initialized','manualIntent','epoch']);
   assert.equal(Object.isFrozen(status),true);
@@ -394,8 +400,8 @@ test('P4c-2: unavailable before init; successful UI entry gives frozen three-fie
   assert.doesNotMatch(JSON.stringify(status),/fictional_a|fictional_rice|2026-/);
   assert.equal(f.saves,0);assert.equal(JSON.stringify(f.stores),f.initial);
 });
-test('P4c-2: focusing the same date without a change event becomes unknown, not manual',()=>{
-  const f=fictionalOrderSelectionUI();f.init();f.enter();
+test('P4c-2: focusing the same date without a change event becomes unknown, not manual',async()=>{
+  const f=fictionalOrderSelectionUI();f.init();f.enter();await settleForecast();
   const before=f.status(),shown=f.model.getState().delivery,date=f.elements.get('ofDelivery');
   date.onfocus();
   assert.equal(f.model.getState().delivery,shown);
@@ -404,8 +410,8 @@ test('P4c-2: focusing the same date without a change event becomes unknown, not 
   f.model.render();
   assert.equal(f.status().manualIntent,null,'render must not relabel an unobserved picker choice auto');
 });
-test('P4c-2: synthetic change is not trusted; a claimed trusted change tests only event branch',()=>{
-  const f=fictionalOrderSelectionUI();f.init();f.enter();
+test('P4c-2: synthetic change is not trusted; a claimed trusted change tests only event branch',async()=>{
+  const f=fictionalOrderSelectionUI();f.init();f.enter();await settleForecast();
   const input=f.elements.get('ofDelivery');
   const before=f.status(),same=f.model.getState().delivery;
   input.value=same;
@@ -418,8 +424,8 @@ test('P4c-2: synthetic change is not trusted; a claimed trusted change tests onl
   assert.equal(f.model.getState().delivery,same);
   assert.equal(f.saves,0);
 });
-test('P4c-2: invalid picker value is rejected without modifying delivery and remains unknown',()=>{
-  const f=fictionalOrderSelectionUI();f.init();f.enter();
+test('P4c-2: invalid picker value is rejected without modifying delivery and remains unknown',async()=>{
+  const f=fictionalOrderSelectionUI();f.init();f.enter();await settleForecast();
   const input=f.elements.get('ofDelivery'),original=f.model.getState().delivery;
   input.value='2026-13-99';
   const start=f.status();
@@ -429,8 +435,8 @@ test('P4c-2: invalid picker value is rejected without modifying delivery and rem
   assert.equal(f.status().manualIntent,null);
   assert.ok(f.status().epoch>start.epoch);
 });
-test('P4c-2: auto delivery at 10:59/11:00 JST updates epoch without changing existing date rule',()=>{
-  const f=fictionalOrderSelectionUI();f.init();f.enter();
+test('P4c-2: auto delivery at 10:59/11:00 JST updates epoch without changing existing date rule',async()=>{
+  const f=fictionalOrderSelectionUI();f.init();f.enter();await settleForecast();
   const fakeAt=iso=>class FakeDate extends Date{
     constructor(...args){super(...(args.length?args:[iso]));}
   };
@@ -446,8 +452,8 @@ test('P4c-2: auto delivery at 10:59/11:00 JST updates epoch without changing exi
   assert.ok(after.epoch>before.epoch);
   assert.equal(f.saves,0);
 });
-test('P4c-2: accepted category A-B-A, page reentry, and refresh advance generations',()=>{
-  const f=fictionalOrderSelectionUI();f.init();f.enter();
+test('P4c-2: accepted category A-B-A, page reentry, and refresh advance generations',async()=>{
+  const f=fictionalOrderSelectionUI();f.init();f.enter();await settleForecast();
   const picker=f.elements.get('ofCategory');
   const first=f.status().epoch;
   picker.onchange({target:{value:'fictional_bread'}});
@@ -456,15 +462,17 @@ test('P4c-2: accepted category A-B-A, page reentry, and refresh advance generati
   assert.ok(second>first);
   f.root.gotoNav('dashboard');
   assert.equal(f.status().initialized,false);
-  f.enter();
+  f.enter();await settleForecast();
   assert.ok(f.status().epoch>second);
   const third=f.status().epoch;
   f.elements.get('ofRefresh').onclick();
+  assert.equal(f.status().initialized,false,'refresh in flight is unknown');
+  await settleForecast();
   assert.ok(f.status().epoch>third);
   assert.equal(f.saves,0);
 });
-test('P4c-2: failed render yields unknown; subsequent successful render gets a new epoch',()=>{
-  const f=fictionalOrderSelectionUI();f.init();f.enter();
+test('P4c-2: failed render yields unknown; subsequent successful render gets a new epoch',async()=>{
+  const f=fictionalOrderSelectionUI();f.init();f.enter();await settleForecast();
   const first=f.status().epoch,original=f.elements.get('ofPreviousYear');
   f.elements.delete('ofPreviousYear');
   assert.throws(()=>f.model.render(),error=>error&&error.name==='TypeError');
@@ -473,4 +481,76 @@ test('P4c-2: failed render yields unknown; subsequent successful render gets a n
   f.model.render();
   assert.equal(f.status().initialized,true);
   assert.ok(f.status().epoch>first);
+});
+
+
+test('P4c2 R1-A: load rejection after page exit cannot reactivate selection metadata',async()=>{
+  const f=fictionalOrderSelectionUI();
+  const pending=[];
+  f.ctx.AbortController=class {constructor(){this.signal={};}abort(){}};
+  f.root.fetch=(url)=>new Promise((_resolve,reject)=>pending.push({url,reject}));
+  f.init();f.enter();
+  assert.equal(f.status().initialized,false,'fetch still running is unknown');
+  assert.ok(pending.length>=2,'both synthetic const fetches started');
+  f.root.gotoNav('dashboard');
+  assert.deepEqual(f.status(),{initialized:false,manualIntent:null,epoch:null});
+  pending.forEach(item=>item.reject(new Error('synthetic offline reject')));
+  await settleForecast();
+  assert.deepEqual(f.status(),{initialized:false,manualIntent:null,epoch:null});
+  assert.equal(f.ctx.currentNav,'dashboard');
+  assert.equal(f.saves,0);
+  f.enter();
+  assert.equal(f.status().initialized,false,'new entry is not ready while loading');
+  // Subsequent attempts can be rate-limited by the original weather client;
+  // regardless, a completed reload may revive metadata only on the active page.
+  await settleForecast();
+  assert.equal(f.status().initialized,true);
+  assert.equal(f.status().manualIntent,false);
+});
+test('P4c2 R1-B: successful delayed weather resolution after exit also stays unknown',async()=>{
+  const f=fictionalOrderSelectionUI();
+  const pending=[];
+  f.ctx.AbortController=class {constructor(){this.signal={};}abort(){}};
+  f.root.fetch=(url)=>new Promise((resolve,reject)=>pending.push({url,resolve,reject}));
+  f.init();f.enter();
+  assert.ok(pending.length>=2);
+  f.root.gotoNav('dashboard');
+  pending.splice(0).forEach(item=>item.resolve({ok:true,json:async()=>({})}));
+  await settleForecast();
+  assert.ok(pending.length>=1,'the synthetic forecast request was started');
+  const today=f.model.today(new Date());
+  const payload=[{reportDatetime:today+'T17:00:00+09:00',
+    timeSeries:[{timeDefines:[today+'T17:00:00+09:00'],
+      areas:[{area:{code:'230010'},weatherCodes:['100'],weathers:['晴れ']}]}]}];
+  pending.splice(0).forEach(item=>item.resolve({ok:true,json:async()=>payload}));
+  await settleForecast();
+  assert.deepEqual(f.status(),{initialized:false,manualIntent:null,epoch:null});
+  assert.equal(f.ctx.currentNav,'dashboard');
+  assert.equal(f.saves,0);
+});
+test('P4c2 R1-C: render while never entered cannot initialize selection metadata',async()=>{
+  const f=fictionalOrderSelectionUI();f.init();
+  f.model.render();
+  assert.deepEqual(f.status(),{initialized:false,manualIntent:null,epoch:null});
+  await settleForecast();
+  assert.deepEqual(f.status(),{initialized:false,manualIntent:null,epoch:null});
+});
+test('P4c2 R2-A: unresolved weather means entry and refresh both report unknown',async()=>{
+  const f=fictionalOrderSelectionUI();
+  const pending=[];
+  f.ctx.AbortController=class {constructor(){this.signal={};}abort(){}};
+  f.root.fetch=(url)=>new Promise((_resolve,reject)=>pending.push({url,reject}));
+  f.init();f.enter();
+  assert.equal(f.elements.get('ofRefresh').disabled,true);
+  assert.deepEqual(f.status(),{initialized:false,manualIntent:null,epoch:null});
+  // Even a direct render must not relabel pending observations ready.
+  f.model.render();
+  assert.deepEqual(f.status(),{initialized:false,manualIntent:null,epoch:null});
+  f.elements.get('ofRefresh').onclick();
+  assert.deepEqual(f.status(),{initialized:false,manualIntent:null,epoch:null});
+  pending.forEach(item=>item.reject(new Error('synthetic offline reject')));
+  await settleForecast();
+  assert.equal(f.status().initialized,true,'only after current load fully finishes');
+  assert.equal(f.elements.get('ofRefresh').disabled,false);
+  assert.equal(f.saves,0);
 });
