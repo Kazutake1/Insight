@@ -302,3 +302,175 @@ test('現在月の便設定を基本としつつ、現在対象外でも入力�
   assert.equal(actual.salesAverage.total,null,'3便未入力なので部分合計は使わない');
   assert.equal(actual.recent[0].date,'2026-10-11');
 });
+
+
+/* STEP4 P4c-2: ORIGINAL order forecast UI handlers inside an isolated
+ * fictional Node VM. No actual browser/storage/AI calls are permitted. */
+function fictionalOrderSelectionUI(){
+  const vm=require('node:vm'),path=require('node:path');
+  const created=[],elements=new Map(),listeners=new Map();
+  function el(tag){
+    const children=[],classes=new Set();
+    const n={tagName:tag,id:'',value:'',textContent:'',className:'',children,
+      dataset:{},style:{},hidden:false,disabled:false,
+      classList:{add(k){classes.add(k);},remove(k){classes.delete(k);},contains(k){return classes.has(k);}},
+      append(...nodes){children.push(...nodes);},appendChild(node){children.push(node);return node;},
+      replaceChildren(...nodes){children.splice(0,children.length,...nodes);},
+      insertAdjacentElement(){},setAttribute(k,x){this[k]=String(x);},
+      querySelector(){return {after(){}};},after(){},
+      focus(){},showModal(){},close(){}};
+    created.push(n);return n;
+  }
+  for(const id of ['navSaleResults','main','ofDelivery','ofCategory','ofPreviousYear',
+    'ofYearCards','ofWeekCards','ofRecentCards','ofRecentEmpty','ofWeather',
+    'ofWeatherStatus','ofRefresh','storeSel']){
+    const n=el('div');n.id=id;elements.set(id,n);
+  }
+  const sidebar=el('div');
+  const doc={
+    readyState:'loading',head:el('head'),
+    getElementById(id){return elements.get(id)||null;},
+    querySelector(q){return q==='#sidebar .nav-list'?sidebar:null;},
+    querySelectorAll(q){
+      if(q==='.nav-btn')return created.filter(n=>n.className.split(/\s+/).includes('nav-btn'));
+      if(q==='.page')return created.filter(n=>n.className.split(/\s+/).includes('page'));
+      return [];
+    },
+    createElement:el,createElementNS(_ns,tag){return el(tag);},
+    addEventListener(name,callback){listeners.set(name,callback);}
+  };
+  const cats=[
+    {id:'fictional_rice',name:'架空米飯',hidden:false,activeTrips:[true,false,false]},
+    {id:'fictional_bread',name:'架空パン',hidden:false,activeTrips:[true,false,false]}
+  ];
+  const stores={current:'fictional_a',salesCountManagement:{categories:cats},
+    stores:{fictional_a:{salesCounts:{},data:{},weatherLocation:null},
+      fictional_b:{salesCounts:{},data:{},weatherLocation:null}}};
+  const initial=JSON.stringify(stores);
+  let traffic=0,saves=0;
+  const root={document:doc,allStores:stores,
+    fetch(){traffic++;return Promise.reject(new Error('FICTIONAL_OFFLINE_ONLY'));},
+    InsightSalesCount:{
+      activeTrips(c){return c.activeTrips;},
+      normalizeRecord(){return {trips:[{delivery:null,sales:null}]};},
+      createReadOnlyDayCard(){return el('article');},
+      createAverageCard(){return el('article');},
+      wasteRecordAt(){return null;},
+      average(){return null;}
+    },
+    InsightTripHistoryResolver:{resolveDate(){return {mask:[true,false,false]};},
+      averageByDate(){return null;}},
+    InsightEvents:{list(){return [];}},
+    persist(){saves++;}
+  };
+  const ctx=vm.createContext({window:root,globalThis:root,document:doc,allStores:stores,
+    currentNav:'dashboard',
+    setTimeout(){return 1;},clearTimeout(){},
+    Error,Date,Intl,Number,Array,Object,Map,Set,String,Boolean,Promise,
+    console:{warn(){throw Error('unexpected console warn');}}});
+  root.gotoNav=function(target){ctx.currentNav=target;};
+  root.switchStore=function(id){stores.current=id;};
+  const originalSource=fs.readFileSync(require('node:path').join(__dirname,'..','insight_order_forecast_v1.js'),'utf8');
+  vm.runInContext(originalSource,ctx,{filename:'insight_order_forecast_v1.js'});
+  const model=root.InsightOrderForecast;
+  const status=()=>JSON.parse(JSON.stringify(model.getForecastSelectionStatus()));
+  return {model,root,ctx,doc,stores,status,initial,elements,
+    init(){listeners.get('DOMContentLoaded')();},
+    enter(){root.gotoNav('orderForecast');},
+    get saves(){return saves;},get traffic(){return traffic;}};
+}
+test('P4c-2: unavailable before init; successful UI entry gives frozen three-field auto metadata',()=>{
+  const f=fictionalOrderSelectionUI();
+  assert.deepEqual(f.status(),{initialized:false,manualIntent:null,epoch:null});
+  f.init();
+  assert.deepEqual(f.status(),{initialized:false,manualIntent:null,epoch:null});
+  f.enter();
+  const status=f.model.getForecastSelectionStatus();
+  assert.deepEqual(Object.keys(status),['initialized','manualIntent','epoch']);
+  assert.equal(Object.isFrozen(status),true);
+  assert.equal(status.initialized,true);
+  assert.equal(status.manualIntent,false);
+  assert.equal(Number.isSafeInteger(status.epoch),true);
+  assert.doesNotMatch(JSON.stringify(status),/fictional_a|fictional_rice|2026-/);
+  assert.equal(f.saves,0);assert.equal(JSON.stringify(f.stores),f.initial);
+});
+test('P4c-2: focusing the same date without a change event becomes unknown, not manual',()=>{
+  const f=fictionalOrderSelectionUI();f.init();f.enter();
+  const before=f.status(),shown=f.model.getState().delivery,date=f.elements.get('ofDelivery');
+  date.onfocus();
+  assert.equal(f.model.getState().delivery,shown);
+  assert.equal(f.status().manualIntent,null);
+  assert.ok(f.status().epoch>before.epoch);
+  f.model.render();
+  assert.equal(f.status().manualIntent,null,'render must not relabel an unobserved picker choice auto');
+});
+test('P4c-2: synthetic change is not trusted; a claimed trusted change tests only event branch',()=>{
+  const f=fictionalOrderSelectionUI();f.init();f.enter();
+  const input=f.elements.get('ofDelivery');
+  const before=f.status(),same=f.model.getState().delivery;
+  input.value=same;
+  input.onchange({target:input,isTrusted:false});
+  assert.equal(f.status().manualIntent,null);
+  assert.ok(f.status().epoch>before.epoch);
+  input.onchange({target:input,isTrusted:true}); // simulated, NOT real browser provenance
+  assert.equal(f.status().manualIntent,true);
+  assert.ok(f.status().epoch>before.epoch);
+  assert.equal(f.model.getState().delivery,same);
+  assert.equal(f.saves,0);
+});
+test('P4c-2: invalid picker value is rejected without modifying delivery and remains unknown',()=>{
+  const f=fictionalOrderSelectionUI();f.init();f.enter();
+  const input=f.elements.get('ofDelivery'),original=f.model.getState().delivery;
+  input.value='2026-13-99';
+  const start=f.status();
+  input.onchange({target:input,isTrusted:true});
+  assert.equal(input.value,original);
+  assert.equal(f.model.getState().delivery,original);
+  assert.equal(f.status().manualIntent,null);
+  assert.ok(f.status().epoch>start.epoch);
+});
+test('P4c-2: auto delivery at 10:59/11:00 JST updates epoch without changing existing date rule',()=>{
+  const f=fictionalOrderSelectionUI();f.init();f.enter();
+  const fakeAt=iso=>class FakeDate extends Date{
+    constructor(...args){super(...(args.length?args:[iso]));}
+  };
+  f.ctx.Date=fakeAt('2026-10-25T01:59:59Z');
+  f.model.render();
+  const before=f.status(),dateBefore=f.model.getState().delivery;
+  assert.equal(dateBefore,'2026-10-26');
+  f.ctx.Date=fakeAt('2026-10-25T02:00:00Z');
+  f.model.render();
+  const after=f.status();
+  assert.equal(f.model.getState().delivery,'2026-10-27');
+  assert.equal(after.manualIntent,false);
+  assert.ok(after.epoch>before.epoch);
+  assert.equal(f.saves,0);
+});
+test('P4c-2: accepted category A-B-A, page reentry, and refresh advance generations',()=>{
+  const f=fictionalOrderSelectionUI();f.init();f.enter();
+  const picker=f.elements.get('ofCategory');
+  const first=f.status().epoch;
+  picker.onchange({target:{value:'fictional_bread'}});
+  picker.onchange({target:{value:'fictional_rice'}});
+  const second=f.status().epoch;
+  assert.ok(second>first);
+  f.root.gotoNav('dashboard');
+  assert.equal(f.status().initialized,false);
+  f.enter();
+  assert.ok(f.status().epoch>second);
+  const third=f.status().epoch;
+  f.elements.get('ofRefresh').onclick();
+  assert.ok(f.status().epoch>third);
+  assert.equal(f.saves,0);
+});
+test('P4c-2: failed render yields unknown; subsequent successful render gets a new epoch',()=>{
+  const f=fictionalOrderSelectionUI();f.init();f.enter();
+  const first=f.status().epoch,original=f.elements.get('ofPreviousYear');
+  f.elements.delete('ofPreviousYear');
+  assert.throws(()=>f.model.render(),error=>error&&error.name==='TypeError');
+  assert.deepEqual(f.status(),{initialized:false,manualIntent:null,epoch:null});
+  f.elements.set('ofPreviousYear',original);
+  f.model.render();
+  assert.equal(f.status().initialized,true);
+  assert.ok(f.status().epoch>first);
+});
