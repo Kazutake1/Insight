@@ -685,3 +685,227 @@ test('P4b R1-C: failed render after read cannot restore a stale clean report',()
   assert.ok(f.status().epoch>start.epoch);
   assert.equal(f.status().initialized,true);
 });
+
+
+/* STEP4 P4c-1: isolate real InsightStorage in Node VM, with entirely
+ * fictional allStores and an injected P4b-shaped non-quantity status.
+ * There is no production-loader change or actual UI/AI connection. */
+const {createSalesStorageReadFence}=require('../insight_forecast_sales_storage_read_fence_v0.js');
+function fictionalSalesStorageFence(){
+  const vm=require('node:vm');
+  const current={current:'fictional_a',stores:{
+    fictional_a:{name:'FICTIONAL_CANARY_STORE',years:[2026],counts:{'2026-10-25':{delivery:0,sales:null}}}
+  }};
+  let raw=JSON.stringify(current),writes=0,reads=0;
+  const callbacks=new Map();
+  const root={
+    SK:'insight_v11',allStores:current,
+    localStorage:{
+      getItem(k){reads++;return k==='insight_v11'?raw:null;},
+      setItem(k,v){writes++;if(k==='insight_v11')raw=String(v);}
+    },
+    addEventListener(type,callback){callbacks.set(type,callback);}
+  };
+  const ctx=vm.createContext({window:root,globalThis:root,SK:'insight_v11',
+    allStores:current,console:{warn(){throw Error('unexpected console output');}}});
+  vm.runInContext(fs.readFileSync(path.join(__dirname,'..','insight_storage_v1.js'),'utf8'),
+    ctx,{filename:'insight_storage_v1.js'});
+  const draft={initialized:true,dirty:false,epoch:1};
+  const selection={store_id:'fictional_a',category_id:'fictional_rice',
+    trip:1,delivery:'2026-10-25',epoch:1};
+  const source={
+    storage:root.InsightStorage,
+    // Genuine prototype identities of the isolated VM executing Storage.
+    // These are test-only; a claimed realm identity is not provenance.
+    trustedPrototypes:Object.freeze({
+      object:vm.runInContext('Object.prototype',ctx),
+      array:vm.runInContext('Array.prototype',ctx)
+    }),
+    salesCount:{getForecastDraftStatus(){return Object.freeze({...draft});}},
+    readLive(){return current;},
+    readSelection(){return {...selection};}
+  };
+  return {
+    current,root,source,draft,selection,
+    inspect(){return createSalesStorageReadFence(source).inspect();},
+    get raw(){return raw;},set raw(v){raw=v;},
+    get writes(){return writes;},get reads(){return reads;},
+    fireExternal(newValue){callbacks.get('storage')({key:'insight_v11',newValue});}
+  };
+}
+test('P4c-1: original storage + fictional P4b status agree without save or disclosure',()=>{
+  const f=fictionalSalesStorageFence();
+  const raw=f.raw,before=JSON.stringify(f.current),out=f.inspect();
+  assert.equal(out.status,'LOCAL_SALES_SCOPE_ONLY');
+  assert.equal(out.consistent,true);
+  assert.equal(out.full_app_clean,false);
+  assert.equal(out.provenance_verified,false);
+  assert.equal(out.authorized_for_model,false);
+  assert.equal(Object.isFrozen(out),true);
+  assert.doesNotMatch(JSON.stringify(out),/FICTIONAL_CANARY_STORE|fictional_a|2026-10-25|fictional_rice/);
+  assert.equal(f.writes,0);
+  assert.equal(f.raw,raw);
+  assert.equal(JSON.stringify(f.current),before);
+});
+test('P4c-1: legacy raw missing schemaVersion is compared after existing migration only',()=>{
+  const f=fictionalSalesStorageFence();
+  assert.equal(JSON.parse(f.raw).schemaVersion,undefined);
+  assert.equal(f.current.schemaVersion,1,'original Storage stamps only live memory');
+  assert.equal(f.inspect().consistent,true);
+  assert.equal(f.writes,0,'observation does not persist migration');
+});
+test('P4c-1: 0, null and absent values remain distinguishable',()=>{
+  const f=fictionalSalesStorageFence();
+  f.current.stores.fictional_a.counts['2026-10-25'].sales=0;
+  assert.equal(f.inspect().reason,'saved_live_mismatch');
+  f.current.stores.fictional_a.counts['2026-10-25'].sales=null;
+  delete f.current.stores.fictional_a.counts['2026-10-25'].delivery;
+  assert.equal(f.inspect().reason,'saved_live_mismatch');
+  assert.equal(f.writes,0);
+});
+test('P4c-1: dirty, unknown and invalid local epoch all fail closed',()=>{
+  const f=fictionalSalesStorageFence();
+  for(const [status,reason] of [
+    [{initialized:true,dirty:true,epoch:1},'sales_draft_unknown_or_dirty'],
+    [{initialized:false,dirty:null,epoch:null},'sales_draft_unknown_or_dirty'],
+    [{initialized:true,dirty:false,epoch:null},'sales_draft_unknown_or_dirty'],
+    [{initialized:true,dirty:false,epoch:Number.MAX_SAFE_INTEGER+1},'observation_unavailable']
+  ]){
+    Object.assign(f.draft,status);
+    assert.equal(f.inspect().reason,reason);
+    assert.equal(f.inspect().authorized_for_model,false);
+  }
+});
+test('P4c-1: non-authentic selection with no epoch fails closed',()=>{
+  const f=fictionalSalesStorageFence();
+  delete f.selection.epoch;
+  assert.equal(f.inspect().reason,'selection_epoch_or_scope_unknown');
+  assert.equal(f.inspect().authorized_for_model,false);
+});
+test('P4c-1: selection A->B->A invalidates identical returned selection values',()=>{
+  const f=fictionalSalesStorageFence();
+  const real=f.source.readLive;
+  f.source.readLive=()=>{f.selection.store_id='fictional_b';f.selection.epoch++;
+    f.selection.store_id='fictional_a';f.selection.epoch++;return real();};
+  assert.equal(f.inspect().reason,'source_changed_during_read');
+});
+test('P4c-1: draft A->B->A with clean final value still invalidates the old fence',()=>{
+  const f=fictionalSalesStorageFence();
+  const real=f.source.readLive;
+  f.source.readLive=()=>{f.draft.dirty=true;f.draft.epoch++;
+    f.draft.dirty=false;f.draft.epoch++;return real();};
+  assert.equal(f.inspect().reason,'source_changed_during_read');
+});
+test('P4c-1: real Storage revision advancing during read invalidates capture',()=>{
+  const f=fictionalSalesStorageFence();
+  const real=f.source.readLive;
+  f.source.readLive=()=>{
+    f.root.InsightStorage.writeSnapshot(JSON.parse(f.raw));
+    return real();
+  };
+  assert.equal(f.inspect().reason,'source_changed_during_read');
+  assert.equal(f.writes,1,'only the artificial test source intentionally wrote');
+});
+test('P4c-1: pending, held and external conflict are never treated as ready',()=>{
+  const f=fictionalSalesStorageFence();
+  const original=f.source.storage;
+  for(const patch of [{pending:1},{held:true},{conflict:true}]){
+    f.source.storage={...original,reportState(){return {...original.reportState(),...patch};}};
+    assert.equal(f.inspect().reason,'storage_unready');
+  }
+  f.source.storage=original;
+  f.fireExternal('fictional_external_change');
+  assert.equal(f.inspect().reason,'storage_unready');
+});
+test('P4c-1: invalid, accessor, custom toJSON and cyclic live values fail closed',()=>{
+  const f=fictionalSalesStorageFence();
+  const original=f.source.readLive;
+  let getterCalled=false,toJSONCalled=false;
+  const withGetter={name:'fake'};
+  Object.defineProperty(withGetter,'private',{enumerable:true,get(){getterCalled=true;return 'secret';}});
+  const withToJSON={toJSON(){toJSONCalled=true;return {a:1};}};
+  const cyclic={};cyclic.loop=cyclic;
+  for(const suspect of [NaN,Infinity,undefined,withGetter,withToJSON,cyclic]){
+    f.source.readLive=()=>suspect;
+    assert.equal(f.inspect().reason,'observation_unavailable');
+  }
+  assert.equal(getterCalled,false);
+  assert.equal(toJSONCalled,false);
+  f.source.readLive=original;
+});
+test('P4c-1: injected read exceptions do not reveal sensitive text',()=>{
+  const f=fictionalSalesStorageFence();
+  f.source.readLive=()=>{throw Error('SECRET_RECORD_VALUE_239978');};
+  const out=f.inspect();
+  assert.equal(out.reason,'observation_unavailable');
+  assert.doesNotMatch(JSON.stringify(out),/SECRET_RECORD_VALUE_239978/);
+});
+test('P4c-1: query uses no DOM, confirmation, AI invocation or write methods',()=>{
+  const f=fictionalSalesStorageFence();
+  f.root.document={getElementById(){throw Error('DOM forbidden');}};
+  f.root.confirm=()=>{throw Error('confirm forbidden');};
+  f.root.fetch=()=>{throw Error('network forbidden');};
+  f.root.InsightModel={run(){throw Error('model forbidden');}};
+  const out=f.inspect();
+  assert.equal(out.consistent,true);
+  assert.equal(f.writes,0);
+});
+
+test('P4c-R1-A: fabricated object prototype name getter is never called and is blocked',()=>{
+  const f=fictionalSalesStorageFence();
+  let calls=0;
+  const spoofedConstructor={};
+  Object.defineProperty(spoofedConstructor,'name',{get(){calls++;return 'Object';}});
+  const spoofedPrototype=Object.create(null);
+  Object.defineProperty(spoofedPrototype,'constructor',{value:spoofedConstructor});
+  Object.setPrototypeOf(f.current,spoofedPrototype);
+  const out=f.inspect();
+  assert.equal(calls,0,'no constructor.name getter may execute');
+  assert.equal(out.status,'BLOCKED');
+  assert.equal(out.reason,'observation_unavailable');
+  assert.equal(out.authorized_for_model,false);
+  assert.equal(f.writes,0);
+});
+test('P4c-R1-B: fabricated array prototype name getter is never called and is blocked',()=>{
+  const f=fictionalSalesStorageFence();
+  let calls=0;
+  function SpoofedArray(){}
+  Object.defineProperty(SpoofedArray,'name',{get(){calls++;return 'Array';},configurable:true});
+  const spoofedPrototype=Object.create(null);
+  Object.defineProperty(spoofedPrototype,'constructor',{value:SpoofedArray});
+  Object.setPrototypeOf(f.current.stores.fictional_a.years,spoofedPrototype);
+  const out=f.inspect();
+  assert.equal(calls,0,'no constructor.name getter may execute');
+  assert.equal(out.status,'BLOCKED');
+  assert.equal(out.reason,'observation_unavailable');
+  assert.equal(out.provenance_verified,false);
+  assert.equal(f.writes,0);
+});
+test('P4c-R1-C: nonfunction constructors and disguised prototype names do not confer acceptance',()=>{
+  for(const fake of [{name:'Object'},function Object(){}]){
+    const f=fictionalSalesStorageFence();
+    const spoofedPrototype=Object.create(null);
+    Object.defineProperty(spoofedPrototype,'constructor',{value:fake});
+    Object.setPrototypeOf(f.current,spoofedPrototype);
+    const out=f.inspect();
+    assert.equal(out.reason,'observation_unavailable');
+    assert.equal(out.consistent,false);
+    assert.equal(out.authorized_for_model,false);
+  }
+});
+test('P4c-R1-D: host JSON and explicitly identified Storage VM JSON realms still compare',()=>{
+  const f=fictionalSalesStorageFence();
+  assert.equal(f.inspect().consistent,true);
+  const vm=require('node:vm');
+  const vmctx=vm.createContext({});
+  const vmObject=vm.runInContext('Object.prototype',vmctx);
+  const vmArray=vm.runInContext('Array.prototype',vmctx);
+  // Objects originating in an unregistered third VM are not trusted.
+  const third=vm.runInContext('JSON.parse(\'{"schemaVersion":1}\')',vmctx);
+  f.source.readLive=()=>third;
+  assert.equal(f.inspect().reason,'observation_unavailable');
+  // Adding genuine but unrelated realm identities remains a fixture-only
+  // trust decision and never confers model use authorization.
+  f.source.trustedPrototypes={object:vmObject,array:vmArray};
+  assert.equal(f.inspect().authorized_for_model,false);
+});
