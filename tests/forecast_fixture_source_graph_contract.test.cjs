@@ -41,7 +41,10 @@ function graph(){
       source_kind:({
         target_calendar:'fixture_calendar',common_registry:'fixture_registry',
         store_registry:'fixture_registry',promotional_sale_absence:'independent_check',
-        event_absence:'independent_check',condition_policy:'fixture_policy',
+        event_absence:'independent_check',
+        historical_promotional_sale_absence:'independent_check',
+        historical_event_absence:'independent_check',
+        condition_policy:'fixture_policy',
         model_policy:'fixture_policy',fallback_policy:'fixture_policy',
         weather_policy:'fixture_policy',area_mapping:'fixture_mapping',
         weather_site_mapping:'fixture_mapping',weather_report:'fixture_report'
@@ -111,7 +114,17 @@ function graph(){
       {day,active:true,holiday:false,event:false,origin:'independent'},
       {day,time:contextTime,coverage:coverage(day)}),
       {day,time:contextTime});
-    derived('history_row','history_row_'+suffix,[sf.ref,cf.ref],day,contextTime);
+    // Both historical promotion and event absences have separate source refs,
+    // validity windows, versions and source/binding known_at timestamps.
+    const promo=bind(source('historical_promotional_sale_absence',
+      'history_promotion_'+suffix,
+      {day,status:'confirmed_absent',method:'independent'},
+      {day,time:contextTime,coverage:coverage(day)}),{day,time:contextTime});
+    const event=bind(source('historical_event_absence','history_event_'+suffix,
+      {day,status:'confirmed_absent',method:'independent'},
+      {day,time:contextTime,coverage:coverage(day)}),{day,time:contextTime});
+    derived('history_row','history_row_'+suffix,
+      [sf.ref,cf.ref,promo.ref,event.ref],day,contextTime);
   }
   history('zero','2026-10-19',0,true,'2026-10-20T09:00:00+09:00',
     '2026-10-20T08:00:00+09:00');
@@ -469,4 +482,88 @@ test('G26 R6: duplicated same-day historical sale cannot inflate samples, even w
     KNOWN('2026-10-13T09:00:00+09:00');
   const r=outcome(twoDays,'FICTIONAL_SCREENING_ONLY');
   assert.deepEqual([r.history_eligible,r.history_zero,r.history_excluded],[2,1,0]);
+});
+
+
+/* Work R7: historical promotional sale and event absence are independent
+ * evidence, not inferred from cf.event=false or a registry-only candidate. */
+test('G27 R7: historical promotional sale unknown or present excludes only its row',()=>{
+  for(const status of ['unknown','confirmed_present']){
+    const g=graph();
+    find(g,'history_promotion_zero').fact={
+      day:'2026-10-19',status,method:status==='unknown'?'unknown':'independent'
+    };
+    const r=outcome(g,'FICTIONAL_SCREENING_ONLY');
+    assert.deepEqual([r.history_eligible,r.history_zero,r.history_excluded],[0,0,2]);
+    assert.equal(r.target_status,'HELD');
+  }
+  const g=graph();
+  find(g,'history_promotion_zero').fact={
+    day:'2026-10-19',status:'confirmed_absent',method:'registered_only'
+  };
+  outcome(g,'REJECT');
+});
+test('G28 R7: historical event unknown or present cannot be rescued by promotion absence',()=>{
+  for(const status of ['unknown','confirmed_present']){
+    const g=graph();
+    find(g,'history_event_zero').fact={
+      day:'2026-10-19',status,method:status==='unknown'?'unknown':'independent'
+    };
+    assert.equal(outcome(g,'FICTIONAL_SCREENING_ONLY').history_eligible,0);
+  }
+  const inconsistent=graph();
+  find(inconsistent,'history_context_zero').fact.event=true;
+  assert.equal(outcome(inconsistent,'FICTIONAL_SCREENING_ONLY').history_eligible,0);
+});
+test('G29 R7: unknown, late, unavailable or unversioned independent history evidence excludes row',()=>{
+  for(const id of ['history_promotion_zero','history_event_zero']){
+    for(const edit of [
+      s=>{s.times.known_at=UNKNOWN();},
+      s=>{s.times.known_at=KNOWN('2026-10-25T10:58:30+09:00');},
+      s=>{s.source_version=UNKNOWN();},
+      s=>{s.read_state='unavailable';}
+    ]){
+      const g=graph();edit(find(g,id));
+      assert.equal(outcome(g,'FICTIONAL_SCREENING_ONLY').history_eligible,0);
+    }
+    const b=graph();
+    find(b,id+'_binding').known_at=UNKNOWN();
+    assert.equal(outcome(b,'FICTIONAL_SCREENING_ONLY').history_eligible,0);
+    const another=graph();
+    find(another,id+'_binding').rule_version=UNKNOWN();
+    assert.equal(outcome(another,'FICTIONAL_SCREENING_ONLY').history_eligible,0);
+  }
+  const replay=graph();
+  replay.anchor.purpose='historical_replay';
+  replay.anchor.captured_at='2026-10-27T09:00:00+09:00';
+  find(replay,'history_event_zero').times.known_at=KNOWN('2026-10-26T08:00:00+09:00');
+  assert.equal(outcome(replay,'FICTIONAL_SCREENING_ONLY').history_eligible,0);
+});
+test('G30 R7: absent history dependencies and wrong snapshot, store or day are REJECT',()=>{
+  for(const modify of [
+    g=>{find(g,'history_row_zero').dependencies.pop();},
+    g=>{find(g,'history_row_zero').dependencies[2]='registration_result';},
+    g=>{find(g,'history_promotion_zero_binding').source_ref='nonexistent';},
+    g=>{find(g,'history_event_zero').snapshot_id='fictional_other_snapshot';},
+    g=>{find(g,'history_promotion_zero').coverage.store=exact('lab_b');},
+    g=>{find(g,'history_event_zero').fact.day='2026-10-18';},
+    g=>{find(g,'history_promotion_zero_binding').applied_day='2026-10-18';}
+  ]){
+    const g=graph();modify(g);outcome(g,'REJECT');
+  }
+});
+test('G31 R7: independently checked absence preserves explicit zero and separate history decisions',()=>{
+  const g=graph();
+  const good=outcome(g,'FICTIONAL_SCREENING_ONLY');
+  assert.deepEqual([good.history_eligible,good.history_zero,good.history_excluded],[1,1,1]);
+  find(g,'history_sales_unknown').times.available_at=
+    KNOWN('2026-10-13T09:00:00+09:00');
+  const both=outcome(g,'FICTIONAL_SCREENING_ONLY');
+  assert.deepEqual([both.history_eligible,both.history_zero,both.history_excluded],[2,1,0]);
+  find(g,'history_event_unknown').fact={day:'2026-10-12',status:'unknown',method:'unknown'};
+  const one=outcome(g,'FICTIONAL_SCREENING_ONLY');
+  assert.deepEqual([one.history_eligible,one.history_zero,one.history_excluded],[1,1,1]);
+  assert.equal(one.provenance_verified,false);
+  assert.equal(one.authorized_for_model,false);
+  assert.equal(Object.hasOwn(one,'forecast_value'),false);
 });
