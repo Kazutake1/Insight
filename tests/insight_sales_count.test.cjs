@@ -694,7 +694,7 @@ const {createSalesStorageReadFence}=require('../insight_forecast_sales_storage_r
 function fictionalSalesStorageFence(){
   const vm=require('node:vm');
   const current={current:'fictional_a',stores:{
-    fictional_a:{name:'FICTIONAL_CANARY_STORE',counts:{'2026-10-25':{delivery:0,sales:null}}}
+    fictional_a:{name:'FICTIONAL_CANARY_STORE',years:[2026],counts:{'2026-10-25':{delivery:0,sales:null}}}
   }};
   let raw=JSON.stringify(current),writes=0,reads=0;
   const callbacks=new Map();
