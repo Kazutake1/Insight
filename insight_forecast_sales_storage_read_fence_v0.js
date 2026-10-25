@@ -29,7 +29,12 @@ function stable(value) {
     ancestors.add(v);
     try {
       if(Array.isArray(v)) {
-        if(Object.getPrototypeOf(v)!==Array.prototype)throw Error('unavailable');
+        const arrayProto=Object.getPrototypeOf(v);
+        const ctor=arrayProto&&Object.getOwnPropertyDescriptor(arrayProto,'constructor');
+        if(arrayProto!==Array.prototype&&
+           !(ctor&&Object.hasOwn(ctor,'value')&&
+             typeof ctor.value==='function'&&ctor.value.name==='Array'))
+          throw Error('unavailable');
         const keys=Reflect.ownKeys(v);
         if(keys.length!==v.length+1)throw Error('unavailable');
         const parts=[];
