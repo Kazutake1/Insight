@@ -682,3 +682,112 @@ test('P4c-3: load starts by notifying before the source has settled',async()=>{
   await settleForecast();
   assert.equal(f.saves,0);
 });
+
+
+test('P4c3 R1-A: listeners added during dispatch wait for a later independent event',async()=>{
+  const f=fictionalOrderSelectionUI();f.init();f.enter();await settleForecast();
+  let first=0,later=0;
+  const unsubscribeFirst=f.model.subscribeForecastSelectionInvalidation(()=>{
+    first++;
+    if(first===1)f.model.subscribeForecastSelectionInvalidation(()=>{later++;});
+  });
+  f.model.render();
+  assert.equal(first,1);
+  assert.equal(later,0,'live Set may not visit a newly added subscriber');
+  f.model.render();
+  assert.equal(first,2);
+  assert.equal(later,1);
+  unsubscribeFirst();
+  assert.equal(f.saves,0);
+});
+
+test('P4c3 R1-B: reentrant render is coalesced, never recursively dispatched',async()=>{
+  const f=fictionalOrderSelectionUI();f.init();f.enter();await settleForecast();
+  let calls=0,depth=0,maxDepth=0;
+  const records=[];
+  f.model.subscribeForecastSelectionInvalidation(()=>{
+    calls++;depth++;maxDepth=Math.max(maxDepth,depth);
+    records.push(f.status());
+    if(calls===1)f.model.render();
+    depth--;
+  });
+  const before=f.status().epoch;
+  f.model.render();
+  assert.equal(calls,1,'nested render must not recursively re-notify');
+  assert.equal(maxDepth,1);
+  assert.ok(f.status().epoch>before,'nested render must still advance epoch');
+  assert.deepEqual(records,[{initialized:false,manualIntent:null,epoch:null}],
+    'status seen while notification is in flight must fail closed');
+  assert.equal(f.saves,0);
+});
+
+test('P4c3 R1-C: self unsubscribe/re-register and later-entry removal respect snapshot',async()=>{
+  const f=fictionalOrderSelectionUI();f.init();f.enter();await settleForecast();
+  let first=0,second=0,later=0;
+  let unFirst,unSecond;
+  unFirst=f.model.subscribeForecastSelectionInvalidation(()=>{
+    first++;
+    unFirst();
+    f.model.subscribeForecastSelectionInvalidation(()=>{later++;});
+    unSecond();
+  });
+  unSecond=f.model.subscribeForecastSelectionInvalidation(()=>{second++;});
+  f.model.render();
+  assert.equal(first,1);
+  assert.equal(second,0,'entry removed before its snapshot turn is skipped');
+  assert.equal(later,0,'entry added during snapshot delivery is not visited');
+  f.model.render();
+  assert.equal(first,1);
+  assert.equal(second,0);
+  assert.equal(later,1);
+  assert.equal(f.saves,0);
+});
+
+test('P4c3 R1-D: adding callbacks during render never multiplies synchronous delivery',async()=>{
+  const f=fictionalOrderSelectionUI();f.init();f.enter();await settleForecast();
+  let calls=0;
+  function grow(){
+    calls++;
+    if(calls<6)f.model.subscribeForecastSelectionInvalidation(grow);
+  }
+  f.model.subscribeForecastSelectionInvalidation(grow);
+  f.model.render();
+  assert.equal(calls,1,'new callback must not get a same-operation delivery');
+  f.model.render();
+  assert.equal(calls,3,'only the two callbacks present at start are visited');
+  assert.equal(f.saves,0);
+});
+
+test('P4c3 R2-A: picker focus after manual selection never exposes old intent in new epoch',async()=>{
+  const f=fictionalOrderSelectionUI();f.init();f.enter();await settleForecast();
+  const input=f.elements.get('ofDelivery'),same=f.model.getState().delivery;
+  input.value=same;
+  input.onchange({target:input,isTrusted:true}); // synthetic branch only
+  assert.equal(f.status().manualIntent,true);
+  const before=f.status().epoch,observed=[];
+  f.model.subscribeForecastSelectionInvalidation(function(){
+    observed.push({args:[...arguments],status:f.status()});
+  });
+  input.onfocus();
+  assert.ok(f.status().epoch>before);
+  assert.equal(f.status().manualIntent,null);
+  assert.equal(observed.length,1);
+  assert.deepEqual(observed[0],{args:[],status:{
+    initialized:false,manualIntent:null,epoch:null
+  }});
+  assert.equal(f.saves,0);
+});
+
+test('P4c3 R2-B: valid changed date notifies after intent quarantine, then recovers',async()=>{
+  const f=fictionalOrderSelectionUI();f.init();f.enter();await settleForecast();
+  const input=f.elements.get('ofDelivery');
+  let observed=[];
+  f.model.subscribeForecastSelectionInvalidation(()=>observed.push(f.status()));
+  input.value='2026-12-01';
+  input.onchange({target:input,isTrusted:true}); // branch simulation only
+  assert.ok(observed.length>0);
+  assert.ok(observed.every(s=>s.initialized===false&&s.manualIntent===null));
+  assert.equal(f.status().manualIntent,true);
+  assert.equal(f.model.getState().delivery,'2026-12-01');
+  assert.equal(f.saves,0);
+});
