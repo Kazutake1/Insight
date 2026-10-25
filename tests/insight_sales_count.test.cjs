@@ -650,7 +650,7 @@ test('P4b R1-A: partially failed reload is unknown until a complete read and ren
   const p=f.model.getPeriod();
   const date=p.year+'-'+String(p.month).padStart(2,'0')+'-01';
   f.allStores.stores.a.salesCounts[date]=null;
-  assert.throws(()=>f.model.reloadFromStore(),TypeError);
+  assert.throws(()=>f.model.reloadFromStore(),error=>error&&error.name==='TypeError');
   assert.deepEqual(JSON.parse(JSON.stringify(f.status())),{initialized:false,dirty:null,epoch:null});
   delete f.allStores.stores.a.salesCounts[date];
   assert.equal(f.model.reloadFromStore(),true);
@@ -678,7 +678,7 @@ test('P4b R1-C: failed render after read cannot restore a stale clean report',()
   const start=f.status();assert.equal(start.initialized,true);
   const get=f.doc.getElementById.bind(f.doc);
   f.doc.getElementById=(id)=>id==='scCalendar'?null:get(id);
-  assert.throws(()=>f.model.reloadFromStore(),TypeError);
+  assert.throws(()=>f.model.reloadFromStore(),error=>error&&error.name==='TypeError');
   assert.deepEqual(JSON.parse(JSON.stringify(f.status())),{initialized:false,dirty:null,epoch:null});
   f.doc.getElementById=get;
   assert.equal(f.model.reloadFromStore(),true);
