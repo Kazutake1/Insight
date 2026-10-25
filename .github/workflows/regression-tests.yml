@@ -60,6 +60,7 @@ jobs:
           - ai_context.test.cjs
           - local_ai_privacy.test.cjs
           - forecast_fictional_privacy_handoff.test.cjs
+          - forecast_fixture_privacy_coordinator_integration.test.cjs
           - secure_backup_crypto.test.cjs
           - ai_interpretation.test.cjs
           - ai_visual.test.cjs
