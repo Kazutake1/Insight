@@ -238,3 +238,83 @@ test('G1: real OrderForecast exposes 11:00 boundary but not genuine manual selec
   assert.match(sourceText,/model\.getState=function\(\)\{return Object\.assign\(\{\},state\);\}/);
   // This is source inspection; no running UI event provenance is attested.
 });
+
+
+/* STEP4 SnapshotReader evidence integrity regression (fictional source only). */
+function sourceWithMutation(which, mutate) {
+  const fixture=source();
+  const value=which==='inspect'?fixture.inspect():fixture.readFixture();
+  mutate(value);
+  if(which==='inspect')fixture.inspect=()=>value;
+  else fixture.readFixture=()=>value;
+  return fixture;
+}
+function expectFixtureRejected(which, mutate, reason) {
+  const reader=createFixtureSnapshotReader(sourceWithMutation(which,mutate));
+  assert.throws(()=>reader.read(request()),reason);
+}
+test('S05: Reader refuses array extras and hidden fields rather than silently losing evidence',()=>{
+  expectFixtureRejected('fixture',value=>{value.history.extra='fictional-extra';},/invalid_fixture_member/);
+  expectFixtureRejected('fixture',value=>{
+    Object.defineProperty(value.target_evidence,'hidden',{value:'fictional-hidden',enumerable:false});
+  },/invalid_fixture_member/);
+  expectFixtureRejected('inspect',value=>{
+    Object.defineProperty(value.versions,'hidden',{value:'fictional-hidden',enumerable:false});
+  },/invalid_fixture_member/);
+  expectFixtureRejected('inspect',value=>{value.versions.extra=undefined;},/invalid_fixture_value/);
+});
+test('S05: Reader refuses numeric evidence that loses meaning while preserving finite decimals',()=>{
+  expectFixtureRejected('fixture',value=>{value.history[0].sales.value=-0;},/invalid_fixture_number/);
+  expectFixtureRejected('fixture',value=>{
+    value.history[0].sales.value=Number.MAX_SAFE_INTEGER+1;
+  },/invalid_fixture_number/);
+  expectFixtureRejected('inspect',value=>{value.report_revision=-0;},/invalid_fixture_number/);
+  const f=source();
+  f.payload.history[0].weather.temp_max=21.75;
+  f.payload.history[0].weather.temp_min=-1.5;
+  const reader=createFixtureSnapshotReader(f);
+  const snapshot=reader.read(request());
+  assert.equal(snapshot.history[0].sales.value,0);
+  assert.equal(snapshot.history[0].weather.temp_max,21.75);
+  assert.equal(snapshot.history[0].weather.temp_min,-1.5);
+  assert.equal(reader.isCurrent(snapshot),true);
+});
+test('S05: Reader rejects inherited array toJSON and does not invoke it',()=>{
+  let invoked=0;
+  const f=sourceWithMutation('fixture',value=>{
+    const inherited=Object.create(Array.prototype);
+    Object.defineProperty(inherited,'toJSON',{value(){invoked++;return [{scope:SCOPE,day:'2026-10-23',sales:{value:99}}];}});
+    Object.setPrototypeOf(value.history,inherited);
+  });
+  assert.throws(()=>createFixtureSnapshotReader(f).read(request()),/invalid_fixture_object/);
+  assert.equal(invoked,0);
+});
+test('S05: Reader rejects accessors without calling getters during state and evidence inspection',()=>{
+  let invoked=0;
+  for(const side of ['fixture','inspect']){
+    expectFixtureRejected(side,value=>{
+      Object.defineProperty(value,'untrusted',{enumerable:true,get(){invoked++;return 99;}});
+    },/invalid_fixture_member/);
+  }
+  assert.equal(invoked,0);
+});
+test('S05: Reader state token bypasses inherited toJSON and still detects revisions',()=>{
+  const old=Object.getOwnPropertyDescriptor(Object.prototype,'toJSON');
+  let invoked=0;
+  try{
+    Object.defineProperty(Object.prototype,'toJSON',{
+      configurable:true,value(){invoked++;return {report_revision:'forged'};}
+    });
+    const fixture=source();
+    const reader=createFixtureSnapshotReader(fixture);
+    const snapshot=reader.read(request());
+    assert.equal(snapshot.history[0].sales.value,0);
+    assert.equal(reader.isCurrent(snapshot),true);
+    fixture.state.report_revision++;
+    assert.equal(reader.isCurrent(snapshot),false);
+    assert.equal(invoked,0);
+  }finally{
+    if(old)Object.defineProperty(Object.prototype,'toJSON',old);
+    else delete Object.prototype.toJSON;
+  }
+});
