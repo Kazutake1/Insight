@@ -554,3 +554,131 @@ test('P4c2 R2-A: unresolved weather means entry and refresh both report unknown'
   assert.equal(f.elements.get('ofRefresh').disabled,false);
   assert.equal(f.saves,0);
 });
+
+
+/* STEP4 P4c-3: bounded event-only invalidation bridge tests. These do NOT
+ * connect production Coordinator/Reader or exercise real browser events. */
+test('P4c-3: invalidation subscription is argument-free and never reveals selection values',async()=>{
+  const f=fictionalOrderSelectionUI(),reports=[],prior=f.initial;
+  const unsubscribe=f.model.subscribeForecastSelectionInvalidation(function(){
+    reports.push({args:[...arguments],status:f.status()});
+  });
+  f.init();f.enter();await settleForecast();
+  assert.ok(reports.length>0);
+  for(const report of reports){
+    assert.deepEqual(report.args,[],'listener receives neither raw data nor identifiers');
+    assert.equal(report.status.authorized_for_model,undefined);
+  }
+  assert.doesNotMatch(JSON.stringify(reports),/fictional_a|fictional_rice|20\d\d-\d\d-\d\d/);
+  assert.equal(f.saves,0);
+  assert.equal(JSON.stringify(f.stores),prior);
+  const count=reports.length;
+  unsubscribe();
+  f.model.render();
+  assert.equal(reports.length,count);
+});
+test('P4c-3: input reselect, A-B-A, page exit/entry and refresh emit invalidations',async()=>{
+  const f=fictionalOrderSelectionUI();f.init();f.enter();await settleForecast();
+  let count=0;
+  f.model.subscribeForecastSelectionInvalidation(()=>{count++;});
+  const date=f.elements.get('ofDelivery');
+  const start=f.status().epoch,original=f.model.getState().delivery;
+  date.onfocus();
+  assert.ok(count>0);
+  assert.equal(f.status().manualIntent,null);
+  const afterFocus=count;
+  date.value=original;
+  date.onchange({target:date,isTrusted:true}); // branch simulation only
+  assert.ok(count>afterFocus);
+  assert.equal(f.model.getState().delivery,original);
+  const picker=f.elements.get('ofCategory'),afterDate=count;
+  picker.onchange({target:{value:'fictional_bread'}});
+  picker.onchange({target:{value:'fictional_rice'}});
+  assert.ok(count>=afterDate+2);
+  assert.ok(f.status().epoch>start);
+  const beforeExit=count;
+  f.root.gotoNav('dashboard');
+  assert.ok(count>beforeExit);
+  assert.equal(f.status().initialized,false);
+  const beforeEntry=count;
+  f.enter();assert.ok(count>beforeEntry);
+  await settleForecast();
+  const beforeRefresh=count;
+  f.elements.get('ofRefresh').onclick();
+  assert.ok(count>beforeRefresh);
+  assert.equal(f.status().initialized,false);
+  await settleForecast();
+  assert.equal(f.saves,0);
+});
+test('P4c-3: throwing listeners do not break UI, later listeners or read status',async()=>{
+  const f=fictionalOrderSelectionUI();f.init();f.enter();await settleForecast();
+  let good=0;
+  const unThrow=f.model.subscribeForecastSelectionInvalidation(()=>{throw Error('FICTIONAL_SECRET_03934');});
+  const unGood=f.model.subscribeForecastSelectionInvalidation(()=>{good++;});
+  f.model.render();
+  assert.ok(good>0);
+  assert.equal(f.status().initialized,true);
+  assert.equal(f.saves,0);
+  unThrow();unGood();
+  assert.throws(()=>f.model.subscribeForecastSelectionInvalidation(null),
+    error=>error&&error.name==='TypeError');
+});
+test('P4c-3: duplicate callback subscriptions are independently revocable',async()=>{
+  const f=fictionalOrderSelectionUI();f.init();f.enter();await settleForecast();
+  let calls=0;
+  const listener=()=>{calls++;};
+  const unsubA=f.model.subscribeForecastSelectionInvalidation(listener);
+  const unsubB=f.model.subscribeForecastSelectionInvalidation(listener);
+  f.model.render();
+  assert.equal(calls,2);
+  unsubA();unsubA();
+  f.model.render();
+  assert.equal(calls,3);
+  unsubB();
+  f.model.render();
+  assert.equal(calls,3);
+});
+test('P4c-3: test-only coordinator is invalidated before accepting a delayed result',async()=>{
+  const f=fictionalOrderSelectionUI();f.init();f.enter();await settleForecast();
+  // A fabricated coordinator clock, not a reproduction of the PR #231 module.
+  let generation=0;
+  const invalidationKinds=[];
+  const coordinator={
+    invalidate(){generation++;invalidationKinds.push('invalidation');},
+    getGeneration(){return generation;}
+  };
+  const unsubscribe=f.model.subscribeForecastSelectionInvalidation(
+    ()=>coordinator.invalidate()
+  );
+  const snapshotGeneration=coordinator.getGeneration();
+  const pending=new Promise(resolve=>{f.__resolveSynthetic=resolve;});
+  const picker=f.elements.get('ofCategory');
+  picker.onchange({target:{value:'fictional_bread'}});
+  picker.onchange({target:{value:'fictional_rice'}});
+  f.__resolveSynthetic({status:'READY',value:100391});
+  const raw=await pending;
+  // The late result may resolve, but cannot be adopted against its older
+  // generation. Deliberately do not log/show the synthetic quantity.
+  assert.equal(raw.status,'READY');
+  assert.notEqual(coordinator.getGeneration(),snapshotGeneration);
+  assert.ok(invalidationKinds.length>=2);
+  assert.equal(f.saves,0);
+  unsubscribe();
+});
+test('P4c-3: load starts by notifying before the source has settled',async()=>{
+  const f=fictionalOrderSelectionUI();
+  const unresolved=[];
+  f.ctx.AbortController=class {constructor(){this.signal={};}abort(){}};
+  f.root.fetch=(url)=>new Promise((_resolve,reject)=>unresolved.push({url,reject}));
+  let notifications=0;
+  f.model.subscribeForecastSelectionInvalidation(()=>notifications++);
+  f.init();f.enter();
+  assert.ok(unresolved.length>=2);
+  const before=notifications;
+  f.elements.get('ofRefresh').onclick();
+  assert.ok(notifications>before);
+  assert.deepEqual(f.status(),{initialized:false,manualIntent:null,epoch:null});
+  unresolved.forEach(x=>x.reject(new Error('SYNTHETIC_NETWORK_REJECT')));
+  await settleForecast();
+  assert.equal(f.saves,0);
+});
