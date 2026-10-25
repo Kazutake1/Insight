@@ -642,3 +642,46 @@ test('P4b: status inquiry has no write, DOM change or raw-value disclosure',()=>
   assert.equal(JSON.stringify(f.allStores),original);
   assert.equal(f.traffic.length,events);
 });
+
+
+test('P4b R1-A: partially failed reload is unknown until a complete read and render',()=>{
+  const f=fictionalSalesDraftUI();f.init();
+  const start=f.status();assert.equal(start.initialized,true);
+  const p=f.model.getPeriod();
+  const date=p.year+'-'+String(p.month).padStart(2,'0')+'-01';
+  f.allStores.stores.a.salesCounts[date]=null;
+  assert.throws(()=>f.model.reloadFromStore(),TypeError);
+  assert.deepEqual(JSON.parse(JSON.stringify(f.status())),{initialized:false,dirty:null,epoch:null});
+  delete f.allStores.stores.a.salesCounts[date];
+  assert.equal(f.model.reloadFromStore(),true);
+  const fresh=f.status();
+  assert.equal(fresh.initialized,true);
+  assert.equal(fresh.dirty,false);
+  assert.ok(fresh.epoch>start.epoch);
+});
+
+test('P4b R1-B: missing store invalidates previous clean state; recovery advances epoch',()=>{
+  const f=fictionalSalesDraftUI();f.init();
+  const before=f.status();assert.equal(before.dirty,false);
+  f.allStores.current='missing';
+  assert.equal(f.model.reloadFromStore(),false);
+  assert.deepEqual(JSON.parse(JSON.stringify(f.status())),{initialized:false,dirty:null,epoch:null});
+  f.allStores.current='a';
+  assert.equal(f.model.reloadFromStore(),true);
+  const restored=f.status();
+  assert.equal(restored.initialized,true);assert.equal(restored.dirty,false);
+  assert.ok(restored.epoch>before.epoch);
+});
+
+test('P4b R1-C: failed render after read cannot restore a stale clean report',()=>{
+  const f=fictionalSalesDraftUI();f.init();
+  const start=f.status();assert.equal(start.initialized,true);
+  const get=f.doc.getElementById.bind(f.doc);
+  f.doc.getElementById=(id)=>id==='scCalendar'?null:get(id);
+  assert.throws(()=>f.model.reloadFromStore(),TypeError);
+  assert.deepEqual(JSON.parse(JSON.stringify(f.status())),{initialized:false,dirty:null,epoch:null});
+  f.doc.getElementById=get;
+  assert.equal(f.model.reloadFromStore(),true);
+  assert.ok(f.status().epoch>start.epoch);
+  assert.equal(f.status().initialized,true);
+});
