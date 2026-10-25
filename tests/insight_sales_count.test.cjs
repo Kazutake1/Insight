@@ -715,6 +715,12 @@ function fictionalSalesStorageFence(){
     trip:1,delivery:'2026-10-25',epoch:1};
   const source={
     storage:root.InsightStorage,
+    // Genuine prototype identities of the isolated VM executing Storage.
+    // These are test-only; a claimed realm identity is not provenance.
+    trustedPrototypes:Object.freeze({
+      object:vm.runInContext('Object.prototype',ctx),
+      array:vm.runInContext('Array.prototype',ctx)
+    }),
     salesCount:{getForecastDraftStatus(){return Object.freeze({...draft});}},
     readLive(){return current;},
     readSelection(){return {...selection};}
@@ -843,4 +849,63 @@ test('P4c-1: query uses no DOM, confirmation, AI invocation or write methods',()
   const out=f.inspect();
   assert.equal(out.consistent,true);
   assert.equal(f.writes,0);
+});
+
+test('P4c-R1-A: fabricated object prototype name getter is never called and is blocked',()=>{
+  const f=fictionalSalesStorageFence();
+  let calls=0;
+  const spoofedConstructor={};
+  Object.defineProperty(spoofedConstructor,'name',{get(){calls++;return 'Object';}});
+  const spoofedPrototype=Object.create(null);
+  Object.defineProperty(spoofedPrototype,'constructor',{value:spoofedConstructor});
+  Object.setPrototypeOf(f.current,spoofedPrototype);
+  const out=f.inspect();
+  assert.equal(calls,0,'no constructor.name getter may execute');
+  assert.equal(out.status,'BLOCKED');
+  assert.equal(out.reason,'observation_unavailable');
+  assert.equal(out.authorized_for_model,false);
+  assert.equal(f.writes,0);
+});
+test('P4c-R1-B: fabricated array prototype name getter is never called and is blocked',()=>{
+  const f=fictionalSalesStorageFence();
+  let calls=0;
+  function SpoofedArray(){}
+  Object.defineProperty(SpoofedArray,'name',{get(){calls++;return 'Array';},configurable:true});
+  const spoofedPrototype=Object.create(null);
+  Object.defineProperty(spoofedPrototype,'constructor',{value:SpoofedArray});
+  Object.setPrototypeOf(f.current.stores.fictional_a.years,spoofedPrototype);
+  const out=f.inspect();
+  assert.equal(calls,0,'no constructor.name getter may execute');
+  assert.equal(out.status,'BLOCKED');
+  assert.equal(out.reason,'observation_unavailable');
+  assert.equal(out.provenance_verified,false);
+  assert.equal(f.writes,0);
+});
+test('P4c-R1-C: nonfunction constructors and disguised prototype names do not confer acceptance',()=>{
+  for(const fake of [{name:'Object'},function Object(){}]){
+    const f=fictionalSalesStorageFence();
+    const spoofedPrototype=Object.create(null);
+    Object.defineProperty(spoofedPrototype,'constructor',{value:fake});
+    Object.setPrototypeOf(f.current,spoofedPrototype);
+    const out=f.inspect();
+    assert.equal(out.reason,'observation_unavailable');
+    assert.equal(out.consistent,false);
+    assert.equal(out.authorized_for_model,false);
+  }
+});
+test('P4c-R1-D: host JSON and explicitly identified Storage VM JSON realms still compare',()=>{
+  const f=fictionalSalesStorageFence();
+  assert.equal(f.inspect().consistent,true);
+  const vm=require('node:vm');
+  const vmctx=vm.createContext({});
+  const vmObject=vm.runInContext('Object.prototype',vmctx);
+  const vmArray=vm.runInContext('Array.prototype',vmctx);
+  // Objects originating in an unregistered third VM are not trusted.
+  const third=vm.runInContext('JSON.parse(\'{"schemaVersion":1}\')',vmctx);
+  f.source.readLive=()=>third;
+  assert.equal(f.inspect().reason,'observation_unavailable');
+  // Adding genuine but unrelated realm identities remains a fixture-only
+  // trust decision and never confers model use authorization.
+  f.source.trustedPrototypes={object:vmObject,array:vmArray};
+  assert.equal(f.inspect().authorized_for_model,false);
 });
