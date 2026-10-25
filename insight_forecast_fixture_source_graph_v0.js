@@ -9,7 +9,8 @@ const AREAS=['fictional_area_a','fictional_area_b'],SITES=['lab_site_a','lab_sit
 const SOURCE_ROLES=[
   'target_trip','target_calendar','common_registry','store_registry',
   'promotional_sale_absence','event_absence','historical_sales',
-  'historical_context','condition_policy','model_policy','fallback_policy',
+  'historical_context','historical_promotional_sale_absence',
+  'historical_event_absence','condition_policy','model_policy','fallback_policy',
   'area_mapping','weather_site_mapping','weather_report','weather_policy'
 ];
 const DERIVED={
@@ -17,7 +18,8 @@ const DERIVED={
     'store_registry_binding','condition_policy_binding'],
   numeric_target_context:['target_trip_binding','target_calendar_binding',
     'promotional_sale_absence_binding','event_absence_binding'],
-  history_row:['historical_sales_binding','historical_context_binding'],
+  history_row:['historical_sales_binding','historical_context_binding',
+    'historical_promotional_sale_absence_binding','historical_event_absence_binding'],
   weather_gate:['weather_report_binding','weather_site_mapping_binding',
     'weather_policy_binding'],
   model_gate:['numeric_target_context','model_policy_binding','fallback_policy_binding']
@@ -32,6 +34,8 @@ const sourceKinds={
   target_trip:'fixture_record',target_calendar:'fixture_calendar',
   common_registry:'fixture_registry',store_registry:'fixture_registry',
   promotional_sale_absence:'independent_check',event_absence:'independent_check',
+  historical_promotional_sale_absence:'independent_check',
+  historical_event_absence:'independent_check',
   historical_sales:'fixture_record',historical_context:'fixture_record',
   condition_policy:'fixture_policy',model_policy:'fixture_policy',
   fallback_policy:'fixture_policy',weather_policy:'fixture_policy',
@@ -137,9 +141,12 @@ function fact(role,f){
     keys(f,['status']);if(!['non_holiday','holiday','unknown'].includes(f.status))fail();
   }else if(role==='common_registry'||role==='store_registry'){
     keys(f,['presence']);if(!['absent','present','unknown'].includes(f.presence))fail();
-  }else if(role==='promotional_sale_absence'||role==='event_absence'){
-    keys(f,['status','method']);
-    if(!['confirmed_absent','confirmed_present','unknown'].includes(f.status)||
+  }else if(['promotional_sale_absence','event_absence',
+      'historical_promotional_sale_absence','historical_event_absence'].includes(role)){
+    const historical=role.startsWith('historical_');
+    keys(f,historical?['day','status','method']:['status','method']);
+    if((historical&&!day(f.day))||
+      !['confirmed_absent','confirmed_present','unknown'].includes(f.status)||
       !['independent','registered_only','unknown'].includes(f.method)||
       (f.status==='confirmed_absent'&&f.method!=='independent'))fail();
   }else if(role==='historical_sales'){
@@ -275,7 +282,8 @@ function structural(input){
            get(n.mapping_refs[0]).kind!=='source')))fail();
       const cd=covers(s.coverage,a,n.applied_day);
       if(cd==='mismatch')fail();
-      if(['historical_sales','historical_context','weather_report'].includes(s.role)){
+      if(['historical_sales','historical_context','historical_promotional_sale_absence',
+          'historical_event_absence','weather_report'].includes(s.role)){
         if(s.fact.day!==n.applied_day)fail();
       }else if(n.applied_day!==a.target_day)fail();
       if(s.role==='target_calendar'){
@@ -301,9 +309,9 @@ function structural(input){
       }
       if(actual.length!==required.length||actual.some((v,i)=>v!==required[i]))fail();
       if(n.role==='history_row'){
-        const sale=get(deps.find(id=>get(id).role==='historical_sales_binding'));
-        const context=get(deps.find(id=>get(id).role==='historical_context_binding'));
-        if(sale.applied_day!==n.day||context.applied_day!==n.day)fail();
+        for(const ref of deps){
+          if(get(ref).applied_day!==n.day)fail();
+        }
       }else if(n.day!==a.target_day)fail();
     }
     edges.set(n.ref,deps);
@@ -336,7 +344,8 @@ function evaluate(input){
       if(n.kind==='source'){
         if(n.read_state!=='ok'||n.source_version.state!=='known')return false;
         const at=covers(n.coverage,a,
-          n.role==='historical_sales'||n.role==='historical_context'?n.fact.day:
+          ['historical_sales','historical_context','historical_promotional_sale_absence',
+            'historical_event_absence'].includes(n.role)?n.fact.day:
           n.role==='weather_report'?n.fact.day:a.target_day);
         if(at!=='ok'||
           (n.role==='target_calendar'&&n.coverage.area.mode==='unknown')||
@@ -411,14 +420,21 @@ function evaluate(input){
       const row=node(ref);
       const saleNode=child(row,'historical_sales_binding');
       const contextNode=child(row,'historical_context_binding');
+      const promotionNode=child(row,'historical_promotional_sale_absence_binding');
+      const eventNode=child(row,'historical_event_absence_binding');
       const sf=factFor(saleNode),cf=factFor(contextNode);
-      if(sf.day!==cf.day||sf.day!==row.day||row.day>=a.target_day)fail();
+      const promotion=factFor(promotionNode),eventAbsence=factFor(eventNode);
+      if([sf.day,cf.day,promotion.day,eventAbsence.day].some(d=>d!==row.day)||
+          row.day>=a.target_day)fail();
       const saleTime=node(saleNode.source_ref).times.available_at;
       const availableDayOk=saleTime.state==='known'&&
         Date.parse(saleTime.value)>=Date.parse(sf.day+'T00:00:00+09:00');
       if(usable(ref)&&availableDayOk&&sf.entered===true&&
           cf.active===true&&cf.holiday===false&&cf.event===false&&
-          cf.origin==='independent'&&row.day<a.issued_at.slice(0,10)){
+          cf.origin==='independent'&&
+          promotion.status==='confirmed_absent'&&promotion.method==='independent'&&
+          eventAbsence.status==='confirmed_absent'&&eventAbsence.method==='independent'&&
+          row.day<a.issued_at.slice(0,10)){
         eligible++;if(sf.count===0)zeros++;
       }else excluded++;
     }
