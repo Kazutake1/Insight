@@ -759,14 +759,15 @@ test('P4c-1: 0, null and absent values remain distinguishable',()=>{
 });
 test('P4c-1: dirty, unknown and invalid local epoch all fail closed',()=>{
   const f=fictionalSalesStorageFence();
-  for(const status of [
-    {initialized:true,dirty:true,epoch:1},
-    {initialized:false,dirty:null,epoch:null},
-    {initialized:true,dirty:false,epoch:null},
-    {initialized:true,dirty:false,epoch:Number.MAX_SAFE_INTEGER+1}
+  for(const [status,reason] of [
+    [{initialized:true,dirty:true,epoch:1},'sales_draft_unknown_or_dirty'],
+    [{initialized:false,dirty:null,epoch:null},'sales_draft_unknown_or_dirty'],
+    [{initialized:true,dirty:false,epoch:null},'sales_draft_unknown_or_dirty'],
+    [{initialized:true,dirty:false,epoch:Number.MAX_SAFE_INTEGER+1},'observation_unavailable']
   ]){
     Object.assign(f.draft,status);
-    assert.equal(f.inspect().reason,'sales_draft_unknown_or_dirty');
+    assert.equal(f.inspect().reason,reason);
+    assert.equal(f.inspect().authorized_for_model,false);
   }
 });
 test('P4c-1: non-authentic selection with no epoch fails closed',()=>{
