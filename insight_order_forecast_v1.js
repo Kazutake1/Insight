@@ -166,18 +166,19 @@
   // quantities, DOM nodes, errors or model permissions cross this boundary.
   var selectionInvalidationSubscribers=new Set();
   function announceSelectionInvalidation(){
-    selectionInvalidationSubscribers.forEach(function(listener){
-      try{listener();}catch(_){/* Never break the existing UI or surface source data. */}
+    selectionInvalidationSubscribers.forEach(function(entry){
+      try{entry.listener();}catch(_){/* Never break the existing UI or surface source data. */}
     });
   }
   model.subscribeForecastSelectionInvalidation=function(listener){
     if(typeof listener!=='function')throw new TypeError('listener_required');
-    selectionInvalidationSubscribers.add(listener);
+    var entry={listener:listener};
+    selectionInvalidationSubscribers.add(entry);
     var subscribed=true;
     return function(){
       if(!subscribed)return;
       subscribed=false;
-      selectionInvalidationSubscribers.delete(listener);
+      selectionInvalidationSubscribers.delete(entry);
     };
   };
   model.getForecastSelectionStatus=function(){
