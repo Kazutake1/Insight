@@ -9,28 +9,60 @@ let serial = 0;
 
 function reject(code) { throw new Error(code); }
 function copy(value) {
+  // Lossless fixture data capture: never invoke user-supplied getters or toJSON.
   const seen = new Set();
-  function check(v) {
-    if (v === null || typeof v === 'string' || typeof v === 'boolean') return;
+  function visit(v) {
+    if (v === null || typeof v === 'string' || typeof v === 'boolean') return v;
     if (typeof v === 'number') {
       if (!Number.isFinite(v)) reject('non_finite_fixture_value');
-      return;
+      if (Object.is(v, -0) || (Number.isInteger(v) && !Number.isSafeInteger(v))) reject('invalid_fixture_number');
+      return v; // finite temperatures may legitimately contain decimals
     }
     if (typeof v !== 'object' || seen.has(v)) reject('invalid_fixture_value');
-    if (Object.getPrototypeOf(v) !== Object.prototype && !Array.isArray(v) && Object.getPrototypeOf(v) !== null) reject('invalid_fixture_object');
+    const array = Array.isArray(v);
+    const proto = Object.getPrototypeOf(v);
+    if (array ? proto !== Array.prototype : (proto !== Object.prototype && proto !== null))
+      reject('invalid_fixture_object');
     seen.add(v);
-    if (Array.isArray(v)) {
-      for (let i = 0; i < v.length; i++) if (!Object.hasOwn(v, i)) reject('sparse_fixture_array');
-    }
-    if (Reflect.ownKeys(v).some(key => typeof key === 'symbol')) reject('invalid_fixture_member');
-    for (const [key, desc] of Object.entries(Object.getOwnPropertyDescriptors(v))) {
-      if (key === '__proto__' || key === 'constructor' || key === 'prototype' || !Object.hasOwn(desc, 'value')) reject('invalid_fixture_member');
-      check(desc.value);
+    const keys = Reflect.ownKeys(v);
+    let result;
+    if (array) {
+      // A dense array owns exactly its indices and the non-enumerable length.
+      if (keys.length !== v.length + 1) reject('invalid_fixture_member');
+      result = [];
+      for (let i = 0; i < v.length; i++) {
+        const desc = Object.getOwnPropertyDescriptor(v, String(i));
+        if (!desc || !desc.enumerable || !Object.hasOwn(desc, 'value')) reject('invalid_fixture_member');
+        result.push(visit(desc.value));
+      }
+    } else {
+      result = {};
+      for (const key of keys) {
+        if (typeof key !== 'string' || ['__proto__', 'constructor', 'prototype', 'toJSON'].includes(key))
+          reject('invalid_fixture_member');
+        const desc = Object.getOwnPropertyDescriptor(v, key);
+        if (!desc || !desc.enumerable || !Object.hasOwn(desc, 'value')) reject('invalid_fixture_member');
+        Object.defineProperty(result, key, { value: visit(desc.value), enumerable: true,
+          writable: true, configurable: true });
+      }
     }
     seen.delete(v);
+    return result;
   }
-  check(value);
-  return JSON.parse(JSON.stringify(value));
+  return visit(value);
+}
+// Canonical scalar-only identity avoids invoking inherited toJSON when comparing
+// independently observed fictional storage states. It is NOT authentication.
+function inspectionToken(value) {
+  if (value === null) return 'n';
+  if (typeof value === 'string') return 's' + value.length + ':' + value;
+  if (typeof value === 'number') return 'd' + String(value) + ';';
+  if (typeof value === 'boolean') return value ? 't' : 'f';
+  if (Array.isArray(value))
+    return 'a' + value.length + '[' + value.map(inspectionToken).join('') + ']';
+  const keys = Object.keys(value);
+  return 'o' + keys.length + '{' +
+    keys.map(key => inspectionToken(key) + inspectionToken(value[key])).join('') + '}';
 }
 function freeze(value) {
   if (value && typeof value === 'object' && !Object.isFrozen(value)) {
@@ -118,7 +150,7 @@ function inspection(source) {
   const state = copy(source.inspect());
   if (!state || !Number.isInteger(state.pending) || state.pending !== 0 || state.held !== false || state.conflict !== false) reject('source_not_ready');
   if ((typeof state.report_revision !== 'number' && typeof state.report_revision !== 'string') || typeof state.raw_fingerprint !== 'string' || !state.raw_fingerprint || !state.versions || Array.isArray(state.versions) || typeof state.versions !== 'object') reject('source_metadata_unavailable');
-  return { token: JSON.stringify(state), versions: state.versions };
+  return { token: inspectionToken(state), versions: state.versions };
 }
 function assertFixture(payload, request) {
   if (!payload || !Array.isArray(payload.history) || payload.history.length > request.history_days) reject('invalid_history');
