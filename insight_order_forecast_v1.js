@@ -164,11 +164,23 @@
   var selectionStatusReader=null;
   // Optional GATE-3 invalidation signal. No store, date, category, trip,
   // quantities, DOM nodes, errors or model permissions cross this boundary.
-  var selectionInvalidationSubscribers=new Set();
+  var selectionInvalidationSubscribers=new Set(),selectionInvalidationDispatching=false;
   function announceSelectionInvalidation(){
-    selectionInvalidationSubscribers.forEach(function(entry){
-      try{entry.listener();}catch(_){/* Never break the existing UI or surface source data. */}
-    });
+    // A listener can synchronously render or add another listener. Coalesce
+    // nested invalidations into this one synchronous dispatch: the notified
+    // consumer must recheck the monotonically increasing selection epoch.
+    // Do not drain pending notifications, which permits endless recursion.
+    if(selectionInvalidationDispatching)return;
+    selectionInvalidationDispatching=true;
+    try{
+      // Snapshot once: registrations made during delivery are not called
+      // until a later independent action. Unsubscribed entries are skipped.
+      var recipients=Array.from(selectionInvalidationSubscribers);
+      recipients.forEach(function(entry){
+        if(!selectionInvalidationSubscribers.has(entry))return;
+        try{entry.listener();}catch(_){/* Preserve UI; never expose exceptions. */}
+      });
+    }finally{selectionInvalidationDispatching=false;}
   }
   model.subscribeForecastSelectionInvalidation=function(listener){
     if(typeof listener!=='function')throw new TypeError('listener_required');
@@ -207,9 +219,9 @@
     // Merely opening/focusing a native date picker does NOT prove that a
     // same-date manual choice was committed (some browsers emit no change).
     // In that case, deliberately retain unknown provenance.
-    function datePickerAttempt(){advanceSelectionEpoch();manualIntent=null;}
+    function datePickerAttempt(){manualIntent=null;selectionStatusValid=false;advanceSelectionEpoch();}
     selectionStatusReader=function(){
-      return !selectionStatusValid||loading||currentNav!=='orderForecast'||selectionEpoch===null?
+      return selectionInvalidationDispatching||!selectionStatusValid||loading||currentNav!=='orderForecast'||selectionEpoch===null?
         {initialized:false,manualIntent:null,epoch:null}:
         {initialized:true,manualIntent:manualIntent,epoch:selectionEpoch};
     };
@@ -268,7 +280,8 @@ doc.getElementById('ofCategory').onchange=function(e){advanceSelectionEpoch();st
     deliveryInput.onfocus=datePickerAttempt;
     deliveryInput.onpointerdown=datePickerAttempt;
     deliveryInput.onchange=function(e){
-      advanceSelectionEpoch();
+      // No listener may observe the new epoch paired with the old intent.
+      selectionStatusValid=false;manualIntent=null;advanceSelectionEpoch();
       if(!isoDate(e.target.value)||e.target.value<'1900-01-01'||e.target.value>'9998-12-31'){
         manualIntent=null;e.target.value=state.delivery;return;
       }
