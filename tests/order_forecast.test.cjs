@@ -405,9 +405,10 @@ test('P4c-2: focusing the same date without a change event becomes unknown, not 
   const before=f.status(),shown=f.model.getState().delivery,date=f.elements.get('ofDelivery');
   date.onfocus();
   assert.equal(f.model.getState().delivery,shown);
-  assert.equal(f.status().manualIntent,null);
-  assert.ok(f.status().epoch>before.epoch);
+  assert.deepEqual(f.status(),{initialized:false,manualIntent:null,epoch:null},
+    'unverified date-picker intent must be unknown during its transition');
   f.model.render();
+  assert.ok(f.status().epoch>before.epoch);
   assert.equal(f.status().manualIntent,null,'render must not relabel an unobserved picker choice auto');
 });
 test('P4c-2: synthetic change is not trusted; a claimed trusted change tests only event branch',async()=>{
@@ -432,8 +433,11 @@ test('P4c-2: invalid picker value is rejected without modifying delivery and rem
   input.onchange({target:input,isTrusted:true});
   assert.equal(input.value,original);
   assert.equal(f.model.getState().delivery,original);
-  assert.equal(f.status().manualIntent,null);
+  assert.deepEqual(f.status(),{initialized:false,manualIntent:null,epoch:null},
+    'invalid input must remain unknown, not report a clean new epoch');
+  f.model.render();
   assert.ok(f.status().epoch>start.epoch);
+  assert.equal(f.status().manualIntent,null);
 });
 test('P4c-2: auto delivery at 10:59/11:00 JST updates epoch without changing existing date rule',async()=>{
   const f=fictionalOrderSelectionUI();f.init();f.enter();await settleForecast();
@@ -769,12 +773,14 @@ test('P4c3 R2-A: picker focus after manual selection never exposes old intent in
     observed.push({args:[...arguments],status:f.status()});
   });
   input.onfocus();
-  assert.ok(f.status().epoch>before);
-  assert.equal(f.status().manualIntent,null);
+  assert.deepEqual(f.status(),{initialized:false,manualIntent:null,epoch:null});
   assert.equal(observed.length,1);
   assert.deepEqual(observed[0],{args:[],status:{
     initialized:false,manualIntent:null,epoch:null
   }});
+  f.model.render();
+  assert.ok(f.status().epoch>before,'recovered metadata gets a strictly newer epoch');
+  assert.equal(f.status().manualIntent,null);
   assert.equal(f.saves,0);
 });
 
