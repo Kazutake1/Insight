@@ -13,7 +13,15 @@
  */
 const MAX_NODES=120000,MAX_DEPTH=90;
 
-function stable(value) {
+function stable(value, trustedPrototypes) {
+  // Only explicit realm identities are accepted, never constructor.name.
+  // Caller-supplied realm identities are not a provenance/authenticity proof.
+  const objectPrototypes=new Set([Object.prototype,null]);
+  const arrayPrototypes=new Set([Array.prototype]);
+  if(trustedPrototypes){
+    objectPrototypes.add(trustedPrototypes.object);
+    arrayPrototypes.add(trustedPrototypes.array);
+  }
   let nodes=0;
   const ancestors=new Set();
   function visit(v,depth) {
@@ -29,11 +37,7 @@ function stable(value) {
     ancestors.add(v);
     try {
       if(Array.isArray(v)) {
-        const arrayProto=Object.getPrototypeOf(v);
-        const ctor=arrayProto&&Object.getOwnPropertyDescriptor(arrayProto,'constructor');
-        if(arrayProto!==Array.prototype&&
-           !(ctor&&Object.hasOwn(ctor,'value')&&
-             typeof ctor.value==='function'&&ctor.value.name==='Array'))
+        if(!arrayPrototypes.has(Object.getPrototypeOf(v)))
           throw Error('unavailable');
         const keys=Reflect.ownKeys(v);
         if(keys.length!==v.length+1)throw Error('unavailable');
@@ -45,13 +49,10 @@ function stable(value) {
         }
         return '['+parts.join(',')+']';
       }
-      const proto=Object.getPrototypeOf(v);
-      // JSON.parse objects from an isolated Node VM have a different
-      // Object.prototype; inspect the prototype without invoking a getter.
-      const constructor=proto&&Object.getOwnPropertyDescriptor(proto,'constructor');
-      if(proto!==null&&proto!==Object.prototype&&
-        !(Object.getPrototypeOf(proto)===null&&constructor&&
-          Object.hasOwn(constructor,'value')&&constructor.value.name==='Object'))
+      // A cross-realm JSON.parse object is accepted only if its genuine
+      // realm prototype was explicitly supplied by the trusted VM harness.
+      // Inspecting a prototype's constructor.name could execute a getter.
+      if(!objectPrototypes.has(Object.getPrototypeOf(v)))
         throw Error('unavailable');
       const keys=Reflect.ownKeys(v);
       if(keys.some(k=>typeof k!=='string'||['__proto__','prototype','constructor'].includes(k)))
@@ -70,8 +71,8 @@ function stable(value) {
   }
   return visit(value,0);
 }
-function normalized(value) {
-  return JSON.parse(stable(value));
+function normalized(value, trustedPrototypes) {
+  return JSON.parse(stable(value,trustedPrototypes));
 }
 function record(v) {
   return !!v&&typeof v==='object'&&!Array.isArray(v);
@@ -109,14 +110,30 @@ function createSalesStorageReadFence(source) {
       typeof source.readSelection!=='function')
     throw Error('read_fence_source_required');
 
+  // Fixed at construction: only the two actual VM realm prototypes supplied
+  // by the isolated caller may supplement the host's built-in prototypes.
+  const injected=source.trustedPrototypes;
+  let trustedPrototypes=null;
+  if(injected!==undefined){
+    if(!injected||typeof injected!=='object')
+      throw Error('trusted_realm_prototypes_required');
+    const object=Object.getOwnPropertyDescriptor(injected,'object');
+    const array=Object.getOwnPropertyDescriptor(injected,'array');
+    if(!object||!array||!Object.hasOwn(object,'value')||
+       !Object.hasOwn(array,'value')||!object.value||!array.value||
+       typeof object.value!=='object'||typeof array.value!=='object')
+      throw Error('trusted_realm_prototypes_required');
+    trustedPrototypes=Object.freeze({object:object.value,array:array.value});
+  }
+
   function fence() {
     // Make each read an immediate copy. Later mutation cannot rewrite the
     // earlier observation before the comparison.
-    const report=normalized(source.storage.reportState());
-    const draft=normalized(source.salesCount.getForecastDraftStatus());
-    const selection=normalized(source.readSelection());
+    const report=normalized(source.storage.reportState(),trustedPrototypes);
+    const draft=normalized(source.salesCount.getForecastDraftStatus(),trustedPrototypes);
+    const selection=normalized(source.readSelection(),trustedPrototypes);
     return {report,draft,selection,
-      token:stable({report,draft,selection})};
+      token:stable({report,draft,selection},trustedPrototypes)};
   }
   function inspect() {
     try {
@@ -130,8 +147,8 @@ function createSalesStorageReadFence(source) {
       // Original InsightStorage.readSnapshot parses persisted raw and migrates
       // legacy schema into a new copy. Compare that copy with live allStores,
       // NOT raw JSON bytes and NOT serialize(live), which may mutate state.
-      const saved=stable(source.storage.readSnapshot());
-      const live=stable(source.readLive());
+      const saved=stable(source.storage.readSnapshot(),trustedPrototypes);
+      const live=stable(source.readLive(),trustedPrototypes);
       const after=fence();
       if(before.token!==after.token)
         return result(false,'source_changed_during_read');
