@@ -9,11 +9,13 @@ const source=fs.readFileSync(path.join(root,'insight_storage_v1.js'),'utf8');
 
 function setup(options={}){
   const calls=[];
+  const listeners={};
   const values=options.sharedValues||Object.assign({},options.initial||{});
   const window={
     SK:'insight_v11',
     localStorage:{
       setItem(key,value){
+        if(options.beforeWrite)options.beforeWrite({key,value,window,values});
         if(options.failWrite)throw new Error('quota');
         calls.push([key,value]);
         values[key]=value;
@@ -23,10 +25,14 @@ function setup(options={}){
       }
     }
   };
+  window.addEventListener=function(type,callback){
+    (listeners[type]||(listeners[type]=[])).push(callback);
+  };
   const context={window,globalThis:window,SK:'insight_v11',JSON,Error};
   vm.createContext(context);
   vm.runInContext(source,context);
-  return {window,calls,values,context};
+  return {window,calls,values,context,
+    emitStorage(event){(listeners.storage||[]).forEach(fn=>fn(event));}};
 }
 
 test('snapshot writerはschemaVersionを付けて指定キーへ1回だけJSON保存する',()=>{
@@ -201,4 +207,342 @@ test('runtime persist guardはStorage直後に読み込まれ共有保存層へ�
   assert.match(index,/insight_persist_guard_v1\.js\?v=20261011-stale-tab-1/);
   assert.ok(index.indexOf('insight_storage_v1.js')<index.indexOf('insight_persist_guard_v1.js'));
   assert.ok(index.indexOf('insight_persist_guard_v1.js')<index.indexOf('insight_year_manager_v1.js'));
+});
+
+
+/* STEP4 P4d-7: isolated storage-observation boundary checks.
+ * These tests exercise the ORIGINAL InsightStorage module with fictional
+ * localStorage, not any real store data, browser event loop or AI consumer.
+ * A stable reportState is NOT a trusted full-app-clean or model-use proof.
+ */
+const FICTIONAL_A=JSON.stringify({schemaVersion:1,current:'fictional',
+  stores:{fictional:{value:'A'}}});
+const FICTIONAL_B=JSON.stringify({schemaVersion:1,current:'fictional',
+  stores:{fictional:{value:'B'}}});
+
+test('P4d7 S01: reportState witnesses a pending write before setItem commits',()=>{
+  let during;
+  const f=setup({beforeWrite({window}){during=window.InsightStorage.reportState();}});
+  const first=f.window.InsightStorage.reportState();
+  assert.equal(first.pending,0);
+  f.window.InsightStorage.writeSnapshot(JSON.parse(FICTIONAL_A));
+  assert.equal(during.pending,1);
+  assert.ok(during.revision>first.revision);
+  const after=f.window.InsightStorage.reportState();
+  assert.equal(after.pending,0);
+  assert.equal(after.held,false);
+  assert.equal(f.calls.length,1);
+});
+
+test('P4d7 S02: failed write leaves held status and never claims clean',()=>{
+  const f=setup({failWrite:true});
+  assert.throws(()=>f.window.InsightStorage.writeSnapshot(JSON.parse(FICTIONAL_A)),/quota/);
+  const state=f.window.InsightStorage.reportState();
+  assert.equal(state.pending,0);
+  assert.equal(state.held,true);
+  assert.ok(state.revision>0);
+  assert.equal(f.calls.length,0);
+});
+
+test('P4d7 S03: unannounced cross-tab raw difference is reported and not acknowledged by readSnapshot',()=>{
+  const f=setup({initial:{insight_v11:FICTIONAL_A}});
+  const first=f.window.InsightStorage.reportState();
+  f.values.insight_v11=FICTIONAL_B;
+  const beforeRead=f.window.InsightStorage.reportState();
+  assert.equal(beforeRead.conflict,true);
+  assert.equal(beforeRead.revision,first.revision); // no event, only raw mismatch
+  assert.equal(f.window.InsightStorage.readSnapshot().stores.fictional.value,'B');
+  assert.equal(f.window.InsightStorage.reportState().conflict,true);
+  assert.throws(()=>f.window.InsightStorage.writeSnapshot(JSON.parse(FICTIONAL_A)),
+    e=>e.name==='InsightStorageConflictError');
+  assert.equal(f.calls.length,0);
+});
+
+test('P4d7 S04: observed cross-tab A-B-A remains conflict after raw returns to A',()=>{
+  const f=setup({initial:{insight_v11:FICTIONAL_A}});
+  const start=f.window.InsightStorage.reportState();
+  f.values.insight_v11=FICTIONAL_B;
+  f.emitStorage({key:'insight_v11',newValue:FICTIONAL_B});
+  f.values.insight_v11=FICTIONAL_A;
+  const state=f.window.InsightStorage.reportState();
+  assert.equal(state.conflict,true);
+  assert.ok(state.revision>start.revision);
+  assert.throws(()=>f.window.InsightStorage.writeSnapshot(JSON.parse(FICTIONAL_A)),
+    e=>e.name==='InsightStorageConflictError');
+  assert.equal(f.values.insight_v11,FICTIONAL_A);
+});
+
+test('P4d7 S05: silent A-B-A cannot be proven fresh by the current report API',()=>{
+  const f=setup({initial:{insight_v11:FICTIONAL_A}});
+  const start=f.window.InsightStorage.reportState();
+  f.values.insight_v11=FICTIONAL_B;
+  f.values.insight_v11=FICTIONAL_A; // no dispatched storage event
+  const after=f.window.InsightStorage.reportState();
+  assert.equal(after.conflict,false);
+  assert.equal(after.revision,start.revision);
+  assert.equal(after.pending,0);
+  // This is a documented detection GAP, NOT a clean/authorization assertion.
+  assert.equal(f.calls.length,0);
+});
+
+test('P4d7 S06: even same-value storage notifications invalidate report freshness',()=>{
+  const f=setup({initial:{insight_v11:FICTIONAL_A}});
+  f.emitStorage({key:'insight_v11',newValue:FICTIONAL_A});
+  const state=f.window.InsightStorage.reportState();
+  assert.equal(state.conflict,true);
+  assert.ok(state.revision>0);
+  assert.equal(f.values.insight_v11,FICTIONAL_A);
+  // report conflict is not the same thing as writeSnapshot's own stale guard.
+});
+
+test('P4d7 S07: nested transaction cannot be mistaken for a single settled state',()=>{
+  const during=[];
+  const f=setup({beforeWrite({window}){during.push(window.InsightStorage.reportState());}});
+  f.window.InsightStorage.transaction(JSON.parse(FICTIONAL_A),
+    next=>{next.stores.fictional.value='B';});
+  assert.equal(during.length,1);
+  assert.equal(during[0].pending,2);
+  assert.equal(during[0].held,false);
+  const settled=f.window.InsightStorage.reportState();
+  assert.equal(settled.pending,0);
+  assert.equal(settled.held,false);
+  assert.ok(settled.revision>=2);
+  assert.equal(JSON.parse(f.values.insight_v11).stores.fictional.value,'B');
+});
+
+test('P4d7 S08: apply failure after committed bytes remains held, not proven clean',()=>{
+  const f=setup();
+  assert.throws(()=>f.window.InsightStorage.transaction(JSON.parse(FICTIONAL_A),
+    next=>{next.stores.fictional.value='B';},null,()=>{throw new Error('fictional apply fail');}),
+    /fictional apply fail/);
+  const report=f.window.InsightStorage.reportState();
+  assert.equal(report.pending,0);
+  assert.equal(report.held,true);
+  assert.equal(JSON.parse(f.values.insight_v11).stores.fictional.value,'B');
+  // A write can commit while in-memory apply fails; do not grant permission.
+});
+
+test('P4d7 S09: unreadable storage report throws rather than returning false confidence',()=>{
+  const f=setup({initial:{insight_v11:FICTIONAL_A}});
+  f.window.localStorage.getItem=()=>{throw new Error('fictional storage unavailable');};
+  assert.throws(()=>f.window.InsightStorage.reportState(),
+    /fictional storage unavailable/);
+  assert.equal(f.calls.length,0);
+});
+
+test('P4d7 S10: unrelated storage event does not fabricate source revision',()=>{
+  const f=setup({initial:{insight_v11:FICTIONAL_A}});
+  const start=f.window.InsightStorage.reportState();
+  f.emitStorage({key:'fictional_unrelated_key',newValue:'irrelevant'});
+  const after=f.window.InsightStorage.reportState();
+  assert.equal(after.revision,start.revision);
+  assert.equal(after.conflict,false);
+  assert.equal(f.calls.length,0);
+});
+
+
+/* STEP4 P4d-8: TEST-ONLY joined observation of the original InsightStorage
+ * and seven fictional editor STATUS CALLBACKS. Never loaded by Index.html.
+ * All observations, including an all-false sampling, are non-authorizing.
+ * This is not an atomic snapshot, subscription, browser/iPad proof or AI gate.
+ * Pre-existing P4d-1 tests check the editor-only contract separately.
+ */
+const P4D8_EDITOR_KEYS=Object.freeze([
+  'sales_count','quick_daily','daily_sales','daily_customers',
+  'daily_waste','hourly_customers','events_and_promotions'
+]);
+const p4d8Result=observation=>Object.freeze({
+  observation,full_app_clean:false,provenance_verified:false,authorized_for_model:false
+});
+const p4d8Unknown=()=>p4d8Result('UNKNOWN');
+
+// Read only OWN DATA DESCRIPTORS: never resolve accessor values, IDs, draft or raw.
+function p4d8Own(value,key){
+  const descriptor=Object.getOwnPropertyDescriptor(value,key);
+  if(!descriptor||!Object.hasOwn(descriptor,'value'))
+    throw Error('fictional_status_unavailable');
+  return descriptor.value;
+}
+function p4d8Statuses(providers){
+  const stamps=[];
+  for(const key of P4D8_EDITOR_KEYS){
+    const provider=p4d8Own(providers,key);
+    if(typeof provider!=='function')throw Error('fictional_provider_missing');
+    const value=provider();
+    if(!value||typeof value!=='object'||Array.isArray(value))
+      throw Error('fictional_status_missing');
+    const initialized=p4d8Own(value,'initialized');
+    const dirty=p4d8Own(value,'dirty');
+    const epoch=p4d8Own(value,'epoch');
+    if(initialized!==true||typeof dirty!=='boolean'||
+        !Number.isSafeInteger(epoch)||epoch<0)
+      throw Error('fictional_status_unknown');
+    stamps.push({key,provider,dirty,epoch});
+  }
+  return stamps;
+}
+function p4d8Report(storage){
+  const report=storage.reportState(); // original real module running in isolated VM
+  if(!report||typeof report!=='object'||Array.isArray(report))
+    throw Error('fictional_report_invalid');
+  const revision=p4d8Own(report,'revision');
+  const pending=p4d8Own(report,'pending');
+  const held=p4d8Own(report,'held');
+  const conflict=p4d8Own(report,'conflict');
+  if(!Number.isSafeInteger(revision)||revision<0||
+      !Number.isSafeInteger(pending)||pending<0||
+      typeof held!=='boolean'||typeof conflict!=='boolean')
+    throw Error('fictional_report_invalid');
+  return {revision,pending,held,conflict};
+}
+function p4d8ObserveJoined(storage,providers,interleave){
+  try {
+    if(!storage||typeof storage.reportState!=='function'||
+        !providers||typeof providers!=='object')return p4d8Unknown();
+    const before=p4d8Report(storage);
+    if(before.pending!==0||before.held||before.conflict)return p4d8Unknown();
+    const first=p4d8Statuses(providers);
+    if(typeof interleave==='function')interleave(); // fictional race injection only
+    const second=p4d8Statuses(providers);
+    const after=p4d8Report(storage);
+    if(after.pending!==0||after.held||after.conflict||
+        before.revision!==after.revision)return p4d8Unknown();
+    for(let i=0;i<first.length;i++){
+      if(first[i].provider!==second[i].provider||
+          first[i].dirty!==second[i].dirty||
+          first[i].epoch!==second[i].epoch)return p4d8Unknown();
+    }
+    // Local samples are not transactional; a clean sample does NOT allow use.
+    return p4d8Result(second.some(s=>s.dirty)?'DIRTY':'OBSERVED_CLEAN_ONLY');
+  }catch(_){return p4d8Unknown();} // never surface untrusted error text
+}
+function p4d8Editors(){
+  const statuses=Object.fromEntries(P4D8_EDITOR_KEYS.map(key=>[
+    key,{initialized:true,dirty:false,epoch:0}
+  ]));
+  const providers=Object.fromEntries(P4D8_EDITOR_KEYS.map(key=>[
+    key,()=>statuses[key]
+  ]));
+  return {statuses,providers};
+}
+function p4d8Check(result,observation){
+  assert.equal(result.observation,observation);
+  assert.equal(result.full_app_clean,false);
+  assert.equal(result.provenance_verified,false);
+  assert.equal(result.authorized_for_model,false);
+  assert.equal(Object.isFrozen(result),true);
+  assert.deepEqual(Object.keys(result).sort(),[
+    'authorized_for_model','full_app_clean','observation','provenance_verified'
+  ]);
+}
+
+test('P4d8 J01: seven sampled clean statuses and original Storage never authorize',()=>{
+  const f=setup({initial:{insight_v11:FICTIONAL_A}}),e=p4d8Editors();
+  p4d8Check(p4d8ObserveJoined(f.window.InsightStorage,e.providers),'OBSERVED_CLEAN_ONLY');
+  assert.equal(f.calls.length,0);
+});
+test('P4d8 J02: any observed editor dirty is still non-authorizing',()=>{
+  const f=setup(),e=p4d8Editors();
+  e.statuses.daily_customers.dirty=true;
+  e.statuses.daily_customers.epoch++;
+  p4d8Check(p4d8ObserveJoined(f.window.InsightStorage,e.providers),'DIRTY');
+  assert.equal(f.calls.length,0);
+});
+test('P4d8 J03: missing, uninitialized or null-dirty editor stops a joined capture',()=>{
+  const f=setup(),e=p4d8Editors();
+  delete e.providers.events_and_promotions;
+  p4d8Check(p4d8ObserveJoined(f.window.InsightStorage,e.providers),'UNKNOWN');
+  e.providers.events_and_promotions=()=>e.statuses.events_and_promotions;
+  e.statuses.quick_daily.initialized=false;
+  e.statuses.quick_daily.dirty=null;
+  p4d8Check(p4d8ObserveJoined(f.window.InsightStorage,e.providers),'UNKNOWN');
+  assert.equal(f.calls.length,0);
+});
+test('P4d8 J04: original Storage save between editor samples invalidates revision',()=>{
+  const f=setup({initial:{insight_v11:FICTIONAL_A}}),e=p4d8Editors();
+  const outcome=p4d8ObserveJoined(f.window.InsightStorage,e.providers,()=>{
+    f.window.InsightStorage.writeSnapshot(JSON.parse(FICTIONAL_B));
+  });
+  p4d8Check(outcome,'UNKNOWN');
+  assert.equal(f.calls.length,1);
+  assert.equal(JSON.parse(f.values.insight_v11).stores.fictional.value,'B');
+});
+test('P4d8 J05: silent external raw mismatch aborts even without revision bump',()=>{
+  const f=setup({initial:{insight_v11:FICTIONAL_A}}),e=p4d8Editors();
+  p4d8Check(p4d8ObserveJoined(f.window.InsightStorage,e.providers,()=>{
+    f.values.insight_v11=FICTIONAL_B;
+  }),'UNKNOWN');
+  assert.equal(f.calls.length,0);
+});
+test('P4d8 J06: editor epoch changing mid-window aborts the observation',()=>{
+  const f=setup(),e=p4d8Editors();
+  p4d8Check(p4d8ObserveJoined(f.window.InsightStorage,e.providers,()=>{
+    e.statuses.daily_waste.epoch++;
+    e.statuses.daily_waste.dirty=true;
+  }),'UNKNOWN');
+});
+test('P4d8 J07: a provider callback replaced mid-window is unknown',()=>{
+  const f=setup(),e=p4d8Editors();
+  p4d8Check(p4d8ObserveJoined(f.window.InsightStorage,e.providers,()=>{
+    e.providers.sales_count=()=>({...e.statuses.sales_count});
+  }),'UNKNOWN');
+});
+test('P4d8 J08: actual pending write re-entry cannot claim a settled view',()=>{
+  let seen=null,e=p4d8Editors();
+  const f=setup({beforeWrite({window}){
+    seen=p4d8ObserveJoined(window.InsightStorage,e.providers);
+  }});
+  f.window.InsightStorage.writeSnapshot(JSON.parse(FICTIONAL_A));
+  p4d8Check(seen,'UNKNOWN');
+  assert.equal(f.calls.length,1);
+});
+test('P4d8 J09: original Storage failure held state remains unknown',()=>{
+  const f=setup({failWrite:true}),e=p4d8Editors();
+  assert.throws(()=>f.window.InsightStorage.writeSnapshot(JSON.parse(FICTIONAL_A)),/quota/);
+  p4d8Check(p4d8ObserveJoined(f.window.InsightStorage,e.providers),'UNKNOWN');
+  assert.equal(f.calls.length,0);
+});
+test('P4d8 J10: notified A-B-A remains unknown even after raw returns',()=>{
+  const f=setup({initial:{insight_v11:FICTIONAL_A}}),e=p4d8Editors();
+  f.values.insight_v11=FICTIONAL_B;
+  f.emitStorage({key:'insight_v11',newValue:FICTIONAL_B});
+  f.values.insight_v11=FICTIONAL_A;
+  p4d8Check(p4d8ObserveJoined(f.window.InsightStorage,e.providers),'UNKNOWN');
+});
+test('P4d8 J11: UNNOTIFIED A-B-A is undetectable and never authorizes',()=>{
+  const f=setup({initial:{insight_v11:FICTIONAL_A}}),e=p4d8Editors();
+  f.values.insight_v11=FICTIONAL_B;
+  f.values.insight_v11=FICTIONAL_A; // impossible to prove continuous freshness
+  p4d8Check(p4d8ObserveJoined(f.window.InsightStorage,e.providers),'OBSERVED_CLEAN_ONLY');
+  // Green observation is a LIMIT demonstration, not proof of full-app clean.
+  assert.equal(f.calls.length,0);
+});
+test('P4d8 J12: hostile input/identifier getters are never read or returned',()=>{
+  const f=setup(),e=p4d8Editors();
+  let accessed=0;
+  Object.defineProperty(e.statuses.sales_count,'draft',{get(){
+    accessed++;throw Error('fictional-private-input');
+  }});
+  Object.defineProperty(e.statuses.daily_sales,'storeId',{get(){
+    accessed++;throw Error('fictional-store-id');
+  }});
+  p4d8Check(p4d8ObserveJoined(f.window.InsightStorage,e.providers),'OBSERVED_CLEAN_ONLY');
+  assert.equal(accessed,0);
+  Object.defineProperty(e.statuses.sales_count,'epoch',{configurable:true,get(){
+    accessed++;throw Error('fictional-secret');
+  }});
+  p4d8Check(p4d8ObserveJoined(f.window.InsightStorage,e.providers),'UNKNOWN');
+  assert.equal(accessed,0); // accessor descriptor, not value
+});
+test('P4d8 J13: failed storage reading and thrown provider never leak error strings',()=>{
+  const f=setup({initial:{insight_v11:FICTIONAL_A}}),e=p4d8Editors();
+  e.providers.quick_daily=()=>{throw Error('fictional-raw-secret');};
+  const a=p4d8ObserveJoined(f.window.InsightStorage,e.providers);
+  p4d8Check(a,'UNKNOWN');
+  assert.doesNotMatch(JSON.stringify(a),/fictional-raw-secret/);
+  e.providers.quick_daily=()=>e.statuses.quick_daily;
+  f.window.localStorage.getItem=()=>{throw Error('fictional-storage-secret');};
+  const b=p4d8ObserveJoined(f.window.InsightStorage,e.providers);
+  p4d8Check(b,'UNKNOWN');
+  assert.doesNotMatch(JSON.stringify(b),/fictional-storage-secret/);
 });
