@@ -192,14 +192,16 @@
         refresh();
         var invalid=inputs.find(function(input){return !input.checkValidity();});
         if(invalid){invalid.reportValidity();invalid.focus();return;}
+        forecastPhase='saving';
         forecastStep(false,null);
+        var saveEpoch=forecastEpoch;
         try{
           persist(date,draft);
           dialog.close();
           renderQuick();
           if(root.InsightEventResults&&typeof root.InsightEventResults.render==='function')root.InsightEventResults.render();
           if(typeof showToast==='function')showToast('✓ 時間帯別客数を保存しました','#15803d','#f0fdf4');
-        }catch(error){forecastFailure=true;forecastStep(false,null);alert('時間帯別客数を保存できませんでした。\n'+error.message);}
+        }catch(error){forecastPhase='failed';forecastStep(false,null);alert('時間帯別客数を保存できませんでした。\n'+error.message);}
       };
       actions.append(cancel,save);dialog.append(actions);
       dialog.addEventListener('cancel',function(){forecastPhase='closing';forecastStep(false,null);});
