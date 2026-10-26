@@ -478,3 +478,86 @@ test('P4d13 D02: forbidden weather API request is rejected by the route fence',a
   expect(rejected().filter(origin=>origin==='https://api.open-meteo.com').length).toBeGreaterThanOrEqual(1);
   expect(errors).toEqual([]);
 });
+
+
+/* STEP4 P4d-14: browser-local writes outside InsightStorage. E01 measures
+ * raw-mismatch rejection with NO storage event in the same page. E02 is a
+ * deliberate silent A-B-A limitation demonstration, NOT a safety guarantee.
+ * Synthetic fixture only; no model or real data authorization.
+ */
+test('P4d14 E01: same-tab raw change without storage event blocks stale QuickDaily save',async({page})=>{
+  const {errors}=await p4d12Boot(page);
+  await p4d12EditWithoutSaving(page);
+  page.on('dialog',dialog=>dialog.dismiss());
+  const changed=await page.evaluate(()=>{
+    window.__p4d14NativeNotifications=0;
+    window.addEventListener('storage',event=>{
+      if(event.isTrusted&&event.key==='insight_v11')
+        window.__p4d14NativeNotifications++;
+    });
+    const before=window.InsightStorage.reportState();
+    const next=JSON.parse(localStorage.getItem('insight_v11'));
+    next.stores[next.current].name+='（架空同一タブ更新）';
+    localStorage.setItem('insight_v11',JSON.stringify(next));
+    window.__p4d14ExternalRaw=localStorage.getItem('insight_v11');
+    const after=window.InsightStorage.reportState();
+    return {
+      rawChanged:window.__p4d14ExternalRaw!==window.__p4d11Witness.raw,
+      conflict:after.conflict,
+      revisionUnchanged:before.revision===after.revision,
+      noNativeEvent:window.__p4d14NativeNotifications===0
+    };
+  });
+  expect(changed).toEqual({
+    rawChanged:true,conflict:true,revisionUnchanged:true,noNativeEvent:true
+  });
+  await page.locator('#quickSaveBtn').click();
+  const after=await page.evaluate(()=>{
+    const state=window.InsightStorage.reportState();
+    return {
+      unchangedExternalBytes:localStorage.getItem('insight_v11')===window.__p4d14ExternalRaw,
+      pending:state.pending,held:state.held,conflict:state.conflict,
+      noNativeEvent:window.__p4d14NativeNotifications===0,
+      notCertifiedClean:window.InsightQuickDaily.getForecastDraftStatus().dirty!==false
+    };
+  });
+  expect(after).toEqual({
+    unchangedExternalBytes:true,pending:0,held:true,conflict:true,
+    noNativeEvent:true,notCertifiedClean:true
+  });
+  // A rejected save can trigger a modal; absence of page errors is not claimed.
+  expect(errors.every(e=>typeof e==='string')).toBe(true);
+});
+
+test('P4d14 E02: silent same-tab A-B-A is observationally invisible, never authorizing',async({page})=>{
+  await p4d12Boot(page);
+  const limits=await page.evaluate(()=>{
+    let notifications=0;
+    window.addEventListener('storage',event=>{
+      if(event.isTrusted&&event.key==='insight_v11')notifications++;
+    });
+    const baseline=localStorage.getItem('insight_v11');
+    const first=window.InsightStorage.reportState();
+    const modified=JSON.parse(baseline);
+    modified.stores[modified.current].name+='（架空一時変更）';
+    localStorage.setItem('insight_v11',JSON.stringify(modified));
+    const during=window.InsightStorage.reportState();
+    localStorage.setItem('insight_v11',baseline);
+    const after=window.InsightStorage.reportState();
+    const draft=window.InsightQuickDaily.getForecastDraftStatus();
+    return {
+      observedMismatchWhileDifferent:during.conflict===true,
+      originalRawRestored:localStorage.getItem('insight_v11')===baseline,
+      noEventForSameDocument:notifications===0,
+      revisionUnchanged:after.revision===first.revision,
+      conflictNotRemembered:after.conflict===false,
+      uninitializedDraft:draft.initialized===false&&draft.dirty===null
+    };
+  });
+  // This confirms an important blind spot, not an all-editor CLEAN result.
+  expect(limits).toEqual({
+    observedMismatchWhileDifferent:true,originalRawRestored:true,
+    noEventForSameDocument:true,revisionUnchanged:true,
+    conflictNotRemembered:true,uninitializedDraft:true
+  });
+});
