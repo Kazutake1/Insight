@@ -302,3 +302,991 @@ test('現在月の便設定を基本としつつ、現在対象外でも入力�
   assert.equal(actual.salesAverage.total,null,'3便未入力なので部分合計は使わない');
   assert.equal(actual.recent[0].date,'2026-10-11');
 });
+
+
+/* STEP4 P4c-2: ORIGINAL order forecast UI handlers inside an isolated
+ * fictional Node VM. No actual browser/storage/AI calls are permitted. */
+function fictionalOrderSelectionUI(){
+  const vm=require('node:vm'),path=require('node:path');
+  const created=[],elements=new Map(),listeners=new Map();
+  function el(tag){
+    const children=[],classes=new Set();
+    const n={tagName:tag,id:'',value:'',textContent:'',className:'',children,
+      dataset:{},style:{},hidden:false,disabled:false,
+      classList:{add(k){classes.add(k);},remove(k){classes.delete(k);},contains(k){return classes.has(k);}},
+      append(...nodes){children.push(...nodes);},appendChild(node){children.push(node);return node;},
+      replaceChildren(...nodes){children.splice(0,children.length,...nodes);},
+      insertAdjacentElement(){},setAttribute(k,x){this[k]=String(x);},
+      querySelector(){return {after(){}};},after(){},
+      focus(){},showModal(){},close(){}};
+    created.push(n);return n;
+  }
+  for(const id of ['navSaleResults','main','ofDelivery','ofCategory','ofPreviousYear',
+    'ofYearCards','ofWeekCards','ofRecentCards','ofRecentEmpty','ofWeather',
+    'ofWeatherStatus','ofRefresh','storeSel']){
+    const n=el('div');n.id=id;elements.set(id,n);
+  }
+  const sidebar=el('div');
+  const doc={
+    readyState:'loading',head:el('head'),
+    getElementById(id){return elements.get(id)||null;},
+    querySelector(q){return q==='#sidebar .nav-list'?sidebar:null;},
+    querySelectorAll(q){
+      if(q==='.nav-btn')return created.filter(n=>n.className.split(/\s+/).includes('nav-btn'));
+      if(q==='.page')return created.filter(n=>n.className.split(/\s+/).includes('page'));
+      return [];
+    },
+    createElement:el,createElementNS(_ns,tag){return el(tag);},
+    addEventListener(name,callback){listeners.set(name,callback);}
+  };
+  const cats=[
+    {id:'fictional_rice',name:'架空米飯',hidden:false,activeTrips:[true,false,false]},
+    {id:'fictional_bread',name:'架空パン',hidden:false,activeTrips:[true,false,false]}
+  ];
+  const stores={current:'fictional_a',salesCountManagement:{categories:cats},
+    stores:{fictional_a:{salesCounts:{},data:{},weatherLocation:null},
+      fictional_b:{salesCounts:{},data:{},weatherLocation:null}}};
+  const initial=JSON.stringify(stores);
+  let traffic=0,saves=0;
+  const root={document:doc,allStores:stores,
+    fetch(){traffic++;return Promise.reject(new Error('FICTIONAL_OFFLINE_ONLY'));},
+    InsightSalesCount:{
+      activeTrips(c){return c.activeTrips;},
+      normalizeRecord(){return {trips:[{delivery:null,sales:null}]};},
+      createReadOnlyDayCard(){return el('article');},
+      createAverageCard(){return el('article');},
+      wasteRecordAt(){return null;},
+      average(){return null;}
+    },
+    InsightTripHistoryResolver:{resolveDate(){return {mask:[true,false,false]};},
+      averageByDate(){return null;}},
+    InsightEvents:{list(){return [];}},
+    persist(){saves++;}
+  };
+  const ctx=vm.createContext({window:root,globalThis:root,document:doc,allStores:stores,
+    currentNav:'dashboard',
+    setTimeout(){return 1;},clearTimeout(){},
+    Error,Date,Intl,Number,Array,Object,Map,Set,String,Boolean,Promise,
+    console:{warn(){throw Error('unexpected console warn');}}});
+  root.gotoNav=function(target){ctx.currentNav=target;};
+  root.switchStore=function(id){stores.current=id;};
+  const originalSource=fs.readFileSync(require('node:path').join(__dirname,'..','insight_order_forecast_v1.js'),'utf8');
+  vm.runInContext(originalSource,ctx,{filename:'insight_order_forecast_v1.js'});
+  const model=root.InsightOrderForecast;
+  const status=()=>JSON.parse(JSON.stringify(model.getForecastSelectionStatus()));
+  return {model,root,ctx,doc,stores,status,initial,elements,
+    init(){listeners.get('DOMContentLoaded')();},
+    enter(){root.gotoNav('orderForecast');},
+    get saves(){return saves;},get traffic(){return traffic;}};
+}
+async function settleForecast(){
+  // Flush the original rejected-fictional-network fetch and load.finally
+  // without a real timer or a real network connection.
+  await new Promise(resolve=>setImmediate(resolve));
+  await new Promise(resolve=>setImmediate(resolve));
+}
+test('P4c-2: unavailable before init; successful UI entry gives frozen three-field auto metadata',async()=>{
+  const f=fictionalOrderSelectionUI();
+  assert.deepEqual(f.status(),{initialized:false,manualIntent:null,epoch:null});
+  f.init();
+  assert.deepEqual(f.status(),{initialized:false,manualIntent:null,epoch:null});
+  f.enter();await settleForecast();
+  const status=f.model.getForecastSelectionStatus();
+  assert.deepEqual(Object.keys(status),['initialized','manualIntent','epoch']);
+  assert.equal(Object.isFrozen(status),true);
+  assert.equal(status.initialized,true);
+  assert.equal(status.manualIntent,false);
+  assert.equal(Number.isSafeInteger(status.epoch),true);
+  assert.doesNotMatch(JSON.stringify(status),/fictional_a|fictional_rice|2026-/);
+  assert.equal(f.saves,0);assert.equal(JSON.stringify(f.stores),f.initial);
+});
+test('P4c-2: focusing the same date without a change event becomes unknown, not manual',async()=>{
+  const f=fictionalOrderSelectionUI();f.init();f.enter();await settleForecast();
+  const before=f.status(),shown=f.model.getState().delivery,date=f.elements.get('ofDelivery');
+  date.onfocus();
+  assert.equal(f.model.getState().delivery,shown);
+  assert.deepEqual(f.status(),{initialized:false,manualIntent:null,epoch:null},
+    'unverified date-picker intent must be unknown during its transition');
+  f.model.render();
+  assert.ok(f.status().epoch>before.epoch);
+  assert.equal(f.status().manualIntent,null,'render must not relabel an unobserved picker choice auto');
+});
+test('P4c-2: synthetic change is not trusted; a claimed trusted change tests only event branch',async()=>{
+  const f=fictionalOrderSelectionUI();f.init();f.enter();await settleForecast();
+  const input=f.elements.get('ofDelivery');
+  const before=f.status(),same=f.model.getState().delivery;
+  input.value=same;
+  input.onchange({target:input,isTrusted:false});
+  assert.equal(f.status().manualIntent,null);
+  assert.ok(f.status().epoch>before.epoch);
+  input.onchange({target:input,isTrusted:true}); // simulated, NOT real browser provenance
+  assert.equal(f.status().manualIntent,true);
+  assert.ok(f.status().epoch>before.epoch);
+  assert.equal(f.model.getState().delivery,same);
+  assert.equal(f.saves,0);
+});
+test('P4c-2: invalid picker value is rejected without modifying delivery and remains unknown',async()=>{
+  const f=fictionalOrderSelectionUI();f.init();f.enter();await settleForecast();
+  const input=f.elements.get('ofDelivery'),original=f.model.getState().delivery;
+  input.value='2026-13-99';
+  const start=f.status();
+  input.onchange({target:input,isTrusted:true});
+  assert.equal(input.value,original);
+  assert.equal(f.model.getState().delivery,original);
+  assert.deepEqual(f.status(),{initialized:false,manualIntent:null,epoch:null},
+    'invalid input must remain unknown, not report a clean new epoch');
+  f.model.render();
+  assert.ok(f.status().epoch>start.epoch);
+  assert.equal(f.status().manualIntent,null);
+});
+test('P4c-2: auto delivery at 10:59/11:00 JST updates epoch without changing existing date rule',async()=>{
+  const f=fictionalOrderSelectionUI();f.init();f.enter();await settleForecast();
+  const fakeAt=iso=>class FakeDate extends Date{
+    constructor(...args){super(...(args.length?args:[iso]));}
+  };
+  f.ctx.Date=fakeAt('2026-10-25T01:59:59Z');
+  f.model.render();
+  const before=f.status(),dateBefore=f.model.getState().delivery;
+  assert.equal(dateBefore,'2026-10-26');
+  f.ctx.Date=fakeAt('2026-10-25T02:00:00Z');
+  f.model.render();
+  const after=f.status();
+  assert.equal(f.model.getState().delivery,'2026-10-27');
+  assert.equal(after.manualIntent,false);
+  assert.ok(after.epoch>before.epoch);
+  assert.equal(f.saves,0);
+});
+test('P4c-2: accepted category A-B-A, page reentry, and refresh advance generations',async()=>{
+  const f=fictionalOrderSelectionUI();f.init();f.enter();await settleForecast();
+  const picker=f.elements.get('ofCategory');
+  const first=f.status().epoch;
+  picker.onchange({target:{value:'fictional_bread'}});
+  picker.onchange({target:{value:'fictional_rice'}});
+  const second=f.status().epoch;
+  assert.ok(second>first);
+  f.root.gotoNav('dashboard');
+  assert.equal(f.status().initialized,false);
+  f.enter();await settleForecast();
+  assert.ok(f.status().epoch>second);
+  const third=f.status().epoch;
+  f.elements.get('ofRefresh').onclick();
+  assert.equal(f.status().initialized,false,'refresh in flight is unknown');
+  await settleForecast();
+  assert.ok(f.status().epoch>third);
+  assert.equal(f.saves,0);
+});
+test('P4c-2: failed render yields unknown; subsequent successful render gets a new epoch',async()=>{
+  const f=fictionalOrderSelectionUI();f.init();f.enter();await settleForecast();
+  const first=f.status().epoch,original=f.elements.get('ofPreviousYear');
+  f.elements.delete('ofPreviousYear');
+  assert.throws(()=>f.model.render(),error=>error&&error.name==='TypeError');
+  assert.deepEqual(f.status(),{initialized:false,manualIntent:null,epoch:null});
+  f.elements.set('ofPreviousYear',original);
+  f.model.render();
+  assert.equal(f.status().initialized,true);
+  assert.ok(f.status().epoch>first);
+});
+
+
+test('P4c2 R1-A: load rejection after page exit cannot reactivate selection metadata',async()=>{
+  const f=fictionalOrderSelectionUI();
+  const pending=[];
+  f.ctx.AbortController=class {constructor(){this.signal={};}abort(){}};
+  f.root.fetch=(url)=>new Promise((_resolve,reject)=>pending.push({url,reject}));
+  f.init();f.enter();
+  assert.equal(f.status().initialized,false,'fetch still running is unknown');
+  assert.ok(pending.length>=2,'both synthetic const fetches started');
+  f.root.gotoNav('dashboard');
+  assert.deepEqual(f.status(),{initialized:false,manualIntent:null,epoch:null});
+  pending.forEach(item=>item.reject(new Error('synthetic offline reject')));
+  await settleForecast();
+  assert.deepEqual(f.status(),{initialized:false,manualIntent:null,epoch:null});
+  assert.equal(f.ctx.currentNav,'dashboard');
+  assert.equal(f.saves,0);
+  f.enter();
+  assert.equal(f.status().initialized,false,'new entry is not ready while loading');
+  // Subsequent attempts can be rate-limited by the original weather client;
+  // regardless, a completed reload may revive metadata only on the active page.
+  await settleForecast();
+  assert.equal(f.status().initialized,true);
+  assert.equal(f.status().manualIntent,false);
+});
+test('P4c2 R1-B: successful delayed weather resolution after exit also stays unknown',async()=>{
+  const f=fictionalOrderSelectionUI();
+  const pending=[];
+  f.ctx.AbortController=class {constructor(){this.signal={};}abort(){}};
+  f.root.fetch=(url)=>new Promise((resolve,reject)=>pending.push({url,resolve,reject}));
+  f.init();f.enter();
+  assert.ok(pending.length>=2);
+  f.root.gotoNav('dashboard');
+  pending.splice(0).forEach(item=>item.resolve({ok:true,json:async()=>({})}));
+  await settleForecast();
+  assert.ok(pending.length>=1,'the synthetic forecast request was started');
+  const today=f.model.today(new Date());
+  const payload=[{reportDatetime:today+'T17:00:00+09:00',
+    timeSeries:[{timeDefines:[today+'T17:00:00+09:00'],
+      areas:[{area:{code:'230010'},weatherCodes:['100'],weathers:['晴れ']}]}]}];
+  pending.splice(0).forEach(item=>item.resolve({ok:true,json:async()=>payload}));
+  await settleForecast();
+  assert.deepEqual(f.status(),{initialized:false,manualIntent:null,epoch:null});
+  assert.equal(f.ctx.currentNav,'dashboard');
+  assert.equal(f.saves,0);
+});
+test('P4c2 R1-C: render while never entered cannot initialize selection metadata',async()=>{
+  const f=fictionalOrderSelectionUI();f.init();
+  f.model.render();
+  assert.deepEqual(f.status(),{initialized:false,manualIntent:null,epoch:null});
+  await settleForecast();
+  assert.deepEqual(f.status(),{initialized:false,manualIntent:null,epoch:null});
+});
+test('P4c2 R2-A: unresolved weather means entry and refresh both report unknown',async()=>{
+  const f=fictionalOrderSelectionUI();
+  const pending=[];
+  f.ctx.AbortController=class {constructor(){this.signal={};}abort(){}};
+  f.root.fetch=(url)=>new Promise((_resolve,reject)=>pending.push({url,reject}));
+  f.init();f.enter();
+  assert.equal(f.elements.get('ofRefresh').disabled,true);
+  assert.deepEqual(f.status(),{initialized:false,manualIntent:null,epoch:null});
+  // Even a direct render must not relabel pending observations ready.
+  f.model.render();
+  assert.deepEqual(f.status(),{initialized:false,manualIntent:null,epoch:null});
+  f.elements.get('ofRefresh').onclick();
+  assert.deepEqual(f.status(),{initialized:false,manualIntent:null,epoch:null});
+  pending.forEach(item=>item.reject(new Error('synthetic offline reject')));
+  await settleForecast();
+  assert.equal(f.status().initialized,true,'only after current load fully finishes');
+  assert.equal(f.elements.get('ofRefresh').disabled,false);
+  assert.equal(f.saves,0);
+});
+
+
+/* STEP4 P4c-3: bounded event-only invalidation bridge tests. These do NOT
+ * connect production Coordinator/Reader or exercise real browser events. */
+test('P4c-3: invalidation subscription is argument-free and never reveals selection values',async()=>{
+  const f=fictionalOrderSelectionUI(),reports=[],prior=f.initial;
+  const unsubscribe=f.model.subscribeForecastSelectionInvalidation(function(){
+    reports.push({args:[...arguments],status:f.status()});
+  });
+  f.init();f.enter();await settleForecast();
+  assert.ok(reports.length>0);
+  for(const report of reports){
+    assert.deepEqual(report.args,[],'listener receives neither raw data nor identifiers');
+    assert.equal(report.status.authorized_for_model,undefined);
+  }
+  assert.doesNotMatch(JSON.stringify(reports),/fictional_a|fictional_rice|20\d\d-\d\d-\d\d/);
+  assert.equal(f.saves,0);
+  assert.equal(JSON.stringify(f.stores),prior);
+  const count=reports.length;
+  unsubscribe();
+  f.model.render();
+  assert.equal(reports.length,count);
+});
+test('P4c-3: input reselect, A-B-A, page exit/entry and refresh emit invalidations',async()=>{
+  const f=fictionalOrderSelectionUI();f.init();f.enter();await settleForecast();
+  let count=0;
+  f.model.subscribeForecastSelectionInvalidation(()=>{count++;});
+  const date=f.elements.get('ofDelivery');
+  const start=f.status().epoch,original=f.model.getState().delivery;
+  date.onfocus();
+  assert.ok(count>0);
+  assert.equal(f.status().manualIntent,null);
+  const afterFocus=count;
+  date.value=original;
+  date.onchange({target:date,isTrusted:true}); // branch simulation only
+  assert.ok(count>afterFocus);
+  assert.equal(f.model.getState().delivery,original);
+  const picker=f.elements.get('ofCategory'),afterDate=count;
+  picker.onchange({target:{value:'fictional_bread'}});
+  picker.onchange({target:{value:'fictional_rice'}});
+  assert.ok(count>=afterDate+2);
+  assert.ok(f.status().epoch>start);
+  const beforeExit=count;
+  f.root.gotoNav('dashboard');
+  assert.ok(count>beforeExit);
+  assert.equal(f.status().initialized,false);
+  const beforeEntry=count;
+  f.enter();assert.ok(count>beforeEntry);
+  await settleForecast();
+  const beforeRefresh=count;
+  f.elements.get('ofRefresh').onclick();
+  assert.ok(count>beforeRefresh);
+  assert.equal(f.status().initialized,false);
+  await settleForecast();
+  assert.equal(f.saves,0);
+});
+test('P4c-3: throwing listeners do not break UI, later listeners or read status',async()=>{
+  const f=fictionalOrderSelectionUI();f.init();f.enter();await settleForecast();
+  let good=0;
+  const unThrow=f.model.subscribeForecastSelectionInvalidation(()=>{throw Error('FICTIONAL_SECRET_03934');});
+  const unGood=f.model.subscribeForecastSelectionInvalidation(()=>{good++;});
+  f.model.render();
+  assert.ok(good>0);
+  assert.equal(f.status().initialized,true);
+  assert.equal(f.saves,0);
+  unThrow();unGood();
+  assert.throws(()=>f.model.subscribeForecastSelectionInvalidation(null),
+    error=>error&&error.name==='TypeError');
+});
+test('P4c-3: duplicate callback subscriptions are independently revocable',async()=>{
+  const f=fictionalOrderSelectionUI();f.init();f.enter();await settleForecast();
+  let calls=0;
+  const listener=()=>{calls++;};
+  const unsubA=f.model.subscribeForecastSelectionInvalidation(listener);
+  const unsubB=f.model.subscribeForecastSelectionInvalidation(listener);
+  f.model.render();
+  assert.equal(calls,2);
+  unsubA();unsubA();
+  f.model.render();
+  assert.equal(calls,3);
+  unsubB();
+  f.model.render();
+  assert.equal(calls,3);
+});
+test('P4c-3: test-only coordinator is invalidated before accepting a delayed result',async()=>{
+  const f=fictionalOrderSelectionUI();f.init();f.enter();await settleForecast();
+  // A fabricated coordinator clock, not a reproduction of the PR #231 module.
+  let generation=0;
+  const invalidationKinds=[];
+  const coordinator={
+    invalidate(){generation++;invalidationKinds.push('invalidation');},
+    getGeneration(){return generation;}
+  };
+  const unsubscribe=f.model.subscribeForecastSelectionInvalidation(
+    ()=>coordinator.invalidate()
+  );
+  const snapshotGeneration=coordinator.getGeneration();
+  const pending=new Promise(resolve=>{f.__resolveSynthetic=resolve;});
+  const picker=f.elements.get('ofCategory');
+  picker.onchange({target:{value:'fictional_bread'}});
+  picker.onchange({target:{value:'fictional_rice'}});
+  f.__resolveSynthetic({status:'READY',value:100391});
+  const raw=await pending;
+  // The late result may resolve, but cannot be adopted against its older
+  // generation. Deliberately do not log/show the synthetic quantity.
+  assert.equal(raw.status,'READY');
+  assert.notEqual(coordinator.getGeneration(),snapshotGeneration);
+  assert.ok(invalidationKinds.length>=2);
+  assert.equal(f.saves,0);
+  unsubscribe();
+});
+test('P4c-3: load starts by notifying before the source has settled',async()=>{
+  const f=fictionalOrderSelectionUI();
+  const unresolved=[];
+  f.ctx.AbortController=class {constructor(){this.signal={};}abort(){}};
+  f.root.fetch=(url)=>new Promise((_resolve,reject)=>unresolved.push({url,reject}));
+  let notifications=0;
+  f.model.subscribeForecastSelectionInvalidation(()=>notifications++);
+  f.init();f.enter();
+  assert.ok(unresolved.length>=2);
+  const before=notifications;
+  f.elements.get('ofRefresh').onclick();
+  assert.ok(notifications>before);
+  assert.deepEqual(f.status(),{initialized:false,manualIntent:null,epoch:null});
+  unresolved.forEach(x=>x.reject(new Error('SYNTHETIC_NETWORK_REJECT')));
+  await settleForecast();
+  assert.equal(f.saves,0);
+});
+
+
+test('P4c3 R1-A: listeners added during dispatch wait for a later independent event',async()=>{
+  const f=fictionalOrderSelectionUI();f.init();f.enter();await settleForecast();
+  let first=0,later=0;
+  const unsubscribeFirst=f.model.subscribeForecastSelectionInvalidation(()=>{
+    first++;
+    if(first===1)f.model.subscribeForecastSelectionInvalidation(()=>{later++;});
+  });
+  f.model.render();
+  assert.equal(first,1);
+  assert.equal(later,0,'live Set may not visit a newly added subscriber');
+  f.model.render();
+  assert.equal(first,2);
+  assert.equal(later,1);
+  unsubscribeFirst();
+  assert.equal(f.saves,0);
+});
+
+test('P4c3 R1-B: reentrant render is coalesced, never recursively dispatched',async()=>{
+  const f=fictionalOrderSelectionUI();f.init();f.enter();await settleForecast();
+  let calls=0,depth=0,maxDepth=0;
+  const records=[];
+  f.model.subscribeForecastSelectionInvalidation(()=>{
+    calls++;depth++;maxDepth=Math.max(maxDepth,depth);
+    records.push(f.status());
+    if(calls===1)f.model.render();
+    depth--;
+  });
+  const before=f.status().epoch;
+  f.model.render();
+  assert.equal(calls,1,'nested render must not recursively re-notify');
+  assert.equal(maxDepth,1);
+  assert.ok(f.status().epoch>before,'nested render must still advance epoch');
+  assert.deepEqual(records,[{initialized:false,manualIntent:null,epoch:null}],
+    'status seen while notification is in flight must fail closed');
+  assert.equal(f.saves,0);
+});
+
+test('P4c3 R1-C: self unsubscribe/re-register and later-entry removal respect snapshot',async()=>{
+  const f=fictionalOrderSelectionUI();f.init();f.enter();await settleForecast();
+  let first=0,second=0,later=0;
+  let unFirst,unSecond;
+  unFirst=f.model.subscribeForecastSelectionInvalidation(()=>{
+    first++;
+    unFirst();
+    f.model.subscribeForecastSelectionInvalidation(()=>{later++;});
+    unSecond();
+  });
+  unSecond=f.model.subscribeForecastSelectionInvalidation(()=>{second++;});
+  f.model.render();
+  assert.equal(first,1);
+  assert.equal(second,0,'entry removed before its snapshot turn is skipped');
+  assert.equal(later,0,'entry added during snapshot delivery is not visited');
+  f.model.render();
+  assert.equal(first,1);
+  assert.equal(second,0);
+  assert.equal(later,1);
+  assert.equal(f.saves,0);
+});
+
+test('P4c3 R1-D: adding callbacks during render never multiplies synchronous delivery',async()=>{
+  const f=fictionalOrderSelectionUI();f.init();f.enter();await settleForecast();
+  let calls=0;
+  function grow(){
+    calls++;
+    if(calls<6)f.model.subscribeForecastSelectionInvalidation(grow);
+  }
+  f.model.subscribeForecastSelectionInvalidation(grow);
+  f.model.render();
+  assert.equal(calls,1,'new callback must not get a same-operation delivery');
+  f.model.render();
+  assert.equal(calls,3,'only the two callbacks present at start are visited');
+  assert.equal(f.saves,0);
+});
+
+test('P4c3 R2-A: picker focus after manual selection never exposes old intent in new epoch',async()=>{
+  const f=fictionalOrderSelectionUI();f.init();f.enter();await settleForecast();
+  const input=f.elements.get('ofDelivery'),same=f.model.getState().delivery;
+  input.value=same;
+  input.onchange({target:input,isTrusted:true}); // synthetic branch only
+  assert.equal(f.status().manualIntent,true);
+  const before=f.status().epoch,observed=[];
+  f.model.subscribeForecastSelectionInvalidation(function(){
+    observed.push({args:[...arguments],status:f.status()});
+  });
+  input.onfocus();
+  assert.deepEqual(f.status(),{initialized:false,manualIntent:null,epoch:null});
+  assert.equal(observed.length,1);
+  assert.deepEqual(observed[0],{args:[],status:{
+    initialized:false,manualIntent:null,epoch:null
+  }});
+  f.model.render();
+  assert.ok(f.status().epoch>before,'recovered metadata gets a strictly newer epoch');
+  assert.equal(f.status().manualIntent,null);
+  assert.equal(f.saves,0);
+});
+
+test('P4c3 R2-B: valid changed date notifies after intent quarantine, then recovers',async()=>{
+  const f=fictionalOrderSelectionUI();f.init();f.enter();await settleForecast();
+  const input=f.elements.get('ofDelivery');
+  let observed=[];
+  f.model.subscribeForecastSelectionInvalidation(()=>observed.push(f.status()));
+  input.value='2026-12-01';
+  input.onchange({target:input,isTrusted:true}); // branch simulation only
+  assert.ok(observed.length>0);
+  assert.ok(observed.every(s=>s.initialized===false&&s.manualIntent===null));
+  assert.equal(f.status().manualIntent,true);
+  assert.equal(f.model.getState().delivery,'2026-12-01');
+  assert.equal(f.saves,0);
+});
+
+
+/* P4c-4: bounded, entirely fictional cross-module interop.
+ * Use the unchanged RequestCoordinator module from the pinned PR #231 and
+ * the original OrderForecast handlers from the pinned PR #248.
+ * This never reads InsightStorage, starts a real network request, runs AI,
+ * or grants a model permission. All dates/scopes below are invented.
+ */
+const {createFixtureRequestCoordinator}=require('../insight_forecast_fixture_request_coordinator_v0.js');
+
+async function p4c4FixtureHarness(){
+  const f=fictionalOrderSelectionUI();
+  f.init();f.enter();await settleForecast();
+  assert.equal(f.status().initialized,true,'synthetic UI must finish loading');
+  const originalDay=f.model.getState().delivery;
+  const deferred={};
+  deferred.promise=new Promise((resolve,reject)=>{
+    deferred.resolve=resolve;deferred.reject=reject;
+  });
+  const trace={read:0,check:0,evaluate:0,notice:0,args:[],signal:null};
+  const signature=()=>{
+    const status=f.status(),state=f.model.getState();
+    return {
+      epoch:status.epoch,
+      initialized:status.initialized,
+      manualIntent:status.manualIntent,
+      storeId:state.storeId,
+      categoryId:state.categoryId,
+      delivery:state.delivery
+    };
+  };
+  const reader={
+    read(){
+      trace.read++;
+      const observed=signature();
+      if(!observed.initialized)throw new Error('FICTIONAL_UNAVAILABLE');
+      return Object.freeze({
+        snapshot_id:'fictional-snapshot-p4c4',
+        request:Object.freeze({
+          scope:Object.freeze({store:'fictional-scope-only'}),
+          target_day:originalDay,
+          request_issued_at:'2026-10-26T06:00:00+09:00'
+        }),
+        source_versions:Object.freeze({fictionalOnly:'synthetic-v1'}),
+        observed:Object.freeze(observed)
+      });
+    },
+    isCurrent(snapshot){
+      trace.check++;
+      const now=signature(),then=snapshot.observed;
+      return now.initialized
+        && now.epoch===then.epoch
+        && now.manualIntent===then.manualIntent
+        && now.storeId===then.storeId
+        && now.categoryId===then.categoryId
+        && now.delivery===then.delivery;
+    }
+  };
+  const coordinator=createFixtureRequestCoordinator({
+    reader,session_id:'fictional-p4c4',
+    evaluate(_snapshot,{signal}){
+      trace.evaluate++;
+      trace.signal=signal;
+      // Deliberately ignores abort, just as an uncooperative evaluator might.
+      return deferred.promise;
+    }
+  });
+  const unsubscribe=f.model.subscribeForecastSelectionInvalidation(function(){
+    trace.notice++;
+    trace.args.push(arguments.length);
+    coordinator.invalidate();
+  });
+  const pending=coordinator.request({purpose:'fictional-interoperation'});
+  assert.equal(trace.read,1);
+  assert.equal(trace.check,1,'read-time current check');
+  assert.equal(trace.evaluate,1);
+  assert.equal(trace.signal.aborted,false);
+  const startingCoordinatorEpoch=coordinator.getEpoch();
+  return {f,coordinator,trace,pending,deferred,unsubscribe,startingCoordinatorEpoch};
+}
+function p4c4AssertNoEffects(h){
+  assert.equal(h.f.saves,0,'no fixture persistence');
+  assert.equal(h.f.traffic,0,'no real or fabricated fetches');
+  assert.equal(JSON.stringify(h.f.stores),h.f.initial,'all fixture stores unchanged');
+  assert.ok(h.trace.args.every(n=>n===0),'no data attached to invalidation');
+}
+function p4c4AssertStale(reply){
+  assert.equal(reply.accepted,false);
+  assert.equal(reply.freshness,'stale');
+  assert.equal(Object.hasOwn(reply,'result'),false,'old READY is never returned');
+  assert.doesNotMatch(JSON.stringify(reply),/FICTIONAL_RAW_CANARY_72491|FICTIONAL_REJECTION_CANARY/);
+}
+async function p4c4AbortAndSettle(h,options={}){
+  assert.ok(h.trace.notice>0,'source UI must send invalidation');
+  assert.equal(h.trace.signal.aborted,true,'Coordinator abort signalled');
+  assert.ok(h.coordinator.getEpoch()>h.startingCoordinatorEpoch);
+  const reply=await h.pending;
+  p4c4AssertStale(reply);
+  if(options.reject)h.deferred.reject(new Error('FICTIONAL_REJECTION_CANARY'));
+  else h.deferred.resolve({kind:'FICTIONAL',raw:'FICTIONAL_RAW_CANARY_72491'});
+  await settleForecast();
+  p4c4AssertStale(reply);
+  p4c4AssertNoEffects(h);
+  return reply;
+}
+
+test('P4c4 F01: unchanged fictional UI can adopt the current READY',async()=>{
+  const h=await p4c4FixtureHarness();
+  h.deferred.resolve({kind:'FICTIONAL',raw:'FICTIONAL_RAW_CANARY_72491'});
+  const reply=await h.pending;
+  assert.equal(reply.accepted,true);
+  assert.equal(reply.freshness,'current');
+  assert.equal(reply.result.kind,'FICTIONAL');
+  assert.equal(h.trace.notice,0);
+  assert.equal(h.trace.check,2,'read-time and adoption-time checks both ran');
+  assert.equal(h.coordinator.getEpoch(),h.startingCoordinatorEpoch);
+  p4c4AssertNoEffects(h);
+  h.unsubscribe();
+});
+test('P4c4 F02: same-day picker focus without change invalidates late READY',async()=>{
+  const h=await p4c4FixtureHarness(),day=h.f.model.getState().delivery;
+  h.f.elements.get('ofDelivery').onfocus();
+  assert.equal(h.f.model.getState().delivery,day,'date remains the same');
+  await p4c4AbortAndSettle(h);
+  assert.equal(h.trace.check,1,'abort can short-circuit adoption-time check');
+  h.unsubscribe();
+});
+test('P4c4 F03: category A-B-A cannot resurrect an old READY',async()=>{
+  const h=await p4c4FixtureHarness(),picker=h.f.elements.get('ofCategory');
+  const before=h.f.model.getState().categoryId;
+  picker.onchange({target:{value:'fictional_bread'}});
+  picker.onchange({target:{value:'fictional_rice'}});
+  assert.equal(h.f.model.getState().categoryId,before,'ABA restores value, not epoch');
+  await p4c4AbortAndSettle(h);
+  h.unsubscribe();
+});
+test('P4c4 F04: navigating away invalidates the pending READY',async()=>{
+  const h=await p4c4FixtureHarness();
+  h.f.root.gotoNav('dashboard');
+  assert.deepEqual(h.f.status(),{initialized:false,manualIntent:null,epoch:null});
+  await p4c4AbortAndSettle(h);
+  h.unsubscribe();
+});
+test('P4c4 F05: refresh invalidates an unresolved request',async()=>{
+  const h=await p4c4FixtureHarness();
+  h.f.elements.get('ofRefresh').onclick();
+  await p4c4AbortAndSettle(h);
+  h.unsubscribe();
+});
+test('P4c4 F06: late non-cooperative evaluator rejection never exposes error',async()=>{
+  const h=await p4c4FixtureHarness();
+  h.f.elements.get('ofDelivery').onpointerdown();
+  await p4c4AbortAndSettle(h,{reject:true});
+  h.unsubscribe();
+});
+test('P4c4 F07: after unsubscribe, adoption-time reader alone rejects stale',async()=>{
+  const h=await p4c4FixtureHarness();
+  h.unsubscribe();
+  const epoch=h.coordinator.getEpoch(),before=h.f.status().epoch;
+  h.f.model.render();
+  assert.ok(h.f.status().epoch>before);
+  assert.equal(h.trace.notice,0);
+  assert.equal(h.coordinator.getEpoch(),epoch,'unsubscribe does not invalidate');
+  assert.equal(h.trace.signal.aborted,false,'no abort after unsubscribe');
+  h.deferred.resolve({kind:'FICTIONAL',raw:'FICTIONAL_RAW_CANARY_72491'});
+  const reply=await h.pending;
+  p4c4AssertStale(reply);
+  assert.equal(h.trace.check,2,'adoption-time isCurrent is the sole rejection');
+  p4c4AssertNoEffects(h);
+});
+test('P4c4 F08: synthetic untrusted same-date change invalidates READY',async()=>{
+  const h=await p4c4FixtureHarness(),picker=h.f.elements.get('ofDelivery');
+  const old=h.f.model.getState().delivery;
+  picker.value=old;
+  picker.onchange({target:picker,isTrusted:false});
+  assert.equal(h.f.model.getState().delivery,old);
+  assert.equal(h.f.status().manualIntent,null,'untrusted input is never proven manual');
+  await p4c4AbortAndSettle(h);
+  h.unsubscribe();
+});
+
+
+/* P4c-5: fictional in-memory display lease. Not a production adapter.
+ * No source values/context reach the view, only the literal FICTIONAL_READY.
+ * A real adapter with failed synchronous clear is UNSAFE, never approved.
+ */
+async function p4c5Harness(){
+  const f=fictionalOrderSelectionUI();f.init();f.enter();await settleForecast();
+  assert.equal(f.status().initialized,true);
+  const tasks=[],source={version:0},hooks={status:null,source:null,paint:null,clear:null};
+  const view={marker:null,events:[],notices:[],paints:0,clears:0};
+  const stamp=v=>v&&v.initialized===true&&
+    (v.manualIntent===true||v.manualIntent===false)&&
+    Number.isSafeInteger(v.epoch)&&v.epoch>=0?
+      {epoch:v.epoch,manualIntent:v.manualIntent}:null;
+  const status=()=>{try{return stamp(hooks.status?hooks.status():f.status());}catch{return null;}};
+  const sourceOK=()=>{try{return hooks.source?hooks.source()===true:true;}catch{return false;}};
+  const reader={
+    read(){
+      const s=stamp(f.status());if(!s)throw Error('FICTIONAL_UNKNOWN');
+      return Object.freeze({
+        snapshot_id:'fictional-lease',
+        request:{scope:{id:'SECRET_SCOPE_NOT_FOR_VIEW'},target_day:'2026-10-27',
+          request_issued_at:'2026-10-26T07:00:00+09:00'},
+        source_versions:{fictional:'SECRET_VERSION_NOT_FOR_VIEW'},
+        observed:s,sourceVersion:source.version
+      });
+    },
+    isCurrent(snapshot){
+      const s=stamp(f.status()),old=snapshot.observed;
+      return !!s&&s.epoch===old.epoch&&
+        s.manualIntent===old.manualIntent&&
+        source.version===snapshot.sourceVersion;
+    }
+  };
+  const coordinator=createFixtureRequestCoordinator({
+    reader,session_id:'SECRET_SESSION_NOT_FOR_VIEW',
+    evaluate(_snapshot,{signal}){
+      return new Promise((resolve,reject)=>tasks.push({resolve,reject,signal}));
+    }
+  });
+  let phase='HIDDEN',gen=0,disposed=false,unsafe=false;
+  let current=null;
+  const clear=()=>{
+    try{
+      if(hooks.clear)hooks.clear();
+      view.marker=null;view.clears++;
+      view.events.push({type:'clear'});
+    }catch{unsafe=true;phase='UNSAFE';}
+  };
+  const invalidate=()=>{
+    if(disposed||unsafe)return;
+    gen++;phase='HIDDEN';current=null;coordinator.invalidate();clear();
+  };
+  const unsubscribe=f.model.subscribeForecastSelectionInvalidation(function(){
+    view.notices.push(arguments.length);invalidate();
+  });
+  // External verification callbacks may synchronously invalidate or dispose.
+  // Recheck ticket ownership after each callback, not just before it.
+  const active=(ticket)=>!!ticket&&!disposed&&!unsafe&&
+    (phase==='PENDING'||phase==='VISIBLE')&&current===ticket&&
+    ticket.gen===gen&&ticket.coordinatorEpoch===coordinator.getEpoch()&&
+    ticket.sourceVersion===source.version;
+  const fresh=(ticket)=>{
+    if(!active(ticket))return false;
+    if(!sourceOK()||!active(ticket))return false;
+    const s=status();
+    if(!active(ticket))return false;
+    return !!s&&s.epoch===ticket.selection.epoch&&
+      s.manualIntent===ticket.selection.manualIntent;
+  };
+  const guard={
+    async begin(options={}){
+      if(disposed||unsafe)return false;
+      invalidate();if(disposed||unsafe)return false;
+      const beginGen=gen,beginEpoch=coordinator.getEpoch();
+      const selection=status();
+      if(disposed||unsafe||gen!==beginGen||
+         coordinator.getEpoch()!==beginEpoch||!selection)return false;
+      const sourceValid=sourceOK();
+      if(disposed||unsafe||gen!==beginGen||
+         coordinator.getEpoch()!==beginEpoch||!sourceValid)return false;
+      phase='PENDING';
+      let pending;
+      try{pending=coordinator.request({purpose:'FICTIONAL_DISPLAY_ONLY'});}
+      catch{invalidate();return false;}
+      const ticket={gen,selection,sourceVersion:source.version,
+        coordinatorEpoch:coordinator.getEpoch()};
+      current=ticket;
+      let outcome;
+      try{outcome=await pending;}
+      catch{if(gen===ticket.gen)invalidate();return false;}
+      if(!outcome||outcome.accepted!==true||outcome.freshness!=='current'||!fresh(ticket)){
+        if(gen===ticket.gen)invalidate();
+        return false;
+      }
+      try{if(options.beforePaint)options.beforePaint();}
+      catch{if(gen===ticket.gen)invalidate();return false;}
+      if(!fresh(ticket))return false;
+      try{
+        // Never forward opaque result, context, scope, date or versions.
+        view.marker='FICTIONAL_READY';
+        view.paints++;view.events.push({type:'paint',marker:'FICTIONAL_READY'});
+        if(hooks.paint)hooks.paint();
+      }catch{if(gen===ticket.gen)invalidate();return false;}
+      if(!fresh(ticket)){
+        if(gen===ticket.gen)invalidate();
+        return false;
+      }
+      phase='VISIBLE';return true;
+    },
+    inspect(){
+      if(phase!=='VISIBLE')return false;
+      if(!fresh(current)){invalidate();return false;}
+      return true;
+    },
+    dispose(){
+      if(disposed)return;
+      // Mark terminal before calling clear adapter: it can reenter the guard.
+      disposed=true;gen++;phase='HIDDEN';current=null;clear();
+      coordinator.dispose();unsubscribe();
+      if(!unsafe)phase='DISPOSED';
+    },
+    state(){return {phase,visible:view.marker==='FICTIONAL_READY',
+      unsafe,disposed,generation:gen};}
+  };
+  return {f,guard,view,hooks,source,tasks,coordinator};
+}
+async function p4c5Visible(h){
+  const p=h.guard.begin();
+  assert.ok(h.tasks.length);
+  h.tasks.at(-1).resolve({raw:'RAW_QUANTITY_CANARY_DO_NOT_SHOW'});
+  assert.equal(await p,true);
+  assert.equal(h.view.marker,'FICTIONAL_READY');
+}
+function p4c5AssertNoEffects(h){
+  assert.equal(h.f.saves,0);assert.equal(h.f.traffic,0);
+  assert.equal(JSON.stringify(h.f.stores),h.f.initial);
+  assert.ok(h.view.notices.every(n=>n===0));
+  assert.doesNotMatch(JSON.stringify(h.view),
+    /RAW_QUANTITY_CANARY_DO_NOT_SHOW|ERROR_CANARY_DO_NOT_SHOW|SECRET_SCOPE_NOT_FOR_VIEW|SECRET_VERSION_NOT_FOR_VIEW|SECRET_SESSION_NOT_FOR_VIEW/);
+}
+test('P4c5 T01: accepted fictional READY remains visible while state is current',async()=>{
+  const h=await p4c5Harness();await p4c5Visible(h);
+  assert.equal(h.guard.inspect(),true);
+  assert.equal(h.guard.state().phase,'VISIBLE');
+  h.guard.dispose();assert.equal(h.view.marker,null);
+});
+test('P4c5 T02: same-day date picker focus clears existing display synchronously',async()=>{
+  const h=await p4c5Harness();await p4c5Visible(h);
+  const day=h.f.model.getState().delivery,clears=h.view.clears;
+  h.f.elements.get('ofDelivery').onfocus();
+  assert.equal(h.f.model.getState().delivery,day);
+  assert.equal(h.view.marker,null);assert.ok(h.view.clears>clears);
+  assert.deepEqual(h.f.status(),{initialized:false,manualIntent:null,epoch:null});
+  h.guard.dispose();
+});
+test('P4c5 T03: category A-B-A cannot resurrect previously visible READY',async()=>{
+  const h=await p4c5Harness();await p4c5Visible(h);
+  const picker=h.f.elements.get('ofCategory'),start=h.f.model.getState().categoryId;
+  picker.onchange({target:{value:'fictional_bread'}});
+  assert.equal(h.view.marker,null);
+  picker.onchange({target:{value:'fictional_rice'}});
+  assert.equal(h.f.model.getState().categoryId,start);
+  assert.equal(h.guard.inspect(),false);assert.equal(h.view.paints,1);
+  h.guard.dispose();
+});
+test('P4c5 T04: leaving page and refresh clear display without automatic re-adoption',async()=>{
+  const a=await p4c5Harness();await p4c5Visible(a);
+  a.f.root.gotoNav('dashboard');assert.equal(a.view.marker,null);
+  a.f.enter();await settleForecast();assert.equal(a.view.marker,null);
+  a.guard.dispose();
+  const b=await p4c5Harness();await p4c5Visible(b);
+  b.f.elements.get('ofRefresh').onclick();
+  assert.equal(b.view.marker,null);
+  await settleForecast();assert.equal(b.view.marker,null);
+  b.guard.dispose();
+});
+test('P4c5 T05: event between accepted reply and paint prevents drawing',async()=>{
+  const h=await p4c5Harness();
+  const p=h.guard.begin({beforePaint:()=>h.f.elements.get('ofDelivery').onfocus()});
+  h.tasks[0].resolve({raw:'RAW_QUANTITY_CANARY_DO_NOT_SHOW'});
+  assert.equal(await p,false);
+  assert.equal(h.view.paints,0);assert.equal(h.view.marker,null);
+  h.guard.dispose();
+});
+test('P4c5 T06: event or exception during paint leaves no old READY',async()=>{
+  const a=await p4c5Harness();
+  a.hooks.paint=()=>a.f.elements.get('ofDelivery').onfocus();
+  const p=a.guard.begin();a.tasks[0].resolve({raw:'RAW_QUANTITY_CANARY_DO_NOT_SHOW'});
+  assert.equal(await p,false);assert.equal(a.view.marker,null);
+  a.guard.dispose();
+  const b=await p4c5Harness();
+  b.hooks.paint=()=>{throw Error('ERROR_CANARY_DO_NOT_SHOW');};
+  const r=b.guard.begin();b.tasks[0].resolve({raw:'RAW_QUANTITY_CANARY_DO_NOT_SHOW'});
+  assert.equal(await r,false);assert.equal(b.view.marker,null);
+  b.guard.dispose();
+});
+test('P4c5 T07: dispose clears visible and prevents late resolve/reject',async()=>{
+  const a=await p4c5Harness();await p4c5Visible(a);
+  a.guard.dispose();assert.equal(a.guard.state().phase,'DISPOSED');
+  assert.equal(a.view.marker,null);assert.equal(await a.guard.begin(),false);
+  const b=await p4c5Harness(),p=b.guard.begin();
+  b.guard.dispose();assert.equal(await p,false);
+  b.tasks[0].reject(Error('ERROR_CANARY_DO_NOT_SHOW'));
+  await settleForecast();assert.equal(b.view.marker,null);
+  assert.equal(b.guard.state().phase,'DISPOSED');
+});
+test('P4c5 R1a: source check disposing mid-fresh cannot repaint',async()=>{
+  const h=await p4c5Harness(),p=h.guard.begin();
+  let checks=0;
+  h.hooks.source=()=>{
+    if(++checks===2)h.guard.dispose();
+    return true;
+  };
+  h.tasks[0].resolve({raw:'RAW_QUANTITY_CANARY_DO_NOT_SHOW'});
+  assert.equal(await p,false);
+  assert.deepEqual(h.guard.state(),{
+    phase:'DISPOSED',visible:false,unsafe:false,disposed:true,generation:2
+  });
+  assert.equal(h.view.paints,0);
+  assert.equal(h.view.marker,null);
+  p4c5AssertNoEffects(h);
+});
+test('P4c5 R1b: status check disposing mid-fresh cannot repaint',async()=>{
+  const h=await p4c5Harness(),p=h.guard.begin();
+  let checks=0;
+  h.hooks.status=()=>{
+    if(++checks===2)h.guard.dispose();
+    return h.f.status();
+  };
+  h.tasks[0].resolve({raw:'RAW_QUANTITY_CANARY_DO_NOT_SHOW'});
+  assert.equal(await p,false);
+  assert.equal(h.guard.state().phase,'DISPOSED');
+  assert.equal(h.guard.state().visible,false);
+  assert.equal(h.view.paints,0);
+  p4c5AssertNoEffects(h);
+});
+test('P4c5 R1c: dispose inside begin callbacks blocks request',async()=>{
+  for(const callback of ['status','source']){
+    const h=await p4c5Harness();
+    if(callback==='status')h.hooks.status=()=>{
+      h.guard.dispose();return h.f.status();
+    };
+    else h.hooks.source=()=>{
+      h.guard.dispose();return true;
+    };
+    assert.equal(await h.guard.begin(),false);
+    assert.equal(h.tasks.length,0);
+    assert.equal(h.guard.state().phase,'DISPOSED');
+    assert.equal(h.guard.state().visible,false);
+    p4c5AssertNoEffects(h);
+  }
+});
+test('P4c5 R1d: dispose reentered during paint clears old sentinel',async()=>{
+  const h=await p4c5Harness();
+  h.hooks.paint=()=>h.guard.dispose();
+  const p=h.guard.begin();
+  h.tasks[0].resolve({raw:'RAW_QUANTITY_CANARY_DO_NOT_SHOW'});
+  assert.equal(await p,false);
+  assert.equal(h.guard.state().phase,'DISPOSED');
+  assert.equal(h.view.marker,null);
+  assert.equal(h.guard.state().unsafe,false);
+  p4c5AssertNoEffects(h);
+});
+test('P4c5 T08: unknown status, thrown source and clear failure fail closed',async()=>{
+  for(const s of [
+    {initialized:true,manualIntent:null,epoch:1},
+    {initialized:false,manualIntent:false,epoch:1},
+    {initialized:true,manualIntent:false,epoch:null},
+    {initialized:true,manualIntent:false,epoch:-1}
+  ]){
+    const h=await p4c5Harness();h.hooks.status=()=>s;
+    assert.equal(await h.guard.begin(),false);
+    assert.equal(h.tasks.length,0);h.guard.dispose();
+  }
+  const a=await p4c5Harness();
+  a.hooks.status=()=>{throw Error('ERROR_CANARY_DO_NOT_SHOW');};
+  assert.equal(await a.guard.begin(),false);a.guard.dispose();
+  const b=await p4c5Harness();await p4c5Visible(b);
+  b.hooks.source=()=>{throw Error('ERROR_CANARY_DO_NOT_SHOW');};
+  assert.equal(b.guard.inspect(),false);assert.equal(b.view.marker,null);
+  b.guard.dispose();
+  const c=await p4c5Harness();await p4c5Visible(c);
+  c.hooks.clear=()=>{throw Error('UNCLEARED_SURFACE_CANARY');};
+  c.f.elements.get('ofDelivery').onfocus();
+  assert.equal(c.guard.state().unsafe,true,'uncleared real surface is NOT safe');
+  assert.equal(await c.guard.begin(),false);
+  c.guard.dispose();
+});
+test('P4c5 T09: only new current request may display after ABA',async()=>{
+  const h=await p4c5Harness();await p4c5Visible(h);
+  const picker=h.f.elements.get('ofCategory');
+  picker.onchange({target:{value:'fictional_bread'}});
+  picker.onchange({target:{value:'fictional_rice'}});
+  assert.equal(h.view.marker,null);
+  const p=h.guard.begin();
+  assert.equal(h.tasks.length,2);
+  h.tasks[1].resolve({raw:'RAW_QUANTITY_CANARY_DO_NOT_SHOW'});
+  assert.equal(await p,true);assert.equal(h.view.marker,'FICTIONAL_READY');
+  assert.equal(h.view.paints,2);
+  h.guard.dispose();
+});
+test('P4c5 T10: no raw, context, identifiers or network escape fixture view',async()=>{
+  const h=await p4c5Harness();await p4c5Visible(h);
+  h.f.elements.get('ofDelivery').onfocus();
+  assert.equal(h.view.marker,null);
+  p4c5AssertNoEffects(h);
+  assert.ok(h.view.notices.length>0);
+  assert.ok(h.view.events.every(e=>e.type==='clear'||
+    (e.type==='paint'&&e.marker==='FICTIONAL_READY')));
+  h.guard.dispose();p4c5AssertNoEffects(h);
+});
