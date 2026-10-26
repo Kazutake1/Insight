@@ -256,3 +256,65 @@ test('P4d2 H08: original model and status never transmit raw or call external se
   assert.equal(JSON.stringify(h.allStores),h.before);
   ui.cancel.onclick();ui.dialog.finishClose();
 });
+
+test('P4d2 R1a: reentrant typing in showModal never becomes CLEAN',()=>{
+  const h=hourlyForecastFixture();
+  const append=h.body.append;
+  h.body.append=function(...items){
+    append.apply(this,items);
+    for(const d of items)if(d.tagName==='dialog'){
+      const original=d.showModal;
+      d.showModal=function(){
+        original.call(this);
+        const input=h.byTag(this,'input')[0];
+        input.value='17';input.dispatch('input');
+      };
+    }
+  };
+  const ui=h.open();
+  assert.equal(ui.inputs[0].value,'17');
+  assert.equal(h.state().initialized,false);
+  assert.equal(h.state().dirty,null);
+  assert.equal(h.calls.transaction,0);
+  ui.cancel.onclick();ui.dialog.finishClose();
+  assert.equal(h.state().dirty,false);
+});
+test('P4d2 R1b: input during cancel-to-close transition stays UNKNOWN',()=>{
+  const h=hourlyForecastFixture(),ui=h.open();
+  ui.cancel.onclick();
+  const prior=h.state().epoch;
+  ui.inputs[0].value='19';ui.inputs[0].dispatch('input');
+  assert.equal(h.state().initialized,false);
+  assert.equal(h.state().dirty,null);
+  assert.ok(h.state().epoch>prior);
+  ui.dialog.finishClose();
+  assert.equal(h.state().dirty,false);
+});
+test('P4d2 R1c: reentrant input during storage commit cannot certify clean',()=>{
+  const h=hourlyForecastFixture(),ui=h.open();
+  ui.inputs[0].value='5';ui.inputs[0].dispatch('input');
+  const original=h.root.InsightStorage.transaction;
+  h.root.InsightStorage.transaction=function(...args){
+    original.apply(this,args);
+    ui.inputs[1].value='28';ui.inputs[1].dispatch('input');
+    assert.equal(h.state().initialized,false);
+  };
+  ui.save.onclick();
+  assert.equal(h.calls.transaction,1);
+  assert.equal(h.state().initialized,false);
+  ui.dialog.finishClose();
+  assert.equal(h.state().initialized,false,'in-flight edit invalidates close acknowledgment');
+});
+test('P4d2 R1d: premature synchronous close inside save remains UNKNOWN',()=>{
+  const h=hourlyForecastFixture(),ui=h.open();
+  ui.inputs[0].value='2';ui.inputs[0].dispatch('input');
+  const original=h.root.InsightStorage.transaction;
+  h.root.InsightStorage.transaction=function(...args){
+    ui.dialog.close();ui.dialog.finishClose();
+    return original.apply(this,args);
+  };
+  ui.save.onclick();
+  assert.equal(h.calls.transaction,1);
+  assert.equal(h.state().initialized,false);
+  assert.equal(h.state().dirty,null);
+});
