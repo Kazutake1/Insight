@@ -145,8 +145,11 @@ function threeEditorFixture(){
       }
     };
   }
-  function emit(event,type,kind,nav=false){
+  function emit(event,type,kind,nav=false,throwingValue=false){
     const t=target(type,kind,nav);
+    if(throwingValue)Object.defineProperty(t,'value',{
+      get(){throw Error('PRIVATE_INPUT_VALUE_GETTER_CANARY');}
+    });
     for(const fn of handlers[event]||[])fn({target:t});
   }
   function assertNoEffects(){
@@ -185,7 +188,7 @@ test('P4d4 L02: sales, customers and waste have independent dirty epochs',()=>{
 });
 test('P4d4 L03: input value getter is never read or exposed',()=>{
   const h=threeEditorFixture();
-  h.emit('input','sales');
+  h.emit('input','sales',null,false,true);
   const result=h.api.getForecastDraftStatus('sales');
   assert.equal(Object.isFrozen(result),true);
   assert.deepEqual(Object.keys(result).sort(),['dirty','epoch','initialized']);
