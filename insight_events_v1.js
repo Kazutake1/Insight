@@ -236,6 +236,18 @@
     validate(all);return e.id;
   }
   var model={validate:validate,validateSnapshot:validateSnapshot,summary:summary,targetForCategory:targetForCategory,segmentsForCategory:segmentsForCategory,segmentSummary:segmentSummary,list:list,presets:presets,specialPresets:specialPresets,nearbyPresets:nearbyPresets,demandCategories:demandCategories,appendDemandFavorites:appendDemandFavorites,demandItems:demandItems,demandTemplate:demandTemplate,syncDemandPreset:syncDemandPreset,findDuplicateSpecial:findDuplicateSpecial,add:add,copy:copy};
+  // STEP4 GATE-3: positive local event-dialog witness only; never CLEAN.
+  var forecastEpoch=0,forecastWitness=false;
+  function forecastAdvance(dirty){
+    if(forecastEpoch===null)return;
+    if(forecastEpoch>=Number.MAX_SAFE_INTEGER){forecastEpoch=null;forecastWitness=false;return;}
+    forecastEpoch++;
+    forecastWitness=!!dirty;
+  }
+  model.getForecastDraftStatus=function(){
+    var witnessed=forecastWitness&&forecastEpoch!==null;
+    return Object.freeze({initialized:witnessed,dirty:witnessed?true:null,epoch:forecastEpoch});
+  };
   if(typeof module!=='undefined'&&module.exports)module.exports=model;
   if(!root.document)return;
   root.InsightEvents=model;
@@ -259,9 +271,14 @@
     }
 
     function dialog(title){
+      forecastAdvance(false);
       var d=el('dialog',undefined,'ie-dialog'),head=el('header');
+      d.addEventListener('input',function(){forecastAdvance(true);},true);
+      d.addEventListener('change',function(){forecastAdvance(true);},true);
+      // Validation, persistence and programmatic form changes are not proven.
+      d.addEventListener('submit',function(){forecastAdvance(false);},true);
       var h=el('h2',title);h.id=id();d.setAttribute('aria-labelledby',h.id);head.append(h,button('閉じる',function(){d.close();}));d.append(head);
-      d.addEventListener('close',function(){d.remove();if(activeDialog===d)activeDialog=null;});doc.body.append(d);d.showModal();return d;
+      d.addEventListener('close',function(){forecastAdvance(false);d.remove();if(activeDialog===d)activeDialog=null;});doc.body.append(d);d.showModal();return d;
     }
     function field(parent,label,type,value){var l=el('label',label),input=el(type==='textarea'?'textarea':'input');if(type!=='textarea')input.type=type;input.value=value==null?'':String(value);input.setAttribute('aria-label',label);l.append(input);parent.append(l);return input;}
     function locationEditor(parent,snapshot){
