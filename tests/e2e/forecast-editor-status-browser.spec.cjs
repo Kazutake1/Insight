@@ -251,7 +251,7 @@ test('P4d11 B08: real hourly dialog edit is DIRTY and discard returns local idle
   // This local editor can report false while open; it is not full-app CLEAN.
   expect(opened.initialized).toBe(true);
   expect(opened.dirty).toBe(false);
-  await dialog.getByLabel('0時台の客数').fill('42');
+  await dialog.locator('input[data-hour="0"]').fill('42');
   await assertPositiveLocalDirty(page,'hourly_customers',opened.epoch);
   await dialog.getByRole('button',{name:'閉じる'}).click();
   await expect(dialog).toHaveCount(0);
