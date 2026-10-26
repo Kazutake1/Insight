@@ -282,6 +282,18 @@ async function p4d12Boot(page){
   await expect(page.locator('#pageQuick')).toHaveClass(/show/);
   await expect(page.locator('#qi_売上')).toBeVisible();
   await expect(page.locator('#quickSaveBtn')).toBeVisible();
+  await page.evaluate(()=>{
+    window.__p4d12StorageObservation=function(){
+      const state=window.InsightStorage.reportState();
+      const local=window.InsightQuickDaily.getForecastDraftStatus();
+      return {
+        revisionAdvanced:state.revision>window.__p4d11Witness.revision,
+        pending:state.pending,held:state.held,conflict:state.conflict,
+        localInitialized:local.initialized,localDirty:local.dirty,
+        rawChanged:localStorage.getItem('insight_v11')!==window.__p4d11Witness.raw
+      };
+    };
+  });
   return {errors,rejected};
 }
 async function p4d12EditWithoutSaving(page){
@@ -290,23 +302,12 @@ async function p4d12EditWithoutSaving(page){
   await page.locator('#qi_売上').fill('42');
   await assertPositiveLocalDirty(page,'quick_daily',previous.epoch);
 }
-function p4d12StorageObservation(){
-  const state=window.InsightStorage.reportState();
-  const local=window.InsightQuickDaily.getForecastDraftStatus();
-  return {
-    revisionAdvanced:state.revision>window.__p4d11Witness.revision,
-    pending:state.pending,held:state.held,conflict:state.conflict,
-    localInitialized:local.initialized,localDirty:local.dirty,
-    rawChanged:localStorage.getItem('insight_v11')!==window.__p4d11Witness.raw
-  };
-}
-
 test('P4d12 C01: real QuickDaily save commits synthetic input but status returns UNKNOWN',async({page})=>{
   const {errors}=await p4d12Boot(page);
   await p4d12EditWithoutSaving(page);
   await page.locator('#quickSaveBtn').click();
   const observed=await page.evaluate(()=>{
-    const v=p4d12StorageObservation();
+    const v=window.__p4d12StorageObservation();
     const raw=JSON.parse(localStorage.getItem('insight_v11'));
     const saved=raw.stores[raw.current].data['2026']['10月'][20];
     return {...v,fictionalValueSaved:saved?.売上===42};
@@ -342,7 +343,7 @@ test('P4d12 C02: real QuickDaily save failure holds Storage, never certifies CLE
     });
   }
   const observed=await page.evaluate(()=>{
-    const v=p4d12StorageObservation();
+    const v=window.__p4d12StorageObservation();
     return {
       attempted:window.__p4d12RejectedWrites>0,
       revisionAdvanced:v.revisionAdvanced,pending:v.pending,
@@ -383,7 +384,7 @@ test('P4d12 C03: native second-tab write conflicts with stale QuickDaily save',a
   });
   await page.locator('#quickSaveBtn').click();
   const observed=await page.evaluate(()=>{
-    const v=p4d12StorageObservation();
+    const v=window.__p4d12StorageObservation();
     return {
       nativeEvent:window.__p4d12NativeStorage,
       revisionAdvanced:v.revisionAdvanced,pending:v.pending,
