@@ -206,8 +206,9 @@
         dialog.remove();
         if(activeDialog===dialog){activeDialog=null;forecastFailure=false;forecastStep(true,false);}
       });
+      var openingEpoch=forecastEpoch;
       doc.body.append(dialog);dialog.showModal();
-      forecastStep(true,false);
+      if(activeDialog===dialog&&forecastEpoch===openingEpoch&&dialog.open)forecastStep(true,false);
       setTimeout(function(){var first=inputs.find(function(input){return input.value==='';})||inputs[0];if(first)first.focus();},0);
     }
 
