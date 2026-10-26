@@ -81,7 +81,7 @@
     if(!root.InsightHooks||!root.InsightDateContext||!root.InsightStorage){setTimeout(init,0);return;}
     root.__insightHourlyCustomersV1=true;
     var doc=root.document,activeDialog=null;
-    var forecastEpoch=0,forecastKnown=false,forecastDirty=null,forecastPhase='idle';
+    var forecastEpoch=0,forecastKnown=false,forecastDirty=null,forecastPhase='idle',forecastCloseKind=null,forecastCloseEpoch=null;
     forecastDraftReader=function(){
       return {initialized:forecastKnown&&forecastEpoch!==null,
         dirty:forecastKnown&&forecastEpoch!==null?forecastDirty:null,epoch:forecastEpoch};
@@ -96,7 +96,8 @@
       forecastDirty=forecastKnown?!!dirty:null;
     }
     function forecastInput(){
-      // A failed transaction keeps the observation unknown until dialog exit.
+      // Late input after a successful save invalidates the close acknowledgment.
+      if(forecastPhase==='closing'&&forecastCloseKind==='saved')forecastCloseKind=null;
       forecastStep(forecastPhase==='editing',true);
     }
 
