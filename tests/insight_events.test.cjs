@@ -330,7 +330,7 @@ const path=require('node:path');
 const vm=require('node:vm');
 const eventSource=fs.readFileSync(path.join(__dirname,'../insight_events_v1.js'),'utf8');
 
-function fictionalEventDialog(){
+function fictionalEventDialog(options={}){
   const operations={transaction:0,network:0,model:0},dialogs=[];
   function make(tag){
     const element={
@@ -373,7 +373,7 @@ function fictionalEventDialog(){
         this.removed=true;this.parentNode=null;
       }
     };
-    if(tag==='dialog')dialogs.push(element);
+    if(tag==='dialog'){dialogs.push(element);if(options.onDialogCreated)options.onDialogCreated(element);}
     return element;
   }
   const body=make('body'),host=make('section');host.id='opsDailyWrap';
@@ -518,5 +518,91 @@ test('P4d5 V12: no storage transaction or model/network side effect',()=>{
   ui.dialog.close();
   assert.equal(h.operations.transaction,0);
   assert.equal(h.operations.network,0);assert.equal(h.operations.model,0);
+  assert.equal(JSON.stringify(h.allStores),h.original);
+});
+
+
+/* P4d-6: multi-dialog and button/programmatic fail-closed fence. */
+test('P4d6 M01: UI click invalidates previous witness without a CLEAN claim',()=>{
+  const h=fictionalEventDialog(),ui=h.openEdit();
+  ui.input.emit('input');const prior=h.read().epoch;
+  ui.input.emit('click');
+  eventUnknown(h.read());assert.ok(h.read().epoch>prior);
+  ui.input.emit('change');
+  assert.equal(h.read().dirty,true);
+  h.assertNoEffects?.();
+});
+test('P4d6 M02: multiple live dialogs remain UNKNOWN despite either input',()=>{
+  const h=fictionalEventDialog(),editor=h.openEdit();
+  editor.input.emit('input');assert.equal(h.read().dirty,true);
+  const details=h.openDetails();
+  eventUnknown(h.read());
+  editor.input.emit('input');
+  eventUnknown(h.read());
+  details.emit('input');
+  eventUnknown(h.read());
+  details.close();
+  eventUnknown(h.read());
+  editor.input.emit('input');
+  assert.equal(h.read().dirty,true);
+  assert.equal(JSON.stringify(h.allStores),h.original);
+});
+test('P4d6 M03: late events from closed older dialog cannot mask new dirty',()=>{
+  const h=fictionalEventDialog(),old=h.openEdit();
+  old.input.emit('input');old.dialog.close();
+  const next=h.openEdit();
+  next.input.emit('input');const state=h.read();
+  assert.equal(state.dirty,true);
+  old.input.emit('change');old.dialog.emit('click');old.dialog.emit('submit');
+  assert.deepEqual(h.read(),state);
+  assert.equal(h.operations.transaction,0);
+});
+test('P4d6 M04: reentrant showModal input remains UNKNOWN',()=>{
+  const h=fictionalEventDialog({onDialogCreated(dialog){
+    const original=dialog.showModal;
+    dialog.showModal=function(){
+      original.call(this);
+      this.emit('input');
+    };
+  }});
+  const editor=h.openEdit();
+  eventUnknown(h.read());
+  editor.input.emit('input');
+  eventUnknown(h.read(),'cannot revive a session with incomplete initialization');
+  editor.dialog.close();
+  eventUnknown(h.read());
+});
+test('P4d6 M05: cancel without close invalidates, later explicit input is new witness',()=>{
+  const h=fictionalEventDialog(),ui=h.openEdit();
+  ui.input.emit('input');const first=h.read().epoch;
+  ui.dialog.emit('cancel');eventUnknown(h.read());
+  assert.ok(h.read().epoch>first);
+  ui.input.emit('input');assert.equal(h.read().dirty,true);
+  ui.dialog.close();eventUnknown(h.read());
+});
+test('P4d6 M06: old dialog closing while second remains never certifies CLEAN',()=>{
+  const h=fictionalEventDialog(),old=h.openEdit(),detail=h.openDetails();
+  old.dialog.close();
+  eventUnknown(h.read());
+  detail.emit('change');
+  assert.equal(h.read().dirty,true,'sole current dialog input can be witnessed');
+  detail.close();eventUnknown(h.read());
+});
+test('P4d6 M07: synthetic changes on a closed dialog remain ignored',()=>{
+  const h=fictionalEventDialog(),ui=h.openEdit();
+  ui.input.emit('input');ui.dialog.close();
+  const start=h.read();eventUnknown(start);
+  ui.input.emit('input');ui.input.emit('change');ui.dialog.emit('cancel');
+  assert.deepEqual(h.read(),start);
+});
+test('P4d6 M08: input raw getter and private store identifiers remain inaccessible',()=>{
+  const h=fictionalEventDialog(),ui=h.openEdit();
+  Object.defineProperty(ui.input,'value',{get(){throw Error('SECRET_INPUT_GETTER');}});
+  ui.input.emit('input');
+  assert.equal(h.read().dirty,true);
+  assert.doesNotMatch(JSON.stringify(h.read()),/SECRET_INPUT_GETTER|FICTIONAL_PRIVATE/);
+  assert.equal(Object.isFrozen(h.model.getForecastDraftStatus()),true);
+  assert.deepEqual(Object.keys(h.read()).sort(),['dirty','epoch','initialized']);
+  assert.equal(h.operations.transaction,0);
   assert.equal(JSON.stringify(h.allStores),h.original);
 });
