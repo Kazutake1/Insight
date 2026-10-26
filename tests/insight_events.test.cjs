@@ -530,7 +530,8 @@ test('P4d6 M01: UI click invalidates previous witness without a CLEAN claim',()=
   eventUnknown(h.read());assert.ok(h.read().epoch>prior);
   ui.input.emit('change');
   assert.equal(h.read().dirty,true);
-  h.assertNoEffects?.();
+  assert.equal(h.operations.transaction,0);
+  assert.equal(JSON.stringify(h.allStores),h.original);
 });
 test('P4d6 M02: multiple live dialogs remain UNKNOWN despite either input',()=>{
   const h=fictionalEventDialog(),editor=h.openEdit();
@@ -603,6 +604,19 @@ test('P4d6 M08: input raw getter and private store identifiers remain inaccessib
   assert.doesNotMatch(JSON.stringify(h.read()),/SECRET_INPUT_GETTER|FICTIONAL_PRIVATE/);
   assert.equal(Object.isFrozen(h.model.getForecastDraftStatus()),true);
   assert.deepEqual(Object.keys(h.read()).sort(),['dirty','epoch','initialized']);
+  assert.equal(h.operations.transaction,0);
+  assert.equal(JSON.stringify(h.allStores),h.original);
+});
+
+test('P4d6 M09: duplicate close notification from stale dialog cannot erase newer DIRTY',()=>{
+  const h=fictionalEventDialog(),old=h.openEdit();
+  old.input.emit('input');old.dialog.close();
+  const current=h.openEdit();
+  current.input.emit('input');
+  const before=h.read();
+  assert.equal(before.dirty,true);
+  old.dialog.emit('close');
+  assert.deepEqual(h.read(),before);
   assert.equal(h.operations.transaction,0);
   assert.equal(JSON.stringify(h.allStores),h.original);
 });
