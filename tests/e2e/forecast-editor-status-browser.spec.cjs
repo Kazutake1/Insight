@@ -398,3 +398,83 @@ test('P4d12 C03: native second-tab write conflicts with stale QuickDaily save',a
     conflict:true,remoteWriteKept:true,notCertifiedClean:true
   });
 });
+
+
+/* STEP4 P4d-13: synthetic native, NOT silent, A -> B -> A plus a negative
+ * HTTP(S) network-fence probe. Only these two new browser tests are in
+ * scope. Neither test proves atomicity or authorizes model use.
+ */
+test('P4d13 D01: notified native two-tab A-B-A still rejects stale QuickDaily save',async({page,context})=>{
+  await p4d12Boot(page);
+  await p4d12EditWithoutSaving(page);
+  page.on('dialog',dialog=>dialog.dismiss());
+  const second=await context.newPage();
+  await second.clock.setFixedTime(new Date('2026-10-21T03:00:00Z'));
+  await installDataApiFence(second);
+  await open(second);
+  await page.evaluate(()=>{
+    window.__p4d13NativeCount=0;
+    window.addEventListener('storage',event=>{
+      if(event.isTrusted&&event.key==='insight_v11')window.__p4d13NativeCount++;
+    });
+  });
+  await second.evaluate(()=>{
+    window.__p4d13InitialRaw=localStorage.getItem('insight_v11');
+    const next=JSON.parse(window.__p4d13InitialRaw);
+    next.stores[next.current].name+='（架空更新）';
+    localStorage.setItem('insight_v11',JSON.stringify(next));
+  });
+  await page.waitForFunction(()=>window.__p4d13NativeCount>=1&&
+    window.InsightStorage.reportState().conflict===true);
+  await page.evaluate(()=>{
+    window.__p4d13AfterFirst=window.InsightStorage.reportState().revision;
+  });
+  await second.evaluate(()=>{
+    localStorage.setItem('insight_v11',window.__p4d13InitialRaw);
+    delete window.__p4d13InitialRaw;
+  });
+  await page.waitForFunction(()=>window.__p4d13NativeCount>=2);
+  const restored=await page.evaluate(()=>{
+    const state=window.InsightStorage.reportState();
+    return {
+      twoTrustedNotifications:window.__p4d13NativeCount>=2,
+      rawEqualOriginal:localStorage.getItem('insight_v11')===window.__p4d11Witness.raw,
+      revisionAdvancedAgain:state.revision>window.__p4d13AfterFirst,
+      conflictStillHeld:state.conflict
+    };
+  });
+  expect(restored).toEqual({
+    twoTrustedNotifications:true,rawEqualOriginal:true,
+    revisionAdvancedAgain:true,conflictStillHeld:true
+  });
+  await page.locator('#quickSaveBtn').click();
+  const after=await page.evaluate(()=>{
+    const state=window.InsightStorage.reportState();
+    const draft=window.InsightQuickDaily.getForecastDraftStatus();
+    return {
+      rawStillEqualOriginal:localStorage.getItem('insight_v11')===window.__p4d11Witness.raw,
+      pending:state.pending,held:state.held,conflict:state.conflict,
+      notCertifiedClean:draft.dirty!==false
+    };
+  });
+  expect(after).toEqual({
+    rawStillEqualOriginal:true,pending:0,held:true,
+    conflict:true,notCertifiedClean:true
+  });
+});
+
+test('P4d13 D02: forbidden weather API request is rejected by the route fence',async({page})=>{
+  const {errors,rejected}=await p4d12Boot(page);
+  // CSP connect-src normally permits this API; the explicit test-only
+  // Playwright route must abort it before any actual external contact.
+  const fetchRejected=await page.evaluate(async()=>{
+    try{
+      await fetch('https://api.open-meteo.com/v1/forecast?latitude=0&longitude=0&current=temperature_2m',
+        {cache:'no-store'});
+      return false;
+    }catch(_){return true;}
+  });
+  expect(fetchRejected).toBe(true);
+  expect(rejected().filter(origin=>origin==='https://api.open-meteo.com').length).toBeGreaterThanOrEqual(1);
+  expect(errors).toEqual([]);
+});
