@@ -210,7 +210,13 @@
       dialog.addEventListener('cancel',function(){forecastPhase='closing';forecastStep(false,null);});
       dialog.addEventListener('close',function(){
         dialog.remove();
-        if(activeDialog===dialog){activeDialog=null;forecastFailure=false;forecastStep(true,false);}
+        if(activeDialog===dialog){
+          activeDialog=null;
+          // A close fired while still opening/saving cannot prove clean.
+          var safeExit=forecastPhase==='closing';
+          forecastPhase=safeExit?'idle':'unknown';
+          forecastStep(safeExit,false);
+        }
       });
       var openingEpoch=forecastEpoch;
       doc.body.append(dialog);dialog.showModal();
