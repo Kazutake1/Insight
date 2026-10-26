@@ -66,6 +66,12 @@
   }
 
   var model={VERSION:1,validDate:validDate,normalizeHours:normalizeHours,validate:validate,get:get,status:status,set:set,copy:copy};
+  // GATE-3 observation only: no draft values, date, store ID or authorization.
+  var forecastDraftReader=null;
+  model.getForecastDraftStatus=function(){
+    var value=forecastDraftReader?forecastDraftReader():{initialized:false,dirty:null,epoch:null};
+    return Object.freeze({initialized:value.initialized,dirty:value.dirty,epoch:value.epoch});
+  };
   if(typeof module!=='undefined'&&module.exports)module.exports=model;
   root.InsightHourlyCustomers=model;
   if(!root.document)return;
@@ -75,6 +81,24 @@
     if(!root.InsightHooks||!root.InsightDateContext||!root.InsightStorage){setTimeout(init,0);return;}
     root.__insightHourlyCustomersV1=true;
     var doc=root.document,activeDialog=null;
+    var forecastEpoch=0,forecastKnown=false,forecastDirty=null,forecastFailure=false;
+    forecastDraftReader=function(){
+      return {initialized:forecastKnown&&forecastEpoch!==null,
+        dirty:forecastKnown&&forecastEpoch!==null?forecastDirty:null,epoch:forecastEpoch};
+    };
+    function forecastStep(known,dirty){
+      // This is editor-local only; never certify Storage or any other editor.
+      if(forecastEpoch!==null){
+        if(forecastEpoch===Number.MAX_SAFE_INTEGER)forecastEpoch=null;
+        else forecastEpoch++;
+      }
+      forecastKnown=!!known&&forecastEpoch!==null;
+      forecastDirty=forecastKnown?!!dirty:null;
+    }
+    function forecastInput(){
+      // A failed transaction keeps the observation unknown until dialog exit.
+      forecastStep(!forecastFailure, true);
+    }
 
     function el(tag,text,cls){
       var node=doc.createElement(tag);
@@ -116,9 +140,10 @@
     }
     function openDialog(date){
       if(activeDialog)return;
+      forecastStep(false,null);
       var saved=status(allStores,selectedStore(),date),draft=saved.hours.slice();
       var dialog=el('dialog',undefined,'hourly-dialog');activeDialog=dialog;
-      var head=el('header'),heading=el('h2','時間帯別客数　'+date),close=el('button','閉じる');close.type='button';close.onclick=function(){dialog.close();};
+      var head=el('header'),heading=el('h2','時間帯別客数　'+date),close=el('button','閉じる');close.type='button';close.onclick=function(){forecastStep(false,null);dialog.close();};
       head.append(heading,close);dialog.append(head);
 
       var grid=el('div',undefined,'hourly-input-grid'),inputs=[];
@@ -149,7 +174,7 @@
         total.textContent='合計 '+formatTotal(sum);
       }
       inputs.forEach(function(input,index){
-        input.addEventListener('input',refresh);
+        input.addEventListener('input',function(){forecastInput();refresh();});
         input.addEventListener('keydown',function(event){
           if(event.key==='Enter'){
             event.preventDefault();
@@ -162,21 +187,27 @@
       refresh();
 
       var actions=el('div',undefined,'hourly-actions'),cancel=el('button','キャンセル'),save=el('button','保存する','hourly-primary');
-      cancel.type='button';cancel.onclick=function(){dialog.close();};save.type='button';save.onclick=function(){
+      cancel.type='button';cancel.onclick=function(){forecastStep(false,null);dialog.close();};save.type='button';save.onclick=function(){
         refresh();
         var invalid=inputs.find(function(input){return !input.checkValidity();});
         if(invalid){invalid.reportValidity();invalid.focus();return;}
+        forecastStep(false,null);
         try{
           persist(date,draft);
           dialog.close();
           renderQuick();
           if(root.InsightEventResults&&typeof root.InsightEventResults.render==='function')root.InsightEventResults.render();
           if(typeof showToast==='function')showToast('✓ 時間帯別客数を保存しました','#15803d','#f0fdf4');
-        }catch(error){alert('時間帯別客数を保存できませんでした。\n'+error.message);}
+        }catch(error){forecastFailure=true;forecastStep(false,null);alert('時間帯別客数を保存できませんでした。\n'+error.message);}
       };
       actions.append(cancel,save);dialog.append(actions);
-      dialog.addEventListener('close',function(){dialog.remove();if(activeDialog===dialog)activeDialog=null;});
+      dialog.addEventListener('cancel',function(){forecastStep(false,null);});
+      dialog.addEventListener('close',function(){
+        dialog.remove();
+        if(activeDialog===dialog){activeDialog=null;forecastFailure=false;forecastStep(true,false);}
+      });
       doc.body.append(dialog);dialog.showModal();
+      forecastStep(true,false);
       setTimeout(function(){var first=inputs.find(function(input){return input.value==='';})||inputs[0];if(first)first.focus();},0);
     }
 
@@ -185,6 +216,7 @@
     root.InsightHooks.on('quick:render:after','hourly-customers-render',renderQuick,25);
     if(typeof currentNav!=='undefined'&&currentNav===0)renderQuick();
     model.renderQuick=renderQuick;
+    forecastStep(true,false);
   }
 
   if(root.document.readyState==='loading')root.document.addEventListener('DOMContentLoaded',init);
