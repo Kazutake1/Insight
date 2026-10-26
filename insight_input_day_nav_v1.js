@@ -11,6 +11,31 @@
     {key:'salesCounts',page:'pageSalesCount',label:'販売数',kind:'count'}
   ];
   var selected={},dirty={},applied={},weekday=['日','月','火','水','木','金','土'];
+  // GATE-3 P4d-4: a positive input witness, never a CLEAN certificate.
+  // Each editor has an independent local epoch; raw input/store IDs stay private.
+  var forecastEpoch={sales:0,kyaku:0,haiki:0};
+  var forecastDirtyWitness={sales:false,kyaku:false,haiki:false};
+  function forecastAdvance(type,observedDirty){
+    if(!Object.prototype.hasOwnProperty.call(forecastEpoch,type))return;
+    var epoch=forecastEpoch[type];
+    if(epoch===null)return;
+    if(epoch>=Number.MAX_SAFE_INTEGER){
+      forecastEpoch[type]=null;forecastDirtyWitness[type]=false;return;
+    }
+    forecastEpoch[type]=epoch+1;
+    forecastDirtyWitness[type]=!!observedDirty;
+  }
+  function forecastUnknown(type){forecastAdvance(type,false);}
+  function forecastInput(type){forecastAdvance(type,true);}
+  function forecastUnknownAll(){
+    ['sales','kyaku','haiki'].forEach(forecastUnknown);
+  }
+  function forecastStatus(type){
+    var valid=Object.prototype.hasOwnProperty.call(forecastEpoch,type);
+    var epoch=valid?forecastEpoch[type]:null;
+    var witnessed=valid&&epoch!==null&&forecastDirtyWitness[type]===true;
+    return Object.freeze({initialized:witnessed,dirty:witnessed?true:null,epoch:epoch});
+  }
   function period(spec){
     if(spec.kind==='count'){
       var count=root.InsightSalesCount;
@@ -131,6 +156,7 @@
     if(crossing&&spec.kind==='legacy'&&dirty[spec.key]&&
       !root.confirm('未保存の入力があります。\n保存せずに別の日付へ移動しますか？'))return false;
     if(crossing){
+      if(spec.kind==='legacy')forecastUnknown(spec.key);
       var oldDay=spec.dayKey?root[spec.dayKey]:null;
       if(spec.dayKey)root[spec.dayKey]=date.getDate();
       var ok=spec.kind==='count'?
@@ -161,7 +187,11 @@
     specs.forEach(sync);
     doc.addEventListener('input',function(e){
       var spec=currentSpec(e.target);
-      if(spec&&spec.kind==='legacy'&&!e.target.closest('.insight-shared-day-nav'))dirty[spec.key]=true;
+      if(spec&&spec.kind==='legacy'&&!e.target.closest('.insight-shared-day-nav')){dirty[spec.key]=true;forecastInput(spec.key);}
+    },true);
+    doc.addEventListener('change',function(e){
+      var spec=currentSpec(e.target);
+      if(spec&&spec.kind==='legacy'&&!e.target.closest('.insight-shared-day-nav'))forecastInput(spec.key);
     },true);
     doc.addEventListener('click',function(e){
       var target=e.target&&e.target.closest?e.target.closest('button,input'):null;
@@ -169,8 +199,8 @@
       var spec=currentSpec(target);
       if(!spec)return;
       if(spec.kind==='legacy'){
-        if(target.matches('#salesSaveBtn,#kyakuSaveBtn,#haikiSaveBtn'))dirty[spec.key]=false;
-        if(target.matches('.wx-btn'))dirty[spec.key]=true;
+        if(target.matches('#salesSaveBtn,#kyakuSaveBtn,#haikiSaveBtn')){dirty[spec.key]=false;forecastUnknown(spec.key);}
+        if(target.matches('.wx-btn')){dirty[spec.key]=true;forecastInput(spec.key);}
         var list=target.closest('#salesDayList .haiki-day-btn,#haikiDayList .haiki-day-btn');
         if(list){
           var index=Array.prototype.indexOf.call(list.parentNode.children,list);
@@ -185,9 +215,15 @@
     });
     var delayed=function(){root.requestAnimationFrame(function(){specs.forEach(sync);});};
     ['nav0','nav1','nav2','nav3','nav4','navSalesCount','storeSel'].forEach(function(id){
-      var node=doc.getElementById(id);if(node)node.addEventListener('click',delayed);
+      var node=doc.getElementById(id);
+      if(node)node.addEventListener('click',function(){forecastUnknownAll();delayed();});
+      if(node&&id==='storeSel')node.addEventListener('change',forecastUnknownAll);
     });
-    if(root.InsightHooks)root.InsightHooks.on('input:table:after','shared-input-day-nav',delayed,85);
+    if(root.InsightHooks)root.InsightHooks.on('input:table:after','shared-input-day-nav',function(ctx){
+      var type=ctx&&ctx.args&&ctx.args[0];
+      if(type==='sales'||type==='kyaku'||type==='haiki')forecastUnknown(type);
+      delayed();
+    },85);
     root.addEventListener('insight:sales-count-period-change',delayed);
     ['kyakuGrid','scCalendar'].forEach(function(id){
       var node=doc.getElementById(id);
@@ -201,7 +237,8 @@
   root.InsightInputDayNav={VERSION:1,select:function(type,iso){
     var spec=specs.find(function(s){return s.key===type;}),date=context.parseIso(iso);
     return !!(spec&&date&&go(spec,date));
-  },getSelectedIso:function(type){var spec=specs.find(function(s){return s.key===type;}),date=spec&&dateFor(spec);return date?context.iso(date):null;}};
+  },getSelectedIso:function(type){var spec=specs.find(function(s){return s.key===type;}),date=spec&&dateFor(spec);return date?context.iso(date):null;},
+    getForecastDraftStatus:forecastStatus};
   if(doc.readyState==='loading')doc.addEventListener('DOMContentLoaded',install);
   else root.setTimeout(install,0);
 })(typeof window!=='undefined'?window:globalThis);
