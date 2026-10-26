@@ -144,7 +144,7 @@
       forecastStep(false,null);
       var saved=status(allStores,selectedStore(),date),draft=saved.hours.slice();
       var dialog=el('dialog',undefined,'hourly-dialog');activeDialog=dialog;
-      var head=el('header'),heading=el('h2','時間帯別客数　'+date),close=el('button','閉じる');close.type='button';close.onclick=function(){forecastStep(false,null);dialog.close();};
+      var head=el('header'),heading=el('h2','時間帯別客数　'+date),close=el('button','閉じる');close.type='button';close.onclick=function(){forecastPhase='closing';forecastStep(false,null);dialog.close();};
       head.append(heading,close);dialog.append(head);
 
       var grid=el('div',undefined,'hourly-input-grid'),inputs=[];
@@ -188,7 +188,7 @@
       refresh();
 
       var actions=el('div',undefined,'hourly-actions'),cancel=el('button','キャンセル'),save=el('button','保存する','hourly-primary');
-      cancel.type='button';cancel.onclick=function(){forecastStep(false,null);dialog.close();};save.type='button';save.onclick=function(){
+      cancel.type='button';cancel.onclick=function(){forecastPhase='closing';forecastStep(false,null);dialog.close();};save.type='button';save.onclick=function(){
         refresh();
         var invalid=inputs.find(function(input){return !input.checkValidity();});
         if(invalid){invalid.reportValidity();invalid.focus();return;}
@@ -202,14 +202,14 @@
         }catch(error){forecastFailure=true;forecastStep(false,null);alert('時間帯別客数を保存できませんでした。\n'+error.message);}
       };
       actions.append(cancel,save);dialog.append(actions);
-      dialog.addEventListener('cancel',function(){forecastStep(false,null);});
+      dialog.addEventListener('cancel',function(){forecastPhase='closing';forecastStep(false,null);});
       dialog.addEventListener('close',function(){
         dialog.remove();
         if(activeDialog===dialog){activeDialog=null;forecastFailure=false;forecastStep(true,false);}
       });
       var openingEpoch=forecastEpoch;
       doc.body.append(dialog);dialog.showModal();
-      if(activeDialog===dialog&&forecastEpoch===openingEpoch&&dialog.open)forecastStep(true,false);
+      if(activeDialog===dialog&&forecastPhase==='opening'&&Number.isSafeInteger(forecastEpoch)&&forecastEpoch===openingEpoch&&dialog.open){forecastPhase='editing';forecastStep(true,false);}
       setTimeout(function(){var first=inputs.find(function(input){return input.value==='';})||inputs[0];if(first)first.focus();},0);
     }
 
