@@ -9,11 +9,13 @@ const source=fs.readFileSync(path.join(root,'insight_storage_v1.js'),'utf8');
 
 function setup(options={}){
   const calls=[];
+  const listeners={};
   const values=options.sharedValues||Object.assign({},options.initial||{});
   const window={
     SK:'insight_v11',
     localStorage:{
       setItem(key,value){
+        if(options.beforeWrite)options.beforeWrite({key,value,window,values});
         if(options.failWrite)throw new Error('quota');
         calls.push([key,value]);
         values[key]=value;
@@ -23,10 +25,14 @@ function setup(options={}){
       }
     }
   };
+  window.addEventListener=function(type,callback){
+    (listeners[type]||(listeners[type]=[])).push(callback);
+  };
   const context={window,globalThis:window,SK:'insight_v11',JSON,Error};
   vm.createContext(context);
   vm.runInContext(source,context);
-  return {window,calls,values,context};
+  return {window,calls,values,context,
+    emitStorage(event){(listeners.storage||[]).forEach(fn=>fn(event));}};
 }
 
 test('snapshot writerはschemaVersionを付けて指定キーへ1回だけJSON保存する',()=>{
@@ -201,4 +207,135 @@ test('runtime persist guardはStorage直後に読み込まれ共有保存層へ�
   assert.match(index,/insight_persist_guard_v1\.js\?v=20261011-stale-tab-1/);
   assert.ok(index.indexOf('insight_storage_v1.js')<index.indexOf('insight_persist_guard_v1.js'));
   assert.ok(index.indexOf('insight_persist_guard_v1.js')<index.indexOf('insight_year_manager_v1.js'));
+});
+
+
+/* STEP4 P4d-7: isolated storage-observation boundary checks.
+ * These tests exercise the ORIGINAL InsightStorage module with fictional
+ * localStorage, not any real store data, browser event loop or AI consumer.
+ * A stable reportState is NOT a trusted full-app-clean or model-use proof.
+ */
+const FICTIONAL_A=JSON.stringify({schemaVersion:1,current:'fictional',
+  stores:{fictional:{value:'A'}}});
+const FICTIONAL_B=JSON.stringify({schemaVersion:1,current:'fictional',
+  stores:{fictional:{value:'B'}}});
+
+test('P4d7 S01: reportState witnesses a pending write before setItem commits',()=>{
+  let during;
+  const f=setup({beforeWrite({window}){during=window.InsightStorage.reportState();}});
+  const first=f.window.InsightStorage.reportState();
+  assert.equal(first.pending,0);
+  f.window.InsightStorage.writeSnapshot(JSON.parse(FICTIONAL_A));
+  assert.equal(during.pending,1);
+  assert.ok(during.revision>first.revision);
+  const after=f.window.InsightStorage.reportState();
+  assert.equal(after.pending,0);
+  assert.equal(after.held,false);
+  assert.equal(f.calls.length,1);
+});
+
+test('P4d7 S02: failed write leaves held status and never claims clean',()=>{
+  const f=setup({failWrite:true});
+  assert.throws(()=>f.window.InsightStorage.writeSnapshot(JSON.parse(FICTIONAL_A)),/quota/);
+  const state=f.window.InsightStorage.reportState();
+  assert.equal(state.pending,0);
+  assert.equal(state.held,true);
+  assert.ok(state.revision>0);
+  assert.equal(f.calls.length,0);
+});
+
+test('P4d7 S03: unannounced cross-tab raw difference is reported and not acknowledged by readSnapshot',()=>{
+  const f=setup({initial:{insight_v11:FICTIONAL_A}});
+  const first=f.window.InsightStorage.reportState();
+  f.values.insight_v11=FICTIONAL_B;
+  const beforeRead=f.window.InsightStorage.reportState();
+  assert.equal(beforeRead.conflict,true);
+  assert.equal(beforeRead.revision,first.revision); // no event, only raw mismatch
+  assert.equal(f.window.InsightStorage.readSnapshot().stores.fictional.value,'B');
+  assert.equal(f.window.InsightStorage.reportState().conflict,true);
+  assert.throws(()=>f.window.InsightStorage.writeSnapshot(JSON.parse(FICTIONAL_A)),
+    e=>e.name==='InsightStorageConflictError');
+  assert.equal(f.calls.length,0);
+});
+
+test('P4d7 S04: observed cross-tab A-B-A remains conflict after raw returns to A',()=>{
+  const f=setup({initial:{insight_v11:FICTIONAL_A}});
+  const start=f.window.InsightStorage.reportState();
+  f.values.insight_v11=FICTIONAL_B;
+  f.emitStorage({key:'insight_v11',newValue:FICTIONAL_B});
+  f.values.insight_v11=FICTIONAL_A;
+  const state=f.window.InsightStorage.reportState();
+  assert.equal(state.conflict,true);
+  assert.ok(state.revision>start.revision);
+  assert.throws(()=>f.window.InsightStorage.writeSnapshot(JSON.parse(FICTIONAL_A)),
+    e=>e.name==='InsightStorageConflictError');
+  assert.equal(f.values.insight_v11,FICTIONAL_A);
+});
+
+test('P4d7 S05: silent A-B-A cannot be proven fresh by the current report API',()=>{
+  const f=setup({initial:{insight_v11:FICTIONAL_A}});
+  const start=f.window.InsightStorage.reportState();
+  f.values.insight_v11=FICTIONAL_B;
+  f.values.insight_v11=FICTIONAL_A; // no dispatched storage event
+  const after=f.window.InsightStorage.reportState();
+  assert.equal(after.conflict,false);
+  assert.equal(after.revision,start.revision);
+  assert.equal(after.pending,0);
+  // This is a documented detection GAP, NOT a clean/authorization assertion.
+  assert.equal(f.calls.length,0);
+});
+
+test('P4d7 S06: even same-value storage notifications invalidate report freshness',()=>{
+  const f=setup({initial:{insight_v11:FICTIONAL_A}});
+  f.emitStorage({key:'insight_v11',newValue:FICTIONAL_A});
+  const state=f.window.InsightStorage.reportState();
+  assert.equal(state.conflict,true);
+  assert.ok(state.revision>0);
+  assert.equal(f.values.insight_v11,FICTIONAL_A);
+  // report conflict is not the same thing as writeSnapshot's own stale guard.
+});
+
+test('P4d7 S07: nested transaction cannot be mistaken for a single settled state',()=>{
+  const during=[];
+  const f=setup({beforeWrite({window}){during.push(window.InsightStorage.reportState());}});
+  f.window.InsightStorage.transaction(JSON.parse(FICTIONAL_A),
+    next=>{next.stores.fictional.value='B';});
+  assert.equal(during.length,1);
+  assert.equal(during[0].pending,2);
+  assert.equal(during[0].held,false);
+  const settled=f.window.InsightStorage.reportState();
+  assert.equal(settled.pending,0);
+  assert.equal(settled.held,false);
+  assert.ok(settled.revision>=2);
+  assert.equal(JSON.parse(f.values.insight_v11).stores.fictional.value,'B');
+});
+
+test('P4d7 S08: apply failure after committed bytes remains held, not proven clean',()=>{
+  const f=setup();
+  assert.throws(()=>f.window.InsightStorage.transaction(JSON.parse(FICTIONAL_A),
+    next=>{next.stores.fictional.value='B';},null,()=>{throw new Error('fictional apply fail');}),
+    /fictional apply fail/);
+  const report=f.window.InsightStorage.reportState();
+  assert.equal(report.pending,0);
+  assert.equal(report.held,true);
+  assert.equal(JSON.parse(f.values.insight_v11).stores.fictional.value,'B');
+  // A write can commit while in-memory apply fails; do not grant permission.
+});
+
+test('P4d7 S09: unreadable storage report throws rather than returning false confidence',()=>{
+  const f=setup({initial:{insight_v11:FICTIONAL_A}});
+  f.window.localStorage.getItem=()=>{throw new Error('fictional storage unavailable');};
+  assert.throws(()=>f.window.InsightStorage.reportState(),
+    /fictional storage unavailable/);
+  assert.equal(f.calls.length,0);
+});
+
+test('P4d7 S10: unrelated storage event does not fabricate source revision',()=>{
+  const f=setup({initial:{insight_v11:FICTIONAL_A}});
+  const start=f.window.InsightStorage.reportState();
+  f.emitStorage({key:'fictional_unrelated_key',newValue:'irrelevant'});
+  const after=f.window.InsightStorage.reportState();
+  assert.equal(after.revision,start.revision);
+  assert.equal(after.conflict,false);
+  assert.equal(f.calls.length,0);
 });
