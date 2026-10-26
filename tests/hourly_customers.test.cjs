@@ -151,7 +151,7 @@ function hourlyForecastFixture(){
       close:byTag(dialog,'button').find(b=>b.textContent==='閉じる')};
   }
   return {
-    model,allStores,before,calls,alerts,state,open,
+    model,root,allStores,before,calls,alerts,state,open,
     setFail(value){failSave=!!value;},
     byTag,body
   };
