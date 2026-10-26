@@ -112,6 +112,8 @@ test('P4d10 B04: real event editor DIRTY is lost on close, never certified CLEAN
   await page.getByRole('button',{name:'＋イベントを追加'}).click();
   const dialog=page.locator('.ie-dialog.ie-event-add');
   await expect(dialog).toBeVisible();
+  // The initial sale form does not show the general event-name field.
+  await dialog.getByLabel('イベント種別').selectOption('nearby');
   await dialog.getByLabel('イベント名',{exact:true}).fill('架空の未保存イベント');
   const dirty=await status(page,'events_and_promotions');
   assertNonAuthorizingShape(dirty);
