@@ -198,11 +198,9 @@ test('JN05: fabricated authorizations and accessor graphs are rejected',()=>{
   const forged=fixture();forged.graph_input.authorized_for_model=true;
   verdict(forged,'REJECT','GRAPH_INVALID');
   const invalid=fixture();
-  const graph=invalid.graph_input;delete invalid.graph_input;
-  Object.defineProperty(invalid,'graph_input',{enumerable:true,
-    get(){throw new Error('must not return raw exception');}});
+  Object.defineProperty(invalid.graph_input,'anchor',{enumerable:true,
+    get(){throw new Error('secret fixture exception must not escape');}});
   verdict(invalid,'REJECT','INVALID_FIXTURE_INPUT');
-  assert.ok(graph);
 });
 test('JN06: old observed automatic day holds, explicit manual fixture stays unchanged',()=>{
   const old=fixture();
