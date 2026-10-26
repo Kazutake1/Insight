@@ -318,3 +318,17 @@ test('P4d2 R1d: premature synchronous close inside save remains UNKNOWN',()=>{
   assert.equal(h.state().initialized,false);
   assert.equal(h.state().dirty,null);
 });
+
+test('P4d2 R1e: late input after completed save but before close stays UNKNOWN',()=>{
+  const h=hourlyForecastFixture(),ui=h.open();
+  ui.inputs[0].value='5';ui.inputs[0].dispatch('input');
+  ui.save.onclick();
+  assert.equal(h.calls.transaction,1);
+  const before=h.state().epoch;
+  ui.inputs[1].value='99';ui.inputs[1].dispatch('input');
+  assert.equal(h.state().initialized,false);
+  assert.ok(h.state().epoch>before);
+  ui.dialog.finishClose();
+  assert.equal(h.state().initialized,false);
+  assert.equal(h.state().dirty,null);
+});
