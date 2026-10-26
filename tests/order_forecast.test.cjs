@@ -1034,21 +1034,31 @@ async function p4c5Harness(){
   const unsubscribe=f.model.subscribeForecastSelectionInvalidation(function(){
     view.notices.push(arguments.length);invalidate();
   });
+  // External verification callbacks may synchronously invalidate or dispose.
+  // Recheck ticket ownership after each callback, not just before it.
+  const active=(ticket)=>!!ticket&&!disposed&&!unsafe&&
+    (phase==='PENDING'||phase==='VISIBLE')&&current===ticket&&
+    ticket.gen===gen&&ticket.coordinatorEpoch===coordinator.getEpoch()&&
+    ticket.sourceVersion===source.version;
   const fresh=(ticket)=>{
-    if(disposed||unsafe||!ticket||
-       (phase!=='PENDING'&&phase!=='VISIBLE')||
-       ticket.gen!==gen||ticket.coordinatorEpoch!==coordinator.getEpoch()||
-       ticket.sourceVersion!==source.version||!sourceOK())return false;
+    if(!active(ticket))return false;
+    if(!sourceOK()||!active(ticket))return false;
     const s=status();
+    if(!active(ticket))return false;
     return !!s&&s.epoch===ticket.selection.epoch&&
       s.manualIntent===ticket.selection.manualIntent;
   };
   const guard={
     async begin(options={}){
       if(disposed||unsafe)return false;
-      invalidate();if(unsafe)return false;
+      invalidate();if(disposed||unsafe)return false;
+      const beginGen=gen,beginEpoch=coordinator.getEpoch();
       const selection=status();
-      if(!selection||!sourceOK())return false;
+      if(disposed||unsafe||gen!==beginGen||
+         coordinator.getEpoch()!==beginEpoch||!selection)return false;
+      const sourceValid=sourceOK();
+      if(disposed||unsafe||gen!==beginGen||
+         coordinator.getEpoch()!==beginEpoch||!sourceValid)return false;
       phase='PENDING';
       let pending;
       try{pending=coordinator.request({purpose:'FICTIONAL_DISPLAY_ONLY'});}
@@ -1085,8 +1095,9 @@ async function p4c5Harness(){
     },
     dispose(){
       if(disposed)return;
-      gen++;phase='HIDDEN';current=null;clear();
-      coordinator.dispose();unsubscribe();disposed=true;
+      // Mark terminal before calling clear adapter: it can reenter the guard.
+      disposed=true;gen++;phase='HIDDEN';current=null;clear();
+      coordinator.dispose();unsubscribe();
       if(!unsafe)phase='DISPOSED';
     },
     state(){return {phase,visible:view.marker==='FICTIONAL_READY',
@@ -1173,6 +1184,63 @@ test('P4c5 T07: dispose clears visible and prevents late resolve/reject',async()
   b.tasks[0].reject(Error('ERROR_CANARY_DO_NOT_SHOW'));
   await settleForecast();assert.equal(b.view.marker,null);
   assert.equal(b.guard.state().phase,'DISPOSED');
+});
+test('P4c5 R1a: source check disposing mid-fresh cannot repaint',async()=>{
+  const h=await p4c5Harness(),p=h.guard.begin();
+  let checks=0;
+  h.hooks.source=()=>{
+    if(++checks===2)h.guard.dispose();
+    return true;
+  };
+  h.tasks[0].resolve({raw:'RAW_QUANTITY_CANARY_DO_NOT_SHOW'});
+  assert.equal(await p,false);
+  assert.deepEqual(h.guard.state(),{
+    phase:'DISPOSED',visible:false,unsafe:false,disposed:true,generation:2
+  });
+  assert.equal(h.view.paints,0);
+  assert.equal(h.view.marker,null);
+  p4c5AssertNoEffects(h);
+});
+test('P4c5 R1b: status check disposing mid-fresh cannot repaint',async()=>{
+  const h=await p4c5Harness(),p=h.guard.begin();
+  let checks=0;
+  h.hooks.status=()=>{
+    if(++checks===2)h.guard.dispose();
+    return h.f.status();
+  };
+  h.tasks[0].resolve({raw:'RAW_QUANTITY_CANARY_DO_NOT_SHOW'});
+  assert.equal(await p,false);
+  assert.equal(h.guard.state().phase,'DISPOSED');
+  assert.equal(h.guard.state().visible,false);
+  assert.equal(h.view.paints,0);
+  p4c5AssertNoEffects(h);
+});
+test('P4c5 R1c: dispose inside begin callbacks blocks request',async()=>{
+  for(const callback of ['status','source']){
+    const h=await p4c5Harness();
+    if(callback==='status')h.hooks.status=()=>{
+      h.guard.dispose();return h.f.status();
+    };
+    else h.hooks.source=()=>{
+      h.guard.dispose();return true;
+    };
+    assert.equal(await h.guard.begin(),false);
+    assert.equal(h.tasks.length,0);
+    assert.equal(h.guard.state().phase,'DISPOSED');
+    assert.equal(h.guard.state().visible,false);
+    p4c5AssertNoEffects(h);
+  }
+});
+test('P4c5 R1d: dispose reentered during paint clears old sentinel',async()=>{
+  const h=await p4c5Harness();
+  h.hooks.paint=()=>h.guard.dispose();
+  const p=h.guard.begin();
+  h.tasks[0].resolve({raw:'RAW_QUANTITY_CANARY_DO_NOT_SHOW'});
+  assert.equal(await p,false);
+  assert.equal(h.guard.state().phase,'DISPOSED');
+  assert.equal(h.view.marker,null);
+  assert.equal(h.guard.state().unsafe,false);
+  p4c5AssertNoEffects(h);
 });
 test('P4c5 T08: unknown status, thrown source and clear failure fail closed',async()=>{
   for(const s of [
