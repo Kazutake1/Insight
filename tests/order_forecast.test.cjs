@@ -977,3 +977,248 @@ test('P4c4 F08: synthetic untrusted same-date change invalidates READY',async()=
   await p4c4AbortAndSettle(h);
   h.unsubscribe();
 });
+
+
+/* P4c-5: fictional in-memory display lease. Not a production adapter.
+ * No source values/context reach the view, only the literal FICTIONAL_READY.
+ * A real adapter with failed synchronous clear is UNSAFE, never approved.
+ */
+async function p4c5Harness(){
+  const f=fictionalOrderSelectionUI();f.init();f.enter();await settleForecast();
+  assert.equal(f.status().initialized,true);
+  const tasks=[],source={version:0},hooks={status:null,source:null,paint:null,clear:null};
+  const view={marker:null,events:[],notices:[],paints:0,clears:0};
+  const stamp=v=>v&&v.initialized===true&&
+    (v.manualIntent===true||v.manualIntent===false)&&
+    Number.isSafeInteger(v.epoch)&&v.epoch>=0?
+      {epoch:v.epoch,manualIntent:v.manualIntent}:null;
+  const status=()=>{try{return stamp(hooks.status?hooks.status():f.status());}catch{return null;}};
+  const sourceOK=()=>{try{return hooks.source?hooks.source()===true:true;}catch{return false;}};
+  const reader={
+    read(){
+      const s=stamp(f.status());if(!s)throw Error('FICTIONAL_UNKNOWN');
+      return Object.freeze({
+        snapshot_id:'fictional-lease',
+        request:{scope:{id:'SECRET_SCOPE_NOT_FOR_VIEW'},target_day:'2026-10-27',
+          request_issued_at:'2026-10-26T07:00:00+09:00'},
+        source_versions:{fictional:'SECRET_VERSION_NOT_FOR_VIEW'},
+        observed:s,sourceVersion:source.version
+      });
+    },
+    isCurrent(snapshot){
+      const s=stamp(f.status()),old=snapshot.observed;
+      return !!s&&s.epoch===old.epoch&&
+        s.manualIntent===old.manualIntent&&
+        source.version===snapshot.sourceVersion;
+    }
+  };
+  const coordinator=createFixtureRequestCoordinator({
+    reader,session_id:'SECRET_SESSION_NOT_FOR_VIEW',
+    evaluate(_snapshot,{signal}){
+      return new Promise((resolve,reject)=>tasks.push({resolve,reject,signal}));
+    }
+  });
+  let phase='HIDDEN',gen=0,disposed=false,unsafe=false;
+  let current=null;
+  const clear=()=>{
+    try{
+      if(hooks.clear)hooks.clear();
+      view.marker=null;view.clears++;
+      view.events.push({type:'clear'});
+    }catch{unsafe=true;phase='UNSAFE';}
+  };
+  const invalidate=()=>{
+    if(disposed||unsafe)return;
+    gen++;phase='HIDDEN';current=null;coordinator.invalidate();clear();
+  };
+  const unsubscribe=f.model.subscribeForecastSelectionInvalidation(function(){
+    view.notices.push(arguments.length);invalidate();
+  });
+  const fresh=(ticket)=>{
+    if(disposed||unsafe||!ticket||
+       (phase!=='PENDING'&&phase!=='VISIBLE')||
+       ticket.gen!==gen||ticket.coordinatorEpoch!==coordinator.getEpoch()||
+       ticket.sourceVersion!==source.version||!sourceOK())return false;
+    const s=status();
+    return !!s&&s.epoch===ticket.selection.epoch&&
+      s.manualIntent===ticket.selection.manualIntent;
+  };
+  const guard={
+    async begin(options={}){
+      if(disposed||unsafe)return false;
+      invalidate();if(unsafe)return false;
+      const selection=status();
+      if(!selection||!sourceOK())return false;
+      phase='PENDING';
+      let pending;
+      try{pending=coordinator.request({purpose:'FICTIONAL_DISPLAY_ONLY'});}
+      catch{invalidate();return false;}
+      const ticket={gen,selection,sourceVersion:source.version,
+        coordinatorEpoch:coordinator.getEpoch()};
+      current=ticket;
+      let outcome;
+      try{outcome=await pending;}
+      catch{if(gen===ticket.gen)invalidate();return false;}
+      if(!outcome||outcome.accepted!==true||outcome.freshness!=='current'||!fresh(ticket)){
+        if(gen===ticket.gen)invalidate();
+        return false;
+      }
+      try{if(options.beforePaint)options.beforePaint();}
+      catch{if(gen===ticket.gen)invalidate();return false;}
+      if(!fresh(ticket))return false;
+      try{
+        // Never forward opaque result, context, scope, date or versions.
+        view.marker='FICTIONAL_READY';
+        view.paints++;view.events.push({type:'paint',marker:'FICTIONAL_READY'});
+        if(hooks.paint)hooks.paint();
+      }catch{if(gen===ticket.gen)invalidate();return false;}
+      if(!fresh(ticket)){
+        if(gen===ticket.gen)invalidate();
+        return false;
+      }
+      phase='VISIBLE';return true;
+    },
+    inspect(){
+      if(phase!=='VISIBLE')return false;
+      if(!fresh(current)){invalidate();return false;}
+      return true;
+    },
+    dispose(){
+      if(disposed)return;
+      gen++;phase='HIDDEN';current=null;clear();
+      coordinator.dispose();unsubscribe();disposed=true;
+      if(!unsafe)phase='DISPOSED';
+    },
+    state(){return {phase,visible:view.marker==='FICTIONAL_READY',
+      unsafe,disposed,generation:gen};}
+  };
+  return {f,guard,view,hooks,source,tasks,coordinator};
+}
+async function p4c5Visible(h){
+  const p=h.guard.begin();
+  assert.ok(h.tasks.length);
+  h.tasks.at(-1).resolve({raw:'RAW_QUANTITY_CANARY_DO_NOT_SHOW'});
+  assert.equal(await p,true);
+  assert.equal(h.view.marker,'FICTIONAL_READY');
+}
+function p4c5AssertNoEffects(h){
+  assert.equal(h.f.saves,0);assert.equal(h.f.traffic,0);
+  assert.equal(JSON.stringify(h.f.stores),h.f.initial);
+  assert.ok(h.view.notices.every(n=>n===0));
+  assert.doesNotMatch(JSON.stringify(h.view),
+    /RAW_QUANTITY_CANARY_DO_NOT_SHOW|ERROR_CANARY_DO_NOT_SHOW|SECRET_SCOPE_NOT_FOR_VIEW|SECRET_VERSION_NOT_FOR_VIEW|SECRET_SESSION_NOT_FOR_VIEW/);
+}
+test('P4c5 T01: accepted fictional READY remains visible while state is current',async()=>{
+  const h=await p4c5Harness();await p4c5Visible(h);
+  assert.equal(h.guard.inspect(),true);
+  assert.equal(h.guard.state().phase,'VISIBLE');
+  h.guard.dispose();assert.equal(h.view.marker,null);
+});
+test('P4c5 T02: same-day date picker focus clears existing display synchronously',async()=>{
+  const h=await p4c5Harness();await p4c5Visible(h);
+  const day=h.f.model.getState().delivery,clears=h.view.clears;
+  h.f.elements.get('ofDelivery').onfocus();
+  assert.equal(h.f.model.getState().delivery,day);
+  assert.equal(h.view.marker,null);assert.ok(h.view.clears>clears);
+  assert.deepEqual(h.f.status(),{initialized:false,manualIntent:null,epoch:null});
+  h.guard.dispose();
+});
+test('P4c5 T03: category A-B-A cannot resurrect previously visible READY',async()=>{
+  const h=await p4c5Harness();await p4c5Visible(h);
+  const picker=h.f.elements.get('ofCategory'),start=h.f.model.getState().categoryId;
+  picker.onchange({target:{value:'fictional_bread'}});
+  assert.equal(h.view.marker,null);
+  picker.onchange({target:{value:'fictional_rice'}});
+  assert.equal(h.f.model.getState().categoryId,start);
+  assert.equal(h.guard.inspect(),false);assert.equal(h.view.paints,1);
+  h.guard.dispose();
+});
+test('P4c5 T04: leaving page and refresh clear display without automatic re-adoption',async()=>{
+  const a=await p4c5Harness();await p4c5Visible(a);
+  a.f.root.gotoNav('dashboard');assert.equal(a.view.marker,null);
+  a.f.enter();await settleForecast();assert.equal(a.view.marker,null);
+  a.guard.dispose();
+  const b=await p4c5Harness();await p4c5Visible(b);
+  b.f.elements.get('ofRefresh').onclick();
+  assert.equal(b.view.marker,null);
+  await settleForecast();assert.equal(b.view.marker,null);
+  b.guard.dispose();
+});
+test('P4c5 T05: event between accepted reply and paint prevents drawing',async()=>{
+  const h=await p4c5Harness();
+  const p=h.guard.begin({beforePaint:()=>h.f.elements.get('ofDelivery').onfocus()});
+  h.tasks[0].resolve({raw:'RAW_QUANTITY_CANARY_DO_NOT_SHOW'});
+  assert.equal(await p,false);
+  assert.equal(h.view.paints,0);assert.equal(h.view.marker,null);
+  h.guard.dispose();
+});
+test('P4c5 T06: event or exception during paint leaves no old READY',async()=>{
+  const a=await p4c5Harness();
+  a.hooks.paint=()=>a.f.elements.get('ofDelivery').onfocus();
+  const p=a.guard.begin();a.tasks[0].resolve({raw:'RAW_QUANTITY_CANARY_DO_NOT_SHOW'});
+  assert.equal(await p,false);assert.equal(a.view.marker,null);
+  a.guard.dispose();
+  const b=await p4c5Harness();
+  b.hooks.paint=()=>{throw Error('ERROR_CANARY_DO_NOT_SHOW');};
+  const r=b.guard.begin();b.tasks[0].resolve({raw:'RAW_QUANTITY_CANARY_DO_NOT_SHOW'});
+  assert.equal(await r,false);assert.equal(b.view.marker,null);
+  b.guard.dispose();
+});
+test('P4c5 T07: dispose clears visible and prevents late resolve/reject',async()=>{
+  const a=await p4c5Harness();await p4c5Visible(a);
+  a.guard.dispose();assert.equal(a.guard.state().phase,'DISPOSED');
+  assert.equal(a.view.marker,null);assert.equal(await a.guard.begin(),false);
+  const b=await p4c5Harness(),p=b.guard.begin();
+  b.guard.dispose();assert.equal(await p,false);
+  b.tasks[0].reject(Error('ERROR_CANARY_DO_NOT_SHOW'));
+  await settleForecast();assert.equal(b.view.marker,null);
+  assert.equal(b.guard.state().phase,'DISPOSED');
+});
+test('P4c5 T08: unknown status, thrown source and clear failure fail closed',async()=>{
+  for(const s of [
+    {initialized:true,manualIntent:null,epoch:1},
+    {initialized:false,manualIntent:false,epoch:1},
+    {initialized:true,manualIntent:false,epoch:null},
+    {initialized:true,manualIntent:false,epoch:-1}
+  ]){
+    const h=await p4c5Harness();h.hooks.status=()=>s;
+    assert.equal(await h.guard.begin(),false);
+    assert.equal(h.tasks.length,0);h.guard.dispose();
+  }
+  const a=await p4c5Harness();
+  a.hooks.status=()=>{throw Error('ERROR_CANARY_DO_NOT_SHOW');};
+  assert.equal(await a.guard.begin(),false);a.guard.dispose();
+  const b=await p4c5Harness();await p4c5Visible(b);
+  b.hooks.source=()=>{throw Error('ERROR_CANARY_DO_NOT_SHOW');};
+  assert.equal(b.guard.inspect(),false);assert.equal(b.view.marker,null);
+  b.guard.dispose();
+  const c=await p4c5Harness();await p4c5Visible(c);
+  c.hooks.clear=()=>{throw Error('UNCLEARED_SURFACE_CANARY');};
+  c.f.elements.get('ofDelivery').onfocus();
+  assert.equal(c.guard.state().unsafe,true,'uncleared real surface is NOT safe');
+  assert.equal(await c.guard.begin(),false);
+  c.guard.dispose();
+});
+test('P4c5 T09: only new current request may display after ABA',async()=>{
+  const h=await p4c5Harness();await p4c5Visible(h);
+  const picker=h.f.elements.get('ofCategory');
+  picker.onchange({target:{value:'fictional_bread'}});
+  picker.onchange({target:{value:'fictional_rice'}});
+  assert.equal(h.view.marker,null);
+  const p=h.guard.begin();
+  assert.equal(h.tasks.length,2);
+  h.tasks[1].resolve({raw:'RAW_QUANTITY_CANARY_DO_NOT_SHOW'});
+  assert.equal(await p,true);assert.equal(h.view.marker,'FICTIONAL_READY');
+  assert.equal(h.view.paints,2);
+  h.guard.dispose();
+});
+test('P4c5 T10: no raw, context, identifiers or network escape fixture view',async()=>{
+  const h=await p4c5Harness();await p4c5Visible(h);
+  h.f.elements.get('ofDelivery').onfocus();
+  assert.equal(h.view.marker,null);
+  p4c5AssertNoEffects(h);
+  assert.ok(h.view.notices.length>0);
+  assert.ok(h.view.events.every(e=>e.type==='clear'||
+    (e.type==='paint'&&e.marker==='FICTIONAL_READY')));
+  h.guard.dispose();p4c5AssertNoEffects(h);
+});
