@@ -170,6 +170,11 @@ jobs:
     container:
       image: mcr.microsoft.com/playwright/python:v1.63.0-noble
       options: --user 1001
+      # Keep fontconfig and installed fonts aligned with ubuntu-latest;
+      # geometry assertions remain unchanged (1.5px).
+      volumes:
+        - /usr/share/fonts:/usr/share/fonts:ro
+        - /etc/fonts:/etc/fonts:ro
     permissions:
       contents: read
     timeout-minutes: 25
