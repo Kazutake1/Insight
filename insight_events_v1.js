@@ -236,6 +236,30 @@
     validate(all);return e.id;
   }
   var model={validate:validate,validateSnapshot:validateSnapshot,summary:summary,targetForCategory:targetForCategory,segmentsForCategory:segmentsForCategory,segmentSummary:segmentSummary,list:list,presets:presets,specialPresets:specialPresets,nearbyPresets:nearbyPresets,demandCategories:demandCategories,appendDemandFavorites:appendDemandFavorites,demandItems:demandItems,demandTemplate:demandTemplate,syncDemandPreset:syncDemandPreset,findDuplicateSpecial:findDuplicateSpecial,add:add,copy:copy};
+  // STEP4 GATE-3: positive local event-dialog witness only; never CLEAN.
+  var forecastEpoch=0,forecastWitness=false,forecastDialogs=[];
+  function forecastSoleLive(record){
+    return !!(record&&record.alive&&record.ready&&record.dialog.open&&
+      forecastDialogs.length===1&&forecastDialogs[0]===record);
+  }
+  function forecastObserve(record){
+    // A stale, already-closed dialog cannot overwrite a newer observation.
+    if(!record.alive)return;
+    forecastAdvance(forecastSoleLive(record));
+  }
+  function forecastInvalidate(record){
+    if(record.alive)forecastAdvance(false);
+  }
+  function forecastAdvance(dirty){
+    if(forecastEpoch===null)return;
+    if(forecastEpoch>=Number.MAX_SAFE_INTEGER){forecastEpoch=null;forecastWitness=false;return;}
+    forecastEpoch++;
+    forecastWitness=!!dirty;
+  }
+  model.getForecastDraftStatus=function(){
+    var witnessed=forecastWitness&&forecastEpoch!==null&&forecastSoleLive(forecastDialogs[0]);
+    return Object.freeze({initialized:witnessed,dirty:witnessed?true:null,epoch:forecastEpoch});
+  };
   if(typeof module!=='undefined'&&module.exports)module.exports=model;
   if(!root.document)return;
   root.InsightEvents=model;
@@ -259,9 +283,34 @@
     }
 
     function dialog(title){
+      forecastAdvance(false);
       var d=el('dialog',undefined,'ie-dialog'),head=el('header');
+      var record={dialog:d,alive:true,ready:false};
+      forecastDialogs.push(record);
+      d.addEventListener('input',function(){forecastObserve(record);},true);
+      d.addEventListener('change',function(){forecastObserve(record);},true);
+      // A UI click may indirectly mutate a draft without an input event.
+      // Such changes are UNKNOWN until a fresh, directly observed input.
+      d.addEventListener('click',function(){forecastInvalidate(record);},true);
+      d.addEventListener('submit',function(){forecastInvalidate(record);},true);
+      d.addEventListener('cancel',function(){forecastInvalidate(record);},true);
       var h=el('h2',title);h.id=id();d.setAttribute('aria-labelledby',h.id);head.append(h,button('閉じる',function(){d.close();}));d.append(head);
-      d.addEventListener('close',function(){d.remove();if(activeDialog===d)activeDialog=null;});doc.body.append(d);d.showModal();return d;
+      d.addEventListener('close',function(){
+        if(record.alive){
+          record.alive=false;
+          var index=forecastDialogs.indexOf(record);
+          if(index>=0)forecastDialogs.splice(index,1);
+          forecastAdvance(false);
+        }
+        d.remove();
+        if(activeDialog===d)activeDialog=null;
+      });
+      // append/showModal can synchronously reenter handlers. Never report
+      // DIRTY from their incomplete setup or revive an old status afterwards.
+      var openEpoch=forecastEpoch;
+      doc.body.append(d);d.showModal();
+      if(record.alive&&forecastEpoch===openEpoch&&d.open)record.ready=true;
+      return d;
     }
     function field(parent,label,type,value){var l=el('label',label),input=el(type==='textarea'?'textarea':'input');if(type!=='textarea')input.type=type;input.value=value==null?'':String(value);input.setAttribute('aria-label',label);l.append(input);parent.append(l);return input;}
     function locationEditor(parent,snapshot){
