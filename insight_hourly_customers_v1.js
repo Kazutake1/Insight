@@ -193,7 +193,7 @@
         refresh();
         var invalid=inputs.find(function(input){return !input.checkValidity();});
         if(invalid){invalid.reportValidity();invalid.focus();return;}
-        forecastPhase='saving';
+        forecastPhase='saving';forecastCloseKind=null;
         forecastStep(false,null);
         var saveEpoch=forecastEpoch;
         try{
@@ -203,7 +203,7 @@
           if(root.InsightEventResults&&typeof root.InsightEventResults.render==='function')root.InsightEventResults.render();
           if(typeof showToast==='function')showToast('✓ 時間帯別客数を保存しました','#15803d','#f0fdf4');
           // Callback reentry during saving cannot certify a clean view.
-          if(activeDialog===dialog&&forecastPhase==='saving'&&forecastEpoch===saveEpoch)forecastPhase='closing';
+          if(activeDialog===dialog&&forecastPhase==='saving'&&forecastEpoch===saveEpoch){forecastPhase='closing';forecastCloseKind='saved';forecastCloseEpoch=forecastEpoch;}
           else{forecastPhase='unknown';forecastStep(false,null);}
         }catch(error){forecastPhase='failed';forecastStep(false,null);alert('時間帯別客数を保存できませんでした。\n'+error.message);}
       };
@@ -214,7 +214,8 @@
         if(activeDialog===dialog){
           activeDialog=null;
           // A close fired while still opening/saving cannot prove clean.
-          var safeExit=forecastPhase==='closing';
+          var safeExit=forecastPhase==='closing'&&(forecastCloseKind==='discard'||(forecastCloseKind==='saved'&&forecastEpoch===forecastCloseEpoch));
+          forecastCloseKind=null;forecastCloseEpoch=null;
           forecastPhase=safeExit?'idle':'unknown';
           forecastStep(safeExit,false);
         }
