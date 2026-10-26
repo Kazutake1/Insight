@@ -81,7 +81,7 @@
     if(!root.InsightHooks||!root.InsightDateContext||!root.InsightStorage){setTimeout(init,0);return;}
     root.__insightHourlyCustomersV1=true;
     var doc=root.document,activeDialog=null;
-    var forecastEpoch=0,forecastKnown=false,forecastDirty=null,forecastFailure=false;
+    var forecastEpoch=0,forecastKnown=false,forecastDirty=null,forecastPhase='idle';
     forecastDraftReader=function(){
       return {initialized:forecastKnown&&forecastEpoch!==null,
         dirty:forecastKnown&&forecastEpoch!==null?forecastDirty:null,epoch:forecastEpoch};
@@ -97,7 +97,7 @@
     }
     function forecastInput(){
       // A failed transaction keeps the observation unknown until dialog exit.
-      forecastStep(!forecastFailure, true);
+      forecastStep(forecastPhase==='editing',true);
     }
 
     function el(tag,text,cls){
@@ -140,6 +140,7 @@
     }
     function openDialog(date){
       if(activeDialog)return;
+      forecastPhase='opening';
       forecastStep(false,null);
       var saved=status(allStores,selectedStore(),date),draft=saved.hours.slice();
       var dialog=el('dialog',undefined,'hourly-dialog');activeDialog=dialog;
