@@ -73,6 +73,7 @@ jobs:
           - hourly_customers.test.cjs
           - event_results.test.cjs
           - insight_sales_count.test.cjs
+          - forecast_editor_coverage.test.cjs
           - trip_inference.test.cjs
           - trip_inference_view.test.cjs
           - trip_overrides.test.cjs
