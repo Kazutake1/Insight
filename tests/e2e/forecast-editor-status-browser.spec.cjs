@@ -262,3 +262,138 @@ test('P4d11 B08: real hourly dialog edit is DIRTY and discard returns local idle
   expect(rejected().every(origin=>origin!=='https://cdnjs.cloudflare.com')).toBe(true);
   expect(errors).toEqual([]);
 });
+
+
+/* P4d-12 C01-C03: actual QuickDaily save lifecycle in FRESH, SYNTHETIC
+ * browser contexts. A positive local status is not an app-wide CLEAN
+ * witness, and no test here authorizes model data access or production use.
+ * Raw localStorage is compared inside the page, never returned to Node.
+ */
+const {reportFixture:p4d12Fixture}=require('../report_fixture.cjs');
+async function p4d12Boot(page){
+  await page.clock.setFixedTime(new Date('2026-10-21T03:00:00Z'));
+  await page.addInitScript(snapshot=>{
+    if(localStorage.getItem('insight_v11')===null)
+      localStorage.setItem('insight_v11',JSON.stringify(snapshot));
+  },p4d12Fixture());
+  const rejected=await installDataApiFence(page);
+  const errors=await open(page);
+  await page.locator('#nav0').click();
+  await expect(page.locator('#pageQuick')).toHaveClass(/show/);
+  await expect(page.locator('#qi_売上')).toBeVisible();
+  await expect(page.locator('#quickSaveBtn')).toBeVisible();
+  return {errors,rejected};
+}
+async function p4d12EditWithoutSaving(page){
+  const previous=await status(page,'quick_daily');
+  await captureLocalStorageBaseline(page);
+  await page.locator('#qi_売上').fill('42');
+  await assertPositiveLocalDirty(page,'quick_daily',previous.epoch);
+}
+function p4d12StorageObservation(){
+  const state=window.InsightStorage.reportState();
+  const local=window.InsightQuickDaily.getForecastDraftStatus();
+  return {
+    revisionAdvanced:state.revision>window.__p4d11Witness.revision,
+    pending:state.pending,held:state.held,conflict:state.conflict,
+    localInitialized:local.initialized,localDirty:local.dirty,
+    rawChanged:localStorage.getItem('insight_v11')!==window.__p4d11Witness.raw
+  };
+}
+
+test('P4d12 C01: real QuickDaily save commits synthetic input but status returns UNKNOWN',async({page})=>{
+  const {errors}=await p4d12Boot(page);
+  await p4d12EditWithoutSaving(page);
+  await page.locator('#quickSaveBtn').click();
+  const observed=await page.evaluate(()=>{
+    const v=p4d12StorageObservation();
+    const raw=JSON.parse(localStorage.getItem('insight_v11'));
+    const saved=raw.stores[raw.current].data['2026']['10月'][20];
+    return {...v,fictionalValueSaved:saved?.売上===42};
+  });
+  expect(observed).toEqual({
+    revisionAdvanced:true,pending:0,held:false,conflict:false,
+    localInitialized:false,localDirty:null,rawChanged:true,fictionalValueSaved:true
+  });
+  expect(errors).toEqual([]);
+});
+
+test('P4d12 C02: real QuickDaily save failure holds Storage, never certifies CLEAN',async({page})=>{
+  await p4d12Boot(page);
+  await p4d12EditWithoutSaving(page);
+  page.on('dialog',dialog=>dialog.dismiss());
+  await page.evaluate(()=>{
+    window.__p4d12SavedSetItem=Storage.prototype.setItem;
+    window.__p4d12RejectedWrites=0;
+    Storage.prototype.setItem=function(key,value){
+      if(key==='insight_v11'){
+        window.__p4d12RejectedWrites++;
+        throw new DOMException('synthetic quota only','QuotaExceededError');
+      }
+      return window.__p4d12SavedSetItem.call(this,key,value);
+    };
+  });
+  try{
+    await page.locator('#quickSaveBtn').click();
+  }finally{
+    await page.evaluate(()=>{
+      Storage.prototype.setItem=window.__p4d12SavedSetItem;
+      delete window.__p4d12SavedSetItem;
+    });
+  }
+  const observed=await page.evaluate(()=>{
+    const v=p4d12StorageObservation();
+    return {
+      attempted:window.__p4d12RejectedWrites>0,
+      revisionAdvanced:v.revisionAdvanced,pending:v.pending,
+      held:v.held,rawUnchanged:!v.rawChanged,
+      notCertifiedClean:v.localDirty!==false
+    };
+  });
+  expect(observed).toEqual({
+    attempted:true,revisionAdvanced:true,pending:0,held:true,
+    rawUnchanged:true,notCertifiedClean:true
+  });
+});
+
+test('P4d12 C03: native second-tab write conflicts with stale QuickDaily save',async({page,context})=>{
+  await p4d12Boot(page);
+  await p4d12EditWithoutSaving(page);
+  page.on('dialog',dialog=>dialog.dismiss());
+  const second=await context.newPage();
+  await second.clock.setFixedTime(new Date('2026-10-21T03:00:00Z'));
+  await installDataApiFence(second);
+  await open(second);
+  await page.evaluate(()=>{
+    window.__p4d12NativeStorage=false;
+    window.addEventListener('storage',event=>{
+      if(event.isTrusted&&event.key==='insight_v11')
+        window.__p4d12NativeStorage=true;
+    });
+  });
+  await second.evaluate(()=>{
+    const next=JSON.parse(localStorage.getItem('insight_v11'));
+    next.stores[next.current].name+='（架空の別タブ更新）';
+    localStorage.setItem('insight_v11',JSON.stringify(next));
+  });
+  await page.waitForFunction(()=>window.__p4d12NativeStorage===true&&
+    window.InsightStorage.reportState().conflict===true);
+  await page.evaluate(()=>{
+    window.__p4d12OtherTabRaw=localStorage.getItem('insight_v11');
+  });
+  await page.locator('#quickSaveBtn').click();
+  const observed=await page.evaluate(()=>{
+    const v=p4d12StorageObservation();
+    return {
+      nativeEvent:window.__p4d12NativeStorage,
+      revisionAdvanced:v.revisionAdvanced,pending:v.pending,
+      held:v.held,conflict:v.conflict,
+      remoteWriteKept:localStorage.getItem('insight_v11')===window.__p4d12OtherTabRaw,
+      notCertifiedClean:v.localDirty!==false
+    };
+  });
+  expect(observed).toEqual({
+    nativeEvent:true,revisionAdvanced:true,pending:0,held:true,
+    conflict:true,remoteWriteKept:true,notCertifiedClean:true
+  });
+});
