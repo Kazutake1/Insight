@@ -11,6 +11,22 @@
 
   var selectedStore=allStores.current;
   var dirty=false;
+  // GATE-3 P4d-3: a positive local draft witness only.
+  // Unobserved/programmatic changes and save results remain UNKNOWN, never CLEAN.
+  var forecastEpoch=0,forecastDirtyWitness=false;
+  function forecastAdvance(){
+    if(forecastEpoch===null)return;
+    if(forecastEpoch>=Number.MAX_SAFE_INTEGER){forecastEpoch=null;return;}
+    forecastEpoch++;
+  }
+  function forecastUnknown(){forecastAdvance();forecastDirtyWitness=false;}
+  function forecastDirty(){forecastAdvance();forecastDirtyWitness=true;}
+  window.InsightQuickDaily=Object.freeze({
+    getForecastDraftStatus:function(){
+      var known=forecastDirtyWitness&&forecastEpoch!==null;
+      return Object.freeze({initialized:known,dirty:known?true:null,epoch:forecastEpoch});
+    }
+  });
   var week=['日','月','火','水','木','金','土'];
   function selectedDate(){return dateContext.getSelectedDate();}
   function todaySelected(){return dateContext.isToday();}
@@ -37,6 +53,7 @@
     if(!date||typeof date.getTime!=='function'||!Number.isFinite(date.getTime())||dateContext.iso(date)===dateContext.getSelectedIso())return;
     if(dirty&&!window.confirm('未保存の入力があります。\n保存せずに別の日付へ移動しますか？'))return;
     if(!ensureRegisteredYear(date))return;
+    forecastUnknown();
     dateContext.setSelectedDate(date);
     quickEditDay=dateContext.getSelectedInfo().day;
     if(preserveDatePicker){
@@ -69,6 +86,7 @@
     });
   };
   window.initQuickPage=function(){
+    forecastUnknown();
     todayInfo=todayFY();
     if(selectedStore!==allStores.current){
       selectedStore=allStores.current;
@@ -84,19 +102,20 @@
       if(!row||!row.weather)fetchWeather();
     }
   };
-  grid.addEventListener('input',function(){dirty=true;});
-  grid.addEventListener('change',function(){dirty=true;});
+  grid.addEventListener('input',function(){dirty=true;forecastDirty();});
+  grid.addEventListener('change',function(){dirty=true;forecastDirty();});
   page.addEventListener('click',function(event){
-    if(event.target&&event.target.closest&&event.target.closest('.wx-btn,#autoWxBtn'))dirty=true;
+    if(event.target&&event.target.closest&&event.target.closest('.wx-btn,#autoWxBtn')){dirty=true;forecastDirty();}
   });
   if(window.InsightHooks){
-    window.InsightHooks.on('quick:save:after','quick-date-clear-dirty',function(){dirty=false;},30);
+    window.InsightHooks.on('quick:save:after','quick-date-clear-dirty',function(){dirty=false;forecastUnknown();},30);
   }
   window.clearTodayData=function(){
     var t=dateContext.getSelectedInfo(),rows=store.data[t.fy]&&store.data[t.fy][t.month];
     var target=t.fy+'年'+t.month+t.day+'日';
     if(!window.confirm(store.name+' の '+target+'の入力データを削除します。\n売上・客数・買上点数・廃棄・店舗メモをクリアし、天気・店舗イベント（共通セールを含む）は保持します。\n\nこの操作は元に戻せません。よろしいですか？'))return;
     if(!rows||!rows[t.day-1])return;
+    forecastUnknown();
     var row=rows[t.day-1];
     row.売上=0;row.客数=0;row.買上点数=0;row.廃棄金額=0;
     row.haiki=blankHaiki();delete row.storeMemo;

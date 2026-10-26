@@ -2,7 +2,7 @@ const path=require('node:path');
 
 module.exports={
   testDir:path.join(__dirname,'tests','e2e'),
-  testMatch:['webkit-smoke.spec.cjs','saved-report.spec.cjs','sales-count-year-warning.spec.cjs','order-forecast.spec.cjs','event-demand-categories.spec.cjs','event-day-scroll.spec.cjs','weather-picker.spec.cjs','inline-events.spec.cjs','runtime-csp.spec.cjs','weather-sales-view.spec.cjs'],
+  testMatch:['webkit-smoke.spec.cjs','forecast-editor-status-browser.spec.cjs','saved-report.spec.cjs','sales-count-year-warning.spec.cjs','order-forecast.spec.cjs','event-demand-categories.spec.cjs','event-day-scroll.spec.cjs','weather-picker.spec.cjs','inline-events.spec.cjs','runtime-csp.spec.cjs','weather-sales-view.spec.cjs'],
   timeout:45000,
   expect:{timeout:10000},
   fullyParallel:false,
