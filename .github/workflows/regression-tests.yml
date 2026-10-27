@@ -65,6 +65,7 @@ jobs:
           - forecast_order_ui_isolated_events.test.cjs
           - forecast_fixture_trip_group_contract.test.cjs
           - forecast_fixture_source_graph_contract.test.cjs
+          - forecast_fixture_contract_join.test.cjs
           - secure_backup_crypto.test.cjs
           - ai_interpretation.test.cjs
           - ai_visual.test.cjs
@@ -172,7 +173,16 @@ jobs:
     name: browser e2e / webkit smoke
     needs: security-prepublish
     runs-on: ubuntu-latest
-    timeout-minutes: 15
+    # Version-aligned official image has python3, WebKit and OS dependencies.
+    container:
+      image: mcr.microsoft.com/playwright/python:v1.63.0-noble
+      options: --user 1001
+      volumes:
+        - /usr/share/fonts:/usr/share/fonts:ro
+        - /etc/fonts:/etc/fonts:ro
+    permissions:
+      contents: read
+    timeout-minutes: 25
     steps:
       - name: Checkout repository
         uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
@@ -182,8 +192,8 @@ jobs:
           node-version: '22'
       - name: Install E2E dependencies
         run: npm ci --no-audit --no-fund
-      - name: Install WebKit
-        run: npx playwright install --with-deps webkit
+      - name: Verify preinstalled WebKit version
+        run: npx playwright --version
       - name: Run WebKit smoke E2E
         run: npx playwright test --config=playwright.webkit.config.cjs
       - name: Upload WebKit E2E artifacts
