@@ -139,8 +139,9 @@ function fixture({shortVersions=false,manual=false}={}){
     ui_epoch:7,captured_at:CAPTURE,storage_revision:2};
   const reference={child_request_id:child.context.request_id,
     graph_request_ref:graph_input.anchor.request_id};
-  return {reader,snapshot,group,child,graph_input,reference,capture,observed,
-    inspection};
+  // inspection is private to the fictional Reader source; the join contract
+  // deliberately permits only its eight explicit input keys.
+  return {reader,snapshot,group,child,graph_input,reference,capture,observed};
 }
 function verdict(v,status,reason){
   const out=join(v);assert.equal(out.status,status);
