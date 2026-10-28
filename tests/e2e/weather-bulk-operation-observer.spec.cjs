@@ -29,21 +29,17 @@ async function seedWeather(page,twoGroups=false){
     }};
     allStores=saved;
     store=allStores.stores[allStores.current];
+    window.__fictionalWeatherRequests=[];
+    window.fetch=async url=>{
+      window.__fictionalWeatherRequests.push(String(url));
+      const parameters=new URL(url).searchParams;
+      const day=parameters.get('start_date')||'2025-01-01';
+      return {ok:true,status:200,json:async()=>({daily:{
+        time:[day],weather_code:[1],temperature_2m_max:[23],temperature_2m_min:[12]
+      }})};
+    };
     return InsightWeatherBulk.scan(allStores).groups.map(group=>group.dates);
   },twoGroups);
-}
-
-function mockedWeatherSource(){
-  const called=[];
-  window.fetch=async url=>{
-    called.push(String(url));
-    const parameters=new URL(url).searchParams;
-    const day=parameters.get('start_date')||'2025-01-01';
-    return {ok:true,status:200,json:async()=>({daily:{
-      time:[day],weather_code:[1],temperature_2m_max:[23],temperature_2m_min:[12]
-    }})};
-  };
-  return called;
 }
 
 test('FICTIONAL weather run remains ACTIVE during pending fetch and storage/live apply',async({page})=>{
@@ -89,7 +85,7 @@ test('FICTIONAL cancellation after one committed group stays HELD, never silentl
   await openWeather(page);
   expect(await seedWeather(page,true)).toEqual([['2025-01-01'],['2025-04-01']]);
   const result=await page.evaluate(async()=>{
-    const calls=mockedWeatherSource();
+    const calls=window.__fictionalWeatherRequests;
     const before=InsightWeatherBulk.getWeatherBulkOperationStatus();
     const outcome=await InsightWeatherBulk.run(p=>{
       if(p.done===1)InsightWeatherBulk.cancel();
@@ -112,7 +108,7 @@ test('FICTIONAL after-write failure preserves rejection and records sticky HELD'
   await openWeather(page);
   await seedWeather(page);
   const result=await page.evaluate(async()=>{
-    const calls=mockedWeatherSource();
+    const calls=window.__fictionalWeatherRequests;
     const write=InsightStorage.writeSnapshot;
     InsightStorage.writeSnapshot=function(snapshot){
       write.apply(this,arguments);
@@ -138,7 +134,7 @@ test('FICTIONAL missing observer does not block a successful weather bulk run',a
   await openWeather(page,{observerMissing:true});
   await seedWeather(page);
   const result=await page.evaluate(async()=>{
-    mockedWeatherSource();
+    /* Fictional weather fetch was installed by seedWeather. */
     const before=InsightWeatherBulk.getWeatherBulkOperationStatus();
     const output=await InsightWeatherBulk.run();
     return {before,output,after:InsightWeatherBulk.getWeatherBulkOperationStatus()};
