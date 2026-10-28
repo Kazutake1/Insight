@@ -409,3 +409,15 @@ test('O35: FICTIONAL waste budget save is registered-only, never model-authorizi
   assert.equal(o.end(later,'unknown'),true);
   assert.equal(o.status().state,'HELD');
 });
+
+test('O36: FICTIONAL customer month clear remains a nonauthorizing registered operation',()=>{
+  const observer=newReady(),t=observer.begin('kyaku_month_clear');
+  assert.ok(t&&typeof t==='object');
+  assert.equal(observer.status().state,'ACTIVE');
+  assert.equal(observer.end(t,'completed'),true);
+  assert.equal(observer.status().state,'IDLE_OBSERVED');
+  assert.equal('authorized_for_model' in observer.status(),false);
+  const failure=observer.begin('kyaku_month_clear');
+  assert.equal(observer.end(failure,'unknown'),true);
+  assert.equal(observer.status().state,'HELD');
+});
