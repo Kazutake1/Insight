@@ -27,7 +27,10 @@ test('fictional sales save observes the whole save callback, not just storage wr
     const original=InsightStorage.writeSnapshot;
     InsightStorage.writeSnapshot=function(snapshot){
       window.__operationSamples.push(InsightSalesCount.getForecastOperationStatus());
-      return original(snapshot);
+      const serialized=original(snapshot);
+      // Storage has committed, but the outer business callback has not yet applied its live state.
+      window.__operationSamples.push(InsightSalesCount.getForecastOperationStatus());
+      return serialized;
     };
   });
   const input=page.locator('#scCalendar .sc-day:not(.empty) .sc-sales-row input[inputmode="numeric"]:not([readonly])').first();
@@ -48,7 +51,10 @@ test('fictional category save observes the outer dialog save callback',async({pa
     const original=InsightStorage.writeSnapshot;
     InsightStorage.writeSnapshot=function(snapshot){
       window.__operationSamples.push(InsightSalesCount.getForecastOperationStatus());
-      return original(snapshot);
+      const serialized=original(snapshot);
+      // Storage has committed, but the outer business callback has not yet applied its live state.
+      window.__operationSamples.push(InsightSalesCount.getForecastOperationStatus());
+      return serialized;
     };
   });
   await page.locator('#scManage').click();
