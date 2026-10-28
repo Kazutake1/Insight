@@ -69,6 +69,67 @@
   }
 
 
+
+  // Independent registered-only observer for confirmed CLEAR; prior SET untouched.
+  var clearObserver=null,clearFault=false,clearActive=0;
+  function getLocationClearOperationStatus(){
+    var scope='weather-location-confirmed-clear-only';
+    if(clearFault)return Object.freeze({scope:scope,state:'HELD',activeCount:null,epoch:null});
+    if(!clearObserver)return Object.freeze({scope:scope,state:'UNAVAILABLE',activeCount:null,epoch:null});
+    try{
+      var result=clearObserver.status();
+      if(!result||result.scope!=='registered-operations-only'||
+         ['IDLE_OBSERVED','ACTIVE','HELD'].indexOf(result.state)<0||
+         !Number.isSafeInteger(result.activeCount)||result.activeCount<0||
+         !Number.isSafeInteger(result.epoch)||result.epoch<1||
+         result.activeCount<clearActive||
+         (result.state==='IDLE_OBSERVED'&&result.activeCount!==0)||
+         (result.state==='ACTIVE'&&result.activeCount===0)||
+         (clearActive>0&&result.state!=='ACTIVE'&&result.state!=='HELD'))
+        throw new Error('location clear observer status invalid');
+      return Object.freeze({scope:scope,state:result.state,activeCount:result.activeCount,epoch:result.epoch});
+    }catch(_){clearFault=true;return Object.freeze({scope:scope,state:'HELD',activeCount:null,epoch:null});}
+  }
+  (function initializeLocationClearObserver(){
+    try{
+      var factory=root.InsightOperationObserverV0&&root.InsightOperationObserverV0.createOperationObserver;
+      if(typeof factory!=='function')return;
+      var candidate=factory();
+      if(!candidate||['initialize','begin','end','invalidate','status'].some(function(name){
+        return typeof candidate[name]!=='function';
+      })||candidate.initialize()!==true){clearFault=true;return;}
+      clearObserver=candidate;
+      var initial=getLocationClearOperationStatus();
+      if(initial.state!=='IDLE_OBSERVED'||initial.activeCount!==0)clearFault=true;
+    }catch(_){clearFault=true;}
+  })();
+  function observeConfirmedLocationClear(operation){
+    var observer=clearObserver,ticket=null,registered=false,outcome='unknown';
+    if(observer&&!clearFault){
+      try{
+        ticket=observer.begin('weather_location_clear');
+        if(!ticket||typeof ticket!=='object'||clearActive>=Number.MAX_SAFE_INTEGER){
+          clearFault=true;
+        }else{
+          registered=true;clearActive++;
+          if(getLocationClearOperationStatus().state!=='ACTIVE')clearFault=true;
+        }
+      }catch(_){clearFault=true;}
+    }
+    try{
+      var value=operation();
+      outcome='completed';
+      return value;
+    }finally{
+      if(registered){
+        try{if(observer.end(ticket,outcome)!==true)clearFault=true;}
+        catch(_){clearFault=true;}
+        clearActive--;
+        if(!clearFault)getLocationClearOperationStatus();
+      }
+    }
+  }
+
   function text(v){return String(v==null?'':v).trim();}
   function uniqueParts(parts){
     var out=[];
@@ -123,9 +184,11 @@
     if(!query){
       if(!current)return;
       if(confirm('この店舗の天気地点設定を解除しますか？')){
-        delete store.weatherLocation;
-        persist();
-        alert('天気地点設定を解除しました。\n未設定時は従来の愛知県西部／名古屋基準で取得します。');
+        observeConfirmedLocationClear(function(){
+          delete store.weatherLocation;
+          persist();
+          alert('天気地点設定を解除しました。\n未設定時は従来の愛知県西部／名古屋基準で取得します。');
+        });
       }
       return;
     }
@@ -191,6 +254,7 @@
   root.InsightWeatherLocation={
     configure:configureLocation,
     getLocationSaveOperationStatus:getLocationSaveOperationStatus,
+    getLocationClearOperationStatus:getLocationClearOperationStatus,
     search:searchLocations,
     label:candidateLabel
   };
