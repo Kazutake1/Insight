@@ -256,7 +256,7 @@ test('廃棄数の保存成功時のみ編集済みフラグを初期化する',
   const source=fs.readFileSync(path.join(__dirname,'..','insight_sales_count_v1.js'),'utf8');
   const save=source.slice(source.indexOf('function save(){'),source.indexOf('function notifyPeriodChange()'));
   assert.match(save,/persistTransaction\(next\);state\.wasteTouched=\{\};setDirty\(false\)/);
-  assert.match(save,/catch\(e\)\{alert\('販売数を保存できませんでした/);
+  assert.match(save,/catch\(e\)\{markOutcome\('failed'\);alert\('販売数を保存できませんでした/);
 });
 
 
