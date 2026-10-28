@@ -349,3 +349,15 @@ test('O30: registered sales period change is observed only as a local operation'
   assert.equal(observer.status().state,'IDLE_OBSERVED');
   assert.equal(observer.status().activeCount,0);
 });
+
+test('O31: fictional weather bulk is one registered async operation kind', () => {
+  const o=newReady(),token=o.begin('weather_bulk_run');
+  assert.ok(token&&typeof token==='object');
+  assert.equal(o.status().state,'ACTIVE');
+  assert.equal(o.end(token,'unknown'),true);
+  assert.equal(o.status().state,'HELD');
+  const next=o.begin('weather_bulk_run');
+  assert.ok(next);
+  assert.equal(o.end(next,'completed'),true);
+  assert.equal(o.status().state,'HELD');
+});
