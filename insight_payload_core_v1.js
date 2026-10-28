@@ -2357,6 +2357,73 @@ function clearDayData(type){
   showToast(`🗑 ${m}${day}日のデータをクリアしました`,"danger");
 }
 
+
+/* STEP4 GATE-3: local observer of confirmed month-level customer data clearing only.
+   It does not observe confirmation, cancel, missing-data, or other writers. */
+const InsightKyakuMonthClearObserverV0=(function(){
+  let observer=null,fault=false,active=0;
+  const scope='kyaku-month-confirmed-clear-only';
+  function getStatus(){
+    if(fault)return Object.freeze({scope,state:'HELD',activeCount:null,epoch:null});
+    if(!observer)return Object.freeze({scope,state:'UNAVAILABLE',activeCount:null,epoch:null});
+    try{
+      const s=observer.status();
+      if(!s||s.scope!=='registered-operations-only'||
+        !['IDLE_OBSERVED','ACTIVE','HELD'].includes(s.state)||
+        !Number.isSafeInteger(s.activeCount)||s.activeCount<0||
+        !Number.isSafeInteger(s.epoch)||s.epoch<1||
+        s.activeCount<active||
+        (s.state==='IDLE_OBSERVED'&&s.activeCount!==0)||
+        (s.state==='ACTIVE'&&s.activeCount===0)||
+        (active>0&&s.state!=='ACTIVE'&&s.state!=='HELD'))throw new Error('invalid kyaku month clear status');
+      return Object.freeze({scope,state:s.state,activeCount:s.activeCount,epoch:s.epoch});
+    }catch(_){fault=true;return Object.freeze({scope,state:'HELD',activeCount:null,epoch:null});}
+  }
+  function initialize(){
+    try{
+      const factory=window.InsightOperationObserverV0&&window.InsightOperationObserverV0.createOperationObserver;
+      if(typeof factory!=='function')return;
+      const candidate=factory();
+      if(!candidate||['initialize','begin','end','invalidate','status'].some(k=>typeof candidate[k]!=='function')||
+         candidate.initialize()!==true){fault=true;return;}
+      observer=candidate;
+      const initial=getStatus();
+      if(initial.state!=='IDLE_OBSERVED'||initial.activeCount!==0)fault=true;
+    }catch(_){fault=true;}
+  }
+  // Core payload is loaded before the feature scripts; initialize after they finish.
+  if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',initialize);
+  else initialize();
+  function observe(action){
+    const ref=observer;
+    let token=null,registered=false,outcome='unknown';
+    if(ref&&!fault){
+      try{
+        token=ref.begin('kyaku_month_clear');
+        if(!token||typeof token!=='object'||active>=Number.MAX_SAFE_INTEGER)fault=true;
+        else{
+          registered=true;
+          active++;
+          if(getStatus().state!=='ACTIVE')fault=true;
+        }
+      }catch(_){fault=true;}
+    }
+    try{
+      const result=action();
+      outcome='completed';
+      return result;
+    }finally{
+      if(registered){
+        try{if(ref.end(token,outcome)!==true)fault=true;}
+        catch(_){fault=true;}
+        active--;
+        if(!fault)getStatus();
+      }
+    }
+  }
+  return Object.freeze({getStatus,observe});
+})();
+
 function clearKyakuMonth(){
   const y=editYear.kyaku,m=editMonth.kyaku;
   const storeName=store.name;
@@ -2364,12 +2431,14 @@ function clearKyakuMonth(){
     return;
   }
   if(!store.data[y]||!store.data[y][m])return;
-  const mi=MONTHS.indexOf(m);
-  store.data[y][m]=blankMonthData(mi,y);
-  persist();
-  initInputPage("kyaku");
-  updateMissingBadge();
-  showToast(`🗑 ${m}の客数データをクリアしました`,"danger");
+  return InsightKyakuMonthClearObserverV0.observe(()=>{
+    const mi=MONTHS.indexOf(m);
+    store.data[y][m]=blankMonthData(mi,y);
+    persist();
+    initInputPage("kyaku");
+    updateMissingBadge();
+    showToast(`🗑 ${m}の客数データをクリアしました`,"danger");
+  });
 }
 
 function clearTodayData(){
