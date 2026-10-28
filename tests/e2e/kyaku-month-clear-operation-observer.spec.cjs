@@ -49,6 +49,8 @@ test('FICTIONAL confirmed month clear ACTIVE across storage then IDLE, readback'
       status:InsightKyakuMonthClearObserverV0.getStatus(),
       savedCustomers:saved.stores.fictional_kyaku_store.data[y][m][0].客数,
       liveCustomers:store.data[y][m][0].客数,
+      savedSales:saved.stores.fictional_kyaku_store.data[y][m][0].売上,
+      liveSales:store.data[y][m][0].売上,
       savedLength:saved.stores.fictional_kyaku_store.data[y][m].length};
   });
   expect(outcome.samples).toHaveLength(2);
@@ -58,6 +60,8 @@ test('FICTIONAL confirmed month clear ACTIVE across storage then IDLE, readback'
   expect(outcome.status.activeCount).toBe(0);
   expect(outcome.savedCustomers).toBe(0);
   expect(outcome.liveCustomers).toBe(0);
+  expect(outcome.savedSales).toBe(42);
+  expect(outcome.liveSales).toBe(42);
   expect(outcome.savedLength).toBeGreaterThan(25);
 });
 
@@ -76,12 +80,14 @@ test('FICTIONAL postcommit exception keeps original throw and HELD',async({page}
     return {errorName,
       status:InsightKyakuMonthClearObserverV0.getStatus(),
       savedCustomers:saved.stores.fictional_kyaku_store.data[y][m][0].客数,
+      savedSales:saved.stores.fictional_kyaku_store.data[y][m][0].売上,
       alerts:window.__kyakuAlerts};
   });
   expect(outcome.errorName).toBe('InsightPersistError');
   expect(outcome.status.state).toBe('HELD');
   expect(outcome.status.activeCount).toBe(0);
   expect(outcome.savedCustomers).toBe(0);
+  expect(outcome.savedSales).toBe(42);
   expect(outcome.alerts.join(' ')).toContain('データを保存できませんでした。');
 });
 
