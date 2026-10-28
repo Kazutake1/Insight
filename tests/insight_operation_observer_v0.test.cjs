@@ -421,3 +421,15 @@ test('O36: FICTIONAL customer month clear remains a nonauthorizing registered op
   assert.equal(observer.end(failure,'unknown'),true);
   assert.equal(observer.status().state,'HELD');
 });
+
+test('O37: FICTIONAL daily sales/waste clear shares one registered nonauthorizing kind',()=>{
+  const obs=newReady(),t=obs.begin('selected_input_day_clear');
+  assert.ok(t&&typeof t==='object');
+  assert.equal(obs.status().state,'ACTIVE');
+  assert.equal(obs.end(t,'completed'),true);
+  assert.equal(obs.status().state,'IDLE_OBSERVED');
+  assert.equal('authorized_for_model' in obs.status(),false);
+  const next=obs.begin('selected_input_day_clear');
+  assert.equal(obs.end(next,'unknown'),true);
+  assert.equal(obs.status().state,'HELD');
+});
