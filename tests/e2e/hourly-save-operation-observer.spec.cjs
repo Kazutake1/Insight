@@ -3,7 +3,7 @@ const {test,expect}=require('@playwright/test');
 async function openHourly(page,{observerMissing=false}={}){
   await page.route('**/Index.html*',async route=>{
     const response=await route.fetch();
-    await route.fulfill({response,body:(await response.text()).replace(/;?\\s*upgrade-insecure-requests/g,'')});
+    await route.fulfill({response,body:(await response.text()).replace(/;?\s*upgrade-insecure-requests/g,'')});
   });
   if(observerMissing){
     await page.route('**/insight_operation_observer_v0.js*',route=>
