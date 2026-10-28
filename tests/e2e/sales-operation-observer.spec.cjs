@@ -190,3 +190,81 @@ for(const fault of ['bad-ticket','idle-with-active','begin-throws','end-throws',
     expect((await getStatus(page)).state).toBe('HELD');
   });
 }
+
+test('fictional registered-year sales period change stays ACTIVE through its UI notification',async({page})=>{
+  await openSales(page);
+  const result=await page.evaluate(()=>{
+    const first=InsightSalesCount.getPeriod();
+    const otherMonth=first.month===12?11:first.month+1;
+    const samples=[];
+    const before=window.dispatchEvent;
+    window.dispatchEvent=function(evt){
+      if(evt.type==='insight:sales-count-period-change')
+        samples.push(InsightSalesCount.getForecastOperationStatus());
+      return before.apply(this,arguments);
+    };
+    try{
+      const ok=InsightSalesCount.setPeriod(first.year,otherMonth);
+      return {ok,period:InsightSalesCount.getPeriod(),samples,
+        final:InsightSalesCount.getForecastOperationStatus()};
+    }finally{window.dispatchEvent=before;}
+  });
+  expect(result.ok).toBe(true);
+  expect(result.period.month).not.toBe(0);
+  expect(result.samples.length).toBe(1);
+  expect(result.samples[0].state).toBe('ACTIVE');
+  expect(result.samples[0].activeCount).toBe(1);
+  expect(result.final.state).toBe('IDLE_OBSERVED');
+});
+
+test('fictional unregistered-year promotion remains ACTIVE during write and post-write',async({page})=>{
+  await openSales(page);
+  const result=await page.evaluate(()=>{
+    const existing=allStores.stores[allStores.current].years.map(Number);
+    const newYear=String(Math.max(...existing)+1);
+    const samples=[];
+    const confirmBefore=window.confirm,writeBefore=InsightStorage.writeSnapshot;
+    window.confirm=()=>true;
+    InsightStorage.writeSnapshot=function(snapshot){
+      samples.push(InsightSalesCount.getForecastOperationStatus());
+      const committed=writeBefore.apply(this,arguments);
+      samples.push(InsightSalesCount.getForecastOperationStatus());
+      return committed;
+    };
+    try{
+      const ok=InsightSalesCount.setPeriod(newYear,1);
+      return {ok,samples,year:InsightSalesCount.getPeriod().year,
+        registered:allStores.stores[allStores.current].years.map(String).includes(newYear),
+        final:InsightSalesCount.getForecastOperationStatus()};
+    }finally{window.confirm=confirmBefore;InsightStorage.writeSnapshot=writeBefore;}
+  });
+  expect(result.ok).toBe(true);
+  expect(result.registered).toBe(true);
+  expect(result.samples.length).toBeGreaterThanOrEqual(2);
+  expect(result.samples.every(s=>s.state==='ACTIVE'&&s.activeCount>=1)).toBe(true);
+  expect(result.final.state).toBe('IDLE_OBSERVED');
+});
+
+test('fictional after-year-write UI failure remains HELD without masking the original error',async({page})=>{
+  await openSales(page);
+  const result=await page.evaluate(()=>{
+    const existing=allStores.stores[allStores.current].years.map(Number);
+    const newYear=String(Math.max(...existing)+1);
+    const confirmBefore=window.confirm,replaceBefore=Element.prototype.replaceChildren;
+    window.confirm=()=>true;
+    Element.prototype.replaceChildren=function(){
+      if(this.id==='scAverages')throw new Error('FICTIONAL period render failure');
+      return replaceBefore.apply(this,arguments);
+    };
+    let error=null;
+    try{InsightSalesCount.setPeriod(newYear,1);}
+    catch(e){error=e&&e.message;}
+    finally{window.confirm=confirmBefore;Element.prototype.replaceChildren=replaceBefore;}
+    return {error,registered:allStores.stores[allStores.current].years.map(String).includes(newYear),
+      final:InsightSalesCount.getForecastOperationStatus()};
+  });
+  expect(result.error).toBe('FICTIONAL period render failure');
+  expect(result.registered).toBe(true);
+  expect(result.final.state).toBe('HELD');
+  expect(result.final.activeCount).toBe(0);
+});
