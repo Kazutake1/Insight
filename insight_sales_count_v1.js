@@ -119,16 +119,21 @@
   var model={ensure:ensure,validate:validate,categoryForSale:categoryForSale,categoriesForSale:categoriesForSale,emptyRecord:emptyRecord,normalizeRecord:normalizeRecord,emptyWasteRecord:emptyWasteRecord,normalizeWasteRecord:normalizeWasteRecord,validateWasteCounts:validateWasteCounts,wasteSummary:wasteSummary,wasteRecordAt:wasteRecordAt,wasteTripStatus:wasteTripStatus,average:average,activeTrips:activeTrips,tripActive:tripActive,validDateKey:validDateKey,uniqueSaleRecords:uniqueSaleRecords,dayTypeRecords:dayTypeRecords,historicalWeather:historicalWeather};
   // STEP4 GATE-3: only the two registered sales save callbacks are observed.
   // No data, storage snapshot, editor cleanliness, or AI authorization is exposed.
-  var forecastOperationObserver=null,forecastOperationFault=false;
+  var forecastOperationObserver=null,forecastOperationFault=false,forecastOperationActive=0;
   function initForecastOperationObserver(){
     try{
       var factory=root.InsightOperationObserverV0&&root.InsightOperationObserverV0.createOperationObserver;
       if(typeof factory!=='function')return;
       var candidate=factory();
-      if(!candidate||typeof candidate.initialize!=='function'||candidate.initialize()!==true){
+      if(!candidate||['initialize','begin','end','invalidate','status'].some(function(name){
+        return typeof candidate[name]!=='function';
+      })||candidate.initialize()!==true){
         forecastOperationFault=true;return;
       }
       forecastOperationObserver=candidate;
+      var initial=observedOperationStatus();
+      if(initial.state!=='IDLE_OBSERVED'||initial.activeCount!==0||initial.epoch<1)
+        forecastOperationFault=true;
     }catch(_){forecastOperationFault=true;}
   }
   function observedOperationStatus(){
@@ -141,27 +146,43 @@
       if(!state||state.scope!=='registered-operations-only'||
         ['UNAVAILABLE','IDLE_OBSERVED','ACTIVE','HELD'].indexOf(state.state)<0||
         !Number.isSafeInteger(state.activeCount)||state.activeCount<0||
-        !Number.isSafeInteger(state.epoch)||state.epoch<0)throw new Error('operation observer status invalid');
+        !Number.isSafeInteger(state.epoch)||state.epoch<0||
+        state.state==='UNAVAILABLE'||
+        (state.state==='IDLE_OBSERVED'&&state.activeCount!==0)||
+        (state.state==='ACTIVE'&&state.activeCount===0)||
+        state.activeCount<forecastOperationActive||
+        (forecastOperationActive>0&&state.state!=='ACTIVE'&&state.state!=='HELD'))
+        throw new Error('operation observer status invalid');
       return Object.freeze({scope:'registered-operations-only',state:state.state,
         activeCount:state.activeCount,epoch:state.epoch});
     }catch(_){forecastOperationFault=true;return Object.freeze(held);}
   }
   model.getForecastOperationStatus=observedOperationStatus;
+  // The adapter count is a fault witness for registered callbacks only.
+  // It must never be interpreted as an app-wide clean or model authorization signal.
   // The observer must never suppress, retry, replace the exception from, or
   // change the return value of the pre-existing business callback.
   function observeForecastOperation(kind,operation){
-    var observer=forecastOperationObserver,ticket=null,outcome='unknown';
+    var observer=forecastOperationObserver,ticket=null,outcome='unknown',registered=false;
     if(observer&&!forecastOperationFault){
       try{
         ticket=observer.begin(kind);
-        if(!ticket)forecastOperationFault=true;
+        if(!ticket||typeof ticket!=='object'||forecastOperationActive>=Number.MAX_SAFE_INTEGER){
+          forecastOperationFault=true;
+        }else{
+          forecastOperationActive+=1;
+          registered=true;
+          if(observedOperationStatus().state!=='ACTIVE')forecastOperationFault=true;
+        }
       }catch(_){forecastOperationFault=true;}
     }
     try{return operation(function(result){outcome=result;});}
     finally{
-      if(ticket){
+      if(registered){
         try{if(observer.end(ticket,outcome)!==true)forecastOperationFault=true;}
         catch(_){forecastOperationFault=true;}
+        forecastOperationActive-=1;
+        if(!forecastOperationFault)observedOperationStatus();
       }
     }
   }
