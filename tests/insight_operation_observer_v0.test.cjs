@@ -397,3 +397,15 @@ test('O34: FICTIONAL weather-location clear is a separate non-authorizing kind',
   assert.equal(o.end(second,'unknown'),true);
   assert.equal(o.status().state,'HELD');
 });
+
+test('O35: FICTIONAL waste budget save is registered-only, never model-authorizing', () => {
+  const o=newReady(),token=o.begin('waste_budget_save');
+  assert.ok(token&&typeof token==='object');
+  assert.equal(o.status().state,'ACTIVE');
+  assert.equal(o.end(token,'completed'),true);
+  assert.equal(o.status().state,'IDLE_OBSERVED');
+  assert.equal('full_app_clean' in o.status(),false);
+  const later=o.begin('waste_budget_save');
+  assert.equal(o.end(later,'unknown'),true);
+  assert.equal(o.status().state,'HELD');
+});
