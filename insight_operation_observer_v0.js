@@ -8,7 +8,7 @@
  * No Storage access, UI access, networking, logs, or business data retention.
  */
 
-const FIXED_KINDS = Object.freeze(['sales_count_save', 'sales_category_save', 'sales_period_change', 'weather_bulk_run', 'hourly_customers_save', 'weather_location_set']);
+const FIXED_KINDS = Object.freeze(['sales_count_save', 'sales_category_save', 'sales_period_change', 'weather_bulk_run', 'hourly_customers_save', 'weather_location_set', 'weather_location_clear']);
 const END_OUTCOMES = Object.freeze(['completed', 'cancelled_before_mutation', 'failed', 'partial', 'unknown']);
 
 function createOperationObserver(options = {}) {
