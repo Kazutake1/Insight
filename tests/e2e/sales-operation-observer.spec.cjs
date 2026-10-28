@@ -123,3 +123,70 @@ test('invalid category input causes sticky HELD while the original dialog remain
   expect((await getStatus(page)).state).toBe('HELD');
   await expect(d).toBeVisible();
 });
+
+/*
+ * FICTIONAL fault-injection cases for the registered sales-save adapter.
+ * An invalid observer must never suppress an otherwise valid legacy save.
+ */
+async function saveWithFaultyObserver(page,mode){
+  const injected = `(function(){
+    const fault=${JSON.stringify(mode)};
+    let count=0,epoch=1;
+    const witness={
+      initialize:()=>true,
+      begin:()=>{
+        if(fault==='begin-throws')throw new Error('fictional begin fault');
+        count+=1;epoch+=1;
+        return fault==='bad-ticket'?1:Object.freeze({});
+      },
+      end:()=>{
+        if(fault==='end-throws')throw new Error('fictional end fault');
+        count-=1;epoch+=1;return true;
+      },
+      invalidate:()=>true,
+      status:()=>{
+        if(fault==='status-throws'&&count>0)throw new Error('fictional status fault');
+        if(fault==='idle-with-active'&&count>0)
+          return {scope:'registered-operations-only',state:'IDLE_OBSERVED',activeCount:0,epoch};
+        return {scope:'registered-operations-only',
+          state:count?'ACTIVE':'IDLE_OBSERVED',activeCount:count,epoch};
+      }
+    };
+    window.InsightOperationObserverV0={createOperationObserver:()=>witness};
+  })();`;
+  await page.route('**/insight_operation_observer_v0.js*',route=>route.fulfill({
+    status:200,contentType:'application/javascript',body:injected
+  }));
+  await openSales(page);
+  await page.evaluate(()=>{
+    window.__fictionalFaultSave={writes:0,during:null};
+    const original=InsightStorage.writeSnapshot;
+    InsightStorage.writeSnapshot=function(snapshot){
+      window.__fictionalFaultSave.writes+=1;
+      window.__fictionalFaultSave.during=InsightSalesCount.getForecastOperationStatus();
+      return original.apply(this,arguments);
+    };
+  });
+  const input=page.locator('#scCalendar .sc-day:not(.empty) .sc-sales-row input[inputmode="numeric"]:not([readonly])').first();
+  await input.fill('71');
+  await page.locator('#scSave').click();
+  await expect(page.locator('#scSave')).toBeDisabled();
+  return page.evaluate(()=>({
+    writes:window.__fictionalFaultSave.writes,
+    during:window.__fictionalFaultSave.during,
+    final:InsightSalesCount.getForecastOperationStatus()
+  }));
+}
+
+for(const fault of ['bad-ticket','idle-with-active','begin-throws','end-throws','status-throws']){
+  test('fictional broken observer '+fault+' keeps one save and never reports false idle',async({page})=>{
+    const result=await saveWithFaultyObserver(page,fault);
+    expect(result.writes).toBe(1);
+    expect(result.final.scope).toBe('registered-operations-only');
+    expect(result.final.state).toBe('HELD');
+    // A throwing end can still be ACTIVE during the saved write; it becomes HELD afterward.
+    if(fault!=='end-throws')expect(result.during.state).toBe('HELD');
+    else expect(result.during.state).toBe('ACTIVE');
+    expect((await getStatus(page)).state).toBe('HELD');
+  });
+}
