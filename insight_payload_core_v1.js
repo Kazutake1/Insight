@@ -2431,14 +2431,12 @@ function clearKyakuMonth(){
     return;
   }
   if(!store.data[y]||!store.data[y][m])return;
-  return InsightKyakuMonthClearObserverV0.observe(()=>{
-    const mi=MONTHS.indexOf(m);
-    store.data[y][m]=blankMonthData(mi,y);
-    persist();
-    initInputPage("kyaku");
-    updateMissingBadge();
-    showToast(`🗑 ${m}の客数データをクリアしました`,"danger");
-  });
+  const mi=MONTHS.indexOf(m);
+  store.data[y][m]=blankMonthData(mi,y);
+  persist();
+  initInputPage("kyaku");
+  updateMissingBadge();
+  showToast(`🗑 ${m}の客数データをクリアしました`,"danger");
 }
 
 function clearTodayData(){
