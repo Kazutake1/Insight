@@ -223,12 +223,15 @@ test('fictional unregistered-year promotion remains ACTIVE during write and post
     const existing=allStores.stores[allStores.current].years.map(Number);
     const newYear=String(Math.max(...existing)+1);
     const samples=[];
-    const confirmBefore=window.confirm,writeBefore=InsightStorage.writeSnapshot;
+    const confirmBefore=window.confirm,setItemBefore=Storage.prototype.setItem;
     window.confirm=()=>true;
-    InsightStorage.writeSnapshot=function(snapshot){
-      samples.push(InsightSalesCount.getForecastOperationStatus());
-      const committed=writeBefore.apply(this,arguments);
-      samples.push(InsightSalesCount.getForecastOperationStatus());
+    // YearManager.transaction uses the module-private writeSnapshot closure,
+    // not the public InsightStorage.writeSnapshot property. Intercept only
+    // this fictional browser's native write boundary; do not inspect data.
+    Storage.prototype.setItem=function(key){
+      if(key==='insight_v11')samples.push(InsightSalesCount.getForecastOperationStatus());
+      const committed=setItemBefore.apply(this,arguments);
+      if(key==='insight_v11')samples.push(InsightSalesCount.getForecastOperationStatus());
       return committed;
     };
     try{
@@ -236,7 +239,7 @@ test('fictional unregistered-year promotion remains ACTIVE during write and post
       return {ok,samples,year:InsightSalesCount.getPeriod().year,
         registered:allStores.stores[allStores.current].years.map(String).includes(newYear),
         final:InsightSalesCount.getForecastOperationStatus()};
-    }finally{window.confirm=confirmBefore;InsightStorage.writeSnapshot=writeBefore;}
+    }finally{window.confirm=confirmBefore;Storage.prototype.setItem=setItemBefore;}
   });
   expect(result.ok).toBe(true);
   expect(result.registered).toBe(true);
