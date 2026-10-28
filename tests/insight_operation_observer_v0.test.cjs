@@ -433,3 +433,15 @@ test('O37: FICTIONAL daily sales/waste clear shares one registered nonauthorizin
   assert.equal(obs.end(next,'unknown'),true);
   assert.equal(obs.status().state,'HELD');
 });
+
+test('O38: FICTIONAL Quick selected date clear is registered-only and nonauthorizing',()=>{
+  const o=newReady(),t=o.begin('quick_selected_date_clear');
+  assert.ok(t&&typeof t==='object');
+  assert.equal(o.status().state,'ACTIVE');
+  assert.equal(o.end(t,'completed'),true);
+  assert.equal(o.status().state,'IDLE_OBSERVED');
+  assert.equal('authorized_for_model' in o.status(),false);
+  const failed=o.begin('quick_selected_date_clear');
+  assert.equal(o.end(failed,'unknown'),true);
+  assert.equal(o.status().state,'HELD');
+});
