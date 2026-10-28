@@ -138,21 +138,21 @@
       if(!confirm('この地点を使用しますか？\n\n'+label+'\n緯度 '+Number(chosen.latitude).toFixed(4)+' / 経度 '+Number(chosen.longitude).toFixed(4)))return;
 
       observeConfirmedLocationSet(function(){
-      store.weatherLocation={
-        name:String(chosen.name||query),
-        query:query,
-        label:label||query,
-        latitude:Number(chosen.latitude),
-        longitude:Number(chosen.longitude),
-        timezone:String(chosen.timezone||'Asia/Tokyo'),
-        admin1:text(chosen.admin1),
-        admin2:text(chosen.admin2),
-        admin3:text(chosen.admin3),
-        admin4:text(chosen.admin4),
-        source:'open-meteo-geocoding'
-      };
-      persist();
-      alert('天気地点を「'+(label||query)+'」に設定しました。\n今後「自動」で、この地点の天気・最高気温・最低気温を取得します。');
+        store.weatherLocation={
+          name:String(chosen.name||query),
+          query:query,
+          label:label||query,
+          latitude:Number(chosen.latitude),
+          longitude:Number(chosen.longitude),
+          timezone:String(chosen.timezone||'Asia/Tokyo'),
+          admin1:text(chosen.admin1),
+          admin2:text(chosen.admin2),
+          admin3:text(chosen.admin3),
+          admin4:text(chosen.admin4),
+          source:'open-meteo-geocoding'
+        };
+        persist();
+        alert('天気地点を「'+(label||query)+'」に設定しました。\n今後「自動」で、この地点の天気・最高気温・最低気温を取得します。');
       });
     }catch(e){
       alert((e&&e.message)||'地点設定に失敗しました。');
