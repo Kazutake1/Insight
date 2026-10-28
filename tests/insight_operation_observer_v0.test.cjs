@@ -385,3 +385,15 @@ test('O33: FICTIONAL confirmed weather-location set remains registered-only', ()
   assert.equal(o.end(t2,'unknown'),true);
   assert.equal(o.status().state,'HELD');
 });
+
+test('O34: FICTIONAL weather-location clear is a separate non-authorizing kind', () => {
+  const o=newReady(), first=o.begin('weather_location_clear');
+  assert.ok(first&&typeof first==='object');
+  assert.equal(o.status().state,'ACTIVE');
+  assert.equal(o.end(first,'completed'),true);
+  assert.equal(o.status().state,'IDLE_OBSERVED');
+  assert.equal('authorized_for_model' in o.status(),false);
+  const second=o.begin('weather_location_clear');
+  assert.equal(o.end(second,'unknown'),true);
+  assert.equal(o.status().state,'HELD');
+});
