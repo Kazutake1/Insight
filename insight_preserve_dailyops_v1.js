@@ -56,11 +56,16 @@
     var storeName=store.name;
     if(!confirm(storeName+' の '+m+'（'+y+'年）の客数データだけを全て削除します。\n売上・買上点数・廃棄・店舗メモ・天気・気温は残ります。\n\nこの操作は元に戻せません。よろしいですか？'))return;
     if(!store.data[y]||!store.data[y][m])return;
-    store.data[y][m].forEach(function(row){if(row)row.客数=0;});
-    persist();
-    initInputPage('kyaku');
-    updateMissingBadge();
-    showToast('🗑 '+m+'の客数データをクリアしました','#dc2626','#fef2f2');
+    // The effective customer-month clear is the preserve-data override.
+    // Start observing before the first row mutation; never switch to the
+    // legacy core blankMonthData behavior, which would erase other fields.
+    return InsightKyakuMonthClearObserverV0.observe(function(){
+      store.data[y][m].forEach(function(row){if(row)row.客数=0;});
+      persist();
+      initInputPage('kyaku');
+      updateMissingBadge();
+      showToast('🗑 '+m+'の客数データをクリアしました','#dc2626','#fef2f2');
+    });
   };
 
 
