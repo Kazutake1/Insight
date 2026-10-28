@@ -361,3 +361,15 @@ test('O31: fictional weather bulk is one registered async operation kind', () =>
   assert.equal(o.end(next,'completed'),true);
   assert.equal(o.status().state,'HELD');
 });
+
+test('O32: FICTIONAL hourly dialog save is registered but cannot authorize app-wide cleanliness', () => {
+  const o=newReady(), token=o.begin('hourly_customers_save');
+  assert.ok(token&&typeof token==='object');
+  assert.equal(o.status().state,'ACTIVE');
+  assert.equal(o.end(token,'completed'),true);
+  assert.equal(o.status().state,'IDLE_OBSERVED');
+  assert.equal('full_app_clean' in o.status(),false);
+  const failure=o.begin('hourly_customers_save');
+  assert.equal(o.end(failure,'unknown'),true);
+  assert.equal(o.status().state,'HELD');
+});
