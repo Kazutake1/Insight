@@ -339,3 +339,13 @@ test('O29: browser source exposes only a frozen observer factory and no persiste
   assert.equal(writes,0);
   assert.equal(external,0);
 });
+
+test('O30: registered sales period change is observed only as a local operation', () => {
+  const observer=newReady(), ticket=observer.begin('sales_period_change');
+  assert.equal(typeof ticket,'object');
+  assert.equal(observer.status().state,'ACTIVE');
+  assert.equal(observer.status().activeCount,1);
+  assert.equal(observer.end(ticket,'completed'),true);
+  assert.equal(observer.status().state,'IDLE_OBSERVED');
+  assert.equal(observer.status().activeCount,0);
+});
