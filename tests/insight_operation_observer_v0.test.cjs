@@ -1,7 +1,7 @@
 'use strict';
 const test = require('node:test');
 const assert = require('node:assert/strict');
-const {createOperationObserver} = require('./insight_operation_observer_v0.js');
+const {createOperationObserver} = require('../insight_operation_observer_v0.js');
 
 const newReady = () => { const o = createOperationObserver(); assert.equal(o.initialize(), true); return o; };
 
@@ -325,7 +325,7 @@ test('O29: browser source exposes only a frozen observer factory and no persiste
   let writes=0,external=0;
   const window={localStorage:{getItem(){writes++;throw Error('unexpected read');},
     setItem(){writes++;throw Error('unexpected write');}},fetch(){external++;throw Error('network');}};
-  vm.runInNewContext(fs.readFileSync(path.join(__dirname,'insight_operation_observer_v0.js'),'utf8'),
+  vm.runInNewContext(fs.readFileSync(path.join(__dirname,'..','insight_operation_observer_v0.js'),'utf8'),
     {window,Object,Set,Number});
   const api=window.InsightOperationObserverV0;
   assert.ok(api&&Object.isFrozen(api));
