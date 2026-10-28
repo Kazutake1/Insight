@@ -373,3 +373,15 @@ test('O32: FICTIONAL hourly dialog save is registered but cannot authorize app-w
   assert.equal(o.end(failure,'unknown'),true);
   assert.equal(o.status().state,'HELD');
 });
+
+test('O33: FICTIONAL confirmed weather-location set remains registered-only', () => {
+  const o=newReady(), t=o.begin('weather_location_set');
+  assert.ok(t&&typeof t==='object');
+  assert.equal(o.status().state,'ACTIVE');
+  assert.equal(o.end(t,'completed'),true);
+  assert.equal(o.status().state,'IDLE_OBSERVED');
+  assert.equal('authorized_for_model' in o.status(),false);
+  const t2=o.begin('weather_location_set');
+  assert.equal(o.end(t2,'unknown'),true);
+  assert.equal(o.status().state,'HELD');
+});
