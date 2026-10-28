@@ -83,7 +83,10 @@ test('FICTIONAL postcommit save error yields HELD and preserves existing alert h
   expect(result.status.state).toBe('HELD');
   expect(result.status.activeCount).toBe(0);
   expect(result.persisted).toBe(35.25);
-  expect(result.alerts.join(' ')).toContain('FICTIONAL location postcommit failure');
+  // Existing InsightPersistGuard intentionally converts the original exception
+  // to its generic user-facing storage error; this observer must not alter it.
+  expect(result.alerts.join(' ')).toContain('データを保存できませんでした。');
+  expect(result.alerts.join(' ')).toContain('Insight data save failed');
 });
 
 test('FICTIONAL missing observer keeps original successful save and UNAVAILABLE status',async({page})=>{
