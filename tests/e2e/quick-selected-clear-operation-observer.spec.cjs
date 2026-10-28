@@ -108,7 +108,7 @@ test('FICTIONAL non-today Quick clear via actual button observes ACTIVE, preserv
     state:'IDLE_OBSERVED',activeCount:0});
   expect([outcome.row.売上,outcome.row.客数,outcome.row.買上点数,outcome.row.廃棄金額])
     .toEqual([0,0,0,0]);
-  expect(outcome.row.haiki[HAIKI_CATS[0]]).toBe(0);
+  expect(Object.values(outcome.row.haiki).every(value=>value===0)).toBe(true);
   expect(outcome.row).not.toHaveProperty('storeMemo');
   expect([outcome.row.weather,outcome.row.tempMaxC,outcome.row.tempMinC])
     .toEqual(['晴',32,20]);
