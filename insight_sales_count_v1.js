@@ -227,8 +227,13 @@
       // A no-op route sync only displays the period; it must not attempt year registration.
       if(String(y)===state.year&&m===state.month)return true;
       if(!confirmLeave())return false;
-      if(!ensureRegisteredYear(y))return false;
-      state.year=String(y);state.month=m;readMonth();render();notifyPeriodChange();return true;
+      // Observe the outermost period change: year promotion can persist before
+      // readMonth/render finish. Unknown early exits remain HELD, never CLEAN.
+      return observeForecastOperation('sales_period_change',function(markOutcome){
+        if(!ensureRegisteredYear(y))return false;
+        state.year=String(y);state.month=m;readMonth();render();notifyPeriodChange();
+        markOutcome('completed');return true;
+      });
     }
     function changePeriod(delta){var d=new Date(Number(state.year),state.month-1+delta,1);setPeriod(d.getFullYear(),d.getMonth()+1);}
     function changeCategory(id){if(id===state.categoryId)return;if(!confirmLeave()){doc.getElementById('scCategory').value=state.categoryId;return;}state.categoryId=id;readMonth();render();}
