@@ -90,6 +90,71 @@
       if(value.complete)return '入力済み 24/24　合計 '+formatTotal(value.total);
       return '途中 '+value.count+'/24　合計 '+formatTotal(value.total);
     }
+    // STEP4 GATE-3: local, non-authorizing observation of this dialog's save only.
+    // No other hourly writer, editor, Storage, UI, or model data is certified.
+    var hourlyObserver=null, hourlyObserverFault=false, hourlyObserverActive=0;
+    function hourlyOperationStatus(){
+      var scope='hourly-dialog-save-only';
+      if(hourlyObserverFault)return Object.freeze({scope:scope,state:'HELD',activeCount:null,epoch:null});
+      if(!hourlyObserver)return Object.freeze({scope:scope,state:'UNAVAILABLE',activeCount:null,epoch:null});
+      try{
+        var value=hourlyObserver.status();
+        if(!value||value.scope!=='registered-operations-only'||
+           ['IDLE_OBSERVED','ACTIVE','HELD'].indexOf(value.state)<0||
+           !Number.isSafeInteger(value.activeCount)||value.activeCount<0||
+           !Number.isSafeInteger(value.epoch)||value.epoch<1||
+           value.activeCount<hourlyObserverActive||
+           (value.state==='IDLE_OBSERVED'&&value.activeCount!==0)||
+           (value.state==='ACTIVE'&&value.activeCount===0)||
+           (hourlyObserverActive>0&&value.state!=='ACTIVE'&&value.state!=='HELD'))
+          throw new Error('invalid hourly observer state');
+        return Object.freeze({scope:scope,state:value.state,activeCount:value.activeCount,epoch:value.epoch});
+      }catch(_){
+        hourlyObserverFault=true;
+        return Object.freeze({scope:scope,state:'HELD',activeCount:null,epoch:null});
+      }
+    }
+    (function initializeHourlyObserver(){
+      try{
+        var factory=root.InsightOperationObserverV0&&root.InsightOperationObserverV0.createOperationObserver;
+        if(typeof factory!=='function')return;
+        var candidate=factory();
+        if(!candidate||['initialize','begin','end','invalidate','status'].some(function(name){
+          return typeof candidate[name]!=='function';
+        })||candidate.initialize()!==true){hourlyObserverFault=true;return;}
+        hourlyObserver=candidate;
+        var state=hourlyOperationStatus();
+        if(state.state!=='IDLE_OBSERVED'||state.activeCount!==0)hourlyObserverFault=true;
+      }catch(_){hourlyObserverFault=true;}
+    })();
+    model.getHourlySaveOperationStatus=hourlyOperationStatus;
+    function observeHourlySave(operation){
+      var observer=hourlyObserver,ticket=null,registered=false,outcome='unknown';
+      if(observer&&!hourlyObserverFault){
+        try{
+          ticket=observer.begin('hourly_customers_save');
+          if(!ticket||typeof ticket!=='object'||hourlyObserverActive>=Number.MAX_SAFE_INTEGER){
+            hourlyObserverFault=true;
+          }else{
+            registered=true;hourlyObserverActive+=1;
+            if(hourlyOperationStatus().state!=='ACTIVE')hourlyObserverFault=true;
+          }
+        }catch(_){hourlyObserverFault=true;}
+      }
+      try{
+        var value=operation();
+        outcome='completed';
+        return value;
+      }finally{
+        if(registered){
+          try{if(observer.end(ticket,outcome)!==true)hourlyObserverFault=true;}
+          catch(_){hourlyObserverFault=true;}
+          hourlyObserverActive-=1;
+          if(!hourlyObserverFault)hourlyOperationStatus();
+        }
+      }
+    }
+
     function persist(date,hours){
       var storeId=selectedStore();
       root.InsightStorage.transaction(allStores,function(next){
@@ -167,11 +232,13 @@
         var invalid=inputs.find(function(input){return !input.checkValidity();});
         if(invalid){invalid.reportValidity();invalid.focus();return;}
         try{
+          observeHourlySave(function(){
           persist(date,draft);
           dialog.close();
           renderQuick();
           if(root.InsightEventResults&&typeof root.InsightEventResults.render==='function')root.InsightEventResults.render();
           if(typeof showToast==='function')showToast('✓ 時間帯別客数を保存しました','#15803d','#f0fdf4');
+          });
         }catch(error){alert('時間帯別客数を保存できませんでした。\n'+error.message);}
       };
       actions.append(cancel,save);dialog.append(actions);
