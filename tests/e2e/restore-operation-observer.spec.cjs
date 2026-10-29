@@ -230,3 +230,41 @@ test('FICTIONAL overlapping native restore readers allow first completion and la
   const second=await snapshot(page,f);
   expect([second.saved,second.live,second.writes]).toEqual([777,777,2]);
 });
+
+test('FICTIONAL stale first load after abort cannot overwrite a newer native restore',async({page})=>{
+  const f=await setup(page);
+  await page.evaluate(()=>{
+    window.__fictionalReaders=[];
+    const NativeReader=window.FileReader;
+    window.FileReader=class extends NativeReader{
+      readAsText(file){window.__fictionalReaders.push({reader:this,file});}
+    };
+  });
+  await upload(page,f.json);
+  await page.waitForFunction(()=>window.__fictionalReaders.length===1);
+  const blocked=await page.evaluate(json=>{
+    const a=window.__fictionalReaders[0].reader;
+    a.onabort(); // FICTIONAL abort before the first load callback.
+    const target=JSON.parse(json);
+    const id=target.current,year=String(target.stores[id].years.at(-1));
+    target.stores[id].data[year]['1月'][0].売上=850;
+    window.__fictionalBJson=JSON.stringify(target);
+    const input={value:'selected',files:[new File([window.__fictionalBJson],'FICTIONAL_second.json',{type:'application/json'})]};
+    restoreData({target:input});
+    a.onload({target:{result:json}}); // The first A load comes after B starts.
+    const forbidden={value:'selected',files:[new File([json],'FICTIONAL_third.json',{type:'application/json'})]};
+    restoreData({target:forbidden});
+    return {readers:window.__fictionalReaders.length,writes:window.__restoreWrites,
+      secondInput:input.value,thirdInput:forbidden.value};
+  },f.json);
+  expect(blocked).toEqual({readers:2,writes:0,secondInput:'selected',thirdInput:''});
+  await page.evaluate(()=>{
+    window.__fictionalReaders[1].reader.onload({target:{result:window.__fictionalBJson}});
+  });
+  await page.waitForFunction(()=>window.__restoreWrites===1);
+  const state=await snapshot(page,f);
+  expect([state.saved,state.live,state.writes]).toEqual([850,850,1]);
+  expect(state.status.state).toBe('HELD');
+  expect(state.alerts.join(' ')).toContain('別のバックアップ復元処理が進行中');
+  expect(await page.evaluate(()=>InsightStorage.snapshotWritesHeld())).toBe(false);
+});
