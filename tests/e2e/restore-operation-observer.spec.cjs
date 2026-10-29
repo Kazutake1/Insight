@@ -318,3 +318,66 @@ for(const scenario of ['postwrite-throw','committed-ui-error']){
     expect([after.saved,after.live,after.held,after.conflict]).toEqual([777,777,false,false]);
   });
 }
+
+for(const rollbackFailure of ['before-rollback-write','after-rollback-write']){
+  test(`FICTIONAL manual reload uses actual saved snapshot after ${rollbackFailure}`,async({page})=>{
+    const f=await setup(page);
+    await page.evaluate(({id,year,month,rollbackFailure})=>{
+      const originalRead=InsightStorage.readSnapshot;
+      let corruptReadbackOnce=true;
+      InsightStorage.readSnapshot=function(){
+        const value=originalRead.apply(this,arguments);
+        if(corruptReadbackOnce&&window.__restoreWrites===1){
+          corruptReadbackOnce=false;
+          value.stores[id].data[year][month][0].売上+=1;
+        }
+        return value;
+      };
+      const originalWrite=InsightStorage.writeSnapshot;
+      let attempts=0;
+      InsightStorage.writeSnapshot=function(){
+        attempts++;
+        if(attempts===2&&rollbackFailure==='before-rollback-write')
+          throw Error('FICTIONAL rollback interrupted before write');
+        const result=originalWrite.apply(this,arguments);
+        if(attempts===2&&rollbackFailure==='after-rollback-write')
+          throw Error('FICTIONAL rollback interrupted after write');
+        return result;
+      };
+    },{...f,rollbackFailure});
+    await upload(page,f.json);
+    await page.waitForFunction(()=>window.__restoreAlerts.some(message=>
+      message.includes('自動復旧にも失敗')));
+    const expected=rollbackFailure==='before-rollback-write'?777:111;
+    const before=await page.evaluate(({id,year,month})=>{
+      const raw=localStorage.getItem('insight_v11');
+      return {
+        raw,
+        saved:JSON.parse(raw).stores[id].data[year][month][0].売上,
+        live:allStores.stores[id].data[year][month][0].売上,
+        held:InsightStorage.snapshotWritesHeld(),
+        alerts:window.__restoreAlerts,
+        observer:InsightRestoreOperationObserverV0.getStatus().state
+      };
+    },f);
+    expect([before.saved,before.live,before.held,before.observer]).toEqual([expected,111,true,'HELD']);
+    expect(before.alerts.join(' ')).toContain('この画面での再復元は行わないでください');
+    expect(before.alerts.join(' ')).toContain('Insightを手動で再読み込み');
+    // Reload must reflect actual persisted data, not assert a successful automatic rollback.
+    await page.reload({waitUntil:'domcontentloaded'});
+    await page.waitForFunction(()=>window.InsightStorage&&typeof allStores!=='undefined'&&
+      allStores&&allStores.stores&&typeof InsightStorage.snapshotWritesHeld==='function');
+    const after=await page.evaluate(({id,year,month})=>{
+      const raw=localStorage.getItem('insight_v11');
+      return {
+        raw,
+        saved:JSON.parse(raw).stores[id].data[year][month][0].売上,
+        live:allStores.stores[id].data[year][month][0].売上,
+        held:InsightStorage.snapshotWritesHeld(),
+        conflict:InsightStorage.reportState().conflict
+      };
+    },f);
+    expect(after.raw).toBe(before.raw);
+    expect([after.saved,after.live,after.held,after.conflict]).toEqual([expected,expected,false,false]);
+  });
+}
