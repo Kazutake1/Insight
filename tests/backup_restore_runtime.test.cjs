@@ -35,7 +35,7 @@ function fixture(options={}){
   const original=snapshot(100);
   let persisted=clone(original),writeCount=0,readFaultOnce=!!options.corruptAfterWrite;
   const downloads=[],alerts=[],toasts=[],samples=[],readers=[];
-  let confirmation=options.confirm!==false;
+  let confirmation=options.confirm!==false,confirmationCount=0;
   let writeHeld=false;
   let failWriteOnce=!!options.quotaOnce;
   const body={
@@ -103,14 +103,14 @@ function fixture(options={}){
     URL:{createObjectURL(){return 'blob:fake';},revokeObjectURL(){}},
     Blob,Date,Number,Set,Map,String,Object,Array,Math,JSON,Promise,
     setTimeout(){return 1;},
-    confirm(){return confirmation;},
+    confirm(){confirmationCount++;return confirmation;},
     alert(message){alerts.push(String(message));},
     console:{warn(){},log(){}},
     FileReader:class FileReader{
       constructor(){readers.push(this);}
       readAsText(file){
         this._file=file;
-        if(options.readThrows)throw new Error('FICTIONAL readAsText failed');
+        if(options.readThrows||(options.readThrowsOnce&&readers.length===1))throw new Error('FICTIONAL readAsText failed');
         if(!options.deferReader)this.onload({target:{result:file.contents}});
       }
     },
@@ -134,6 +134,7 @@ function fixture(options={}){
     repeatReader(){const r=readers.at(-1);r.onload({target:{result:r._file.contents}});},
     get persisted(){return persisted;},
     get writeCount(){return writeCount;},
+    get confirmationCount(){return confirmationCount;},
     setConfirmation(value){confirmation=!!value;}
   };
 }
@@ -472,4 +473,59 @@ test('BR26 FICTIONAL late duplicate from old reader cannot release a newer pendi
   assert.equal(f.persisted.stores.a.data['2026']['1月'][0].売上,800);
   assert.equal(f.downloads.length,2);
   assert.equal(f.window.InsightRestoreOperationObserverV0.getStatus().state,'HELD');
+});
+
+test('BR27 FICTIONAL late first onload after error or abort cannot overwrite a newer pending restore',()=>{
+  for(const failure of ['onerror','onabort']){
+    const f=fixture({deferReader:true});
+    f.restore(snapshot(750));
+    const a=f.readers[0];
+    a[failure]();
+    f.restore(snapshot(850));
+    const notices=f.confirmationCount;
+    a.onload({target:{result:a._file.contents}});
+    assert.equal(f.writeCount,0,failure);
+    assert.equal(f.downloads.length,0,failure);
+    assert.equal(f.confirmationCount,notices,failure);
+    f.restore(snapshot(950)); // B must still own the operation.
+    assert.equal(f.readers.length,2,failure);
+    f.flushReader();
+    assert.equal(f.writeCount,1,failure);
+    assert.equal(f.downloads.length,1,failure);
+    assert.equal(f.persisted.stores.a.data['2026']['1月'][0].売上,850,failure);
+    const confirmations=f.confirmationCount;
+    a.onload({target:{result:a._file.contents}});
+    assert.equal(f.writeCount,1,failure);
+    assert.equal(f.confirmationCount,confirmations,failure);
+    assert.equal(f.downloads.length,1,failure);
+  }
+});
+test('BR28 FICTIONAL readAsText sync exception permanently rejects its late first load',()=>{
+  const f=fixture({deferReader:true,readThrowsOnce:true});
+  assert.throws(()=>f.restore(snapshot(750)),/FICTIONAL readAsText failed/);
+  const a=f.readers[0];
+  f.restore(snapshot(850));
+  a.onload({target:{result:a._file.contents}});
+  assert.equal(f.writeCount,0);
+  assert.equal(f.confirmationCount,0);
+  assert.equal(f.downloads.length,0);
+  f.flushReader();
+  assert.equal(f.writeCount,1);
+  assert.equal(f.confirmationCount,1);
+  assert.equal(f.persisted.stores.a.data['2026']['1月'][0].売上,850);
+  assert.equal(f.downloads.length,1);
+});
+test('BR29 FICTIONAL late reader error does not cancel the next reader',()=>{
+  const f=fixture({deferReader:true});
+  f.restore(snapshot(750));
+  const a=f.readers[0];
+  a.onabort();
+  f.restore(snapshot(850));
+  a.onerror();
+  f.restore(snapshot(950)); // Still refused; B has not finished.
+  assert.equal(f.readers.length,2);
+  assert.equal(f.writeCount,0);
+  f.flushReader();
+  assert.equal(f.writeCount,1);
+  assert.equal(f.persisted.stores.a.data['2026']['1月'][0].売上,850);
 });
