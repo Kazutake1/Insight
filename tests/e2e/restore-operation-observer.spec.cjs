@@ -165,3 +165,68 @@ test('FICTIONAL postwrite throw reports saved target without retry or false unch
   expect(after.errors).toEqual(Array(4).fill('InsightStorageRestoreHoldError'));
   expect(after.metadata).toBe('FICTIONAL allowed');
 });
+
+test('FICTIONAL duplicate native FileReader completion is observed but cannot commit twice',async({page})=>{
+  const f=await setup(page);
+  await page.evaluate(()=>{
+    const NativeReader=window.FileReader;
+    window.FileReader=class extends NativeReader{
+      readAsText(file){
+        this.addEventListener('load',()=>{
+          queueMicrotask(()=>{if(typeof this.onload==='function')this.onload({target:this});});
+        },{once:true});
+        return super.readAsText(file);
+      }
+    };
+  });
+  await upload(page,f.json);
+  await page.waitForFunction(()=>window.__restoreWrites===1&&
+    InsightRestoreOperationObserverV0.getStatus().state==='HELD');
+  const s=await snapshot(page,f);
+  expect([s.saved,s.live,s.writes]).toEqual([777,777,1]);
+  expect(s.inputValue).toBe('');
+  expect(s.alerts).toEqual([]);
+  expect(await page.evaluate(()=>InsightStorage.snapshotWritesHeld())).toBe(false);
+});
+test('FICTIONAL overlapping native restore readers allow first completion and later retry',async({page})=>{
+  const f=await setup(page);
+  await page.evaluate(()=>{
+    window.__pendingRestoreReads=[];
+    window.__resumeRestoreReads=false;
+    const NativeReader=window.FileReader;
+    window.FileReader=class extends NativeReader{
+      readAsText(file){
+        if(!window.__resumeRestoreReads){
+          window.__pendingRestoreReads.push({reader:this,file});
+          return;
+        }
+        return super.readAsText(file);
+      }
+    };
+  });
+  await upload(page,f.json);
+  await page.waitForFunction(()=>window.__pendingRestoreReads.length===1);
+  const blocked=await page.evaluate(json=>{
+    const event={target:{files:[new File([json],'FICTIONAL_overlap.json',{type:'application/json'})],value:'selected'}};
+    restoreData(event);
+    return {value:event.target.value,pending:window.__pendingRestoreReads.length,writes:window.__restoreWrites};
+  },f.json);
+  expect(blocked).toEqual({value:'',pending:1,writes:0});
+  await page.evaluate(()=>{
+    window.__resumeRestoreReads=true;
+    const pending=window.__pendingRestoreReads[0];
+    pending.reader.readAsText(pending.file);
+  });
+  await page.waitForFunction(()=>window.__restoreWrites===1&&document.getElementById('restoreFile').value==='');
+  const first=await snapshot(page,f);
+  expect([first.saved,first.live,first.writes]).toEqual([777,777,1]);
+  expect(first.alerts.join(' ')).toContain('別のバックアップ復元処理が進行中');
+  expect(first.status.state).toBe('HELD');
+  await page.evaluate(json=>{
+    const event={target:{files:[new File([json],'FICTIONAL_retry.json',{type:'application/json'})],value:'selected'}};
+    restoreData(event);
+  },f.json);
+  await page.waitForFunction(()=>window.__restoreWrites===2);
+  const second=await snapshot(page,f);
+  expect([second.saved,second.live,second.writes]).toEqual([777,777,2]);
+});
