@@ -470,3 +470,16 @@ test('O40: FICTIONAL sales/customers/waste input save is registered-only, never 
   assert.equal(o.end(failed,'unknown'),true);
   assert.equal(o.status().state,'HELD');
 });
+
+
+test('O41 FICTIONAL store selector change observer remains registered-only and nonauthorizing',()=>{
+  const o=newReady(),ticket=o.begin('store_selector_change');
+  assert.ok(ticket);
+  assert.equal(o.status().state,'ACTIVE');
+  assert.equal(o.end(ticket,'completed'),true);
+  assert.equal(o.status().state,'IDLE_OBSERVED');
+  assert.equal('authorized_for_model' in o.status(),false);
+  const uncertain=o.begin('store_selector_change');
+  assert.equal(o.end(uncertain,'unknown'),true);
+  assert.equal(o.status().state,'HELD');
+});
