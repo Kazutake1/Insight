@@ -103,7 +103,7 @@ function fixture(options={}){
     URL:{createObjectURL(){return 'blob:fake';},revokeObjectURL(){}},
     Blob,Date,Number,Set,Map,String,Object,Array,Math,JSON,Promise,
     setTimeout(){return 1;},
-    confirm(){confirmationCount++;return confirmation;},
+    confirm(){confirmationCount++;if(typeof options.duringConfirm==='function')options.duringConfirm({ctx,readers});return confirmation;},
     alert(message){alerts.push(String(message));},
     console:{warn(){},log(){}},
     FileReader:class FileReader{
@@ -565,5 +565,40 @@ test('BR30 FICTIONAL first late load after newer reader already completed never 
     assert.equal(f.downloads.length,2,termination);
     assert.equal(f.persisted.stores.a.data['2026']['1月'][0].売上,900,termination);
     assert.equal(f.window.InsightStorage.snapshotWritesHeld(),false,termination);
+  }
+});
+
+test('BR31 FICTIONAL synchronous reader error or abort during accepted onload does not release active restore',()=>{
+  for(const signal of ['onerror','onabort']){
+    let injected=false;
+    const captured=[];
+    const f=fixture({duringConfirm({ctx,readers}){
+      if(injected)return;
+      injected=true;
+      const a=readers[0];
+      a[signal](); // FICTIONAL event synchronously inside onload/confirm.
+      const nested={value:'selected',files:[{name:'FICTIONAL_nested.json',size:100,contents:JSON.stringify(snapshot(900))}]};
+      ctx.restoreData({target:nested}); // Must be rejected while first onload still owns restore.
+      captured.push({value:nested.value,readers:readers.length});
+    }});
+    f.restore(snapshot(750));
+    assert.equal(injected,true,signal);
+    assert.equal(captured.length,1,signal);
+    assert.deepEqual(captured[0],{value:'',readers:1},signal);
+    assert.equal(f.readers.length,1,signal);
+    assert.equal(f.writeCount,1,signal); // Already accepted onload remains synchronous.
+    assert.equal(f.confirmationCount,1,signal);
+    assert.equal(f.downloads.length,1,signal);
+    assert.equal(f.persisted.stores.a.data['2026']['1月'][0].売上,750,signal);
+    assert.equal(f.ctx.allStores.stores.a.data['2026']['1月'][0].売上,750,signal);
+    assert.equal(f.window.InsightRestoreOperationObserverV0.getStatus().state,'HELD',signal);
+    assert.equal(f.window.InsightStorage.snapshotWritesHeld(),false,signal);
+    assert.match(f.alerts.join(' '),/別のバックアップ復元処理が進行中/,signal);
+    assert.doesNotMatch(f.alerts.join(' '),/ファイルを読み込めませんでした/,signal);
+    f.restore(snapshot(850)); // Reader ownership released after original onload finishes.
+    assert.equal(f.readers.length,2,signal);
+    assert.equal(f.writeCount,2,signal);
+    assert.equal(f.persisted.stores.a.data['2026']['1月'][0].売上,850,signal);
+    assert.equal(f.window.InsightStorage.snapshotWritesHeld(),false,signal);
   }
 });
