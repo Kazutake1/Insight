@@ -298,7 +298,7 @@ test('復元の保存前エラーは容量不足と決めつけず元の原因�
 
 test('復元確定後の画面更新エラーは保存成功を伝えて再読込を促す',()=>{
   const source=fs.readFileSync(path.join(root,'insight_backup_guard_v1.js'),'utf8');
-  assert.match(source,/reader\.onload=function\(ev\)\{if\(\+\+restoreLoadCount>1\)markRestoreObservationFault\(\);var restoreCommitted=false,restoreTicket=null,restoreOutcome='unknown',restoreWriteCheck=null;try\{try\{/);
+  assert.match(source,/reader\.onload=function\(ev\)\{if\(\+\+restoreLoadCount>1\)\{markRestoreObservationFault\(\);return;\}var restoreCommitted=false,restoreTicket=null,restoreOutcome='unknown',restoreWriteCheck=null;try\{try\{/);
   assert.ok(source.indexOf('verifiedRestore=verifyRestoredSnapshot(newAll)')<source.indexOf('restoreCommitted=true'));
   assert.ok(source.indexOf('restoreCommitted=true')<source.indexOf('allStores=newAll'));
   assert.match(source,/復元したデータは保存されています。Insightを再読み込み/);
