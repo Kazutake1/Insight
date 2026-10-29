@@ -84,6 +84,8 @@ function restoreSummary(fileName,info,snapshot,report){
 
 
 var preRestoreMemorySnapshot=null;
+// A single FileReader may own the restore path at a time; no snapshot/schema changes.
+var restoreFileReaderActive=null;
 
 /* The registered operation begins at the confirmed restore write, not at
  * file selection/reading or preflight. It neither authorizes data use nor
@@ -327,8 +329,13 @@ backupData=function(){
   }
 };
 restoreData=function(e){
-  var file=e.target.files[0];if(!file)return;if(file.size>20*1024*1024){alert("バックアップファイルが大きすぎます。\n20MB以下のファイルを選択してください。");e.target.value="";return;}
-  var reader=new FileReader(),restoreLoadCount=0;reader.onload=function(ev){if(++restoreLoadCount>1)markRestoreObservationFault();var restoreCommitted=false,restoreTicket=null,restoreOutcome='unknown',restoreWriteCheck=null;try{try{
+  var file=e.target.files[0];if(!file)return;
+  if(restoreFileReaderActive){
+    markRestoreObservationFault();
+    alert('別のバックアップ復元処理が進行中です。完了後にもう一度お試しください。');
+    e.target.value='';return;
+  }if(file.size>20*1024*1024){alert("バックアップファイルが大きすぎます。\n20MB以下のファイルを選択してください。");e.target.value="";return;}
+  var reader=new FileReader(),restoreLoadCount=0;restoreFileReaderActive=reader;reader.onload=function(ev){if(++restoreLoadCount>1){markRestoreObservationFault();return;}var restoreCommitted=false,restoreTicket=null,restoreOutcome='unknown',restoreWriteCheck=null;try{try{
     var parsed=JSON.parse(ev.target.result),envelope=parseBackupEnvelope(parsed),newAll=normalizeBackup(envelope.data);
     if(envelope.info)validateBackupInfo(envelope.info,newAll);
     var preflight=runRestorePreflight(newAll);
@@ -372,6 +379,6 @@ restoreData=function(e){
       :restoreWriteCheck==="uncertain"
       ?"バックアップ復元中にエラーが発生し、現在の保存状態を確認できませんでした。\n"+detail+"\n\n追加の編集・保存や再復元は行わず、復元直前バックアップを保管してからInsightを再読み込みし、保存内容を確認してください。"
       :"バックアップを復元できませんでした。\n"+detail+"\n\n現在のデータは変更されていません。");
-  }e.target.value="";}finally{finishRestoreObservation(restoreTicket,restoreOutcome);}};reader.onerror=function(){markRestoreObservationFault();alert("ファイルを読み込めませんでした。\n現在のデータは変更されていません。");e.target.value="";};reader.onabort=function(){markRestoreObservationFault();};try{reader.readAsText(file);}catch(readErr){markRestoreObservationFault();throw readErr;}
+  }e.target.value="";}finally{finishRestoreObservation(restoreTicket,restoreOutcome);if(restoreFileReaderActive===reader)restoreFileReaderActive=null;}};reader.onerror=function(){markRestoreObservationFault();if(restoreFileReaderActive===reader)restoreFileReaderActive=null;alert("ファイルを読み込めませんでした。\n現在のデータは変更されていません。");e.target.value="";};reader.onabort=function(){markRestoreObservationFault();if(restoreFileReaderActive===reader)restoreFileReaderActive=null;};try{reader.readAsText(file);}catch(readErr){markRestoreObservationFault();if(restoreFileReaderActive===reader)restoreFileReaderActive=null;throw readErr;}
 };
 })();
