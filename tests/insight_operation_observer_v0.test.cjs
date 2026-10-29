@@ -483,3 +483,15 @@ test('O41 FICTIONAL store selector change observer remains registered-only and n
   assert.equal(o.end(uncertain,'unknown'),true);
   assert.equal(o.status().state,'HELD');
 });
+
+test('O42: confirmed backup restore has a fixed kind and remains nonauthorizing',()=>{
+  const o=newReady(),token=o.begin('confirmed_backup_restore');
+  assert.ok(token);
+  assert.equal(o.status().state,'ACTIVE');
+  assert.equal(o.end(token,'completed'),true);
+  assert.equal(o.status().state,'IDLE_OBSERVED');
+  const later=o.begin('confirmed_backup_restore');
+  assert.equal(o.end(later,'unknown'),true);
+  assert.equal(o.status().state,'HELD');
+  assert.doesNotMatch(JSON.stringify(o.status()),/backupData|storeId|filename|authorized_for_model|full_app_clean/i);
+});
