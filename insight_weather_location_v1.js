@@ -5,6 +5,130 @@
   root.__insightWeatherLocationV1=true;
 
   var GEOCODE_URL='https://geocoding-api.open-meteo.com/v1/search';
+  // Registered-only, non-authorizing: the confirmed location set/write path.
+  var locationObserver=null,locationFault=false,locationActive=0;
+  function getLocationSaveOperationStatus(){
+    var scope='weather-location-confirmed-set-only';
+    if(locationFault)return Object.freeze({scope:scope,state:'HELD',activeCount:null,epoch:null});
+    if(!locationObserver)return Object.freeze({scope:scope,state:'UNAVAILABLE',activeCount:null,epoch:null});
+    try{
+      var value=locationObserver.status();
+      if(!value||value.scope!=='registered-operations-only'||
+        ['IDLE_OBSERVED','ACTIVE','HELD'].indexOf(value.state)<0||
+        !Number.isSafeInteger(value.activeCount)||value.activeCount<0||
+        !Number.isSafeInteger(value.epoch)||value.epoch<1||
+        value.activeCount<locationActive||
+        (value.state==='IDLE_OBSERVED'&&value.activeCount!==0)||
+        (value.state==='ACTIVE'&&value.activeCount===0)||
+        (locationActive>0&&value.state!=='ACTIVE'&&value.state!=='HELD'))
+        throw new Error('location observer status invalid');
+      return Object.freeze({scope:scope,state:value.state,activeCount:value.activeCount,epoch:value.epoch});
+    }catch(_){
+      locationFault=true;
+      return Object.freeze({scope:scope,state:'HELD',activeCount:null,epoch:null});
+    }
+  }
+  (function initializeLocationObserver(){
+    try{
+      var factory=root.InsightOperationObserverV0&&root.InsightOperationObserverV0.createOperationObserver;
+      if(typeof factory!=='function')return;
+      var candidate=factory();
+      if(!candidate||['initialize','begin','end','invalidate','status'].some(function(name){
+        return typeof candidate[name]!=='function';
+      })||candidate.initialize()!==true){locationFault=true;return;}
+      locationObserver=candidate;
+      var initial=getLocationSaveOperationStatus();
+      if(initial.state!=='IDLE_OBSERVED'||initial.activeCount!==0)locationFault=true;
+    }catch(_){locationFault=true;}
+  })();
+  function observeConfirmedLocationSet(operation){
+    var observer=locationObserver,ticket=null,registered=false,outcome='unknown';
+    if(observer&&!locationFault){
+      try{
+        ticket=observer.begin('weather_location_set');
+        if(!ticket||typeof ticket!=='object'||locationActive>=Number.MAX_SAFE_INTEGER){
+          locationFault=true;
+        }else{
+          registered=true;locationActive++;
+          if(getLocationSaveOperationStatus().state!=='ACTIVE')locationFault=true;
+        }
+      }catch(_){locationFault=true;}
+    }
+    try{
+      var value=operation();
+      outcome='completed';
+      return value;
+    }finally{
+      if(registered){
+        try{if(observer.end(ticket,outcome)!==true)locationFault=true;}
+        catch(_){locationFault=true;}
+        locationActive--;
+        if(!locationFault)getLocationSaveOperationStatus();
+      }
+    }
+  }
+
+
+
+  // Independent registered-only observer for confirmed CLEAR; prior SET untouched.
+  var clearObserver=null,clearFault=false,clearActive=0;
+  function getLocationClearOperationStatus(){
+    var scope='weather-location-confirmed-clear-only';
+    if(clearFault)return Object.freeze({scope:scope,state:'HELD',activeCount:null,epoch:null});
+    if(!clearObserver)return Object.freeze({scope:scope,state:'UNAVAILABLE',activeCount:null,epoch:null});
+    try{
+      var result=clearObserver.status();
+      if(!result||result.scope!=='registered-operations-only'||
+         ['IDLE_OBSERVED','ACTIVE','HELD'].indexOf(result.state)<0||
+         !Number.isSafeInteger(result.activeCount)||result.activeCount<0||
+         !Number.isSafeInteger(result.epoch)||result.epoch<1||
+         result.activeCount<clearActive||
+         (result.state==='IDLE_OBSERVED'&&result.activeCount!==0)||
+         (result.state==='ACTIVE'&&result.activeCount===0)||
+         (clearActive>0&&result.state!=='ACTIVE'&&result.state!=='HELD'))
+        throw new Error('location clear observer status invalid');
+      return Object.freeze({scope:scope,state:result.state,activeCount:result.activeCount,epoch:result.epoch});
+    }catch(_){clearFault=true;return Object.freeze({scope:scope,state:'HELD',activeCount:null,epoch:null});}
+  }
+  (function initializeLocationClearObserver(){
+    try{
+      var factory=root.InsightOperationObserverV0&&root.InsightOperationObserverV0.createOperationObserver;
+      if(typeof factory!=='function')return;
+      var candidate=factory();
+      if(!candidate||['initialize','begin','end','invalidate','status'].some(function(name){
+        return typeof candidate[name]!=='function';
+      })||candidate.initialize()!==true){clearFault=true;return;}
+      clearObserver=candidate;
+      var initial=getLocationClearOperationStatus();
+      if(initial.state!=='IDLE_OBSERVED'||initial.activeCount!==0)clearFault=true;
+    }catch(_){clearFault=true;}
+  })();
+  function observeConfirmedLocationClear(operation){
+    var observer=clearObserver,ticket=null,registered=false,outcome='unknown';
+    if(observer&&!clearFault){
+      try{
+        ticket=observer.begin('weather_location_clear');
+        if(!ticket||typeof ticket!=='object'||clearActive>=Number.MAX_SAFE_INTEGER){
+          clearFault=true;
+        }else{
+          registered=true;clearActive++;
+          if(getLocationClearOperationStatus().state!=='ACTIVE')clearFault=true;
+        }
+      }catch(_){clearFault=true;}
+    }
+    try{
+      var value=operation();
+      outcome='completed';
+      return value;
+    }finally{
+      if(registered){
+        try{if(observer.end(ticket,outcome)!==true)clearFault=true;}
+        catch(_){clearFault=true;}
+        clearActive--;
+        if(!clearFault)getLocationClearOperationStatus();
+      }
+    }
+  }
 
   function text(v){return String(v==null?'':v).trim();}
   function uniqueParts(parts){
@@ -60,9 +184,11 @@
     if(!query){
       if(!current)return;
       if(confirm('この店舗の天気地点設定を解除しますか？')){
-        delete store.weatherLocation;
-        persist();
-        alert('天気地点設定を解除しました。\n未設定時は従来の愛知県西部／名古屋基準で取得します。');
+        observeConfirmedLocationClear(function(){
+          delete store.weatherLocation;
+          persist();
+          alert('天気地点設定を解除しました。\n未設定時は従来の愛知県西部／名古屋基準で取得します。');
+        });
       }
       return;
     }
@@ -74,21 +200,23 @@
       var label=candidateLabel(chosen);
       if(!confirm('この地点を使用しますか？\n\n'+label+'\n緯度 '+Number(chosen.latitude).toFixed(4)+' / 経度 '+Number(chosen.longitude).toFixed(4)))return;
 
-      store.weatherLocation={
-        name:String(chosen.name||query),
-        query:query,
-        label:label||query,
-        latitude:Number(chosen.latitude),
-        longitude:Number(chosen.longitude),
-        timezone:String(chosen.timezone||'Asia/Tokyo'),
-        admin1:text(chosen.admin1),
-        admin2:text(chosen.admin2),
-        admin3:text(chosen.admin3),
-        admin4:text(chosen.admin4),
-        source:'open-meteo-geocoding'
-      };
-      persist();
-      alert('天気地点を「'+(label||query)+'」に設定しました。\n今後「自動」で、この地点の天気・最高気温・最低気温を取得します。');
+      observeConfirmedLocationSet(function(){
+        store.weatherLocation={
+          name:String(chosen.name||query),
+          query:query,
+          label:label||query,
+          latitude:Number(chosen.latitude),
+          longitude:Number(chosen.longitude),
+          timezone:String(chosen.timezone||'Asia/Tokyo'),
+          admin1:text(chosen.admin1),
+          admin2:text(chosen.admin2),
+          admin3:text(chosen.admin3),
+          admin4:text(chosen.admin4),
+          source:'open-meteo-geocoding'
+        };
+        persist();
+        alert('天気地点を「'+(label||query)+'」に設定しました。\n今後「自動」で、この地点の天気・最高気温・最低気温を取得します。');
+      });
     }catch(e){
       alert((e&&e.message)||'地点設定に失敗しました。');
     }
@@ -125,6 +253,8 @@
 
   root.InsightWeatherLocation={
     configure:configureLocation,
+    getLocationSaveOperationStatus:getLocationSaveOperationStatus,
+    getLocationClearOperationStatus:getLocationClearOperationStatus,
     search:searchLocations,
     label:candidateLabel
   };

@@ -43,9 +43,15 @@ test('apply failure remains held after successful write',()=>{
   const f=setup();assert.throws(()=>f.storage.transaction(f.fixture,n=>{n.current='store_b';},null,()=>{throw Error('apply');}),/apply/);
   assert.equal(JSON.parse(f.values.insight_v11).current,'store_b');assert.equal(f.storage.reportState().held,true);
 });
-test('metadata only invalidates reports for main data key',()=>{
-  const f=setup();f.storage.writeMetadata('insight_dark','1');assert.equal(f.events.length,0);
-  f.storage.writeMetadata('insight_v11',f.values.insight_v11);assert.deepEqual(f.events.map(e=>e.phase),['begin','finish']);
+test('metadata cannot write main data key and reports attempted invalid write',()=>{
+  const f=setup(),prior=f.values.insight_v11;
+  f.storage.writeMetadata('insight_dark','1');assert.equal(f.events.length,0);
+  assert.throws(()=>f.storage.writeMetadata('insight_v11',prior),
+    error=>error.name==='InsightStorageMetadataKeyError');
+  assert.equal(f.values.insight_v11,prior);
+  assert.deepEqual(f.events.map(e=>e.phase),['begin','finish']);
+  assert.equal(f.events.at(-1).outcome,'failed');
+  assert.equal(f.storage.reportState().held,true);
 });
 test('external data and clear notify without changing save conflict behavior',()=>{
   for(const key of ['insight_v11',null]){
