@@ -126,3 +126,23 @@ test('FICTIONAL missing observer script never blocks original native restore',as
   expect([s.saved,s.live,s.writes]).toEqual([777,777,1]);
   expect(s.status.state).toBe('UNAVAILABLE');
 });
+
+
+test('FICTIONAL postwrite throw reports saved target without retry or false unchanged warning',async({page})=>{
+  const f=await setup(page);
+  await page.evaluate(()=>{
+    const original=InsightStorage.writeSnapshot;
+    InsightStorage.writeSnapshot=function(){
+      const result=original.apply(this,arguments);
+      if(window.__restoreWrites===1)throw Error('FICTIONAL postwrite throw');
+      return result;
+    };
+  });
+  await upload(page,f.json);
+  await endState(page,1,'HELD');
+  const s=await snapshot(page,f);
+  expect([s.saved,s.live,s.writes]).toEqual([777,111,1]);
+  expect(s.alerts.join(' ')).toContain('保存領域に復元対象と一致するデータ');
+  expect(s.alerts.join(' ')).not.toContain('現在のデータは変更されていません');
+  expect(s.samples.every(x=>x.state==='ACTIVE')).toBe(true);
+});
