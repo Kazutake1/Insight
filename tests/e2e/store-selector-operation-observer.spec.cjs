@@ -159,7 +159,9 @@ test('FICTIONAL identical store change event does not register a switch',async({
     document.getElementById('storeSel').dispatchEvent(new Event('change',{bubbles:true}));
     return {before,after:InsightStoreSelectorObserverV0.getStatus(),writes:window.__selectorWrites};
   });
-  expect(result.writes).toBe(0);
+  // Existing switchStore() persists even when selecting the current store;
+  // do not change business behavior just to suppress the observer token.
+  expect(result.writes).toBe(1);
   expect(result.after.epoch).toBe(result.before.epoch);
   expect(result.after.state).toBe('IDLE_OBSERVED');
 });
