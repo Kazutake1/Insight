@@ -364,12 +364,26 @@ test('BR18 FICTIONAL postwrite throw latches hold against later stale-live write
   assert.equal(f.writeCount,1);
   assert.equal(f.persisted.stores.a.data['2026']['1月'][0].売上,750);
 });
-test('BR19 FICTIONAL postflight rollback failure latches hold',()=>{
+test('BR19 FICTIONAL rollback failure holds writes and guides manual reload before recovery',()=>{
   const f=fixture({corruptAfterWrite:true,rollbackFailure:true});
   f.restore(snapshot(750));
   assert.equal(f.window.InsightStorage.snapshotWritesHeld(),true);
   assert.throws(()=>f.window.InsightStorage.writeSnapshot(f.ctx.allStores),/FICTIONAL restore hold/);
   assert.equal(f.writeCount,1);
+  assert.equal(f.alerts.length,1);
+  const notice=f.alerts[0];
+  const steps=[
+    'Insight_pre_restore_...json を保管してください',
+    '追加の編集・保存',
+    'この画面での再復元は行わないでください',
+    'Insightを手動で再読み込み',
+    '保存内容を確認してください',
+    'その後、必要な場合のみ保管したバックアップから復元してください'
+  ];
+  const positions=steps.map(step=>notice.indexOf(step));
+  assert.ok(positions.every(position=>position>=0),'復旧案内の必須手順が欠落しています');
+  assert.ok(positions.every((position,i)=>i===0||position>positions[i-1]),'復旧案内の順序が不正です');
+  assert.doesNotMatch(notice,/json を使って手動で復元してください/);
 });
 test('BR20 FICTIONAL uncertain postthrow latches hold without retry',()=>{
   const f=fixture({postcommitThrow:true,readbackUnavailableAfterCommit:true});
