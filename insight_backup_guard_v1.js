@@ -354,7 +354,7 @@ restoreData=function(e){
         alert("復元後の整合性確認に失敗したため、復元前の状態へ自動で戻しました。\n\n"+String(postErr&&postErr.message?postErr.message:postErr)+"\n\n復元直前バックアップも保存されています。");
       }catch(rollbackErr){
         holdRestoreSnapshotWrites();
-        alert("重大なエラー：復元後の整合性確認に失敗し、自動復旧にも失敗しました。\n\n"+String(postErr&&postErr.message?postErr.message:postErr)+"\n\n自動復旧エラー："+String(rollbackErr&&rollbackErr.message?rollbackErr.message:rollbackErr)+"\n\n保存された Insight_pre_restore_...json を使って手動で復元してください。");
+        alert("重大なエラー：復元後の整合性確認に失敗し、自動復旧にも失敗しました。\n\n"+String(postErr&&postErr.message?postErr.message:postErr)+"\n\n自動復旧エラー："+String(rollbackErr&&rollbackErr.message?rollbackErr.message:rollbackErr)+"\n\n復元直前バックアップ Insight_pre_restore_...json を保管してください。\n\n追加の編集・保存や、この画面での再復元は行わないでください。\nInsightを手動で再読み込みし、保存内容を確認してください。\nその後、必要な場合のみ保管したバックアップから復元してください。");
       }
       e.target.value="";return;
     }
