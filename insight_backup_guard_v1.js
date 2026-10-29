@@ -276,6 +276,20 @@ function verifyRestoredSnapshot(expected){
   if(window.InsightStorage.serialize(normalized)!==window.InsightStorage.serialize(expected))throw validationError("復元後検査で保存内容が復元対象と一致しませんでした。");
   return {snapshot:normalized,report:report};
 }
+function classifyInterruptedRestoreWrite(expected,previous){
+  // Read-only diagnosis: never retry, rollback, or acknowledge a write here.
+  // A matching snapshot does not establish writer provenance or atomicity.
+  try{
+    if(!window.InsightStorage||typeof window.InsightStorage.readSnapshot!=="function"||
+       typeof window.InsightStorage.serialize!=="function")return "uncertain";
+    var saved=window.InsightStorage.serialize(window.InsightStorage.readSnapshot());
+    var expectedBytes=window.InsightStorage.serialize(expected);
+    var previousBytes=previous?window.InsightStorage.serialize(previous):null;
+    if(saved===expectedBytes)return previousBytes===expectedBytes?"uncertain":"target-observed";
+    if(previousBytes!==null&&saved===previousBytes)return "previous-observed";
+  }catch(_){}
+  return "uncertain";
+}
 function rollbackPreRestoreSnapshot(){
   if(!preRestoreMemorySnapshot)throw new Error("復元前データがメモリにありません。");
   if(!window.InsightStorage||typeof window.InsightStorage.readSnapshot!=="function")throw new Error("保存済みデータを読み戻せません。");
@@ -305,20 +319,22 @@ backupData=function(){
 };
 restoreData=function(e){
   var file=e.target.files[0];if(!file)return;if(file.size>20*1024*1024){alert("バックアップファイルが大きすぎます。\n20MB以下のファイルを選択してください。");e.target.value="";return;}
-  var reader=new FileReader(),restoreLoadCount=0;reader.onload=function(ev){if(++restoreLoadCount>1)markRestoreObservationFault();var restoreCommitted=false,restoreTicket=null,restoreOutcome='unknown';try{try{
+  var reader=new FileReader(),restoreLoadCount=0;reader.onload=function(ev){if(++restoreLoadCount>1)markRestoreObservationFault();var restoreCommitted=false,restoreTicket=null,restoreOutcome='unknown',restoreWriteCheck=null;try{try{
     var parsed=JSON.parse(ev.target.result),envelope=parseBackupEnvelope(parsed),newAll=normalizeBackup(envelope.data);
     if(envelope.info)validateBackupInfo(envelope.info,newAll);
     var preflight=runRestorePreflight(newAll);
     if(!confirm(restoreSummary(file.name,envelope.info,newAll,preflight))){e.target.value="";return;}
     try{createPreRestoreBackup();}catch(safetyErr){throw new Error("復元直前バックアップを作成できないため、復元を中止しました。 "+String(safetyErr&&safetyErr.message?safetyErr.message:safetyErr));}
-    var verifiedRestore=null,writeCompleted=false;
+    var verifiedRestore=null,writeCompleted=false,writeAttempted=false;
     try{
       if(!window.InsightStorage)throw new Error("保存機能を初期化できませんでした");
       restoreTicket=beginRestoreObservation();
+      writeAttempted=true;
       window.InsightStorage.writeSnapshot(newAll);writeCompleted=true;
       verifiedRestore=verifyRestoredSnapshot(newAll);
     }catch(postErr){
       if(!writeCompleted){
+        if(writeAttempted)restoreWriteCheck=classifyInterruptedRestoreWrite(newAll,preRestoreMemorySnapshot);
         if(postErr&&postErr.name==="QuotaExceededError")throw new Error("保存容量が不足しているため復元できません");
         throw postErr;
       }
@@ -340,6 +356,10 @@ restoreData=function(e){
     var detail=String(err&&err.message?err.message:err);
     alert(restoreCommitted
       ?"バックアップの保存と整合性確認は完了しましたが、画面の更新に失敗しました。\n"+detail+"\n\n復元したデータは保存されています。Insightを再読み込みして表示を更新してください。もう一度復元する必要はありません。"
+      :restoreWriteCheck==="target-observed"
+      ?"復元処理は途中で失敗しましたが、保存領域に復元対象と一致するデータが確認されました。\n"+detail+"\n\n保存後の整合性確認・画面更新は完了していません。追加の編集・保存や再復元は行わず、復元直前バックアップを保管してからInsightを再読み込みし、表示内容を確認してください。"
+      :restoreWriteCheck==="uncertain"
+      ?"バックアップ復元中にエラーが発生し、現在の保存状態を確認できませんでした。\n"+detail+"\n\n追加の編集・保存や再復元は行わず、復元直前バックアップを保管してからInsightを再読み込みし、保存内容を確認してください。"
       :"バックアップを復元できませんでした。\n"+detail+"\n\n現在のデータは変更されていません。");
   }e.target.value="";}finally{finishRestoreObservation(restoreTicket,restoreOutcome);}};reader.onerror=function(){markRestoreObservationFault();alert("ファイルを読み込めませんでした。\n現在のデータは変更されていません。");e.target.value="";};reader.onabort=function(){markRestoreObservationFault();};try{reader.readAsText(file);}catch(readErr){markRestoreObservationFault();throw readErr;}
 };
