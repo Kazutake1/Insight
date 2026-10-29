@@ -84,6 +84,71 @@ function restoreSummary(fileName,info,snapshot,report){
 
 
 var preRestoreMemorySnapshot=null;
+
+/* The registered operation begins at the confirmed restore write, not at
+ * file selection/reading or preflight. It neither authorizes data use nor
+ * changes the backup, rollback, or UI control flow. */
+var restoreObserver=null,restoreObserverFault=false,restoreObserverActive=0,restoreInitClosed=false;
+var restoreScope='confirmed-backup-restore-write-and-sync-ui-only';
+function restoreObservationStatus(){
+  if(restoreObserverFault)return Object.freeze({scope:restoreScope,state:'HELD',activeCount:null,epoch:null});
+  if(!restoreObserver)return Object.freeze({scope:restoreScope,state:'UNAVAILABLE',activeCount:null,epoch:null});
+  try{
+    var s=restoreObserver.status();
+    if(!s||s.scope!=='registered-operations-only'||
+       ['IDLE_OBSERVED','ACTIVE','HELD'].indexOf(s.state)<0||
+       !Number.isSafeInteger(s.activeCount)||s.activeCount<0||
+       !Number.isSafeInteger(s.epoch)||s.epoch<1||
+       s.activeCount<restoreObserverActive||
+       (s.state==='IDLE_OBSERVED'&&s.activeCount!==0)||
+       (s.state==='ACTIVE'&&s.activeCount===0)||
+       (restoreObserverActive>0&&s.state!=='ACTIVE'&&s.state!=='HELD'))
+      throw new Error('invalid restore observer status');
+    return Object.freeze({scope:restoreScope,state:s.state,activeCount:s.activeCount,epoch:s.epoch});
+  }catch(_){markRestoreObservationFault();return Object.freeze({scope:restoreScope,state:'HELD',activeCount:null,epoch:null});}
+}
+function markRestoreObservationFault(){
+  restoreObserverFault=true;
+  try{if(restoreObserver)restoreObserver.invalidate();}catch(_){}
+}
+function initRestoreObservation(){
+  if(restoreObserver||restoreObserverFault||restoreInitClosed)return;
+  try{
+    var factory=window.InsightOperationObserverV0&&window.InsightOperationObserverV0.createOperationObserver;
+    if(typeof factory!=='function')return;
+    var candidate=factory();
+    if(!candidate||['initialize','begin','end','invalidate','status'].some(function(k){return typeof candidate[k]!=='function';})||
+       candidate.initialize()!==true){markRestoreObservationFault();return;}
+    restoreObserver=candidate;
+    if(restoreObservationStatus().state!=='IDLE_OBSERVED')markRestoreObservationFault();
+  }catch(_){markRestoreObservationFault();}
+}
+function beginRestoreObservation(){
+  initRestoreObservation();
+  // No factory discovered after a previously unobserved write may assert IDLE.
+  restoreInitClosed=true;
+  if(!restoreObserver||restoreObserverFault)return null;
+  try{
+    var token=restoreObserver.begin('confirmed_backup_restore');
+    if(!token||typeof token!=='object'||restoreObserverActive>=Number.MAX_SAFE_INTEGER){
+      markRestoreObservationFault();return null;
+    }
+    restoreObserverActive++;
+    if(restoreObservationStatus().state!=='ACTIVE')markRestoreObservationFault();
+    return {observer:restoreObserver,token:token};
+  }catch(_){markRestoreObservationFault();return null;}
+}
+function finishRestoreObservation(ticket,outcome){
+  if(!ticket)return;
+  try{if(ticket.observer.end(ticket.token,outcome)!==true)markRestoreObservationFault();}
+  catch(_){markRestoreObservationFault();}
+  restoreObserverActive--;
+  if(!restoreObserverFault)restoreObservationStatus();
+}
+window.InsightRestoreOperationObserverV0=Object.freeze({getStatus:function(){
+  return restoreObservationStatus();
+}});
+
 function backupStamp(now){
   var pad=function(n){return String(n).padStart(2,"0");};
   return now.getFullYear()+pad(now.getMonth()+1)+pad(now.getDate())+"_"+pad(now.getHours())+pad(now.getMinutes())+pad(now.getSeconds());
@@ -240,7 +305,7 @@ backupData=function(){
 };
 restoreData=function(e){
   var file=e.target.files[0];if(!file)return;if(file.size>20*1024*1024){alert("バックアップファイルが大きすぎます。\n20MB以下のファイルを選択してください。");e.target.value="";return;}
-  var reader=new FileReader();reader.onload=function(ev){var restoreCommitted=false;try{
+  var reader=new FileReader(),restoreLoadCount=0;reader.onload=function(ev){if(++restoreLoadCount>1)markRestoreObservationFault();var restoreCommitted=false,restoreTicket=null,restoreOutcome='unknown';try{try{
     var parsed=JSON.parse(ev.target.result),envelope=parseBackupEnvelope(parsed),newAll=normalizeBackup(envelope.data);
     if(envelope.info)validateBackupInfo(envelope.info,newAll);
     var preflight=runRestorePreflight(newAll);
@@ -249,6 +314,7 @@ restoreData=function(e){
     var verifiedRestore=null,writeCompleted=false;
     try{
       if(!window.InsightStorage)throw new Error("保存機能を初期化できませんでした");
+      restoreTicket=beginRestoreObservation();
       window.InsightStorage.writeSnapshot(newAll);writeCompleted=true;
       verifiedRestore=verifyRestoredSnapshot(newAll);
     }catch(postErr){
@@ -268,13 +334,13 @@ restoreData=function(e){
     newAll=verifiedRestore.snapshot;preRestoreMemorySnapshot=null;
     // Persisted data has passed readback and health checks. UI failures cannot undo it.
     restoreCommitted=true;
-    allStores=newAll;store=allStores.stores[allStores.current];baseYear=store.years[store.years.length-1];cmpYear=store.years.length>1?store.years[store.years.length-2]:null;editYear={sales:baseYear,kyaku:baseYear,haiki:baseYear};editMonth={sales:todayFY().month,kyaku:todayFY().month,haiki:todayFY().month};renderStoreSel();if(currentNav==='salesCounts'){if(window.InsightSalesCount&&typeof window.InsightSalesCount.reloadFromStore==="function")window.InsightSalesCount.reloadFromStore();else gotoNav('salesCounts');}else if(currentNav==='settings'){if(window.InsightSettings&&typeof window.InsightSettings.open==="function")window.InsightSettings.open();}else if(currentNav===1)refreshDash();else if(currentNav>1)initInputPage(["","","sales","kyaku","haiki"][currentNav]);else initQuickPage();if(window.InsightPagePeriodSync&&typeof window.InsightPagePeriodSync.reconcileCurrentStore==="function")window.InsightPagePeriodSync.reconcileCurrentStore();if(window.InsightDataHealth&&typeof window.InsightDataHealth.refresh==="function")window.InsightDataHealth.refresh();updateMissingBadge();showToast("📤 データを復元しました（整合性確認済み）","#1d4ed8","#eff6ff");
+    allStores=newAll;store=allStores.stores[allStores.current];baseYear=store.years[store.years.length-1];cmpYear=store.years.length>1?store.years[store.years.length-2]:null;editYear={sales:baseYear,kyaku:baseYear,haiki:baseYear};editMonth={sales:todayFY().month,kyaku:todayFY().month,haiki:todayFY().month};renderStoreSel();if(currentNav==='salesCounts'){if(window.InsightSalesCount&&typeof window.InsightSalesCount.reloadFromStore==="function")window.InsightSalesCount.reloadFromStore();else gotoNav('salesCounts');}else if(currentNav==='settings'){if(window.InsightSettings&&typeof window.InsightSettings.open==="function")window.InsightSettings.open();}else if(currentNav===1)refreshDash();else if(currentNav>1)initInputPage(["","","sales","kyaku","haiki"][currentNav]);else initQuickPage();if(window.InsightPagePeriodSync&&typeof window.InsightPagePeriodSync.reconcileCurrentStore==="function")window.InsightPagePeriodSync.reconcileCurrentStore();if(window.InsightDataHealth&&typeof window.InsightDataHealth.refresh==="function")window.InsightDataHealth.refresh();updateMissingBadge();showToast("📤 データを復元しました（整合性確認済み）","#1d4ed8","#eff6ff");restoreOutcome="completed";
   }catch(err){
     console.warn("Insight restore rejected:",err);
     var detail=String(err&&err.message?err.message:err);
     alert(restoreCommitted
       ?"バックアップの保存と整合性確認は完了しましたが、画面の更新に失敗しました。\n"+detail+"\n\n復元したデータは保存されています。Insightを再読み込みして表示を更新してください。もう一度復元する必要はありません。"
       :"バックアップを復元できませんでした。\n"+detail+"\n\n現在のデータは変更されていません。");
-  }e.target.value="";};reader.onerror=function(){alert("ファイルを読み込めませんでした。\n現在のデータは変更されていません。");e.target.value="";};reader.readAsText(file);
+  }e.target.value="";}finally{finishRestoreObservation(restoreTicket,restoreOutcome);}};reader.onerror=function(){markRestoreObservationFault();alert("ファイルを読み込めませんでした。\n現在のデータは変更されていません。");e.target.value="";};reader.onabort=function(){markRestoreObservationFault();};try{reader.readAsText(file);}catch(readErr){markRestoreObservationFault();throw readErr;}
 };
 })();
