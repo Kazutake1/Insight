@@ -74,6 +74,7 @@ test('FICTIONAL native FileReader completes confirmed write and sync UI observat
   expect(s.samples.every(x=>x.state==='ACTIVE'&&x.activeCount===1)).toBe(true);
   expect(s.inputValue).toBe('');
   expect(s.alerts).toEqual([]);
+  expect(await page.evaluate(()=>InsightStorage.snapshotWritesHeld())).toBe(false);
 });
 test('FICTIONAL user cancellation does not begin restore write observation',async({page})=>{
   const f=await setup(page);
@@ -145,4 +146,22 @@ test('FICTIONAL postwrite throw reports saved target without retry or false unch
   expect(s.alerts.join(' ')).toContain('保存領域に復元対象と一致するデータ');
   expect(s.alerts.join(' ')).not.toContain('現在のデータは変更されていません');
   expect(s.samples.every(x=>x.state==='ACTIVE')).toBe(true);
+  expect(await page.evaluate(()=>InsightStorage.snapshotWritesHeld())).toBe(true);
+  const after=await page.evaluate(()=>{
+    const before=localStorage.getItem('insight_v11');
+    const errors=[];
+    for(const action of [
+      ()=>InsightStorage.persistCurrent(allStores),
+      ()=>InsightStorage.writeSnapshot(allStores),
+      ()=>InsightStorage.transaction(allStores,draft=>{draft.stores[draft.current].name='FICTIONAL overwrite';}),
+      ()=>InsightStorage.writeMetadata('insight_v11','FICTIONAL overwrite')
+    ]){
+      try{action();errors.push('not blocked');}catch(error){errors.push(error.name);}
+    }
+    InsightStorage.writeMetadata('insight_last_backup','FICTIONAL allowed');
+    return {same:localStorage.getItem('insight_v11')===before,errors,metadata:localStorage.getItem('insight_last_backup')};
+  });
+  expect(after.same).toBe(true);
+  expect(after.errors).toEqual(Array(4).fill('InsightStorageRestoreHoldError'));
+  expect(after.metadata).toBe('FICTIONAL allowed');
 });
