@@ -336,7 +336,7 @@ restoreData=function(e){
     e.target.value='';return;
   }
   if(file.size>20*1024*1024){alert("バックアップファイルが大きすぎます。\n20MB以下のファイルを選択してください。");e.target.value="";return;}
-  var reader=new FileReader(),restoreLoadCount=0;restoreFileReaderActive=reader;reader.onload=function(ev){if(++restoreLoadCount>1){markRestoreObservationFault();return;}var restoreCommitted=false,restoreTicket=null,restoreOutcome='unknown',restoreWriteCheck=null;try{try{
+  var reader=new FileReader(),restoreLoadCount=0,readerPhase='pending';restoreFileReaderActive=reader;reader.onload=function(ev){if(++restoreLoadCount>1||readerPhase!=='pending'||restoreFileReaderActive!==reader){markRestoreObservationFault();return;}readerPhase='processing';var restoreCommitted=false,restoreTicket=null,restoreOutcome='unknown',restoreWriteCheck=null;try{try{
     var parsed=JSON.parse(ev.target.result),envelope=parseBackupEnvelope(parsed),newAll=normalizeBackup(envelope.data);
     if(envelope.info)validateBackupInfo(envelope.info,newAll);
     var preflight=runRestorePreflight(newAll);
@@ -380,6 +380,25 @@ restoreData=function(e){
       :restoreWriteCheck==="uncertain"
       ?"バックアップ復元中にエラーが発生し、現在の保存状態を確認できませんでした。\n"+detail+"\n\n追加の編集・保存や再復元は行わず、復元直前バックアップを保管してからInsightを再読み込みし、保存内容を確認してください。"
       :"バックアップを復元できませんでした。\n"+detail+"\n\n現在のデータは変更されていません。");
-  }e.target.value="";}finally{finishRestoreObservation(restoreTicket,restoreOutcome);if(restoreFileReaderActive===reader)restoreFileReaderActive=null;}};reader.onerror=function(){markRestoreObservationFault();if(restoreFileReaderActive===reader)restoreFileReaderActive=null;alert("ファイルを読み込めませんでした。\n現在のデータは変更されていません。");e.target.value="";};reader.onabort=function(){markRestoreObservationFault();if(restoreFileReaderActive===reader)restoreFileReaderActive=null;};try{reader.readAsText(file);}catch(readErr){markRestoreObservationFault();if(restoreFileReaderActive===reader)restoreFileReaderActive=null;throw readErr;}
+  }e.target.value="";}finally{
+    readerPhase='finished';
+    finishRestoreObservation(restoreTicket,restoreOutcome);
+    if(restoreFileReaderActive===reader)restoreFileReaderActive=null;
+  }};reader.onerror=function(){
+    markRestoreObservationFault();
+    if(readerPhase!=='pending'||restoreFileReaderActive!==reader)return;
+    readerPhase='finished';restoreFileReaderActive=null;
+    alert("ファイルを読み込めませんでした。\n現在のデータは変更されていません。");e.target.value="";
+  };reader.onabort=function(){
+    markRestoreObservationFault();
+    if(readerPhase!=='pending'||restoreFileReaderActive!==reader)return;
+    readerPhase='finished';restoreFileReaderActive=null;
+  };try{reader.readAsText(file);}catch(readErr){
+    markRestoreObservationFault();
+    if(readerPhase==='pending'&&restoreFileReaderActive===reader){
+      readerPhase='finished';restoreFileReaderActive=null;
+    }
+    throw readErr;
+  }
 };
 })();
