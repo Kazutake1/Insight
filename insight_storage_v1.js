@@ -38,6 +38,16 @@
   // silently acknowledge another tab's changes while the live UI still holds old data.
   var lastSavedRaw=root.localStorage.getItem(storageKey());
   var externalChangeSeen=false;
+  // In-memory latch for an indeterminate restore result. Reload is the only reset.
+  var restoreSnapshotWritesHeld=false;
+  function holdSnapshotWrites(){restoreSnapshotWritesHeld=true;return true;}
+  function snapshotWritesHeld(){return restoreSnapshotWritesHeld;}
+  function assertRestoreWritesAllowed(){
+    if(!restoreSnapshotWritesHeld)return;
+    var error=new Error('バックアップ復元後の保存状態が未確認のため、この画面では保存を停止しました。復元直前バックアップを保管し、Insightを手動で再読み込みして保存内容を確認してください。');
+    error.name='InsightStorageRestoreHoldError';
+    throw error;
+  }
   if(typeof root.addEventListener==='function'){
     root.addEventListener('storage',function(event){
       if(event&&(event.key===null||event.key===storageKey())&&event.newValue!==lastSavedRaw)
@@ -89,6 +99,7 @@
   }
 
   function writeSnapshot(snapshot){
+    assertRestoreWritesAllowed();
     return withReportUpdate(function(){
     var serialized=serialize(snapshot);
     assertNotStale();
@@ -109,7 +120,7 @@
 
   function writeMetadata(key,value){
     if(typeof key!=='string'||!key)throw new Error('Insight metadata key is invalid.');
-    var write=function(){root.localStorage.setItem(key,String(value));return true;};
+    var write=function(){if(key===storageKey())assertRestoreWritesAllowed();root.localStorage.setItem(key,String(value));return true;};
     return key===storageKey()?withReportUpdate(write):write();
   }
 
@@ -160,6 +171,8 @@
     migrateSnapshot:migrateSnapshot,
     serialize:serialize,
     writeSnapshot:writeSnapshot,
+    holdSnapshotWrites:holdSnapshotWrites,
+    snapshotWritesHeld:snapshotWritesHeld,
     readSnapshot:readSnapshot,
     writeMetadata:writeMetadata,
     persistCurrent:persistCurrent,
