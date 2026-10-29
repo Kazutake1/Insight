@@ -6,6 +6,7 @@ const path=require('node:path');
 const vm=require('node:vm');
 
 const backupSource=fs.readFileSync(path.join(__dirname,'..','insight_backup_guard_v1.js'),'utf8');
+const {createOperationObserver}=require('../insight_operation_observer_v0.js');
 const months=Array.from({length:12},(_,i)=>(i+1)+'月');
 const days=[31,28,31,30,31,30,31,31,30,31,30,31];
 const clone=value=>JSON.parse(JSON.stringify(value));
@@ -33,7 +34,7 @@ function snapshot(sales){
 function fixture(options={}){
   const original=snapshot(100);
   let persisted=clone(original),writeCount=0,readFaultOnce=!!options.corruptAfterWrite;
-  const downloads=[],alerts=[],toasts=[];
+  const downloads=[],alerts=[],toasts=[],samples=[],readers=[];
   let confirmation=options.confirm!==false;
   let failWriteOnce=!!options.quotaOnce;
   const body={
@@ -52,11 +53,13 @@ function fixture(options={}){
   };
   const window={
     __INSIGHT_SHELL_VERSION__:'test',
+    InsightOperationObserverV0:options.missingObserver?undefined:{createOperationObserver},
     InsightStorage:{
       CURRENT_SCHEMA_VERSION:1,
       migrateSnapshot(value){const valueCopy=clone(value);valueCopy.schemaVersion=1;return valueCopy;},
       serialize(value){return JSON.stringify(value);},
       readSnapshot(){
+        if(window.InsightRestoreOperationObserverV0)samples.push({point:'readback',...window.InsightRestoreOperationObserverV0.getStatus()});
         const result=clone(persisted);
         if(readFaultOnce&&writeCount>0){
           readFaultOnce=false;
@@ -65,6 +68,8 @@ function fixture(options={}){
         return result;
       },
       writeSnapshot(value){
+        if(window.InsightRestoreOperationObserverV0)samples.push({point:'before-write',...window.InsightRestoreOperationObserverV0.getStatus()});
+        if(options.rollbackFailure&&writeCount===1)throw new Error('FICTIONAL rollback failed');
         if(failWriteOnce){
           failWriteOnce=false;
           const error=new Error('simulated quota exceeded');
@@ -73,6 +78,8 @@ function fixture(options={}){
         }
         writeCount++;
         persisted=clone(value);
+        if(window.InsightRestoreOperationObserverV0)samples.push({point:'after-write',...window.InsightRestoreOperationObserverV0.getStatus()});
+        if(options.postcommitThrow&&writeCount===1)throw new Error('FICTIONAL postcommit write throw');
       },
       writeMetadata(){return true;}
     },
@@ -94,10 +101,15 @@ function fixture(options={}){
     alert(message){alerts.push(String(message));},
     console:{warn(){},log(){}},
     FileReader:class FileReader{
-      readAsText(file){this.onload({target:{result:file.contents}});}
+      constructor(){readers.push(this);}
+      readAsText(file){
+        this._file=file;
+        if(options.readThrows)throw new Error('FICTIONAL readAsText failed');
+        if(!options.deferReader)this.onload({target:{result:file.contents}});
+      }
     },
     currentNav:1,
-    renderStoreSel(){},refreshDash(){},updateMissingBadge(){},
+    renderStoreSel(){},refreshDash(){if(options.uiFailure)throw new Error('FICTIONAL UI failure');},updateMissingBadge(){},
     showToast(message){toasts.push(message);},
     todayFY(){return {month:'10月'};}
   };
@@ -111,7 +123,9 @@ function fixture(options={}){
     ctx.restoreData({target:input});
     return input;
   }
-  return {ctx,window,original,restore,downloads,alerts,toasts,
+  return {ctx,window,original,restore,downloads,alerts,toasts,samples,readers,
+    flushReader(){const r=readers.at(-1);r.onload({target:{result:r._file.contents}});},
+    repeatReader(){const r=readers.at(-1);r.onload({target:{result:r._file.contents}});},
     get persisted(){return persisted;},
     get writeCount(){return writeCount;},
     setConfirmation(value){confirmation=!!value;}
@@ -184,4 +198,106 @@ test('post-restore readback mismatch automatically rolls back to original data',
   assert.deepEqual(f.persisted,f.original);
   assert.equal(f.downloads.length,1);
   assert.match(f.alerts.join('\n'),/復元前の状態へ自動で戻しました/);
+});
+
+
+test('BR01 FICTIONAL deferred FileReader starts observation at write, stays ACTIVE through readback',()=>{
+  const f=fixture({deferReader:true});
+  const input=f.restore(snapshot(750));
+  assert.equal(f.writeCount,0);
+  assert.equal(f.window.InsightRestoreOperationObserverV0.getStatus().state,'UNAVAILABLE');
+  f.flushReader();
+  assert.equal(input.value,'');
+  assert.equal(f.writeCount,1);
+  assert.equal(f.samples.filter(x=>['before-write','after-write','readback'].includes(x.point)).length,3);
+  assert.ok(f.samples.every(x=>x.state==='ACTIVE'&&x.activeCount===1));
+  assert.deepEqual({state:f.window.InsightRestoreOperationObserverV0.getStatus().state,activeCount:f.window.InsightRestoreOperationObserverV0.getStatus().activeCount},
+    {state:'IDLE_OBSERVED',activeCount:0});
+  assert.equal(f.persisted.stores.b.data['2026']['12月'][30].売上,750);
+});
+test('BR02 FICTIONAL invalid file and confirmation cancellation never register a write token',()=>{
+  for(const mode of ['cancel','invalid']){
+    const f=fixture(mode==='cancel'?{confirm:false}:{});
+    f.restore(mode==='cancel'?snapshot(750):'{bad json');
+    assert.equal(f.writeCount,0);
+    assert.deepEqual(f.persisted,f.original);
+    assert.equal(f.window.InsightRestoreOperationObserverV0.getStatus().state,'UNAVAILABLE');
+  }
+});
+test('BR03 FICTIONAL quota exception holds without mutating persisted bytes',()=>{
+  const f=fixture({quotaOnce:true});
+  f.restore(snapshot(750));
+  assert.equal(f.writeCount,0);
+  assert.deepEqual(f.persisted,f.original);
+  assert.equal(f.window.InsightRestoreOperationObserverV0.getStatus().state,'HELD');
+  assert.equal(f.samples[0].state,'ACTIVE');
+});
+test('BR04 FICTIONAL postflight mismatch rolls back but observation remains sticky HELD',()=>{
+  const f=fixture({corruptAfterWrite:true});
+  f.restore(snapshot(750));
+  assert.equal(f.writeCount,2);
+  assert.deepEqual(f.persisted,f.original);
+  assert.ok(f.samples.filter(x=>x.point==='before-write').every(x=>x.state==='ACTIVE'));
+  assert.equal(f.window.InsightRestoreOperationObserverV0.getStatus().state,'HELD');
+});
+test('BR05 FICTIONAL rollback failure leaves partial commit and HELD without extra writes',()=>{
+  const f=fixture({corruptAfterWrite:true,rollbackFailure:true});
+  f.restore(snapshot(750));
+  assert.equal(f.writeCount,1);
+  assert.equal(f.persisted.stores.a.data['2026']['1月'][0].売上,750);
+  assert.match(f.alerts.join(' '),/自動復旧にも失敗/);
+  assert.equal(f.window.InsightRestoreOperationObserverV0.getStatus().state,'HELD');
+});
+test('BR06 FICTIONAL committed bytes survive UI failure; observation remains HELD',()=>{
+  const f=fixture({uiFailure:true});
+  f.restore(snapshot(750));
+  assert.equal(f.writeCount,1);
+  assert.equal(f.persisted.stores.a.data['2026']['1月'][0].売上,750);
+  assert.match(f.alerts.join(' '),/復元したデータは保存されています/);
+  assert.equal(f.window.InsightRestoreOperationObserverV0.getStatus().state,'HELD');
+});
+test('BR07 FICTIONAL observer missing never blocks original restore',()=>{
+  const f=fixture({missingObserver:true});
+  f.restore(snapshot(750));
+  assert.equal(f.writeCount,1);
+  assert.equal(f.persisted.stores.a.data['2026']['1月'][0].売上,750);
+  assert.equal(f.window.InsightRestoreOperationObserverV0.getStatus().state,'UNAVAILABLE');
+});
+test('BR08 FICTIONAL duplicate FileReader onload is not silently accepted as clean',()=>{
+  const f=fixture({deferReader:true});
+  f.restore(snapshot(750));
+  f.flushReader();
+  assert.equal(f.window.InsightRestoreOperationObserverV0.getStatus().state,'IDLE_OBSERVED');
+  f.repeatReader(); // Existing business may repeat; monitor must conservatively HOLD.
+  assert.equal(f.writeCount,2);
+  assert.equal(f.window.InsightRestoreOperationObserverV0.getStatus().state,'HELD');
+});
+test('BR09 FICTIONAL observer factory failure never blocks the original write',()=>{
+  const f=fixture({deferReader:true});
+  f.window.InsightOperationObserverV0={createOperationObserver(){throw Error('FICTIONAL factory failure');}};
+  f.restore(snapshot(750));
+  f.flushReader();
+  assert.equal(f.writeCount,1);
+  assert.equal(f.window.InsightRestoreOperationObserverV0.getStatus().state,'HELD');
+});
+test('BR10 FICTIONAL postcommit write throw is HELD even if the original guard shows an optimistic warning',()=>{
+  const f=fixture({postcommitThrow:true});
+  f.restore(snapshot(750));
+  assert.equal(f.writeCount,1);
+  assert.equal(f.persisted.stores.a.data['2026']['1月'][0].売上,750);
+  assert.equal(f.window.InsightRestoreOperationObserverV0.getStatus().state,'HELD');
+});
+test('BR11 FICTIONAL readAsText synchronous exception keeps original exception and HELD',()=>{
+  const f=fixture({readThrows:true});
+  assert.throws(()=>f.restore(snapshot(750)),/FICTIONAL readAsText failed/);
+  assert.equal(f.writeCount,0);
+  assert.equal(f.window.InsightRestoreOperationObserverV0.getStatus().state,'HELD');
+});
+test('BR12 FICTIONAL reader abort leaves existing data untouched and conservatively HELD',()=>{
+  const f=fixture({deferReader:true});
+  f.restore(snapshot(750));
+  f.readers[0].onabort();
+  assert.equal(f.writeCount,0);
+  assert.deepEqual(f.persisted,f.original);
+  assert.equal(f.window.InsightRestoreOperationObserverV0.getStatus().state,'HELD');
 });

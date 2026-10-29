@@ -18,7 +18,94 @@ function invoke(name,args){
   return fn.apply(root,args||[]);
 }
 
-on('storeSel','change',function(event){invoke('switchStore',[event.currentTarget.value]);});
+
+// Registered user store selector change only. Not store menu add/remove/rename
+// nor programmatic switchStore calls; never certifies app-wide cleanliness.
+var selectorObserver=null,selectorFault=false,selectorActive=0,selectorInitClosed=false;
+var selectorScope='store-selector-change-sync-chain-only';
+function selectorStatus(){
+  if(selectorFault)return Object.freeze({scope:selectorScope,state:'HELD',activeCount:null,epoch:null});
+  if(!selectorObserver)return Object.freeze({scope:selectorScope,state:'UNAVAILABLE',activeCount:null,epoch:null});
+  try{
+    var s=selectorObserver.status();
+    if(!s||s.scope!=='registered-operations-only'||
+      ['IDLE_OBSERVED','ACTIVE','HELD'].indexOf(s.state)<0||
+      !Number.isSafeInteger(s.activeCount)||s.activeCount<0||
+      !Number.isSafeInteger(s.epoch)||s.epoch<1||
+      s.activeCount<selectorActive||
+      (s.state==='IDLE_OBSERVED'&&s.activeCount!==0)||
+      (s.state==='ACTIVE'&&s.activeCount===0)||
+      (selectorActive>0&&s.state!=='ACTIVE'&&s.state!=='HELD'))
+      throw new Error('invalid store selector observer status');
+    return Object.freeze({scope:selectorScope,state:s.state,activeCount:s.activeCount,epoch:s.epoch});
+  }catch(_){selectorFault=true;return Object.freeze({scope:selectorScope,state:'HELD',activeCount:null,epoch:null});}
+}
+function initSelectorObserver(){
+  if(selectorObserver||selectorFault||selectorInitClosed)return;
+  try{
+    var factory=root.InsightOperationObserverV0&&root.InsightOperationObserverV0.createOperationObserver;
+    if(typeof factory!=='function')return;
+    var candidate=factory();
+    if(!candidate||['initialize','begin','end','invalidate','status'].some(function(k){
+      return typeof candidate[k]!=='function';
+    })||candidate.initialize()!==true){selectorFault=true;return;}
+    selectorObserver=candidate;
+    var status=selectorStatus();
+    if(status.state!=='IDLE_OBSERVED'||status.activeCount!==0)selectorFault=true;
+  }catch(_){selectorFault=true;}
+}
+function selectorTargetState(target){
+  try{
+    if(typeof allStores==='undefined'||!allStores||
+      !allStores.stores||typeof allStores.current!=='string')return null;
+    return {current:allStores.current,valid:Object.prototype.hasOwnProperty.call(allStores.stores,target)};
+  }catch(_){return null;}
+}
+function observeStoreSelection(target,action){
+  var before=selectorTargetState(target);
+  // An unchanged selector or unknown store is not a confirmed business switch.
+  if(before&&(!before.valid||before.current===target))return action();
+  initSelectorObserver();
+  // A factory appearing after the first unobserved call cannot produce a false IDLE.
+  selectorInitClosed=true;
+  var ref=selectorObserver,token=null,registered=false,outcome='unknown';
+  if(ref&&!selectorFault){
+    try{
+      token=ref.begin('store_selector_change');
+      if(!token||typeof token!=='object'||selectorActive>=Number.MAX_SAFE_INTEGER){
+        selectorFault=true;
+      }else{
+        registered=true;selectorActive++;
+        if(selectorStatus().state!=='ACTIVE')selectorFault=true;
+      }
+    }catch(_){selectorFault=true;}
+  }
+  try{
+    var result=action();
+    var after=selectorTargetState(target);
+    // A rejected dirty-input confirmation has no explicit success signal.
+    // HOLD rather than treat an unchanged current store as proven clean.
+    if(before&&after&&before.valid&&before.current!==target&&after.current===target)
+      outcome='completed';
+    return result;
+  }finally{
+    if(registered){
+      try{if(ref.end(token,outcome)!==true)selectorFault=true;}
+      catch(_){selectorFault=true;}
+      selectorActive--;
+      if(!selectorFault)selectorStatus();
+    }
+  }
+}
+// Status only; no IDs, storage access, or AI authorization.
+root.InsightStoreSelectorObserverV0=Object.freeze({getStatus:function(){
+  initSelectorObserver();return selectorStatus();
+}});
+
+on('storeSel','change',function(event){
+  var id=event.currentTarget.value;
+  return observeStoreSelection(id,function(){return invoke('switchStore',[id]);});
+});
 on('storeMenuBtn','click',function(){invoke('showStoreMenu');});
 [0,1,2,3,4].forEach(function(index){on('nav'+index,'click',function(){invoke('gotoNav',[index]);});});
 
