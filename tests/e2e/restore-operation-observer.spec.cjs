@@ -381,3 +381,50 @@ for(const rollbackFailure of ['before-rollback-write','after-rollback-write']){
     expect([after.saved,after.live,after.held,after.conflict]).toEqual([expected,expected,false,false]);
   });
 }
+
+test('FICTIONAL native second tab cannot overwrite restored snapshot through metadata API',async({page})=>{
+  const f=await setup(page);
+  const second=await page.context().newPage();
+  try{
+    await second.route('**/Index.html*',async route=>{
+      const response=await route.fetch();
+      await route.fulfill({response,body:(await response.text()).replace(/;?\\s*upgrade-insecure-requests/g,'')});
+    });
+    await second.goto('/Index.html',{waitUntil:'domcontentloaded'});
+    await second.waitForFunction(()=>window.InsightStorage&&typeof allStores!=='undefined'&&
+      allStores&&allStores.stores&&allStores.stores[allStores.current]);
+    const oldLive=await second.evaluate(({id,year,month})=>
+      allStores.stores[id].data[year][month][0].売上,f);
+    expect(oldLive).toBe(111);
+    await upload(page,f.json);
+    await endState(page,1,'IDLE_OBSERVED');
+    const restored=await snapshot(page,f);
+    expect([restored.saved,restored.live,restored.writes]).toEqual([777,777,1]);
+    const result=await second.evaluate(({id,year,month})=>{
+      const before=localStorage.getItem('insight_v11');
+      const errors=[];
+      for(const action of [
+        ()=>InsightStorage.writeMetadata('insight_v11','FICTIONAL unauthorized replacement'),
+        ()=>InsightStorage.persistCurrent(allStores)
+      ]){
+        try{action();errors.push('not blocked');}catch(error){errors.push(error.name);}
+      }
+      InsightStorage.writeMetadata('insight_last_backup','FICTIONAL metadata allowed');
+      return {
+        errors,
+        savedUnchanged:localStorage.getItem('insight_v11')===before,
+        saved:JSON.parse(localStorage.getItem('insight_v11')).stores[id].data[year][month][0].売上,
+        live:allStores.stores[id].data[year][month][0].売上,
+        metadata:localStorage.getItem('insight_last_backup')
+      };
+    },f);
+    expect(result).toEqual({
+      errors:['InsightStorageMetadataKeyError','InsightStorageConflictError'],
+      savedUnchanged:true,saved:777,live:111,metadata:'FICTIONAL metadata allowed'
+    });
+    const after=await snapshot(page,f);
+    expect([after.saved,after.live,after.writes]).toEqual([777,777,1]);
+  }finally{
+    await second.close();
+  }
+});
