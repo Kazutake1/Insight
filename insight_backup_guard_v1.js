@@ -290,6 +290,15 @@ function classifyInterruptedRestoreWrite(expected,previous){
   }catch(_){}
   return "uncertain";
 }
+function holdRestoreSnapshotWrites(){
+  // Only an uncertain restored snapshot may set the latch; observer HELD alone never does.
+  try{
+    if(window.InsightStorage&&typeof window.InsightStorage.holdSnapshotWrites==='function')
+      return window.InsightStorage.holdSnapshotWrites()===true;
+  }catch(err){console.warn('Restore write hold failed:',err);}
+  console.warn('Restore write hold unavailable; stop editing and reload manually.');
+  return false;
+}
 function rollbackPreRestoreSnapshot(){
   if(!preRestoreMemorySnapshot)throw new Error("復元前データがメモリにありません。");
   if(!window.InsightStorage||typeof window.InsightStorage.readSnapshot!=="function")throw new Error("保存済みデータを読み戻せません。");
@@ -335,6 +344,7 @@ restoreData=function(e){
     }catch(postErr){
       if(!writeCompleted){
         if(writeAttempted)restoreWriteCheck=classifyInterruptedRestoreWrite(newAll,preRestoreMemorySnapshot);
+        if(writeAttempted&&(restoreWriteCheck==='target-observed'||restoreWriteCheck==='uncertain'))holdRestoreSnapshotWrites();
         if(postErr&&postErr.name==="QuotaExceededError")throw new Error("保存容量が不足しているため復元できません");
         throw postErr;
       }
@@ -343,6 +353,7 @@ restoreData=function(e){
         preRestoreMemorySnapshot=null;
         alert("復元後の整合性確認に失敗したため、復元前の状態へ自動で戻しました。\n\n"+String(postErr&&postErr.message?postErr.message:postErr)+"\n\n復元直前バックアップも保存されています。");
       }catch(rollbackErr){
+        holdRestoreSnapshotWrites();
         alert("重大なエラー：復元後の整合性確認に失敗し、自動復旧にも失敗しました。\n\n"+String(postErr&&postErr.message?postErr.message:postErr)+"\n\n自動復旧エラー："+String(rollbackErr&&rollbackErr.message?rollbackErr.message:rollbackErr)+"\n\n保存された Insight_pre_restore_...json を使って手動で復元してください。");
       }
       e.target.value="";return;
