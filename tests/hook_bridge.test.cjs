@@ -22,6 +22,7 @@ function setup(options={}){
     InsightDateContext:{withLegacyGlobals(fn){calls.push('date:enter');try{return fn();}finally{calls.push('date:exit');}}}
   };
   if(options.saveQuick)window.saveQuick=options.saveQuick;
+  if(options.saveInput)window.saveInput=options.saveInput;
   const context={window,globalThis:window,Object,Array,Number,String,console};
   vm.createContext(context);
   vm.runInContext(read('insight_hooks_v1.js'),context);
@@ -232,4 +233,113 @@ test('QS08 FICTIONAL factory appearing mid-save cannot upgrade an unobserved ope
   }});
   assert.equal(h.window.saveQuick(),23);
   assert.equal(h.window.InsightQuickSaveObserverV0.getStatus().state,'UNAVAILABLE');
+});
+
+
+test('IS01 FICTIONAL real saveInput bridge encloses core and ordered after hooks for three types',()=>{
+  for(const type of ['sales','kyaku','haiki']){
+    let h;
+    h=observedSetup({saveInput(value){
+      assert.equal(value,type);
+      assert.equal(h.window.InsightInputSaveObserverV0.getStatus().state,'ACTIVE');
+      h.calls.push('core:'+value);
+      return 42;
+    }});
+    h.window.InsightHooks.on('input:save:before','before',()=>h.calls.push('before'),10);
+    h.window.InsightHooks.on('input:save:after','restore',()=>{
+      const s=h.window.InsightInputSaveObserverV0.getStatus();
+      assert.equal(s.activeCount,1);
+      h.calls.push('after20');
+    },20);
+    h.window.InsightHooks.on('input:save:after','insights',()=>{
+      assert.equal(h.window.InsightInputSaveObserverV0.getStatus().state,'ACTIVE');
+      h.calls.push('after40');
+    },40);
+    assert.equal(h.window.saveInput(type),42);
+    assert.deepEqual(h.calls,['before','core:'+type,'after20','after40']);
+    const s=h.window.InsightInputSaveObserverV0.getStatus();
+    assert.deepEqual(Object.keys(s).sort(),['activeCount','epoch','scope','state']);
+    assert.equal(s.scope,'input-month-save-core-and-sync-after-hooks-only');
+    assert.equal(s.state,'IDLE_OBSERVED');
+    assert.equal(s.activeCount,0);
+    assert.equal(Object.isFrozen(s),true);
+  }
+});
+
+test('IS02 FICTIONAL cancelled before hook never issues a save token',()=>{
+  const h=observedSetup();
+  const before=h.window.InsightInputSaveObserverV0.getStatus();
+  h.window.InsightHooks.on('input:save:before','cancel',ctx=>{
+    ctx.result='FICTIONAL stopped';return false;
+  },5);
+  assert.equal(h.window.saveInput('sales'),'FICTIONAL stopped');
+  assert.equal(h.window.InsightInputSaveObserverV0.getStatus().epoch,before.epoch);
+  assert.equal(h.window.InsightInputSaveObserverV0.getStatus().activeCount,0);
+  assert.deepEqual(h.calls,[]);
+});
+
+test('IS03 FICTIONAL core and after errors retain the exact original exception and hold',()=>{
+  for(const stage of ['core','after']){
+    const error=new Error('FICTIONAL input save failure');
+    const h=observedSetup(stage==='core'?{saveInput(){throw error;}}:{});
+    if(stage==='after')h.window.InsightHooks.on('input:save:after','throw',()=>{throw error;},20);
+    assert.throws(()=>h.window.saveInput('sales'),e=>e===error);
+    const s=h.window.InsightInputSaveObserverV0.getStatus();
+    assert.equal(s.state,'HELD');
+    assert.equal(s.activeCount,0);
+  }
+});
+
+test('IS04 FICTIONAL observer missing or broken cannot prevent/retry original input saving',()=>{
+  for(const stage of ['missing','factory','begin','end','status']){
+    let saves=0;
+    const h=setup({saveInput(){saves++;return 77;}});
+    if(stage!=='missing'){
+      h.window.InsightOperationObserverV0={createOperationObserver(){
+        if(stage==='factory')throw Error('FICTIONAL factory failure');
+        let count=0,epoch=1;
+        return {initialize(){return true;},invalidate(){return true;},
+          begin(){if(stage==='begin')throw Error('FICTIONAL begin');count++;epoch++;return {};},
+          end(){count--;epoch++;if(stage==='end')throw Error('FICTIONAL end');return true;},
+          status(){if(stage==='status')throw Error('FICTIONAL status');
+            return {scope:'registered-operations-only',state:count?'ACTIVE':'IDLE_OBSERVED',activeCount:count,epoch};}};
+      }};
+    }
+    assert.equal(h.window.saveInput('haiki'),77);
+    assert.equal(saves,1);
+    assert.equal(h.window.InsightInputSaveObserverV0.getStatus().state,stage==='missing'?'UNAVAILABLE':'HELD');
+  }
+});
+
+test('IS05 FICTIONAL reentry counts 1 to 2 to 1, and after cancellation remains HELD',()=>{
+  const h=observedSetup();
+  let nested=false;
+  const counts=[];
+  h.window.InsightHooks.on('input:save:after','nested',()=>{
+    counts.push(h.window.InsightInputSaveObserverV0.getStatus().activeCount);
+    if(!nested){
+      nested=true;h.window.saveInput('sales');
+      counts.push(h.window.InsightInputSaveObserverV0.getStatus().activeCount);
+    }
+  },20);
+  h.window.saveInput('sales');
+  assert.deepEqual(counts,[1,2,1]);
+  assert.equal(h.window.InsightInputSaveObserverV0.getStatus().state,'IDLE_OBSERVED');
+  h.window.InsightHooks.on('input:save:after','cancel',()=>false,40);
+  h.window.saveInput('sales');
+  assert.equal(h.window.InsightInputSaveObserverV0.getStatus().state,'HELD');
+});
+
+test('IS06 FICTIONAL late factory cannot upgrade a previously unobserved save',()=>{
+  let h;
+  const factory=require('../insight_operation_observer_v0.js');
+  h=setup({saveInput(){
+    h.window.InsightOperationObserverV0=factory;
+    assert.equal(h.window.InsightInputSaveObserverV0.getStatus().state,'UNAVAILABLE');
+    return 23;
+  }});
+  assert.equal(h.window.saveInput('sales'),23);
+  assert.equal(h.window.InsightInputSaveObserverV0.getStatus().state,'UNAVAILABLE');
+  assert.equal(h.window.saveInput('unknown'),23);
+  assert.equal(h.window.InsightInputSaveObserverV0.getStatus().state,'UNAVAILABLE');
 });

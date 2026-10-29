@@ -2,7 +2,7 @@ const path=require('node:path');
 
 module.exports={
   testDir:path.join(__dirname,'tests','e2e'),
-  testMatch:['webkit-smoke.spec.cjs','saved-report.spec.cjs','sales-count-year-warning.spec.cjs','order-forecast.spec.cjs','event-demand-categories.spec.cjs','event-day-scroll.spec.cjs','weather-picker.spec.cjs','inline-events.spec.cjs','runtime-csp.spec.cjs','weather-sales-view.spec.cjs','sales-operation-observer.spec.cjs','weather-bulk-operation-observer.spec.cjs','hourly-save-operation-observer.spec.cjs','weather-location-operation-observer.spec.cjs','weather-location-clear-operation-observer.spec.cjs','waste-budget-save-operation-observer.spec.cjs','kyaku-month-clear-operation-observer.spec.cjs','daily-sales-waste-clear-operation-observer.spec.cjs','quick-selected-clear-operation-observer.spec.cjs','quick-save-operation-observer.spec.cjs'],
+  testMatch:['webkit-smoke.spec.cjs','saved-report.spec.cjs','sales-count-year-warning.spec.cjs','order-forecast.spec.cjs','event-demand-categories.spec.cjs','event-day-scroll.spec.cjs','weather-picker.spec.cjs','inline-events.spec.cjs','runtime-csp.spec.cjs','weather-sales-view.spec.cjs','sales-operation-observer.spec.cjs','weather-bulk-operation-observer.spec.cjs','hourly-save-operation-observer.spec.cjs','weather-location-operation-observer.spec.cjs','weather-location-clear-operation-observer.spec.cjs','waste-budget-save-operation-observer.spec.cjs','kyaku-month-clear-operation-observer.spec.cjs','daily-sales-waste-clear-operation-observer.spec.cjs','quick-selected-clear-operation-observer.spec.cjs','quick-save-operation-observer.spec.cjs','input-save-operation-observer.spec.cjs'],
   timeout:45000,
   expect:{timeout:10000},
   fullyParallel:false,

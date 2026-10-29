@@ -457,3 +457,16 @@ test('O39: FICTIONAL multi-stage Quick save remains nonauthorizing and sticky on
   assert.equal(o.status().state,'HELD');
   assert.equal('authorized_for_model' in o.status(),false);
 });
+
+
+test('O40: FICTIONAL sales/customers/waste input save is registered-only, never authorizes model use',()=>{
+  const o=newReady(),t=o.begin('input_month_save');
+  assert.ok(t);
+  assert.equal(o.status().state,'ACTIVE');
+  assert.equal(o.end(t,'completed'),true);
+  assert.equal(o.status().state,'IDLE_OBSERVED');
+  assert.equal('authorized_for_model' in o.status(),false);
+  const failed=o.begin('input_month_save');
+  assert.equal(o.end(failed,'unknown'),true);
+  assert.equal(o.status().state,'HELD');
+});

@@ -108,6 +108,74 @@
   // Exposes state only, never business data or permission decisions.
   root.InsightQuickSaveObserverV0=Object.freeze({getStatus:function(){initQuickSaveObserver();return quickSaveStatus();}});
 
+
+  // STEP4 GATE-3: Only the sales/customers/waste input save core + synchronous after hooks.
+  // This observer cannot authorize model input or assert whole-application cleanliness.
+  var inputSaveObserver=null,inputSaveFault=false,inputSaveActive=0,inputSaveInitClosed=false;
+  var inputSaveScope='input-month-save-core-and-sync-after-hooks-only';
+  function inputSaveStatus(){
+    var scope=inputSaveScope;
+    if(inputSaveFault)return Object.freeze({scope:scope,state:'HELD',activeCount:null,epoch:null});
+    if(!inputSaveObserver)return Object.freeze({scope:scope,state:'UNAVAILABLE',activeCount:null,epoch:null});
+    try{
+      var s=inputSaveObserver.status();
+      if(!s||s.scope!=='registered-operations-only'||
+        ['IDLE_OBSERVED','ACTIVE','HELD'].indexOf(s.state)<0||
+        !Number.isSafeInteger(s.activeCount)||s.activeCount<0||
+        !Number.isSafeInteger(s.epoch)||s.epoch<1||
+        s.activeCount<inputSaveActive||
+        (s.state==='IDLE_OBSERVED'&&s.activeCount!==0)||
+        (s.state==='ACTIVE'&&s.activeCount===0)||
+        (inputSaveActive>0&&s.state!=='ACTIVE'&&s.state!=='HELD'))
+        throw new Error('invalid input save observer status');
+      return Object.freeze({scope:scope,state:s.state,activeCount:s.activeCount,epoch:s.epoch});
+    }catch(_){inputSaveFault=true;return Object.freeze({scope:scope,state:'HELD',activeCount:null,epoch:null});}
+  }
+  function initInputSaveObserver(){
+    if(inputSaveObserver||inputSaveFault||inputSaveInitClosed)return;
+    try{
+      var factory=root.InsightOperationObserverV0&&root.InsightOperationObserverV0.createOperationObserver;
+      if(typeof factory!=='function')return;
+      var candidate=factory();
+      if(!candidate||['initialize','begin','end','invalidate','status'].some(function(k){
+        return typeof candidate[k]!=='function';
+      })||candidate.initialize()!==true){inputSaveFault=true;return;}
+      inputSaveObserver=candidate;
+      var initial=inputSaveStatus();
+      if(initial.state!=='IDLE_OBSERVED'||initial.activeCount!==0)inputSaveFault=true;
+    }catch(_){inputSaveFault=true;}
+  }
+  function observeInputSave(action,context){
+    initInputSaveObserver();
+    // Do not retroactively mark an unobserved save IDLE if the factory appears later.
+    inputSaveInitClosed=true;
+    var ref=inputSaveObserver,token=null,registered=false,outcome='unknown';
+    if(ref&&!inputSaveFault){
+      try{
+        token=ref.begin('input_month_save');
+        if(!token||typeof token!=='object'||inputSaveActive>=Number.MAX_SAFE_INTEGER){
+          inputSaveFault=true;
+        }else{
+          registered=true;inputSaveActive++;
+          if(inputSaveStatus().state!=='ACTIVE')inputSaveFault=true;
+        }
+      }catch(_){inputSaveFault=true;}
+    }
+    try{
+      var result=action();
+      if(context.cancel!==true)outcome='completed';
+      return result;
+    }finally{
+      if(registered){
+        try{if(ref.end(token,outcome)!==true)inputSaveFault=true;}
+        catch(_){inputSaveFault=true;}
+        inputSaveActive--;
+        if(!inputSaveFault)inputSaveStatus();
+      }
+    }
+  }
+  root.InsightInputSaveObserverV0=Object.freeze({getStatus:function(){initInputSaveObserver();return inputSaveStatus();}});
+
   var originals={};
 
   function bridge(functionName,beforeEvent,afterEvent,dateScoped){
@@ -130,6 +198,8 @@
         };
         // Validation cancellation remains outside the registered save operation.
         if(functionName==='saveQuick')return observeQuickSave(execute,context);
+        if(functionName==='saveInput'&&['sales','kyaku','haiki'].indexOf(context.args[0])>=0)
+          return observeInputSave(execute,context);
         return execute();
       });
     };
