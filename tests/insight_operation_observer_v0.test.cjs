@@ -445,3 +445,15 @@ test('O38: FICTIONAL Quick selected date clear is registered-only and nonauthori
   assert.equal(o.end(failed,'unknown'),true);
   assert.equal(o.status().state,'HELD');
 });
+
+test('O39: FICTIONAL multi-stage Quick save remains nonauthorizing and sticky on partial failure',()=>{
+  const o=newReady(),t=o.begin('quick_daily_save');
+  assert.ok(t);
+  assert.equal(o.status().state,'ACTIVE');
+  assert.equal(o.end(t,'completed'),true);
+  assert.equal(o.status().state,'IDLE_OBSERVED');
+  const failed=o.begin('quick_daily_save');
+  assert.equal(o.end(failed,'unknown'),true);
+  assert.equal(o.status().state,'HELD');
+  assert.equal('authorized_for_model' in o.status(),false);
+});

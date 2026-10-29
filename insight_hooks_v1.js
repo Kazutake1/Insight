@@ -41,6 +41,73 @@
     return callback();
   }
 
+  // Registered Quick save only. Hooks loads before the observer factory, so initialize lazily.
+  var quickSaveObserver=null,quickSaveFault=false,quickSaveActive=0,quickSaveInitClosed=false;
+  var quickSaveScope='quick-save-core-and-sync-after-hooks-only';
+  function quickSaveStatus(){
+    var scope=quickSaveScope;
+    if(quickSaveFault)return Object.freeze({scope:scope,state:'HELD',activeCount:null,epoch:null});
+    if(!quickSaveObserver)return Object.freeze({scope:scope,state:'UNAVAILABLE',activeCount:null,epoch:null});
+    try{
+      var s=quickSaveObserver.status();
+      if(!s||s.scope!=='registered-operations-only'||
+        ['IDLE_OBSERVED','ACTIVE','HELD'].indexOf(s.state)<0||
+        !Number.isSafeInteger(s.activeCount)||s.activeCount<0||
+        !Number.isSafeInteger(s.epoch)||s.epoch<1||
+        s.activeCount<quickSaveActive||
+        (s.state==='IDLE_OBSERVED'&&s.activeCount!==0)||
+        (s.state==='ACTIVE'&&s.activeCount===0)||
+        (quickSaveActive>0&&s.state!=='ACTIVE'&&s.state!=='HELD'))
+        throw new Error('invalid quick save observer status');
+      return Object.freeze({scope:scope,state:s.state,activeCount:s.activeCount,epoch:s.epoch});
+    }catch(_){quickSaveFault=true;return Object.freeze({scope:scope,state:'HELD',activeCount:null,epoch:null});}
+  }
+  function initQuickSaveObserver(){
+    if(quickSaveObserver||quickSaveFault||quickSaveInitClosed)return;
+    try{
+      var factory=root.InsightOperationObserverV0&&root.InsightOperationObserverV0.createOperationObserver;
+      if(typeof factory!=='function')return;
+      var candidate=factory();
+      if(!candidate||['initialize','begin','end','invalidate','status'].some(function(k){
+        return typeof candidate[k]!=='function';
+      })||candidate.initialize()!==true){quickSaveFault=true;return;}
+      quickSaveObserver=candidate;
+      var initial=quickSaveStatus();
+      if(initial.state!=='IDLE_OBSERVED'||initial.activeCount!==0)quickSaveFault=true;
+    }catch(_){quickSaveFault=true;}
+  }
+  function observeQuickSave(action,context){
+    initQuickSaveObserver();
+    // A factory appearing during an unobserved save must not report that save IDLE.
+    quickSaveInitClosed=true;
+    var ref=quickSaveObserver,token=null,registered=false,outcome='unknown';
+    if(ref&&!quickSaveFault){
+      try{
+        token=ref.begin('quick_daily_save');
+        if(!token||typeof token!=='object'||quickSaveActive>=Number.MAX_SAFE_INTEGER){
+          quickSaveFault=true;
+        }else{
+          registered=true;quickSaveActive++;
+          if(quickSaveStatus().state!=='ACTIVE')quickSaveFault=true;
+        }
+      }catch(_){quickSaveFault=true;}
+    }
+    try{
+      var result=action();
+      if(context.cancel!==true&&context.state.quickSaveObservationFailed!==true)outcome='completed';
+      return result;
+    }finally{
+      if(registered){
+        try{if(ref.end(token,outcome)!==true)quickSaveFault=true;}
+        catch(_){quickSaveFault=true;}
+        quickSaveActive--;
+        if(!quickSaveFault)quickSaveStatus();
+      }
+    }
+  }
+  // Exposes state only, never business data or permission decisions.
+  root.InsightQuickSaveObserverV0=Object.freeze({getStatus:function(){initQuickSaveObserver();return quickSaveStatus();}});
+
   var originals={};
 
   function bridge(functionName,beforeEvent,afterEvent,dateScoped){
@@ -56,9 +123,14 @@
           if(afterEvent&&context.afterOnCancel)emit(afterEvent,context);
           return context.result;
         }
-        context.result=original.apply(self,context.args);
-        if(afterEvent)emit(afterEvent,context);
-        return context.result;
+        var execute=function(){
+          context.result=original.apply(self,context.args);
+          if(afterEvent)emit(afterEvent,context);
+          return context.result;
+        };
+        // Validation cancellation remains outside the registered save operation.
+        if(functionName==='saveQuick')return observeQuickSave(execute,context);
+        return execute();
       });
     };
     wrapped.__insightHookBridge=true;
