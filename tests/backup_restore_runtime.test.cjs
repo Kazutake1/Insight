@@ -59,8 +59,10 @@ function fixture(options={}){
       migrateSnapshot(value){const valueCopy=clone(value);valueCopy.schemaVersion=1;return valueCopy;},
       serialize(value){return JSON.stringify(value);},
       readSnapshot(){
+        if(options.readbackUnavailableAfterCommit&&writeCount>0)throw Error('FICTIONAL readback unavailable');
         if(window.InsightRestoreOperationObserverV0)samples.push({point:'readback',...window.InsightRestoreOperationObserverV0.getStatus()});
         const result=clone(persisted);
+        if(options.unexpectedReadbackAfterCommit&&writeCount>0){result.stores.a.data['2026']['1月'][0].売上=4242;}
         if(readFaultOnce&&writeCount>0){
           readFaultOnce=false;
           result.stores.a.data['2026']['1月'][0].売上+=1;
@@ -299,5 +301,51 @@ test('BR12 FICTIONAL reader abort leaves existing data untouched and conservativ
   f.readers[0].onabort();
   assert.equal(f.writeCount,0);
   assert.deepEqual(f.persisted,f.original);
+  assert.equal(f.window.InsightRestoreOperationObserverV0.getStatus().state,'HELD');
+});
+
+
+test('BR13 FICTIONAL saved-after-throw identifies target data without falsely claiming unchanged',()=>{
+  const f=fixture({postcommitThrow:true});
+  f.restore(snapshot(750));
+  assert.equal(f.writeCount,1);
+  assert.equal(f.persisted.stores.a.data['2026']['1月'][0].売上,750);
+  assert.equal(f.ctx.allStores.stores.a.data['2026']['1月'][0].売上,100);
+  assert.equal(f.alerts.length,1);
+  assert.match(f.alerts[0],/保存領域に復元対象と一致するデータ/);
+  assert.match(f.alerts[0],/整合性確認・画面更新は完了していません/);
+  assert.doesNotMatch(f.alerts[0],/現在のデータは変更されていません/);
+  assert.equal(f.window.InsightRestoreOperationObserverV0.getStatus().state,'HELD');
+});
+test('BR14 FICTIONAL unreadable postthrow state is uncertain and does not retry writes',()=>{
+  const f=fixture({postcommitThrow:true,readbackUnavailableAfterCommit:true});
+  f.restore(snapshot(750));
+  assert.equal(f.writeCount,1);
+  assert.equal(f.persisted.stores.a.data['2026']['1月'][0].売上,750);
+  assert.match(f.alerts.join(' '),/現在の保存状態を確認できませんでした/);
+  assert.doesNotMatch(f.alerts.join(' '),/現在のデータは変更されていません/);
+  assert.equal(f.window.InsightRestoreOperationObserverV0.getStatus().state,'HELD');
+});
+test('BR15 FICTIONAL prewrite quota error retains previous-data warning and never retries',()=>{
+  const f=fixture({quotaOnce:true});
+  f.restore(snapshot(750));
+  assert.equal(f.writeCount,0);
+  assert.deepEqual(f.persisted,f.original);
+  assert.match(f.alerts.join(' '),/現在のデータは変更されていません/);
+  assert.equal(f.window.InsightRestoreOperationObserverV0.getStatus().state,'HELD');
+});
+test('BR16 FICTIONAL third-state readback does not classify an unknown writer as target',()=>{
+  const f=fixture({postcommitThrow:true,unexpectedReadbackAfterCommit:true});
+  f.restore(snapshot(750));
+  assert.equal(f.writeCount,1);
+  assert.match(f.alerts.join(' '),/現在の保存状態を確認できませんでした/);
+  assert.doesNotMatch(f.alerts.join(' '),/現在のデータは変更されていません/);
+  assert.equal(f.window.InsightRestoreOperationObserverV0.getStatus().state,'HELD');
+});
+test('BR17 FICTIONAL indistinguishable previous and target values stay uncertain',()=>{
+  const f=fixture({postcommitThrow:true});
+  f.restore(snapshot(100));
+  assert.equal(f.writeCount,1);
+  assert.match(f.alerts.join(' '),/現在の保存状態を確認できませんでした/);
   assert.equal(f.window.InsightRestoreOperationObserverV0.getStatus().state,'HELD');
 });
