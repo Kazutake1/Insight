@@ -36,6 +36,7 @@ function fixture(options={}){
   let persisted=clone(original),writeCount=0,readFaultOnce=!!options.corruptAfterWrite;
   const downloads=[],alerts=[],toasts=[],samples=[],readers=[];
   let confirmation=options.confirm!==false;
+  let writeHeld=false;
   let failWriteOnce=!!options.quotaOnce;
   const body={
     appendChild(node){node.parentNode=body;}
@@ -70,6 +71,7 @@ function fixture(options={}){
         return result;
       },
       writeSnapshot(value){
+        if(writeHeld){const err=new Error('FICTIONAL restore hold');err.name='InsightStorageRestoreHoldError';throw err;}
         if(window.InsightRestoreOperationObserverV0)samples.push({point:'before-write',...window.InsightRestoreOperationObserverV0.getStatus()});
         if(options.rollbackFailure&&writeCount===1)throw new Error('FICTIONAL rollback failed');
         if(failWriteOnce){
@@ -79,11 +81,13 @@ function fixture(options={}){
           throw error;
         }
         writeCount++;
-        persisted=clone(value);
+        persisted=options.revertAfterWrite&&writeCount===1?clone(original):clone(value);
         if(window.InsightRestoreOperationObserverV0)samples.push({point:'after-write',...window.InsightRestoreOperationObserverV0.getStatus()});
         if(options.postcommitThrow&&writeCount===1)throw new Error('FICTIONAL postcommit write throw');
       },
-      writeMetadata(){return true;}
+      writeMetadata(){return true;},
+      holdSnapshotWrites(){writeHeld=true;return true;},
+      snapshotWritesHeld(){return writeHeld;}
     },
     InsightDataHealth:{
       check(){return {status:'ok',counts:{errors:0,warnings:0},issues:[]};}
@@ -348,4 +352,43 @@ test('BR17 FICTIONAL indistinguishable previous and target serialized values sta
   assert.equal(f.writeCount,1);
   assert.match(f.alerts.join(' '),/現在の保存状態を確認できませんでした/);
   assert.equal(f.window.InsightRestoreOperationObserverV0.getStatus().state,'HELD');
+});
+
+test('BR18 FICTIONAL postwrite throw latches hold against later stale-live writer',()=>{
+  const f=fixture({postcommitThrow:true});
+  f.restore(snapshot(750));
+  assert.equal(f.window.InsightStorage.snapshotWritesHeld(),true);
+  assert.equal(f.ctx.allStores.stores.a.data['2026']['1月'][0].売上,100);
+  assert.equal(f.persisted.stores.a.data['2026']['1月'][0].売上,750);
+  assert.throws(()=>f.window.InsightStorage.writeSnapshot(f.ctx.allStores),error=>error.name==='InsightStorageRestoreHoldError');
+  assert.equal(f.writeCount,1);
+  assert.equal(f.persisted.stores.a.data['2026']['1月'][0].売上,750);
+});
+test('BR19 FICTIONAL postflight rollback failure latches hold',()=>{
+  const f=fixture({corruptAfterWrite:true,rollbackFailure:true});
+  f.restore(snapshot(750));
+  assert.equal(f.window.InsightStorage.snapshotWritesHeld(),true);
+  assert.throws(()=>f.window.InsightStorage.writeSnapshot(f.ctx.allStores),/FICTIONAL restore hold/);
+  assert.equal(f.writeCount,1);
+});
+test('BR20 FICTIONAL uncertain postthrow latches hold without retry',()=>{
+  const f=fixture({postcommitThrow:true,readbackUnavailableAfterCommit:true});
+  f.restore(snapshot(750));
+  assert.equal(f.window.InsightStorage.snapshotWritesHeld(),true);
+  assert.equal(f.writeCount,1);
+});
+test('BR21 FICTIONAL previous-observed, prewrite quota and successful rollback do not latch',()=>{
+  for(const options of [{postcommitThrow:true,revertAfterWrite:true},{quotaOnce:true},{corruptAfterWrite:true}]){
+    const f=fixture(options);
+    f.restore(snapshot(750));
+    assert.equal(f.window.InsightStorage.snapshotWritesHeld(),false,JSON.stringify(options));
+  }
+});
+test('BR22 FICTIONAL successful restore, UI error and duplicate onload do not latch',()=>{
+  for(const options of [{},{uiFailure:true},{deferReader:true}]){
+    const f=fixture(options);
+    f.restore(snapshot(750));
+    if(options.deferReader){f.flushReader();f.repeatReader();assert.equal(f.writeCount,2);}
+    assert.equal(f.window.InsightStorage.snapshotWritesHeld(),false,JSON.stringify(options));
+  }
 });
