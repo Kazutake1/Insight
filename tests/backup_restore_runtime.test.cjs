@@ -274,8 +274,10 @@ test('BR08 FICTIONAL duplicate FileReader onload is not silently accepted as cle
   f.restore(snapshot(750));
   f.flushReader();
   assert.equal(f.window.InsightRestoreOperationObserverV0.getStatus().state,'IDLE_OBSERVED');
-  f.repeatReader(); // Existing business may repeat; monitor must conservatively HOLD.
-  assert.equal(f.writeCount,2);
+  f.repeatReader(); // FICTIONAL duplicate completion is held, never committed twice.
+  assert.equal(f.writeCount,1);
+  assert.equal(f.downloads.length,1);
+  assert.equal(f.persisted.stores.a.data['2026']['1月'][0].売上,750);
   assert.equal(f.window.InsightRestoreOperationObserverV0.getStatus().state,'HELD');
 });
 test('BR09 FICTIONAL observer factory failure never blocks the original write',()=>{
@@ -402,7 +404,72 @@ test('BR22 FICTIONAL successful restore, UI error and duplicate onload do not la
   for(const options of [{},{uiFailure:true},{deferReader:true}]){
     const f=fixture(options);
     f.restore(snapshot(750));
-    if(options.deferReader){f.flushReader();f.repeatReader();assert.equal(f.writeCount,2);}
+    if(options.deferReader){f.flushReader();f.repeatReader();assert.equal(f.writeCount,1);}
     assert.equal(f.window.InsightStorage.snapshotWritesHeld(),false,JSON.stringify(options));
   }
+});
+
+test('BR23 FICTIONAL overlapping restore requests reject the second without backup or writer',()=>{
+  const f=fixture({deferReader:true});
+  const first=f.restore(snapshot(750));
+  const rejected=f.restore(snapshot(800));
+  assert.equal(first.value,'selected');
+  assert.equal(rejected.value,'');
+  assert.equal(f.readers.length,1);
+  assert.equal(f.writeCount,0);
+  assert.equal(f.downloads.length,0);
+  assert.match(f.alerts.join(' '),/別のバックアップ復元処理が進行中/);
+  f.flushReader();
+  assert.equal(f.writeCount,1);
+  assert.equal(f.downloads.length,1);
+  assert.equal(f.persisted.stores.a.data['2026']['1月'][0].売上,750);
+  f.restore(snapshot(850)); // Reader ownership is released after completion.
+  assert.equal(f.readers.length,2);
+  f.flushReader();
+  assert.equal(f.writeCount,2);
+  assert.equal(f.persisted.stores.a.data['2026']['1月'][0].売上,850);
+  assert.equal(f.window.InsightStorage.snapshotWritesHeld(),false);
+});
+test('BR24 FICTIONAL cancelled or invalid restore releases the reader for a normal retry',()=>{
+  const cancelled=fixture({confirm:false});
+  cancelled.restore(snapshot(750));
+  assert.equal(cancelled.writeCount,0);
+  cancelled.setConfirmation(true);
+  cancelled.restore(snapshot(850));
+  assert.equal(cancelled.writeCount,1);
+  assert.equal(cancelled.persisted.stores.a.data['2026']['1月'][0].売上,850);
+  const malformed=fixture();
+  malformed.restore('{FICTIONAL invalid JSON');
+  assert.equal(malformed.writeCount,0);
+  malformed.restore(snapshot(850));
+  assert.equal(malformed.writeCount,1);
+  assert.equal(malformed.persisted.stores.a.data['2026']['1月'][0].売上,850);
+});
+test('BR25 FICTIONAL reader error and abort release ownership without writes',()=>{
+  for(const failure of ['onerror','onabort']){
+    const f=fixture({deferReader:true});
+    f.restore(snapshot(750));
+    f.readers[0][failure]();
+    assert.equal(f.writeCount,0);
+    f.restore(snapshot(850));
+    assert.equal(f.readers.length,2,failure);
+    f.flushReader();
+    assert.equal(f.writeCount,1);
+    assert.equal(f.persisted.stores.a.data['2026']['1月'][0].売上,850);
+  }
+});
+test('BR26 FICTIONAL late duplicate from old reader cannot release a newer pending reader',()=>{
+  const f=fixture({deferReader:true});
+  f.restore(snapshot(750));
+  f.flushReader();
+  f.restore(snapshot(800));
+  f.readers[0].onload({target:{result:f.readers[0]._file.contents}});
+  assert.equal(f.writeCount,1);
+  f.restore(snapshot(900)); // Must still be refused while reader 2 owns the path.
+  assert.equal(f.readers.length,2);
+  f.flushReader();
+  assert.equal(f.writeCount,2);
+  assert.equal(f.persisted.stores.a.data['2026']['1月'][0].売上,800);
+  assert.equal(f.downloads.length,2);
+  assert.equal(f.window.InsightRestoreOperationObserverV0.getStatus().state,'HELD');
 });
