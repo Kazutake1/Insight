@@ -57,7 +57,7 @@ function fixture(options={}){
     InsightStorage:{
       CURRENT_SCHEMA_VERSION:1,
       migrateSnapshot(value){const valueCopy=clone(value);valueCopy.schemaVersion=1;return valueCopy;},
-      serialize(value){return JSON.stringify(value);},
+      serialize(value){return options.indistinguishableSnapshots?'FICTIONAL identical serialized snapshots':JSON.stringify(value);},
       readSnapshot(){
         if(options.readbackUnavailableAfterCommit&&writeCount>0)throw Error('FICTIONAL readback unavailable');
         if(window.InsightRestoreOperationObserverV0)samples.push({point:'readback',...window.InsightRestoreOperationObserverV0.getStatus()});
@@ -342,8 +342,8 @@ test('BR16 FICTIONAL third-state readback does not classify an unknown writer as
   assert.doesNotMatch(f.alerts.join(' '),/現在のデータは変更されていません/);
   assert.equal(f.window.InsightRestoreOperationObserverV0.getStatus().state,'HELD');
 });
-test('BR17 FICTIONAL indistinguishable previous and target values stay uncertain',()=>{
-  const f=fixture({postcommitThrow:true});
+test('BR17 FICTIONAL indistinguishable previous and target serialized values stay uncertain',()=>{
+  const f=fixture({postcommitThrow:true,indistinguishableSnapshots:true});
   f.restore(snapshot(100));
   assert.equal(f.writeCount,1);
   assert.match(f.alerts.join(' '),/現在の保存状態を確認できませんでした/);
