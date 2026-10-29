@@ -268,3 +268,53 @@ test('FICTIONAL stale first load after abort cannot overwrite a newer native res
   expect(state.alerts.join(' ')).toContain('別のバックアップ復元処理が進行中');
   expect(await page.evaluate(()=>InsightStorage.snapshotWritesHeld())).toBe(false);
 });
+
+for(const scenario of ['postwrite-throw','committed-ui-error']){
+  test(`FICTIONAL manual reload recovers saved snapshot after ${scenario}`,async({page})=>{
+    const f=await setup(page);
+    if(scenario==='postwrite-throw'){
+      await page.evaluate(()=>{
+        const original=InsightStorage.writeSnapshot;
+        InsightStorage.writeSnapshot=function(){
+          const result=original.apply(this,arguments);
+          if(window.__restoreWrites===1)throw Error('FICTIONAL postwrite throw before live commit');
+          return result;
+        };
+      });
+    }else{
+      await page.evaluate(()=>{
+        InsightDataHealth.refresh=function(){throw Error('FICTIONAL UI error after save');};
+      });
+    }
+    await upload(page,f.json);
+    await endState(page,1,'HELD');
+    const before=await page.evaluate(({id,year,month})=>{
+      const raw=localStorage.getItem('insight_v11');
+      return {
+        raw,
+        saved:JSON.parse(raw).stores[id].data[year][month][0].売上,
+        live:allStores.stores[id].data[year][month][0].売上,
+        held:InsightStorage.snapshotWritesHeld()
+      };
+    },f);
+    expect(before.saved).toBe(777);
+    expect(before.live).toBe(scenario==='postwrite-throw'?111:777);
+    expect(before.held).toBe(scenario==='postwrite-throw');
+    // A manual reload is the documented recovery procedure. It must not restore stale live data.
+    await page.reload({waitUntil:'domcontentloaded'});
+    await page.waitForFunction(()=>window.InsightStorage&&typeof allStores!=='undefined'&&
+      allStores&&allStores.stores&&typeof InsightStorage.snapshotWritesHeld==='function');
+    const after=await page.evaluate(({id,year,month})=>{
+      const raw=localStorage.getItem('insight_v11');
+      return {
+        raw,
+        saved:JSON.parse(raw).stores[id].data[year][month][0].売上,
+        live:allStores.stores[id].data[year][month][0].売上,
+        held:InsightStorage.snapshotWritesHeld(),
+        conflict:InsightStorage.reportState().conflict
+      };
+    },f);
+    expect(after.raw).toBe(before.raw);
+    expect([after.saved,after.live,after.held,after.conflict]).toEqual([777,777,false,false]);
+  });
+}
