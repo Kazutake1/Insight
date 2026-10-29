@@ -120,7 +120,16 @@
 
   function writeMetadata(key,value){
     if(typeof key!=='string'||!key)throw new Error('Insight metadata key is invalid.');
-    var write=function(){if(key===storageKey())assertRestoreWritesAllowed();root.localStorage.setItem(key,String(value));return true;};
+    var write=function(){
+      if(key===storageKey()){
+        assertRestoreWritesAllowed();
+        // Snapshot bytes must only be written by the versioned, conflict-checked writer.
+        var error=new Error('Insight snapshot data cannot be written through the metadata API.');
+        error.name='InsightStorageMetadataKeyError';
+        throw error;
+      }
+      root.localStorage.setItem(key,String(value));return true;
+    };
     return key===storageKey()?withReportUpdate(write):write();
   }
 
