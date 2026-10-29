@@ -202,3 +202,39 @@ test('runtime persist guardはStorage直後に読み込まれ共有保存層へ�
   assert.ok(index.indexOf('insight_storage_v1.js')<index.indexOf('insight_persist_guard_v1.js'));
   assert.ok(index.indexOf('insight_persist_guard_v1.js')<index.indexOf('insight_year_manager_v1.js'));
 });
+
+test('FICTIONAL restore hold prevents all shared snapshot writes but preserves metadata and reads',()=>{
+  const {window,calls,values}=setup();
+  const storage=window.InsightStorage;
+  const prior={current:'a',stores:{a:{value:111}}};
+  const target={current:'a',stores:{a:{value:777}}};
+  storage.writeSnapshot(target);
+  const saved=values.insight_v11;
+  const writes=calls.length;
+  assert.equal(storage.snapshotWritesHeld(),false);
+  assert.equal(storage.holdSnapshotWrites(),true);
+  assert.equal(storage.holdSnapshotWrites(),true);
+  for(const write of [
+    ()=>storage.writeSnapshot(prior),
+    ()=>storage.persistCurrent(prior),
+    ()=>storage.transaction(prior,draft=>{draft.stores.a.value=1;}),
+    ()=>storage.writeMetadata('insight_v11','FICTIONAL old data')
+  ]){
+    assert.throws(write,error=>error.name==='InsightStorageRestoreHoldError');
+  }
+  assert.equal(values.insight_v11,saved);
+  assert.equal(calls.length,writes);
+  assert.equal(storage.readSnapshot().stores.a.value,777);
+  assert.equal(storage.writeMetadata('insight_last_backup','FICTIONAL backup'),true);
+  assert.equal(values.insight_last_backup,'FICTIONAL backup');
+  assert.equal(calls.length,writes+1);
+});
+test('FICTIONAL restore hold is absent during normal saves',()=>{
+  const {window,calls}=setup();
+  const storage=window.InsightStorage;
+  assert.equal(storage.snapshotWritesHeld(),false);
+  storage.writeSnapshot({current:'a',stores:{}});
+  storage.writeSnapshot({current:'a',stores:{a:{value:2}}});
+  assert.equal(storage.snapshotWritesHeld(),false);
+  assert.equal(calls.length,2);
+});
