@@ -529,3 +529,41 @@ test('BR29 FICTIONAL late reader error does not cancel the next reader',()=>{
   assert.equal(f.writeCount,1);
   assert.equal(f.persisted.stores.a.data['2026']['1月'][0].売上,850);
 });
+
+test('BR30 FICTIONAL first late load after newer reader already completed never restores stale snapshot',()=>{
+  for(const termination of ['onerror','onabort','readAsText exception']){
+    const options={deferReader:true};
+    if(termination==='readAsText exception')options.readThrowsOnce=true;
+    const f=fixture(options);
+    if(termination==='readAsText exception'){
+      assert.throws(()=>f.restore(snapshot(750)),/FICTIONAL readAsText failed/);
+    }else{
+      f.restore(snapshot(750));
+      f.readers[0][termination]();
+    }
+    const staleReader=f.readers[0];
+    // Reader B has already completed its first (and only) restoration before
+    // A receives the first ever delayed onload callback.
+    f.restore(snapshot(850));
+    f.flushReader();
+    assert.equal(f.persisted.stores.a.data['2026']['1月'][0].売上,850,termination);
+    assert.equal(f.writeCount,1,termination);
+    assert.equal(f.confirmationCount,1,termination);
+    assert.equal(f.downloads.length,1,termination);
+    staleReader.onload({target:{result:staleReader._file.contents}});
+    assert.equal(f.writeCount,1,termination);
+    assert.equal(f.confirmationCount,1,termination);
+    assert.equal(f.downloads.length,1,termination);
+    assert.equal(f.persisted.stores.a.data['2026']['1月'][0].売上,850,termination);
+    assert.equal(f.ctx.allStores.stores.a.data['2026']['1月'][0].売上,850,termination);
+    // A's rejected first load must not prevent a fresh Reader C from saving.
+    f.restore(snapshot(900));
+    f.flushReader();
+    assert.equal(f.readers.length,3,termination);
+    assert.equal(f.writeCount,2,termination);
+    assert.equal(f.confirmationCount,2,termination);
+    assert.equal(f.downloads.length,2,termination);
+    assert.equal(f.persisted.stores.a.data['2026']['1月'][0].売上,900,termination);
+    assert.equal(f.window.InsightStorage.snapshotWritesHeld(),false,termination);
+  }
+});
