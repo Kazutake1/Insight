@@ -334,7 +334,8 @@ restoreData=function(e){
     markRestoreObservationFault();
     alert('別のバックアップ復元処理が進行中です。完了後にもう一度お試しください。');
     e.target.value='';return;
-  }if(file.size>20*1024*1024){alert("バックアップファイルが大きすぎます。\n20MB以下のファイルを選択してください。");e.target.value="";return;}
+  }
+  if(file.size>20*1024*1024){alert("バックアップファイルが大きすぎます。\n20MB以下のファイルを選択してください。");e.target.value="";return;}
   var reader=new FileReader(),restoreLoadCount=0;restoreFileReaderActive=reader;reader.onload=function(ev){if(++restoreLoadCount>1){markRestoreObservationFault();return;}var restoreCommitted=false,restoreTicket=null,restoreOutcome='unknown',restoreWriteCheck=null;try{try{
     var parsed=JSON.parse(ev.target.result),envelope=parseBackupEnvelope(parsed),newAll=normalizeBackup(envelope.data);
     if(envelope.info)validateBackupInfo(envelope.info,newAll);
