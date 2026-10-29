@@ -388,7 +388,7 @@ test('FICTIONAL native second tab cannot overwrite restored snapshot through met
   try{
     await second.route('**/Index.html*',async route=>{
       const response=await route.fetch();
-      await route.fulfill({response,body:(await response.text()).replace(/;?\\s*upgrade-insecure-requests/g,'')});
+      await route.fulfill({response,body:(await response.text()).replace(/;?\s*upgrade-insecure-requests/g,'')});
     });
     await second.goto('/Index.html',{waitUntil:'domcontentloaded'});
     await second.waitForFunction(()=>window.InsightStorage&&typeof allStores!=='undefined'&&
