@@ -846,3 +846,73 @@ test('FICTIONAL native postcommit transaction throw blocks stale retry and reloa
     conflict:false,reportHeld:false,restoreHeld:false
   });
 });
+
+test('FICTIONAL native guarded persist postcommit warning survives page reload',async({page})=>{
+  const f=await setup(page);
+  const fault=await page.evaluate(({id,year,month})=>{
+    const baseline=localStorage.getItem('insight_v11');
+    const originalSetItem=Storage.prototype.setItem;
+    let primaryWrites=0,throwOnce=true;
+    Storage.prototype.setItem=function(key,value){
+      const result=originalSetItem.call(this,key,value);
+      if(key==='insight_v11'){
+        primaryWrites++;
+        if(throwOnce){
+          throwOnce=false;
+          throw new Error('FICTIONAL guarded postcommit failure');
+        }
+      }
+      return result;
+    };
+    // Simulate an edited input value: exercise the actual installed persist
+    // guard, not the direct transaction() API covered by PR #300.
+    allStores.stores[id].data[year][month][0].売上=777;
+    let errorName='none',causeName='none',causeMessage='none';
+    try{window.persist();}
+    catch(error){
+      errorName=error.name;
+      causeName=error.cause?.name||'none';
+      causeMessage=String(error.cause?.message||'');
+    }
+    const committedRaw=localStorage.getItem('insight_v11');
+    return {
+      baseline,committedRaw,errorName,causeName,causeMessage,primaryWrites,
+      guardInstalled:window.persist.__insightPersistGuard===true,
+      alerts:[...window.__restoreAlerts],
+      saved:InsightStorage.readSnapshot().stores[id].data[year][month][0].売上,
+      live:allStores.stores[id].data[year][month][0].売上,
+      report:InsightStorage.reportState(),
+      restoreHeld:InsightStorage.snapshotWritesHeld()
+    };
+  },f);
+  expect(fault.guardInstalled).toBe(true);
+  expect(fault.errorName).toBe('InsightPersistError');
+  expect(fault.causeMessage).toContain('FICTIONAL guarded postcommit failure');
+  expect(fault.baseline).not.toBe(fault.committedRaw);
+  expect(fault).toMatchObject({
+    causeName:'Error',primaryWrites:1,saved:777,live:777,
+    report:{held:true,conflict:true},restoreHeld:false
+  });
+  expect(fault.alerts).toHaveLength(1);
+  expect(fault.alerts[0]).toContain('保存結果を確認できないため');
+  expect(fault.alerts[0]).toContain('追加編集・再保存は控えてください');
+  expect(fault.alerts[0]).toContain('入力内容を控えてからInsightを手動で再読み込み');
+  expect(fault.alerts[0]).not.toContain('現在の変更は保存されていません');
+  // The test alert is captured via setup's window.alert spy, not a real
+  // user's modal interaction. Reload a real document without re-seeding.
+  await page.reload({waitUntil:'domcontentloaded'});
+  await page.waitForFunction(()=>window.InsightStorage&&typeof allStores!=='undefined'&&
+    allStores&&allStores.stores&&allStores.stores[allStores.current]&&
+    typeof InsightStorage.snapshotWritesHeld==='function');
+  const recovered=await page.evaluate(({id,year,month})=>({
+    raw:localStorage.getItem('insight_v11'),
+    saved:InsightStorage.readSnapshot().stores[id].data[year][month][0].売上,
+    live:allStores.stores[id].data[year][month][0].売上,
+    report:InsightStorage.reportState(),
+    restoreHeld:InsightStorage.snapshotWritesHeld()
+  }),f);
+  expect(recovered.raw).toBe(fault.committedRaw);
+  expect(recovered).toMatchObject({
+    saved:777,live:777,report:{held:false,conflict:false},restoreHeld:false
+  });
+});
