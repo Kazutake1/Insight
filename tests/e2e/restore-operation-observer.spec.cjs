@@ -638,3 +638,76 @@ test('FICTIONAL native two-tab ABA storage events block stale save even when raw
     await other.close();
   }
 });
+
+test('FICTIONAL native other-tab metadata event does not falsely block canonical snapshot save',async({page})=>{
+  const f=await setup(page);
+  const other=await page.context().newPage();
+  try{
+    await other.route('**/Index.html*',async route=>{
+      const response=await route.fetch();
+      await route.fulfill({response,body:(await response.text()).replace(/;?\s*upgrade-insecure-requests/g,'')});
+    });
+    await other.goto('/Index.html',{waitUntil:'domcontentloaded'});
+    await other.waitForFunction(()=>window.InsightStorage&&typeof allStores!=='undefined'&&
+      allStores&&allStores.stores&&allStores.stores[allStores.current]);
+    const baseline=await page.evaluate(()=>localStorage.getItem('insight_v11'));
+    await page.evaluate(()=>{
+      window.__fictionalMetadataEvents=[];
+      window.addEventListener('storage',event=>{
+        if(event.key==='insight_fictional_aux_metadata')
+          window.__fictionalMetadataEvents.push({key:event.key,newValue:event.newValue});
+      });
+    });
+    const metadataWritten=await other.evaluate(()=>
+      InsightStorage.writeMetadata('insight_fictional_aux_metadata','FICTIONAL auxiliary update'));
+    expect(metadataWritten).toBe(true);
+    await page.waitForFunction(()=>Array.isArray(window.__fictionalMetadataEvents)&&
+      window.__fictionalMetadataEvents.length===1);
+    const before=await page.evaluate(({id,year,month})=>({
+      raw:localStorage.getItem('insight_v11'),
+      events:window.__fictionalMetadataEvents,
+      saved:InsightStorage.readSnapshot().stores[id].data[year][month][0].売上,
+      live:allStores.stores[id].data[year][month][0].売上,
+      conflict:InsightStorage.reportState().conflict,
+      restoreHeld:InsightStorage.snapshotWritesHeld()
+    }),f);
+    expect(before).toEqual({
+      raw:baseline,
+      events:[{key:'insight_fictional_aux_metadata',newValue:'FICTIONAL auxiliary update'}],
+      saved:111,live:111,conflict:false,restoreHeld:false
+    });
+    const written=await page.evaluate(({id,year,month})=>{
+      allStores.stores[id].data[year][month][0].売上=222;
+      const result=InsightStorage.persistCurrent(allStores);
+      const raw=localStorage.getItem('insight_v11');
+      return {
+        result,raw,saved:InsightStorage.readSnapshot().stores[id].data[year][month][0].売上,
+        live:allStores.stores[id].data[year][month][0].売上,
+        metadata:localStorage.getItem('insight_fictional_aux_metadata'),
+        conflict:InsightStorage.reportState().conflict,
+        restoreHeld:InsightStorage.snapshotWritesHeld()
+      };
+    },f);
+    expect(written).toMatchObject({
+      result:true,saved:222,live:222,metadata:'FICTIONAL auxiliary update',
+      conflict:false,restoreHeld:false
+    });
+    expect(written.raw).not.toBe(baseline);
+    await page.reload({waitUntil:'domcontentloaded'});
+    await page.waitForFunction(()=>window.InsightStorage&&typeof allStores!=='undefined'&&
+      allStores&&allStores.stores&&allStores.stores[allStores.current]&&
+      typeof InsightStorage.snapshotWritesHeld==='function');
+    const reloaded=await page.evaluate(({id,year,month})=>({
+      raw:localStorage.getItem('insight_v11'),
+      saved:InsightStorage.readSnapshot().stores[id].data[year][month][0].売上,
+      live:allStores.stores[id].data[year][month][0].売上,
+      conflict:InsightStorage.reportState().conflict,
+      restoreHeld:InsightStorage.snapshotWritesHeld()
+    }),f);
+    expect(reloaded).toEqual({
+      raw:written.raw,saved:222,live:222,conflict:false,restoreHeld:false
+    });
+  }finally{
+    await other.close();
+  }
+});
