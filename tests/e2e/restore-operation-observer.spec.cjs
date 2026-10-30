@@ -493,3 +493,77 @@ test('FICTIONAL native external direct-storage update blocks stale save until ma
     await other.close();
   }
 });
+
+
+for(const phase of ['before-write','after-write']){
+  test('FICTIONAL external snapshot change '+phase+' cannot be erased by restore or rollback',async({page})=>{
+    const f=await setup(page);
+    await page.evaluate(({id,year,month,phase})=>{
+      window.__externalSnapshotRaw=null;
+      function simulateExternalWriter(){
+        const saved=JSON.parse(localStorage.getItem('insight_v11'));
+        saved.stores[id].data[year][month][0].売上=555;
+        window.__externalSnapshotRaw=JSON.stringify(saved);
+        // FICTIONAL competing writer injected at a synchronous boundary. This
+        // does not use InsightStorage and is not proof of natural browser timing.
+        localStorage.setItem('insight_v11',window.__externalSnapshotRaw);
+      }
+      if(phase==='before-write'){
+        // The external writer runs after restore preflight but before commit.
+        window.confirm=()=>{simulateExternalWriter();return true;};
+      }else{
+        const previous=InsightStorage.writeSnapshot;
+        InsightStorage.writeSnapshot=function(){
+          const result=previous.apply(this,arguments);
+          if(window.__restoreWrites===1)simulateExternalWriter();
+          return result;
+        };
+      }
+    },{...f,phase});
+    await upload(page,f.json);
+    await endState(page,phase==='before-write'?1:2,'HELD');
+    const before=await page.evaluate(({id,year,month})=>{
+      const raw=localStorage.getItem('insight_v11');
+      let blocked='not blocked';
+      try{InsightStorage.persistCurrent(allStores);}catch(error){blocked=error.name;}
+      return {
+        raw,externalRaw:window.__externalSnapshotRaw,
+        saved:JSON.parse(raw).stores[id].data[year][month][0].売上,
+        live:allStores.stores[id].data[year][month][0].売上,
+        writes:window.__restoreWrites,alerts:window.__restoreAlerts,
+        held:InsightStorage.snapshotWritesHeld(),
+        conflict:InsightStorage.reportState().conflict,
+        blocked
+      };
+    },f);
+    expect(before.raw).toBe(before.externalRaw);
+    expect([before.saved,before.live,before.writes]).toEqual([
+      555,111,phase==='before-write'?1:2
+    ]);
+    expect(before.held).toBe(true);
+    expect(before.conflict).toBe(true);
+    expect(before.blocked).toBe('InsightStorageRestoreHoldError');
+    if(phase==='before-write'){
+      expect(before.alerts.join(' ')).toContain('保存状態を確認できませんでした');
+    }else{
+      expect(before.alerts.join(' ')).toContain('自動復旧にも失敗しました');
+    }
+    await page.reload({waitUntil:'domcontentloaded'});
+    await page.waitForFunction(()=>window.InsightStorage&&typeof allStores!=='undefined'&&
+      allStores&&allStores.stores&&allStores.stores[allStores.current]&&
+      typeof InsightStorage.snapshotWritesHeld==='function');
+    const after=await page.evaluate(({id,year,month})=>{
+      const raw=localStorage.getItem('insight_v11');
+      return {
+        raw,
+        saved:InsightStorage.readSnapshot().stores[id].data[year][month][0].売上,
+        live:allStores.stores[id].data[year][month][0].売上,
+        held:InsightStorage.snapshotWritesHeld(),
+        conflict:InsightStorage.reportState().conflict
+      };
+    },f);
+    expect(after).toEqual({
+      raw:before.raw,saved:555,live:555,held:false,conflict:false
+    });
+  });
+}
