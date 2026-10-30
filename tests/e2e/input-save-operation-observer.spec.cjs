@@ -174,3 +174,83 @@ test('FICTIONAL observer 404 does not stop the two existing input writes',async(
   expect(out.row.客数).toBe(456);
   expect(out.row.storeMemo).toBe('FICTIONAL memo');
 });
+
+test('FICTIONAL actual input save button opens native guarded postcommit warning and reloads bytes',async({page})=>{
+  // Capture browser alert before the fictional input fixture installs its spy.
+  // Unlike #302, this uses an actual user-facing Playwright dialog event.
+  await page.addInitScript(()=>{
+    window.__fictionalNativeAlert=window.alert.bind(window);
+  });
+  await openFictionalInput(page,{type:'sales'});
+  const dialogs=[];
+  page.on('dialog',async dialog=>{
+    dialogs.push({type:dialog.type(),message:dialog.message()});
+    await dialog.accept();
+  });
+  const baseline=await page.evaluate(()=>{
+    window.alert=window.__fictionalNativeAlert;
+    const raw=localStorage.getItem('insight_v11');
+    const nativeSetItem=Storage.prototype.setItem;
+    window.__fictionalDialogPrimaryWrites=0;
+    let throwOnce=true;
+    Storage.prototype.setItem=function(key,value){
+      const result=nativeSetItem.call(this,key,value);
+      if(key==='insight_v11'){
+        window.__fictionalDialogPrimaryWrites++;
+        if(throwOnce){
+          throwOnce=false;
+          throw Error('FICTIONAL input button postcommit failure');
+        }
+      }
+      return result;
+    };
+    return raw;
+  });
+  // Click the actual Sales input save button; no direct persist/saveInput API call.
+  await page.locator('#salesSaveBtn').click();
+  expect(dialogs).toHaveLength(1);
+  expect(dialogs[0].type).toBe('alert');
+  expect(dialogs[0].message).toContain('保存結果を確認できないため');
+  expect(dialogs[0].message).toContain('追加編集・再保存は控えてください');
+  expect(dialogs[0].message).toContain('入力内容を控えてからInsightを手動で再読み込み');
+  expect(dialogs[0].message).not.toContain('現在の変更は保存されていません');
+  const fault=await page.evaluate(()=>{
+    const f=window.__inputFixture;
+    const raw=localStorage.getItem('insight_v11');
+    const persisted=JSON.parse(raw).stores.fictional_input_store;
+    return {
+      raw,writes:window.__fictionalDialogPrimaryWrites,
+      guardInstalled:window.persist.__insightPersistGuard===true,
+      saved:persisted.data[f.year][f.month][0].売上,
+      other:persisted.data[f.year][f.month][1].売上,
+      status:InsightInputSaveObserverV0.getStatus(),
+      report:InsightStorage.reportState(),
+      restoreHeld:InsightStorage.snapshotWritesHeld()
+    };
+  });
+  expect(fault.raw).not.toBe(baseline);
+  expect(fault).toMatchObject({
+    writes:1,guardInstalled:true,saved:123,other:99,
+    status:{state:'HELD',activeCount:0},
+    report:{held:true,conflict:true},restoreHeld:false
+  });
+  // A manual document reload must not re-run the fixture or overwrite saved 123.
+  await page.reload({waitUntil:'domcontentloaded'});
+  await page.waitForFunction(()=>window.InsightStorage&&
+    typeof allStores!=='undefined'&&allStores&&
+    allStores.stores&&allStores.stores.fictional_input_store);
+  const recovered=await page.evaluate(({year,month})=>{
+    const raw=localStorage.getItem('insight_v11');
+    return {
+      raw,
+      saved:InsightStorage.readSnapshot().stores.fictional_input_store.data[year][month][0].売上,
+      live:allStores.stores.fictional_input_store.data[year][month][0].売上,
+      report:InsightStorage.reportState(),
+      restoreHeld:InsightStorage.snapshotWritesHeld()
+    };
+  },{year:await page.evaluate(()=>editYear.sales),month:await page.evaluate(()=>editMonth.sales)});
+  expect(recovered).toMatchObject({
+    raw:fault.raw,saved:123,live:123,
+    report:{held:false,conflict:false},restoreHeld:false
+  });
+});
