@@ -202,3 +202,76 @@ test('runtime persist guardはStorage直後に読み込まれ共有保存層へ�
   assert.ok(index.indexOf('insight_storage_v1.js')<index.indexOf('insight_persist_guard_v1.js'));
   assert.ok(index.indexOf('insight_persist_guard_v1.js')<index.indexOf('insight_year_manager_v1.js'));
 });
+
+test('FICTIONAL restore hold prevents all shared snapshot writes but preserves metadata and reads',()=>{
+  const {window,calls,values}=setup();
+  const storage=window.InsightStorage;
+  const prior={current:'a',stores:{a:{value:111}}};
+  const target={current:'a',stores:{a:{value:777}}};
+  storage.writeSnapshot(target);
+  const saved=values.insight_v11;
+  const writes=calls.length;
+  assert.equal(storage.snapshotWritesHeld(),false);
+  assert.equal(storage.holdSnapshotWrites(),true);
+  assert.equal(storage.holdSnapshotWrites(),true);
+  for(const write of [
+    ()=>storage.writeSnapshot(prior),
+    ()=>storage.persistCurrent(prior),
+    ()=>storage.transaction(prior,draft=>{draft.stores.a.value=1;}),
+    ()=>storage.writeMetadata('insight_v11','FICTIONAL old data')
+  ]){
+    assert.throws(write,error=>error.name==='InsightStorageRestoreHoldError');
+  }
+  assert.equal(values.insight_v11,saved);
+  assert.equal(calls.length,writes);
+  assert.equal(storage.readSnapshot().stores.a.value,777);
+  assert.equal(storage.writeMetadata('insight_last_backup','FICTIONAL backup'),true);
+  assert.equal(values.insight_last_backup,'FICTIONAL backup');
+  assert.equal(calls.length,writes+1);
+});
+test('FICTIONAL restore hold is absent during normal saves',()=>{
+  const {window,calls}=setup();
+  const storage=window.InsightStorage;
+  assert.equal(storage.snapshotWritesHeld(),false);
+  storage.writeSnapshot({current:'a',stores:{}});
+  storage.writeSnapshot({current:'a',stores:{a:{value:2}}});
+  assert.equal(storage.snapshotWritesHeld(),false);
+  assert.equal(calls.length,2);
+});
+
+test('FICTIONAL metadata API refuses the primary snapshot key without changing saved bytes',()=>{
+  const {window,calls,values}=setup();
+  const storage=window.InsightStorage;
+  storage.writeSnapshot({current:'a',stores:{a:{value:777}}});
+  const saved=values.insight_v11,writeCount=calls.length;
+  assert.throws(
+    ()=>storage.writeMetadata('insight_v11','FICTIONAL arbitrary bytes'),
+    error=>error.name==='InsightStorageMetadataKeyError'
+  );
+  assert.equal(values.insight_v11,saved);
+  assert.equal(calls.length,writeCount);
+  assert.equal(storage.readSnapshot().stores.a.value,777);
+  assert.equal(storage.writeMetadata('insight_last_backup','FICTIONAL timestamp'),true);
+  assert.equal(values.insight_last_backup,'FICTIONAL timestamp');
+  assert.equal(calls.length,writeCount+1);
+});
+
+test('FICTIONAL stale tab cannot use metadata API to overwrite newer tab snapshot',()=>{
+  const initial=JSON.stringify({schemaVersion:1,current:'a',stores:{a:{value:111}}});
+  const sharedValues={insight_v11:initial};
+  const tabA=setup({sharedValues});
+  const tabB=setup({sharedValues});
+  tabA.window.InsightStorage.writeSnapshot({current:'a',stores:{a:{value:777}}});
+  const saved=sharedValues.insight_v11;
+  assert.throws(
+    ()=>tabB.window.InsightStorage.writeMetadata('insight_v11',initial),
+    error=>error.name==='InsightStorageMetadataKeyError'
+  );
+  assert.throws(
+    ()=>tabB.window.InsightStorage.writeSnapshot({current:'a',stores:{a:{value:111}}}),
+    error=>error.name==='InsightStorageConflictError'
+  );
+  assert.equal(sharedValues.insight_v11,saved);
+  assert.equal(tabB.window.InsightStorage.readSnapshot().stores.a.value,777);
+  assert.equal(tabB.calls.length,0);
+});
