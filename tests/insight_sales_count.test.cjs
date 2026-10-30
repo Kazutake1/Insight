@@ -458,3 +458,230 @@ test('対象外に変更しても保存済みの納品・販売の0と正数を�
     {delivery:0,sales:12});
   assert.equal(JSON.stringify(all),snapshot);
 });
+
+
+// P4b: the REAL sales-count handlers run against an isolated, fabricated DOM.
+// Only the new metadata read boundary is under test; this is not an iPad E2E.
+function fictionalSalesDraftUI(){
+  const vm=require('node:vm');
+  const ids=new Map(),nodes=[],events=new Map(),notices=[],traffic=[];
+  let blockedSave=false,acceptLeave=true,revision=0;
+  function fakeNode(tag){
+    const members=[],attrs={},classes=new Set();
+    let id='';
+    const n={
+      tagName:String(tag).toUpperCase(),children:members,attrs,style:{},dataset:{},
+      value:'',textContent:'',innerHTML:'',className:'',disabled:false,
+      classList:{
+        add(c){classes.add(c);},remove(c){classes.delete(c);},
+        contains(c){return classes.has(c);},
+        toggle(c,force){const present=force===undefined?!classes.has(c):!!force;
+          if(present)classes.add(c);else classes.delete(c);return present;}
+      },
+      setAttribute(k,v){attrs[k]=String(v);},
+      append(...x){members.push(...x);},appendChild(x){members.push(x);return x;},
+      replaceChildren(...x){members.splice(0,members.length,...x);},
+      insertAdjacentElement(_position,x){return x;},
+      addEventListener(){},setCustomValidity(v){this.validationMessage=v;},
+      querySelector(selector){return fakeNode(selector);},
+      querySelectorAll(){return [];},
+      closest(){return fakeNode('article');},blur(){},focus(){},
+      matches(){return false;}
+    };
+    Object.defineProperty(n,'id',{get(){return id;},set(v){id=v;ids.set(v,n);}});
+    nodes.push(n);return n;
+  }
+  for(const key of ['nav4','main','scSave','scPrev','scNext','scCategory','scManage',
+    'scDirty','scPeriod','scCalendar','scAverages','scAnalysis','storeSel','storeMenu']){
+    const n=fakeNode('div');n.id=key;
+  }
+  const doc={
+    readyState:'loading',body:fakeNode('body'),
+    getElementById(id){return ids.get(id)||null;},
+    createElement:fakeNode,
+    querySelector(selector){if(selector==='#pageSalesCount input:invalid')return null;return null;},
+    querySelectorAll(){return [];},
+    addEventListener(kind,fn){events.set(kind,fn);}
+  };
+  const year=String(new Date().getFullYear());
+  const allStores={current:'a',stores:{a:{name:'架空店舗',years:[year],data:{},salesCounts:{}}}};
+  let raw=JSON.stringify(allStores);
+  const root={
+    document:doc,allStores,
+    addEventListener(){},dispatchEvent(){},fetch(url){traffic.push(url);throw Error('network forbidden');},
+    InsightStorage:{writeSnapshot(next){
+      if(blockedSave)throw Error('synthetic-save-rejected');
+      raw=JSON.stringify(next);revision++;
+    }},
+    InsightEvents:{list(){return [];}},
+    gotoNav(){},switchStore(){},
+  };
+  const context=vm.createContext({
+    window:root,globalThis:root,document:doc,allStores,store:allStores.stores.a,
+    WEEKDAYS:['日','月','火','水','木','金','土'],
+    currentNav:'dashboard',
+    confirm(){return acceptLeave;},
+    alert(value){notices.push(String(value));},
+    showToast(){},
+    console:{log(v){traffic.push(['log',v]);},warn(v){traffic.push(['warn',v]);},
+      error(v){traffic.push(['error',v]);}},
+    Date,Intl,Number,String,Boolean,Object,Array,Map,Set,JSON,Promise,
+    setTimeout(){return 1;},clearTimeout(){},
+    CustomEvent:class {constructor(name,detail){this.type=name;this.detail=detail;}}
+  });
+  const source=fs.readFileSync(path.join(__dirname,'..','insight_sales_count_v1.js'),'utf8');
+  vm.runInContext(source,context,{filename:'insight_sales_count_v1.js'});
+  const model=root.InsightSalesCount;
+  function status(){return model.getForecastDraftStatus();}
+  function inputs(kind){
+    const found=[];
+    function visit(n){
+      if(n&&n.oninput&&typeof n.oninput==='function'&&String(n.attrs['aria-label']||'').endsWith(kind))found.push(n);
+      for(const c of n.children||[])visit(c);
+    }
+    visit(doc.getElementById('scCalendar'));
+    return found;
+  }
+  return {
+    model,doc,root,allStores,status,inputs,init(){events.get('DOMContentLoaded')();},
+    save(){doc.getElementById('scSave').onclick();},
+    changeCategory(id){doc.getElementById('scCategory').onchange({target:{value:id}});},
+    set blockedSave(v){blockedSave=v;},
+    set acceptLeave(v){acceptLeave=v;},
+    get revision(){return revision;},get raw(){return raw;},traffic,notices
+  };
+}
+
+test('P4b: uninitialized reader is unknown, initialized reader only exposes frozen metadata',()=>{
+  const f=fictionalSalesDraftUI();
+  assert.deepEqual(JSON.parse(JSON.stringify(f.status())),{initialized:false,dirty:null,epoch:null});
+  f.init();
+  const s=f.status();
+  assert.equal(s.initialized,true);
+  assert.equal(s.dirty,false);
+  assert.equal(Number.isSafeInteger(s.epoch),true);
+  assert.equal(Object.isFrozen(s),true);
+  assert.deepEqual(Object.keys(s),['initialized','dirty','epoch']);
+  assert.equal(f.traffic.length,0);
+  assert.equal(f.notices.length,0);
+  assert.equal(f.model.getForecastDraftStatus().epoch,s.epoch);
+  assert.throws(()=>Object.defineProperty(s,'dirty',{value:true}));
+  assert.equal(f.status().dirty,false);
+});
+
+test('P4b: real delivery and waste inputs advance epoch independently of saved raw and revision',()=>{
+  const f=fictionalSalesDraftUI();f.init();
+  const a=f.inputs('納品数')[0],w=f.inputs('廃棄数')[0];
+  assert.ok(a&&w);
+  const initial=f.status(),before=JSON.stringify(f.allStores),raw=f.raw,rev=f.revision;
+  a.value='7';a.oninput();
+  assert.equal(f.status().dirty,true);
+  assert.ok(f.status().epoch>initial.epoch);
+  const first=f.status().epoch;
+  a.value='';a.oninput();
+  assert.ok(f.status().epoch>first);
+  const second=f.status().epoch;
+  a.value='0';a.oninput();
+  assert.ok(f.status().epoch>second);
+  const third=f.status().epoch;
+  a.value='invalid';a.oninput();
+  assert.ok(f.status().epoch>third);
+  const fourth=f.status().epoch;
+  w.value='0';w.oninput();
+  assert.ok(f.status().epoch>fourth);
+  const fifth=f.status().epoch;
+  w.value='not-a-number';w.oninput();
+  assert.ok(f.status().epoch>fifth);
+  assert.equal(JSON.stringify(f.allStores),before);
+  assert.equal(f.raw,raw);
+  assert.equal(f.revision,rev);
+  assert.deepEqual(Object.keys(f.status()),['initialized','dirty','epoch']);
+  assert.equal(f.traffic.length,0);
+});
+
+test('P4b: failed save remains dirty, successful save advances epoch and clears dirty',()=>{
+  const f=fictionalSalesDraftUI();f.init();
+  const n=f.inputs('販売数')[0];assert.ok(n);
+  n.value='19';n.oninput();
+  const before=f.status().epoch,raw=f.raw;
+  f.blockedSave=true;f.save();
+  assert.equal(f.status().dirty,true);
+  assert.ok(f.status().epoch>=before);
+  assert.equal(f.raw,raw);assert.equal(f.revision,0);
+  f.blockedSave=false;f.save();
+  assert.equal(f.status().dirty,false);
+  assert.ok(f.status().epoch>before);
+  assert.equal(f.revision,1);
+  const last=f.status().epoch;
+  f.model.reloadFromStore();
+  assert.equal(f.status().dirty,false);
+  assert.ok(f.status().epoch>last);
+});
+
+test('P4b: cancelled category change does not touch epoch, accepted change discards draft',()=>{
+  const f=fictionalSalesDraftUI();f.init();
+  const field=f.inputs('納品数')[0];field.value='23';field.oninput();
+  const s=f.status();
+  const id=f.allStores.salesCountManagement.categories.find(c=>c.id!=='cat_onigiri').id;
+  f.acceptLeave=false;f.changeCategory(id);
+  assert.equal(f.status().epoch,s.epoch);assert.equal(f.status().dirty,true);
+  f.acceptLeave=true;f.changeCategory(id);
+  assert.ok(f.status().epoch>s.epoch);assert.equal(f.status().dirty,false);
+  assert.equal(f.traffic.length,0);
+});
+
+test('P4b: status inquiry has no write, DOM change or raw-value disclosure',()=>{
+  const f=fictionalSalesDraftUI();f.init();
+  const input=f.inputs('納品数')[0];input.value='837926';input.oninput();
+  const before=f.status().epoch, saved=f.raw, original=JSON.stringify(f.allStores),events=f.traffic.length;
+  const status=f.status();
+  assert.equal(status.dirty,true);
+  assert.doesNotMatch(JSON.stringify(status),/837926|架空店舗|cat_onigiri/);
+  assert.equal(f.status().epoch,before);
+  assert.equal(f.raw,saved);
+  assert.equal(JSON.stringify(f.allStores),original);
+  assert.equal(f.traffic.length,events);
+});
+
+
+test('P4b R1-A: partially failed reload is unknown until a complete read and render',()=>{
+  const f=fictionalSalesDraftUI();f.init();
+  const start=f.status();assert.equal(start.initialized,true);
+  const p=f.model.getPeriod();
+  const date=p.year+'-'+String(p.month).padStart(2,'0')+'-01';
+  f.allStores.stores.a.salesCounts[date]=null;
+  assert.throws(()=>f.model.reloadFromStore(),error=>error&&error.name==='TypeError');
+  assert.deepEqual(JSON.parse(JSON.stringify(f.status())),{initialized:false,dirty:null,epoch:null});
+  delete f.allStores.stores.a.salesCounts[date];
+  assert.equal(f.model.reloadFromStore(),true);
+  const fresh=f.status();
+  assert.equal(fresh.initialized,true);
+  assert.equal(fresh.dirty,false);
+  assert.ok(fresh.epoch>start.epoch);
+});
+
+test('P4b R1-B: missing store invalidates previous clean state; recovery advances epoch',()=>{
+  const f=fictionalSalesDraftUI();f.init();
+  const before=f.status();assert.equal(before.dirty,false);
+  f.allStores.current='missing';
+  assert.equal(f.model.reloadFromStore(),false);
+  assert.deepEqual(JSON.parse(JSON.stringify(f.status())),{initialized:false,dirty:null,epoch:null});
+  f.allStores.current='a';
+  assert.equal(f.model.reloadFromStore(),true);
+  const restored=f.status();
+  assert.equal(restored.initialized,true);assert.equal(restored.dirty,false);
+  assert.ok(restored.epoch>before.epoch);
+});
+
+test('P4b R1-C: failed render after read cannot restore a stale clean report',()=>{
+  const f=fictionalSalesDraftUI();f.init();
+  const start=f.status();assert.equal(start.initialized,true);
+  const get=f.doc.getElementById.bind(f.doc);
+  f.doc.getElementById=(id)=>id==='scCalendar'?null:get(id);
+  assert.throws(()=>f.model.reloadFromStore(),error=>error&&error.name==='TypeError');
+  assert.deepEqual(JSON.parse(JSON.stringify(f.status())),{initialized:false,dirty:null,epoch:null});
+  f.doc.getElementById=get;
+  assert.equal(f.model.reloadFromStore(),true);
+  assert.ok(f.status().epoch>start.epoch);
+  assert.equal(f.status().initialized,true);
+});
