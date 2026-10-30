@@ -275,3 +275,47 @@ test('FICTIONAL stale tab cannot use metadata API to overwrite newer tab snapsho
   assert.equal(tabB.window.InsightStorage.readSnapshot().stores.a.value,777);
   assert.equal(tabB.calls.length,0);
 });
+
+test('FICTIONAL normal transaction postcommit exception preserves saved bytes and blocks stale followup',()=>{
+  const baseline=JSON.stringify({schemaVersion:1,current:'a',stores:{a:{value:111}}});
+  const {window,values,calls}=setup({initial:{insight_v11:baseline}});
+  const storage=window.InsightStorage;
+  const oldLive=storage.readSnapshot();
+  const nativeSet=window.localStorage.setItem;
+  let failAfterFirstSnapshotWrite=true;
+  window.localStorage.setItem=function(key,value){
+    nativeSet(key,value);
+    if(key==='insight_v11'&&failAfterFirstSnapshotWrite){
+      failAfterFirstSnapshotWrite=false;
+      throw new Error('FICTIONAL postcommit setItem exception');
+    }
+  };
+  let applied=false;
+  assert.throws(()=>storage.transaction(
+    oldLive,draft=>{draft.stores.a.value=777;},null,()=>{applied=true;}
+  ),/FICTIONAL postcommit setItem exception/);
+  assert.equal(applied,false,'failed transaction must not apply new data to live UI');
+  assert.equal(oldLive.stores.a.value,111,'transaction must not mutate old live data');
+  assert.equal(calls.length,1,'one storage write occurred despite the exception');
+  const committedRaw=values.insight_v11;
+  assert.equal(JSON.parse(committedRaw).stores.a.value,777);
+  assert.equal(storage.readSnapshot().stores.a.value,777);
+  assert.equal(storage.reportState().conflict,true);
+  assert.equal(storage.reportState().held,true);
+  assert.equal(storage.snapshotWritesHeld(),false,'report HELD is not restore write hold');
+  // A read of the newer bytes cannot silently acknowledge the write as safe.
+  assert.throws(()=>storage.transaction(oldLive,draft=>{
+    draft.stores.a.value=999;
+  }),error=>error.name==='InsightStorageConflictError');
+  assert.equal(calls.length,1,'stale retry must not write over already-persisted data');
+  assert.equal(values.insight_v11,committedRaw);
+  // A new document's Storage instance loads the persisted value as its baseline.
+  const reloaded=setup({sharedValues:values});
+  const saved=reloaded.window.InsightStorage.readSnapshot();
+  assert.equal(saved.stores.a.value,777);
+  assert.equal(reloaded.window.InsightStorage.reportState().conflict,false);
+  assert.equal(reloaded.window.InsightStorage.snapshotWritesHeld(),false);
+  reloaded.window.InsightStorage.transaction(saved,draft=>{draft.stores.a.value=888;});
+  assert.equal(JSON.parse(values.insight_v11).stores.a.value,888);
+  assert.equal(calls.length,1,'old document performed no additional writes');
+});
