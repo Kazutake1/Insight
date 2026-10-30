@@ -144,7 +144,7 @@ test('FICTIONAL postcommit exception is propagated unchanged and leaves HELD',as
   const events=await page.evaluate(()=>window.__quickFictional);
   expect(out.local).toEqual(events.localEvents);
   expect(out.global).toEqual(events.globalEvents);
-  expect(out.alerts.join(' ')).toContain('データを保存できませんでした。');
+  expect(out.alerts.join(' ')).toContain('保存結果を確認できないため');
 });
 
 test('FICTIONAL missing observer does not stop the original Quick clear',async({page})=>{

@@ -87,7 +87,7 @@ test('FICTIONAL postcommit budget exception preserves existing error and HELD',a
   expect(outcome.status.activeCount).toBe(0);
   expect(outcome.total).toBe(7200);
   expect(outcome.modalOpen).toBe(true);
-  expect(outcome.alerts.join(' ')).toContain('データを保存できませんでした。');
+  expect(outcome.alerts.join(' ')).toContain('保存結果を確認できないため');
 });
 
 test('FICTIONAL observer missing never prevents existing budget save',async({page})=>{

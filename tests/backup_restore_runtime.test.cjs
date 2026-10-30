@@ -35,7 +35,8 @@ function fixture(options={}){
   const original=snapshot(100);
   let persisted=clone(original),writeCount=0,readFaultOnce=!!options.corruptAfterWrite;
   const downloads=[],alerts=[],toasts=[],samples=[],readers=[];
-  let confirmation=options.confirm!==false;
+  let confirmation=options.confirm!==false,confirmationCount=0;
+  let writeHeld=false;
   let failWriteOnce=!!options.quotaOnce;
   const body={
     appendChild(node){node.parentNode=body;}
@@ -57,10 +58,12 @@ function fixture(options={}){
     InsightStorage:{
       CURRENT_SCHEMA_VERSION:1,
       migrateSnapshot(value){const valueCopy=clone(value);valueCopy.schemaVersion=1;return valueCopy;},
-      serialize(value){return JSON.stringify(value);},
+      serialize(value){return options.indistinguishableSnapshots?'FICTIONAL identical serialized snapshots':JSON.stringify(value);},
       readSnapshot(){
+        if(options.readbackUnavailableAfterCommit&&writeCount>0)throw Error('FICTIONAL readback unavailable');
         if(window.InsightRestoreOperationObserverV0)samples.push({point:'readback',...window.InsightRestoreOperationObserverV0.getStatus()});
         const result=clone(persisted);
+        if(options.unexpectedReadbackAfterCommit&&writeCount>0){result.stores.a.data['2026']['1月'][0].売上=4242;}
         if(readFaultOnce&&writeCount>0){
           readFaultOnce=false;
           result.stores.a.data['2026']['1月'][0].売上+=1;
@@ -68,6 +71,7 @@ function fixture(options={}){
         return result;
       },
       writeSnapshot(value){
+        if(writeHeld){const err=new Error('FICTIONAL restore hold');err.name='InsightStorageRestoreHoldError';throw err;}
         if(window.InsightRestoreOperationObserverV0)samples.push({point:'before-write',...window.InsightRestoreOperationObserverV0.getStatus()});
         if(options.rollbackFailure&&writeCount===1)throw new Error('FICTIONAL rollback failed');
         if(failWriteOnce){
@@ -77,11 +81,13 @@ function fixture(options={}){
           throw error;
         }
         writeCount++;
-        persisted=clone(value);
+        persisted=options.revertAfterWrite&&writeCount===1?clone(original):clone(value);
         if(window.InsightRestoreOperationObserverV0)samples.push({point:'after-write',...window.InsightRestoreOperationObserverV0.getStatus()});
         if(options.postcommitThrow&&writeCount===1)throw new Error('FICTIONAL postcommit write throw');
       },
-      writeMetadata(){return true;}
+      writeMetadata(){return true;},
+      holdSnapshotWrites(){writeHeld=true;return true;},
+      snapshotWritesHeld(){return writeHeld;}
     },
     InsightDataHealth:{
       check(){return {status:'ok',counts:{errors:0,warnings:0},issues:[]};}
@@ -97,14 +103,14 @@ function fixture(options={}){
     URL:{createObjectURL(){return 'blob:fake';},revokeObjectURL(){}},
     Blob,Date,Number,Set,Map,String,Object,Array,Math,JSON,Promise,
     setTimeout(){return 1;},
-    confirm(){return confirmation;},
+    confirm(){confirmationCount++;if(typeof options.duringConfirm==='function')options.duringConfirm({ctx,readers});return confirmation;},
     alert(message){alerts.push(String(message));},
     console:{warn(){},log(){}},
     FileReader:class FileReader{
       constructor(){readers.push(this);}
       readAsText(file){
         this._file=file;
-        if(options.readThrows)throw new Error('FICTIONAL readAsText failed');
+        if(options.readThrows||(options.readThrowsOnce&&readers.length===1))throw new Error('FICTIONAL readAsText failed');
         if(!options.deferReader)this.onload({target:{result:file.contents}});
       }
     },
@@ -128,6 +134,7 @@ function fixture(options={}){
     repeatReader(){const r=readers.at(-1);r.onload({target:{result:r._file.contents}});},
     get persisted(){return persisted;},
     get writeCount(){return writeCount;},
+    get confirmationCount(){return confirmationCount;},
     setConfirmation(value){confirmation=!!value;}
   };
 }
@@ -268,8 +275,10 @@ test('BR08 FICTIONAL duplicate FileReader onload is not silently accepted as cle
   f.restore(snapshot(750));
   f.flushReader();
   assert.equal(f.window.InsightRestoreOperationObserverV0.getStatus().state,'IDLE_OBSERVED');
-  f.repeatReader(); // Existing business may repeat; monitor must conservatively HOLD.
-  assert.equal(f.writeCount,2);
+  f.repeatReader(); // FICTIONAL duplicate completion is held, never committed twice.
+  assert.equal(f.writeCount,1);
+  assert.equal(f.downloads.length,1);
+  assert.equal(f.persisted.stores.a.data['2026']['1月'][0].売上,750);
   assert.equal(f.window.InsightRestoreOperationObserverV0.getStatus().state,'HELD');
 });
 test('BR09 FICTIONAL observer factory failure never blocks the original write',()=>{
@@ -300,4 +309,296 @@ test('BR12 FICTIONAL reader abort leaves existing data untouched and conservativ
   assert.equal(f.writeCount,0);
   assert.deepEqual(f.persisted,f.original);
   assert.equal(f.window.InsightRestoreOperationObserverV0.getStatus().state,'HELD');
+});
+
+
+test('BR13 FICTIONAL saved-after-throw identifies target data without falsely claiming unchanged',()=>{
+  const f=fixture({postcommitThrow:true});
+  f.restore(snapshot(750));
+  assert.equal(f.writeCount,1);
+  assert.equal(f.persisted.stores.a.data['2026']['1月'][0].売上,750);
+  assert.equal(f.ctx.allStores.stores.a.data['2026']['1月'][0].売上,100);
+  assert.equal(f.alerts.length,1);
+  assert.match(f.alerts[0],/保存領域に復元対象と一致するデータ/);
+  assert.match(f.alerts[0],/整合性確認・画面更新は完了していません/);
+  assert.doesNotMatch(f.alerts[0],/現在のデータは変更されていません/);
+  assert.equal(f.window.InsightRestoreOperationObserverV0.getStatus().state,'HELD');
+});
+test('BR14 FICTIONAL unreadable postthrow state is uncertain and does not retry writes',()=>{
+  const f=fixture({postcommitThrow:true,readbackUnavailableAfterCommit:true});
+  f.restore(snapshot(750));
+  assert.equal(f.writeCount,1);
+  assert.equal(f.persisted.stores.a.data['2026']['1月'][0].売上,750);
+  assert.match(f.alerts.join(' '),/現在の保存状態を確認できませんでした/);
+  assert.doesNotMatch(f.alerts.join(' '),/現在のデータは変更されていません/);
+  assert.equal(f.window.InsightRestoreOperationObserverV0.getStatus().state,'HELD');
+});
+test('BR15 FICTIONAL prewrite quota error retains previous-data warning and never retries',()=>{
+  const f=fixture({quotaOnce:true});
+  f.restore(snapshot(750));
+  assert.equal(f.writeCount,0);
+  assert.deepEqual(f.persisted,f.original);
+  assert.match(f.alerts.join(' '),/現在のデータは変更されていません/);
+  assert.equal(f.window.InsightRestoreOperationObserverV0.getStatus().state,'HELD');
+});
+test('BR16 FICTIONAL third-state readback does not classify an unknown writer as target',()=>{
+  const f=fixture({postcommitThrow:true,unexpectedReadbackAfterCommit:true});
+  f.restore(snapshot(750));
+  assert.equal(f.writeCount,1);
+  assert.match(f.alerts.join(' '),/現在の保存状態を確認できませんでした/);
+  assert.doesNotMatch(f.alerts.join(' '),/現在のデータは変更されていません/);
+  assert.equal(f.window.InsightRestoreOperationObserverV0.getStatus().state,'HELD');
+});
+test('BR17 FICTIONAL indistinguishable previous and target serialized values stay uncertain',()=>{
+  const f=fixture({postcommitThrow:true,indistinguishableSnapshots:true});
+  f.restore(snapshot(100));
+  assert.equal(f.writeCount,1);
+  assert.match(f.alerts.join(' '),/現在の保存状態を確認できませんでした/);
+  assert.equal(f.window.InsightRestoreOperationObserverV0.getStatus().state,'HELD');
+});
+
+test('BR18 FICTIONAL postwrite throw latches hold against later stale-live writer',()=>{
+  const f=fixture({postcommitThrow:true});
+  f.restore(snapshot(750));
+  assert.equal(f.window.InsightStorage.snapshotWritesHeld(),true);
+  assert.equal(f.ctx.allStores.stores.a.data['2026']['1月'][0].売上,100);
+  assert.equal(f.persisted.stores.a.data['2026']['1月'][0].売上,750);
+  assert.throws(()=>f.window.InsightStorage.writeSnapshot(f.ctx.allStores),error=>error.name==='InsightStorageRestoreHoldError');
+  assert.equal(f.writeCount,1);
+  assert.equal(f.persisted.stores.a.data['2026']['1月'][0].売上,750);
+});
+test('BR19 FICTIONAL rollback failure holds writes and guides manual reload before recovery',()=>{
+  const f=fixture({corruptAfterWrite:true,rollbackFailure:true});
+  f.restore(snapshot(750));
+  assert.equal(f.window.InsightStorage.snapshotWritesHeld(),true);
+  assert.throws(()=>f.window.InsightStorage.writeSnapshot(f.ctx.allStores),/FICTIONAL restore hold/);
+  assert.equal(f.writeCount,1);
+  assert.equal(f.alerts.length,1);
+  const notice=f.alerts[0];
+  const steps=[
+    'Insight_pre_restore_...json を保管してください',
+    '追加の編集・保存',
+    'この画面での再復元は行わないでください',
+    'Insightを手動で再読み込み',
+    '保存内容を確認してください',
+    'その後、必要な場合のみ保管したバックアップから復元してください'
+  ];
+  const positions=steps.map(step=>notice.indexOf(step));
+  assert.ok(positions.every(position=>position>=0),'復旧案内の必須手順が欠落しています');
+  assert.ok(positions.every((position,i)=>i===0||position>positions[i-1]),'復旧案内の順序が不正です');
+  assert.doesNotMatch(notice,/json を使って手動で復元してください/);
+});
+test('BR20 FICTIONAL uncertain postthrow latches hold without retry',()=>{
+  const f=fixture({postcommitThrow:true,readbackUnavailableAfterCommit:true});
+  f.restore(snapshot(750));
+  assert.equal(f.window.InsightStorage.snapshotWritesHeld(),true);
+  assert.equal(f.writeCount,1);
+});
+test('BR21 FICTIONAL previous-observed, prewrite quota and successful rollback do not latch',()=>{
+  for(const options of [{postcommitThrow:true,revertAfterWrite:true},{quotaOnce:true},{corruptAfterWrite:true}]){
+    const f=fixture(options);
+    f.restore(snapshot(750));
+    assert.equal(f.window.InsightStorage.snapshotWritesHeld(),false,JSON.stringify(options));
+  }
+});
+test('BR22 FICTIONAL successful restore, UI error and duplicate onload do not latch',()=>{
+  for(const options of [{},{uiFailure:true},{deferReader:true}]){
+    const f=fixture(options);
+    f.restore(snapshot(750));
+    if(options.deferReader){f.flushReader();f.repeatReader();assert.equal(f.writeCount,1);}
+    assert.equal(f.window.InsightStorage.snapshotWritesHeld(),false,JSON.stringify(options));
+  }
+});
+
+test('BR23 FICTIONAL overlapping restore requests reject the second without backup or writer',()=>{
+  const f=fixture({deferReader:true});
+  const first=f.restore(snapshot(750));
+  const rejected=f.restore(snapshot(800));
+  assert.equal(first.value,'selected');
+  assert.equal(rejected.value,'');
+  assert.equal(f.readers.length,1);
+  assert.equal(f.writeCount,0);
+  assert.equal(f.downloads.length,0);
+  assert.match(f.alerts.join(' '),/別のバックアップ復元処理が進行中/);
+  f.flushReader();
+  assert.equal(f.writeCount,1);
+  assert.equal(f.downloads.length,1);
+  assert.equal(f.persisted.stores.a.data['2026']['1月'][0].売上,750);
+  f.restore(snapshot(850)); // Reader ownership is released after completion.
+  assert.equal(f.readers.length,2);
+  f.flushReader();
+  assert.equal(f.writeCount,2);
+  assert.equal(f.persisted.stores.a.data['2026']['1月'][0].売上,850);
+  assert.equal(f.window.InsightStorage.snapshotWritesHeld(),false);
+});
+test('BR24 FICTIONAL cancelled or invalid restore releases the reader for a normal retry',()=>{
+  const cancelled=fixture({confirm:false});
+  cancelled.restore(snapshot(750));
+  assert.equal(cancelled.writeCount,0);
+  cancelled.setConfirmation(true);
+  cancelled.restore(snapshot(850));
+  assert.equal(cancelled.writeCount,1);
+  assert.equal(cancelled.persisted.stores.a.data['2026']['1月'][0].売上,850);
+  const malformed=fixture();
+  malformed.restore('{FICTIONAL invalid JSON');
+  assert.equal(malformed.writeCount,0);
+  malformed.restore(snapshot(850));
+  assert.equal(malformed.writeCount,1);
+  assert.equal(malformed.persisted.stores.a.data['2026']['1月'][0].売上,850);
+});
+test('BR25 FICTIONAL reader error and abort release ownership without writes',()=>{
+  for(const failure of ['onerror','onabort']){
+    const f=fixture({deferReader:true});
+    f.restore(snapshot(750));
+    f.readers[0][failure]();
+    assert.equal(f.writeCount,0);
+    f.restore(snapshot(850));
+    assert.equal(f.readers.length,2,failure);
+    f.flushReader();
+    assert.equal(f.writeCount,1);
+    assert.equal(f.persisted.stores.a.data['2026']['1月'][0].売上,850);
+  }
+});
+test('BR26 FICTIONAL late duplicate from old reader cannot release a newer pending reader',()=>{
+  const f=fixture({deferReader:true});
+  f.restore(snapshot(750));
+  f.flushReader();
+  f.restore(snapshot(800));
+  f.readers[0].onload({target:{result:f.readers[0]._file.contents}});
+  assert.equal(f.writeCount,1);
+  f.restore(snapshot(900)); // Must still be refused while reader 2 owns the path.
+  assert.equal(f.readers.length,2);
+  f.flushReader();
+  assert.equal(f.writeCount,2);
+  assert.equal(f.persisted.stores.a.data['2026']['1月'][0].売上,800);
+  assert.equal(f.downloads.length,2);
+  assert.equal(f.window.InsightRestoreOperationObserverV0.getStatus().state,'HELD');
+});
+
+test('BR27 FICTIONAL late first onload after error or abort cannot overwrite a newer pending restore',()=>{
+  for(const failure of ['onerror','onabort']){
+    const f=fixture({deferReader:true});
+    f.restore(snapshot(750));
+    const a=f.readers[0];
+    a[failure]();
+    f.restore(snapshot(850));
+    const notices=f.confirmationCount;
+    a.onload({target:{result:a._file.contents}});
+    assert.equal(f.writeCount,0,failure);
+    assert.equal(f.downloads.length,0,failure);
+    assert.equal(f.confirmationCount,notices,failure);
+    f.restore(snapshot(950)); // B must still own the operation.
+    assert.equal(f.readers.length,2,failure);
+    f.flushReader();
+    assert.equal(f.writeCount,1,failure);
+    assert.equal(f.downloads.length,1,failure);
+    assert.equal(f.persisted.stores.a.data['2026']['1月'][0].売上,850,failure);
+    const confirmations=f.confirmationCount;
+    a.onload({target:{result:a._file.contents}});
+    assert.equal(f.writeCount,1,failure);
+    assert.equal(f.confirmationCount,confirmations,failure);
+    assert.equal(f.downloads.length,1,failure);
+  }
+});
+test('BR28 FICTIONAL readAsText sync exception permanently rejects its late first load',()=>{
+  const f=fixture({deferReader:true,readThrowsOnce:true});
+  assert.throws(()=>f.restore(snapshot(750)),/FICTIONAL readAsText failed/);
+  const a=f.readers[0];
+  f.restore(snapshot(850));
+  a.onload({target:{result:a._file.contents}});
+  assert.equal(f.writeCount,0);
+  assert.equal(f.confirmationCount,0);
+  assert.equal(f.downloads.length,0);
+  f.flushReader();
+  assert.equal(f.writeCount,1);
+  assert.equal(f.confirmationCount,1);
+  assert.equal(f.persisted.stores.a.data['2026']['1月'][0].売上,850);
+  assert.equal(f.downloads.length,1);
+});
+test('BR29 FICTIONAL late reader error does not cancel the next reader',()=>{
+  const f=fixture({deferReader:true});
+  f.restore(snapshot(750));
+  const a=f.readers[0];
+  a.onabort();
+  f.restore(snapshot(850));
+  a.onerror();
+  f.restore(snapshot(950)); // Still refused; B has not finished.
+  assert.equal(f.readers.length,2);
+  assert.equal(f.writeCount,0);
+  f.flushReader();
+  assert.equal(f.writeCount,1);
+  assert.equal(f.persisted.stores.a.data['2026']['1月'][0].売上,850);
+});
+
+test('BR30 FICTIONAL first late load after newer reader already completed never restores stale snapshot',()=>{
+  for(const termination of ['onerror','onabort','readAsText exception']){
+    const options={deferReader:true};
+    if(termination==='readAsText exception')options.readThrowsOnce=true;
+    const f=fixture(options);
+    if(termination==='readAsText exception'){
+      assert.throws(()=>f.restore(snapshot(750)),/FICTIONAL readAsText failed/);
+    }else{
+      f.restore(snapshot(750));
+      f.readers[0][termination]();
+    }
+    const staleReader=f.readers[0];
+    // Reader B has already completed its first (and only) restoration before
+    // A receives the first ever delayed onload callback.
+    f.restore(snapshot(850));
+    f.flushReader();
+    assert.equal(f.persisted.stores.a.data['2026']['1月'][0].売上,850,termination);
+    assert.equal(f.writeCount,1,termination);
+    assert.equal(f.confirmationCount,1,termination);
+    assert.equal(f.downloads.length,1,termination);
+    staleReader.onload({target:{result:staleReader._file.contents}});
+    assert.equal(f.writeCount,1,termination);
+    assert.equal(f.confirmationCount,1,termination);
+    assert.equal(f.downloads.length,1,termination);
+    assert.equal(f.persisted.stores.a.data['2026']['1月'][0].売上,850,termination);
+    assert.equal(f.ctx.allStores.stores.a.data['2026']['1月'][0].売上,850,termination);
+    // A's rejected first load must not prevent a fresh Reader C from saving.
+    f.restore(snapshot(900));
+    f.flushReader();
+    assert.equal(f.readers.length,3,termination);
+    assert.equal(f.writeCount,2,termination);
+    assert.equal(f.confirmationCount,2,termination);
+    assert.equal(f.downloads.length,2,termination);
+    assert.equal(f.persisted.stores.a.data['2026']['1月'][0].売上,900,termination);
+    assert.equal(f.window.InsightStorage.snapshotWritesHeld(),false,termination);
+  }
+});
+
+test('BR31 FICTIONAL synchronous reader error or abort during accepted onload does not release active restore',()=>{
+  for(const signal of ['onerror','onabort']){
+    let injected=false;
+    const captured=[];
+    const f=fixture({duringConfirm({ctx,readers}){
+      if(injected)return;
+      injected=true;
+      const a=readers[0];
+      a[signal](); // FICTIONAL event synchronously inside onload/confirm.
+      const nested={value:'selected',files:[{name:'FICTIONAL_nested.json',size:100,contents:JSON.stringify(snapshot(900))}]};
+      ctx.restoreData({target:nested}); // Must be rejected while first onload still owns restore.
+      captured.push({value:nested.value,readers:readers.length});
+    }});
+    f.restore(snapshot(750));
+    assert.equal(injected,true,signal);
+    assert.equal(captured.length,1,signal);
+    assert.deepEqual(captured[0],{value:'',readers:1},signal);
+    assert.equal(f.readers.length,1,signal);
+    assert.equal(f.writeCount,1,signal); // Already accepted onload remains synchronous.
+    assert.equal(f.confirmationCount,1,signal);
+    assert.equal(f.downloads.length,1,signal);
+    assert.equal(f.persisted.stores.a.data['2026']['1月'][0].売上,750,signal);
+    assert.equal(f.ctx.allStores.stores.a.data['2026']['1月'][0].売上,750,signal);
+    assert.equal(f.window.InsightRestoreOperationObserverV0.getStatus().state,'HELD',signal);
+    assert.equal(f.window.InsightStorage.snapshotWritesHeld(),false,signal);
+    assert.match(f.alerts.join(' '),/別のバックアップ復元処理が進行中/,signal);
+    assert.doesNotMatch(f.alerts.join(' '),/ファイルを読み込めませんでした/,signal);
+    f.restore(snapshot(850)); // Reader ownership released after original onload finishes.
+    assert.equal(f.readers.length,2,signal);
+    assert.equal(f.writeCount,2,signal);
+    assert.equal(f.persisted.stores.a.data['2026']['1月'][0].売上,850,signal);
+    assert.equal(f.window.InsightStorage.snapshotWritesHeld(),false,signal);
+  }
 });

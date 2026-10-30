@@ -88,7 +88,7 @@ test('FICTIONAL postcommit exception keeps original throw and HELD',async({page}
   expect(outcome.status.activeCount).toBe(0);
   expect(outcome.savedCustomers).toBe(0);
   expect(outcome.savedSales).toBe(42);
-  expect(outcome.alerts.join(' ')).toContain('データを保存できませんでした。');
+  expect(outcome.alerts.join(' ')).toContain('保存結果を確認できないため');
 });
 
 test('FICTIONAL missing observer still clears month, reports UNAVAILABLE',async({page})=>{

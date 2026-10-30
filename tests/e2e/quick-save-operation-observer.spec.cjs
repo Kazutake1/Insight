@@ -167,7 +167,7 @@ test('FICTIONAL second core write failure preserves original persist guard propa
   expect(saved.writes).toBe(2);
   expect(saved.row.売上).toBe(123);
   expect(saved.row.storeMemo).toBe('FICTIONAL remove memo');
-  expect(saved.alerts.join(' ')).toContain('データを保存できませんでした。');
+  expect(saved.alerts.join(' ')).toContain('保存結果を確認できないため');
 });
 
 test('FICTIONAL invalid temperature cancels before any save observation or persistence',async({page})=>{

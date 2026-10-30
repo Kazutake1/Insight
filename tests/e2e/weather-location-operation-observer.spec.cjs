@@ -85,7 +85,7 @@ test('FICTIONAL postcommit save error yields HELD and preserves existing alert h
   expect(result.persisted).toBe(35.25);
   // Existing InsightPersistGuard intentionally converts the original exception
   // to its generic user-facing storage error; this observer must not alter it.
-  expect(result.alerts.join(' ')).toContain('データを保存できませんでした。');
+  expect(result.alerts.join(' ')).toContain('保存結果を確認できないため');
   expect(result.alerts.join(' ')).toContain('Insight data save failed');
 });
 

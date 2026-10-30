@@ -74,6 +74,7 @@ test('FICTIONAL native FileReader completes confirmed write and sync UI observat
   expect(s.samples.every(x=>x.state==='ACTIVE'&&x.activeCount===1)).toBe(true);
   expect(s.inputValue).toBe('');
   expect(s.alerts).toEqual([]);
+  expect(await page.evaluate(()=>InsightStorage.snapshotWritesHeld())).toBe(false);
 });
 test('FICTIONAL user cancellation does not begin restore write observation',async({page})=>{
   const f=await setup(page);
@@ -125,4 +126,793 @@ test('FICTIONAL missing observer script never blocks original native restore',as
   const s=await snapshot(page,f);
   expect([s.saved,s.live,s.writes]).toEqual([777,777,1]);
   expect(s.status.state).toBe('UNAVAILABLE');
+});
+
+
+test('FICTIONAL postwrite throw reports saved target without retry or false unchanged warning',async({page})=>{
+  const f=await setup(page);
+  await page.evaluate(()=>{
+    const original=InsightStorage.writeSnapshot;
+    InsightStorage.writeSnapshot=function(){
+      const result=original.apply(this,arguments);
+      if(window.__restoreWrites===1)throw Error('FICTIONAL postwrite throw');
+      return result;
+    };
+  });
+  await upload(page,f.json);
+  await endState(page,1,'HELD');
+  const s=await snapshot(page,f);
+  expect([s.saved,s.live,s.writes]).toEqual([777,111,1]);
+  expect(s.alerts.join(' ')).toContain('保存領域に復元対象と一致するデータ');
+  expect(s.alerts.join(' ')).not.toContain('現在のデータは変更されていません');
+  expect(s.samples.every(x=>x.state==='ACTIVE')).toBe(true);
+  expect(await page.evaluate(()=>InsightStorage.snapshotWritesHeld())).toBe(true);
+  const after=await page.evaluate(()=>{
+    const before=localStorage.getItem('insight_v11');
+    const errors=[];
+    for(const action of [
+      ()=>InsightStorage.persistCurrent(allStores),
+      ()=>InsightStorage.writeSnapshot(allStores),
+      ()=>InsightStorage.transaction(allStores,draft=>{draft.stores[draft.current].name='FICTIONAL overwrite';}),
+      ()=>InsightStorage.writeMetadata('insight_v11','FICTIONAL overwrite')
+    ]){
+      try{action();errors.push('not blocked');}catch(error){errors.push(error.name);}
+    }
+    InsightStorage.writeMetadata('insight_last_backup','FICTIONAL allowed');
+    return {same:localStorage.getItem('insight_v11')===before,errors,metadata:localStorage.getItem('insight_last_backup')};
+  });
+  expect(after.same).toBe(true);
+  expect(after.errors).toEqual(Array(4).fill('InsightStorageRestoreHoldError'));
+  expect(after.metadata).toBe('FICTIONAL allowed');
+});
+
+test('FICTIONAL duplicate native FileReader completion is observed but cannot commit twice',async({page})=>{
+  const f=await setup(page);
+  await page.evaluate(()=>{
+    const NativeReader=window.FileReader;
+    window.FileReader=class extends NativeReader{
+      readAsText(file){
+        this.addEventListener('load',()=>{
+          queueMicrotask(()=>{if(typeof this.onload==='function')this.onload({target:this});});
+        },{once:true});
+        return super.readAsText(file);
+      }
+    };
+  });
+  await upload(page,f.json);
+  await page.waitForFunction(()=>window.__restoreWrites===1&&
+    InsightRestoreOperationObserverV0.getStatus().state==='HELD');
+  const s=await snapshot(page,f);
+  expect([s.saved,s.live,s.writes]).toEqual([777,777,1]);
+  expect(s.inputValue).toBe('');
+  expect(s.alerts).toEqual([]);
+  expect(await page.evaluate(()=>InsightStorage.snapshotWritesHeld())).toBe(false);
+});
+test('FICTIONAL overlapping native restore readers allow first completion and later retry',async({page})=>{
+  const f=await setup(page);
+  await page.evaluate(()=>{
+    window.__pendingRestoreReads=[];
+    window.__resumeRestoreReads=false;
+    const NativeReader=window.FileReader;
+    window.FileReader=class extends NativeReader{
+      readAsText(file){
+        if(!window.__resumeRestoreReads){
+          window.__pendingRestoreReads.push({reader:this,file});
+          return;
+        }
+        return super.readAsText(file);
+      }
+    };
+  });
+  await upload(page,f.json);
+  await page.waitForFunction(()=>window.__pendingRestoreReads.length===1);
+  const blocked=await page.evaluate(json=>{
+    const event={target:{files:[new File([json],'FICTIONAL_overlap.json',{type:'application/json'})],value:'selected'}};
+    restoreData(event);
+    return {value:event.target.value,pending:window.__pendingRestoreReads.length,writes:window.__restoreWrites};
+  },f.json);
+  expect(blocked).toEqual({value:'',pending:1,writes:0});
+  await page.evaluate(()=>{
+    window.__resumeRestoreReads=true;
+    const pending=window.__pendingRestoreReads[0];
+    pending.reader.readAsText(pending.file);
+  });
+  await page.waitForFunction(()=>window.__restoreWrites===1&&document.getElementById('restoreFile').value==='');
+  const first=await snapshot(page,f);
+  expect([first.saved,first.live,first.writes]).toEqual([777,777,1]);
+  expect(first.alerts.join(' ')).toContain('別のバックアップ復元処理が進行中');
+  expect(first.status.state).toBe('HELD');
+  await page.evaluate(json=>{
+    const event={target:{files:[new File([json],'FICTIONAL_retry.json',{type:'application/json'})],value:'selected'}};
+    restoreData(event);
+  },f.json);
+  await page.waitForFunction(()=>window.__restoreWrites===2);
+  const second=await snapshot(page,f);
+  expect([second.saved,second.live,second.writes]).toEqual([777,777,2]);
+});
+
+test('FICTIONAL stale first load after abort cannot overwrite a newer native restore',async({page})=>{
+  const f=await setup(page);
+  await page.evaluate(()=>{
+    window.__fictionalReaders=[];
+    const NativeReader=window.FileReader;
+    window.FileReader=class extends NativeReader{
+      readAsText(file){window.__fictionalReaders.push({reader:this,file});}
+    };
+  });
+  await upload(page,f.json);
+  await page.waitForFunction(()=>window.__fictionalReaders.length===1);
+  const blocked=await page.evaluate(json=>{
+    const a=window.__fictionalReaders[0].reader;
+    a.onabort(); // FICTIONAL abort before the first load callback.
+    const target=JSON.parse(json);
+    const id=target.current,year=String(target.stores[id].years.at(-1));
+    target.stores[id].data[year]['1月'][0].売上=850;
+    window.__fictionalBJson=JSON.stringify(target);
+    const input={value:'selected',files:[new File([window.__fictionalBJson],'FICTIONAL_second.json',{type:'application/json'})]};
+    restoreData({target:input});
+    a.onload({target:{result:json}}); // The first A load comes after B starts.
+    const forbidden={value:'selected',files:[new File([json],'FICTIONAL_third.json',{type:'application/json'})]};
+    restoreData({target:forbidden});
+    return {readers:window.__fictionalReaders.length,writes:window.__restoreWrites,
+      secondInput:input.value,thirdInput:forbidden.value};
+  },f.json);
+  expect(blocked).toEqual({readers:2,writes:0,secondInput:'selected',thirdInput:''});
+  await page.evaluate(()=>{
+    window.__fictionalReaders[1].reader.onload({target:{result:window.__fictionalBJson}});
+  });
+  await page.waitForFunction(()=>window.__restoreWrites===1);
+  const state=await snapshot(page,f);
+  expect([state.saved,state.live,state.writes]).toEqual([850,850,1]);
+  expect(state.status.state).toBe('HELD');
+  expect(state.alerts.join(' ')).toContain('別のバックアップ復元処理が進行中');
+  expect(await page.evaluate(()=>InsightStorage.snapshotWritesHeld())).toBe(false);
+});
+
+for(const scenario of ['postwrite-throw','committed-ui-error']){
+  test(`FICTIONAL manual reload recovers saved snapshot after ${scenario}`,async({page})=>{
+    const f=await setup(page);
+    if(scenario==='postwrite-throw'){
+      await page.evaluate(()=>{
+        const original=InsightStorage.writeSnapshot;
+        InsightStorage.writeSnapshot=function(){
+          const result=original.apply(this,arguments);
+          if(window.__restoreWrites===1)throw Error('FICTIONAL postwrite throw before live commit');
+          return result;
+        };
+      });
+    }else{
+      await page.evaluate(()=>{
+        InsightDataHealth.refresh=function(){throw Error('FICTIONAL UI error after save');};
+      });
+    }
+    await upload(page,f.json);
+    await endState(page,1,'HELD');
+    const before=await page.evaluate(({id,year,month})=>{
+      const raw=localStorage.getItem('insight_v11');
+      return {
+        raw,
+        saved:JSON.parse(raw).stores[id].data[year][month][0].売上,
+        live:allStores.stores[id].data[year][month][0].売上,
+        held:InsightStorage.snapshotWritesHeld()
+      };
+    },f);
+    expect(before.saved).toBe(777);
+    expect(before.live).toBe(scenario==='postwrite-throw'?111:777);
+    expect(before.held).toBe(scenario==='postwrite-throw');
+    // A manual reload is the documented recovery procedure. It must not restore stale live data.
+    await page.reload({waitUntil:'domcontentloaded'});
+    await page.waitForFunction(()=>window.InsightStorage&&typeof allStores!=='undefined'&&
+      allStores&&allStores.stores&&typeof InsightStorage.snapshotWritesHeld==='function');
+    const after=await page.evaluate(({id,year,month})=>{
+      const raw=localStorage.getItem('insight_v11');
+      return {
+        raw,
+        saved:JSON.parse(raw).stores[id].data[year][month][0].売上,
+        live:allStores.stores[id].data[year][month][0].売上,
+        held:InsightStorage.snapshotWritesHeld(),
+        conflict:InsightStorage.reportState().conflict
+      };
+    },f);
+    expect(after.raw).toBe(before.raw);
+    expect([after.saved,after.live,after.held,after.conflict]).toEqual([777,777,false,false]);
+  });
+}
+
+for(const rollbackFailure of ['before-rollback-write','after-rollback-write']){
+  test(`FICTIONAL manual reload uses actual saved snapshot after ${rollbackFailure}`,async({page})=>{
+    const f=await setup(page);
+    await page.evaluate(({id,year,month,rollbackFailure})=>{
+      const originalRead=InsightStorage.readSnapshot;
+      let corruptReadbackOnce=true;
+      InsightStorage.readSnapshot=function(){
+        const value=originalRead.apply(this,arguments);
+        if(corruptReadbackOnce&&window.__restoreWrites===1){
+          corruptReadbackOnce=false;
+          value.stores[id].data[year][month][0].売上+=1;
+        }
+        return value;
+      };
+      const originalWrite=InsightStorage.writeSnapshot;
+      let attempts=0;
+      InsightStorage.writeSnapshot=function(){
+        attempts++;
+        if(attempts===2&&rollbackFailure==='before-rollback-write')
+          throw Error('FICTIONAL rollback interrupted before write');
+        const result=originalWrite.apply(this,arguments);
+        if(attempts===2&&rollbackFailure==='after-rollback-write')
+          throw Error('FICTIONAL rollback interrupted after write');
+        return result;
+      };
+    },{...f,rollbackFailure});
+    await upload(page,f.json);
+    await page.waitForFunction(()=>window.__restoreAlerts.some(message=>
+      message.includes('自動復旧にも失敗')));
+    const expected=rollbackFailure==='before-rollback-write'?777:111;
+    const before=await page.evaluate(({id,year,month})=>{
+      const raw=localStorage.getItem('insight_v11');
+      return {
+        raw,
+        saved:JSON.parse(raw).stores[id].data[year][month][0].売上,
+        live:allStores.stores[id].data[year][month][0].売上,
+        held:InsightStorage.snapshotWritesHeld(),
+        alerts:window.__restoreAlerts,
+        observer:InsightRestoreOperationObserverV0.getStatus().state
+      };
+    },f);
+    expect([before.saved,before.live,before.held,before.observer]).toEqual([expected,111,true,'HELD']);
+    expect(before.alerts.join(' ')).toContain('この画面での再復元は行わないでください');
+    expect(before.alerts.join(' ')).toContain('Insightを手動で再読み込み');
+    // Reload must reflect actual persisted data, not assert a successful automatic rollback.
+    await page.reload({waitUntil:'domcontentloaded'});
+    await page.waitForFunction(()=>window.InsightStorage&&typeof allStores!=='undefined'&&
+      allStores&&allStores.stores&&typeof InsightStorage.snapshotWritesHeld==='function');
+    const after=await page.evaluate(({id,year,month})=>{
+      const raw=localStorage.getItem('insight_v11');
+      return {
+        raw,
+        saved:JSON.parse(raw).stores[id].data[year][month][0].売上,
+        live:allStores.stores[id].data[year][month][0].売上,
+        held:InsightStorage.snapshotWritesHeld(),
+        conflict:InsightStorage.reportState().conflict
+      };
+    },f);
+    expect(after.raw).toBe(before.raw);
+    expect([after.saved,after.live,after.held,after.conflict]).toEqual([expected,expected,false,false]);
+  });
+}
+
+test('FICTIONAL native second tab cannot overwrite restored snapshot through metadata API',async({page})=>{
+  const f=await setup(page);
+  const second=await page.context().newPage();
+  try{
+    await second.route('**/Index.html*',async route=>{
+      const response=await route.fetch();
+      await route.fulfill({response,body:(await response.text()).replace(/;?\s*upgrade-insecure-requests/g,'')});
+    });
+    await second.goto('/Index.html',{waitUntil:'domcontentloaded'});
+    await second.waitForFunction(()=>window.InsightStorage&&typeof allStores!=='undefined'&&
+      allStores&&allStores.stores&&allStores.stores[allStores.current]);
+    const oldLive=await second.evaluate(({id,year,month})=>
+      allStores.stores[id].data[year][month][0].売上,f);
+    expect(oldLive).toBe(111);
+    await upload(page,f.json);
+    await endState(page,1,'IDLE_OBSERVED');
+    const restored=await snapshot(page,f);
+    expect([restored.saved,restored.live,restored.writes]).toEqual([777,777,1]);
+    const result=await second.evaluate(({id,year,month})=>{
+      const before=localStorage.getItem('insight_v11');
+      const errors=[];
+      for(const action of [
+        ()=>InsightStorage.writeMetadata('insight_v11','FICTIONAL unauthorized replacement'),
+        ()=>InsightStorage.persistCurrent(allStores)
+      ]){
+        try{action();errors.push('not blocked');}catch(error){errors.push(error.name);}
+      }
+      InsightStorage.writeMetadata('insight_last_backup','FICTIONAL metadata allowed');
+      return {
+        errors,
+        savedUnchanged:localStorage.getItem('insight_v11')===before,
+        saved:JSON.parse(localStorage.getItem('insight_v11')).stores[id].data[year][month][0].売上,
+        live:allStores.stores[id].data[year][month][0].売上,
+        metadata:localStorage.getItem('insight_last_backup')
+      };
+    },f);
+    expect(result).toEqual({
+      errors:['InsightStorageMetadataKeyError','InsightStorageConflictError'],
+      savedUnchanged:true,saved:777,live:111,metadata:'FICTIONAL metadata allowed'
+    });
+    const after=await snapshot(page,f);
+    expect([after.saved,after.live,after.writes]).toEqual([777,777,1]);
+  }finally{
+    await second.close();
+  }
+});
+
+test('FICTIONAL native external direct-storage update blocks stale save until manual reload',async({page})=>{
+  const f=await setup(page);
+  const other=await page.context().newPage();
+  try{
+    await other.route('**/Index.html*',async route=>{
+      const response=await route.fetch();
+      await route.fulfill({response,body:(await response.text()).replace(/;?\s*upgrade-insecure-requests/g,'')});
+    });
+    await other.goto('/Index.html',{waitUntil:'domcontentloaded'});
+    await other.waitForFunction(()=>window.InsightStorage&&typeof allStores!=='undefined'&&
+      allStores&&allStores.stores&&allStores.stores[allStores.current]);
+    const initial=await other.evaluate(({id,year,month})=>({
+      saved:JSON.parse(localStorage.getItem('insight_v11')).stores[id].data[year][month][0].売上,
+      live:allStores.stores[id].data[year][month][0].売上
+    }),f);
+    expect(initial).toEqual({saved:111,live:111});
+
+    // FICTIONAL external code writes a valid snapshot directly. This is a bypass
+    // simulation, NOT a claim that Insight can prevent arbitrary localStorage writes.
+    const externalRaw=await other.evaluate(({id,year,month})=>{
+      const next=JSON.parse(localStorage.getItem('insight_v11'));
+      next.stores[id].data[year][month][0].売上=555;
+      const raw=JSON.stringify(next);
+      localStorage.setItem('insight_v11',raw);
+      return raw;
+    },f);
+    const stale=await page.evaluate(({id,year,month})=>{
+      let errorName='none';
+      try{InsightStorage.persistCurrent(allStores);}
+      catch(error){errorName=error.name;}
+      return {
+        errorName,
+        raw:localStorage.getItem('insight_v11'),
+        saved:JSON.parse(localStorage.getItem('insight_v11')).stores[id].data[year][month][0].売上,
+        live:allStores.stores[id].data[year][month][0].売上,
+        conflict:InsightStorage.reportState().conflict,
+        restoreHeld:InsightStorage.snapshotWritesHeld()
+      };
+    },f);
+    expect(stale).toEqual({
+      errorName:'InsightStorageConflictError',raw:externalRaw,
+      saved:555,live:111,conflict:true,restoreHeld:false
+    });
+
+    // User's manual reload reconciles the live view with the actual persisted
+    // bytes. This must not write the stale 111 value over the external 555.
+    await page.reload({waitUntil:'domcontentloaded'});
+    await page.waitForFunction(()=>window.InsightStorage&&typeof allStores!=='undefined'&&
+      allStores&&allStores.stores&&allStores.stores[allStores.current]&&
+      typeof InsightStorage.snapshotWritesHeld==='function');
+    const after=await page.evaluate(({id,year,month})=>({
+      raw:localStorage.getItem('insight_v11'),
+      saved:InsightStorage.readSnapshot().stores[id].data[year][month][0].売上,
+      live:allStores.stores[id].data[year][month][0].売上,
+      conflict:InsightStorage.reportState().conflict,
+      restoreHeld:InsightStorage.snapshotWritesHeld()
+    }),f);
+    expect(after).toEqual({
+      raw:externalRaw,saved:555,live:555,conflict:false,restoreHeld:false
+    });
+  }finally{
+    await other.close();
+  }
+});
+
+
+for(const phase of ['before-write','after-write']){
+  test('FICTIONAL external snapshot change '+phase+' cannot be erased by restore or rollback',async({page})=>{
+    const f=await setup(page);
+    await page.evaluate(({id,year,month,phase})=>{
+      window.__externalSnapshotRaw=null;
+      function simulateExternalWriter(){
+        const saved=JSON.parse(localStorage.getItem('insight_v11'));
+        saved.stores[id].data[year][month][0].売上=555;
+        window.__externalSnapshotRaw=JSON.stringify(saved);
+        // FICTIONAL competing writer injected at a synchronous boundary. This
+        // does not use InsightStorage and is not proof of natural browser timing.
+        localStorage.setItem('insight_v11',window.__externalSnapshotRaw);
+      }
+      if(phase==='before-write'){
+        // The external writer runs after restore preflight but before commit.
+        window.confirm=()=>{simulateExternalWriter();return true;};
+      }else{
+        const previous=InsightStorage.writeSnapshot;
+        InsightStorage.writeSnapshot=function(){
+          const result=previous.apply(this,arguments);
+          if(window.__restoreWrites===1)simulateExternalWriter();
+          return result;
+        };
+      }
+    },{...f,phase});
+    await upload(page,f.json);
+    await endState(page,phase==='before-write'?1:2,'HELD');
+    const before=await page.evaluate(({id,year,month})=>{
+      const raw=localStorage.getItem('insight_v11');
+      let blocked='not blocked';
+      try{InsightStorage.persistCurrent(allStores);}catch(error){blocked=error.name;}
+      return {
+        raw,externalRaw:window.__externalSnapshotRaw,
+        saved:JSON.parse(raw).stores[id].data[year][month][0].売上,
+        live:allStores.stores[id].data[year][month][0].売上,
+        writes:window.__restoreWrites,alerts:window.__restoreAlerts,
+        held:InsightStorage.snapshotWritesHeld(),
+        conflict:InsightStorage.reportState().conflict,
+        blocked
+      };
+    },f);
+    expect(before.raw).toBe(before.externalRaw);
+    expect([before.saved,before.live,before.writes]).toEqual([
+      555,111,phase==='before-write'?1:2
+    ]);
+    expect(before.held).toBe(true);
+    expect(before.conflict).toBe(true);
+    expect(before.blocked).toBe('InsightStorageRestoreHoldError');
+    if(phase==='before-write'){
+      expect(before.alerts.join(' ')).toContain('保存状態を確認できませんでした');
+    }else{
+      expect(before.alerts.join(' ')).toContain('自動復旧にも失敗しました');
+    }
+    await page.reload({waitUntil:'domcontentloaded'});
+    await page.waitForFunction(()=>window.InsightStorage&&typeof allStores!=='undefined'&&
+      allStores&&allStores.stores&&allStores.stores[allStores.current]&&
+      typeof InsightStorage.snapshotWritesHeld==='function');
+    const after=await page.evaluate(({id,year,month})=>{
+      const raw=localStorage.getItem('insight_v11');
+      return {
+        raw,
+        saved:InsightStorage.readSnapshot().stores[id].data[year][month][0].売上,
+        live:allStores.stores[id].data[year][month][0].売上,
+        held:InsightStorage.snapshotWritesHeld(),
+        conflict:InsightStorage.reportState().conflict
+      };
+    },f);
+    expect(after).toEqual({
+      raw:before.raw,saved:555,live:555,held:false,conflict:false
+    });
+  });
+}
+
+test('FICTIONAL native two-tab ABA storage events block stale save even when raw returns to baseline',async({page})=>{
+  const f=await setup(page);
+  const other=await page.context().newPage();
+  try{
+    await other.route('**/Index.html*',async route=>{
+      const response=await route.fetch();
+      await route.fulfill({response,body:(await response.text()).replace(/;?\s*upgrade-insecure-requests/g,'')});
+    });
+    await other.goto('/Index.html',{waitUntil:'domcontentloaded'});
+    await other.waitForFunction(()=>window.InsightStorage&&typeof allStores!=='undefined'&&
+      allStores&&allStores.stores&&allStores.stores[allStores.current]);
+    const baseline=await page.evaluate(()=>localStorage.getItem('insight_v11'));
+    await page.evaluate(({id,year,month})=>{
+      window.__fictionalAbaEvents=[];
+      window.addEventListener('storage',event=>{
+        if(event.key==='insight_v11'&&event.newValue){
+          const next=JSON.parse(event.newValue);
+          window.__fictionalAbaEvents.push(next.stores[id].data[year][month][0].売上);
+        }
+      });
+    },f);
+    // A receives real cross-tab browser storage notifications, not synthetic
+    // events. B's FICTIONAL direct write bypasses the canonical writer.
+    for(const [index,value] of [555,111].entries()){
+      await other.evaluate(({id,year,month,value})=>{
+        const next=JSON.parse(localStorage.getItem('insight_v11'));
+        next.stores[id].data[year][month][0].売上=value;
+        localStorage.setItem('insight_v11',JSON.stringify(next));
+      },{...f,value});
+      await page.waitForFunction(count=>
+        Array.isArray(window.__fictionalAbaEvents)&&window.__fictionalAbaEvents.length===count,index+1);
+    }
+    const stale=await page.evaluate(({id,year,month})=>{
+      let errorName='none';
+      try{InsightStorage.persistCurrent(allStores);}
+      catch(error){errorName=error.name;}
+      const raw=localStorage.getItem('insight_v11');
+      return {
+        raw,errorName,events:window.__fictionalAbaEvents,
+        saved:JSON.parse(raw).stores[id].data[year][month][0].売上,
+        live:allStores.stores[id].data[year][month][0].売上,
+        conflict:InsightStorage.reportState().conflict,
+        restoreHeld:InsightStorage.snapshotWritesHeld()
+      };
+    },f);
+    // The raw bytes match A's original baseline; only the persistent
+    // external-change signal can prevent an ABA stale write.
+    expect(stale.raw).toBe(baseline);
+    expect(stale).toMatchObject({
+      errorName:'InsightStorageConflictError',events:[555,111],
+      saved:111,live:111,conflict:true,restoreHeld:false
+    });
+    await page.reload({waitUntil:'domcontentloaded'});
+    await page.waitForFunction(()=>window.InsightStorage&&typeof allStores!=='undefined'&&
+      allStores&&allStores.stores&&allStores.stores[allStores.current]&&
+      typeof InsightStorage.snapshotWritesHeld==='function');
+    const reloaded=await page.evaluate(({id,year,month})=>({
+      raw:localStorage.getItem('insight_v11'),
+      saved:InsightStorage.readSnapshot().stores[id].data[year][month][0].売上,
+      live:allStores.stores[id].data[year][month][0].売上,
+      conflict:InsightStorage.reportState().conflict,
+      restoreHeld:InsightStorage.snapshotWritesHeld()
+    }),f);
+    expect(reloaded).toEqual({
+      raw:baseline,saved:111,live:111,conflict:false,restoreHeld:false
+    });
+  }finally{
+    await other.close();
+  }
+});
+
+test('FICTIONAL native clear and reinsert of identical snapshot still blocks stale writer',async({page})=>{
+  const f=await setup(page);
+  const other=await page.context().newPage();
+  try{
+    await other.route('**/Index.html*',async route=>{
+      const response=await route.fetch();
+      await route.fulfill({response,body:(await response.text()).replace(/;?\s*upgrade-insecure-requests/g,'')});
+    });
+    await other.goto('/Index.html',{waitUntil:'domcontentloaded'});
+    await other.waitForFunction(()=>window.InsightStorage&&typeof allStores!=='undefined'&&
+      allStores&&allStores.stores&&allStores.stores[allStores.current]);
+    const baseline=await page.evaluate(()=>localStorage.getItem('insight_v11'));
+    await page.evaluate(()=>{
+      window.__fictionalClearEvents=[];
+      window.addEventListener('storage',event=>{
+        if(event.key===null||event.key==='insight_v11'){
+          window.__fictionalClearEvents.push({key:event.key,newValue:event.newValue});
+        }
+      });
+    });
+    // B clears shared localStorage. The native storage event has key=null;
+    // this differs from the primary-key-only ABA scenario in PR #295.
+    await other.evaluate(()=>localStorage.clear());
+    await page.waitForFunction(()=>window.__fictionalClearEvents.some(x=>
+      x.key===null&&x.newValue===null));
+    // B reinserts A's exact original bytes. Byte comparison alone sees no change.
+    await other.evaluate(raw=>localStorage.setItem('insight_v11',raw),baseline);
+    await page.waitForFunction(()=>window.__fictionalClearEvents.some(x=>
+      x.key==='insight_v11'&&x.newValue!==null));
+    const stale=await page.evaluate(({id,year,month})=>{
+      let errorName='none';
+      try{InsightStorage.persistCurrent(allStores);}
+      catch(error){errorName=error.name;}
+      const raw=localStorage.getItem('insight_v11');
+      return {
+        raw,errorName,events:window.__fictionalClearEvents,
+        saved:JSON.parse(raw).stores[id].data[year][month][0].売上,
+        live:allStores.stores[id].data[year][month][0].売上,
+        conflict:InsightStorage.reportState().conflict,
+        restoreHeld:InsightStorage.snapshotWritesHeld()
+      };
+    },f);
+    expect(stale.events).toEqual([
+      {key:null,newValue:null},
+      {key:'insight_v11',newValue:baseline}
+    ]);
+    expect(stale).toMatchObject({
+      raw:baseline,errorName:'InsightStorageConflictError',
+      saved:111,live:111,conflict:true,restoreHeld:false
+    });
+    await page.reload({waitUntil:'domcontentloaded'});
+    await page.waitForFunction(()=>window.InsightStorage&&typeof allStores!=='undefined'&&
+      allStores&&allStores.stores&&allStores.stores[allStores.current]&&
+      typeof InsightStorage.snapshotWritesHeld==='function');
+    const reloaded=await page.evaluate(({id,year,month})=>({
+      raw:localStorage.getItem('insight_v11'),
+      saved:InsightStorage.readSnapshot().stores[id].data[year][month][0].売上,
+      live:allStores.stores[id].data[year][month][0].売上,
+      conflict:InsightStorage.reportState().conflict,
+      restoreHeld:InsightStorage.snapshotWritesHeld()
+    }),f);
+    expect(reloaded).toEqual({
+      raw:baseline,saved:111,live:111,conflict:false,restoreHeld:false
+    });
+  }finally{
+    await other.close();
+  }
+});
+
+test('FICTIONAL native primary-key removal and exact reinsert still reject stale save',async({page})=>{
+  const f=await setup(page);
+  const other=await page.context().newPage();
+  try{
+    await other.route('**/Index.html*',async route=>{
+      const response=await route.fetch();
+      await route.fulfill({response,body:(await response.text()).replace(/;?\s*upgrade-insecure-requests/g,'')});
+    });
+    await other.goto('/Index.html',{waitUntil:'domcontentloaded'});
+    await other.waitForFunction(()=>window.InsightStorage&&typeof allStores!=='undefined'&&
+      allStores&&allStores.stores&&allStores.stores[allStores.current]);
+    const baseline=await page.evaluate(()=>localStorage.getItem('insight_v11'));
+    expect(baseline).toBeTruthy();
+    await page.evaluate(()=>{
+      window.__fictionalPrimaryRemovalEvents=[];
+      window.addEventListener('storage',event=>{
+        if(event.key==='insight_v11')
+          window.__fictionalPrimaryRemovalEvents.push({
+            key:event.key,oldValue:event.oldValue,newValue:event.newValue
+          });
+      });
+    });
+    // B removes only the primary snapshot key, unlike the key=null
+    // localStorage.clear() notification exercised in PR #297.
+    await other.evaluate(()=>localStorage.removeItem('insight_v11'));
+    await page.waitForFunction(()=>window.__fictionalPrimaryRemovalEvents.length===1);
+    // Restore exactly the original bytes before the stale A tab attempts to save.
+    await other.evaluate(raw=>localStorage.setItem('insight_v11',raw),baseline);
+    await page.waitForFunction(()=>window.__fictionalPrimaryRemovalEvents.length===2);
+    const stale=await page.evaluate(({id,year,month})=>{
+      let errorName='none';
+      try{InsightStorage.persistCurrent(allStores);}
+      catch(error){errorName=error.name;}
+      const raw=localStorage.getItem('insight_v11');
+      return {
+        raw,errorName,events:window.__fictionalPrimaryRemovalEvents,
+        saved:JSON.parse(raw).stores[id].data[year][month][0].売上,
+        live:allStores.stores[id].data[year][month][0].売上,
+        conflict:InsightStorage.reportState().conflict,
+        restoreHeld:InsightStorage.snapshotWritesHeld()
+      };
+    },f);
+    expect(stale.events).toEqual([
+      {key:'insight_v11',oldValue:baseline,newValue:null},
+      {key:'insight_v11',oldValue:null,newValue:baseline}
+    ]);
+    expect(stale).toMatchObject({
+      raw:baseline,errorName:'InsightStorageConflictError',
+      saved:111,live:111,conflict:true,restoreHeld:false
+    });
+    // Reload resets the in-memory conflict signal without changing the saved raw.
+    await page.reload({waitUntil:'domcontentloaded'});
+    await page.waitForFunction(()=>window.InsightStorage&&typeof allStores!=='undefined'&&
+      allStores&&allStores.stores&&allStores.stores[allStores.current]&&
+      typeof InsightStorage.snapshotWritesHeld==='function');
+    const reloaded=await page.evaluate(({id,year,month})=>({
+      raw:localStorage.getItem('insight_v11'),
+      saved:InsightStorage.readSnapshot().stores[id].data[year][month][0].売上,
+      live:allStores.stores[id].data[year][month][0].売上,
+      conflict:InsightStorage.reportState().conflict,
+      restoreHeld:InsightStorage.snapshotWritesHeld()
+    }),f);
+    expect(reloaded).toEqual({
+      raw:baseline,saved:111,live:111,conflict:false,restoreHeld:false
+    });
+  }finally{
+    await other.close();
+  }
+});
+
+test('FICTIONAL native postcommit transaction throw blocks stale retry and reloads persisted data',async({page})=>{
+  const f=await setup(page);
+  const fault=await page.evaluate(({id,year,month})=>{
+    const baseline=localStorage.getItem('insight_v11');
+    const originalSetItem=Storage.prototype.setItem;
+    window.__fictionalNativeWrites=[];
+    let injectOnce=true;
+    Storage.prototype.setItem=function(key,value){
+      if(key==='insight_v11'){
+        window.__fictionalNativeWrites.push(String(value));
+        const result=originalSetItem.call(this,key,value);
+        if(injectOnce){
+          injectOnce=false;
+          throw Error('FICTIONAL native postcommit failure');
+        }
+        return result;
+      }
+      return originalSetItem.call(this,key,value);
+    };
+    let firstError='none',applied=false;
+    try{
+      InsightStorage.transaction(allStores,draft=>{
+        draft.stores[id].data[year][month][0].売上=777;
+      },null,draft=>{applied=true;allStores=draft;});
+    }catch(error){firstError=String(error.message);}
+    const committedRaw=localStorage.getItem('insight_v11');
+    const saved=InsightStorage.readSnapshot().stores[id].data[year][month][0].売上;
+    let retryError='none';
+    try{
+      InsightStorage.transaction(allStores,draft=>{
+        draft.stores[id].data[year][month][0].売上=999;
+      });
+    }catch(error){retryError=error.name;}
+    return {
+      baseline,committedRaw,firstError,applied,retryError,
+      writes:window.__fictionalNativeWrites.length,
+      saved,rawAfterRetry:localStorage.getItem('insight_v11'),
+      live:allStores.stores[id].data[year][month][0].売上,
+      report:InsightStorage.reportState(),
+      restoreHeld:InsightStorage.snapshotWritesHeld()
+    };
+  },f);
+  expect(fault.firstError).toContain('FICTIONAL native postcommit failure');
+  expect(fault.baseline).not.toBe(fault.committedRaw);
+  expect(fault).toMatchObject({
+    applied:false,retryError:'InsightStorageConflictError',
+    writes:1,saved:777,live:111,rawAfterRetry:fault.committedRaw,
+    report:{held:true,conflict:true},restoreHeld:false
+  });
+  // Only a real browser document reload clears the patch and reinitializes
+  // the in-memory baseline; do not re-run setup and overwrite the saved 777.
+  await page.reload({waitUntil:'domcontentloaded'});
+  await page.waitForFunction(()=>window.InsightStorage&&typeof allStores!=='undefined'&&
+    allStores&&allStores.stores&&allStores.stores[allStores.current]&&
+    typeof InsightStorage.snapshotWritesHeld==='function');
+  const after=await page.evaluate(({id,year,month})=>({
+    raw:localStorage.getItem('insight_v11'),
+    saved:InsightStorage.readSnapshot().stores[id].data[year][month][0].売上,
+    live:allStores.stores[id].data[year][month][0].売上,
+    conflict:InsightStorage.reportState().conflict,
+    reportHeld:InsightStorage.reportState().held,
+    restoreHeld:InsightStorage.snapshotWritesHeld()
+  }),f);
+  expect(after).toEqual({
+    raw:fault.committedRaw,saved:777,live:777,
+    conflict:false,reportHeld:false,restoreHeld:false
+  });
+});
+
+test('FICTIONAL native guarded persist postcommit warning survives page reload',async({page})=>{
+  const f=await setup(page);
+  const fault=await page.evaluate(({id,year,month})=>{
+    const baseline=localStorage.getItem('insight_v11');
+    const originalSetItem=Storage.prototype.setItem;
+    let primaryWrites=0,throwOnce=true;
+    Storage.prototype.setItem=function(key,value){
+      const result=originalSetItem.call(this,key,value);
+      if(key==='insight_v11'){
+        primaryWrites++;
+        if(throwOnce){
+          throwOnce=false;
+          throw new Error('FICTIONAL guarded postcommit failure');
+        }
+      }
+      return result;
+    };
+    // Simulate an edited input value: exercise the actual installed persist
+    // guard, not the direct transaction() API covered by PR #300.
+    allStores.stores[id].data[year][month][0].売上=777;
+    let errorName='none',causeName='none',causeMessage='none';
+    try{window.persist();}
+    catch(error){
+      errorName=error.name;
+      causeName=error.cause?.name||'none';
+      causeMessage=String(error.cause?.message||'');
+    }
+    const committedRaw=localStorage.getItem('insight_v11');
+    return {
+      baseline,committedRaw,errorName,causeName,causeMessage,primaryWrites,
+      guardInstalled:window.persist.__insightPersistGuard===true,
+      alerts:[...window.__restoreAlerts],
+      saved:InsightStorage.readSnapshot().stores[id].data[year][month][0].売上,
+      live:allStores.stores[id].data[year][month][0].売上,
+      report:InsightStorage.reportState(),
+      restoreHeld:InsightStorage.snapshotWritesHeld()
+    };
+  },f);
+  expect(fault.guardInstalled).toBe(true);
+  expect(fault.errorName).toBe('InsightPersistError');
+  expect(fault.causeMessage).toContain('FICTIONAL guarded postcommit failure');
+  expect(fault.baseline).not.toBe(fault.committedRaw);
+  expect(fault).toMatchObject({
+    causeName:'Error',primaryWrites:1,saved:777,live:777,
+    report:{held:true,conflict:true},restoreHeld:false
+  });
+  expect(fault.alerts).toHaveLength(1);
+  expect(fault.alerts[0]).toContain('保存結果を確認できないため');
+  expect(fault.alerts[0]).toContain('追加編集・再保存は控えてください');
+  expect(fault.alerts[0]).toContain('入力内容を控えてからInsightを手動で再読み込み');
+  expect(fault.alerts[0]).not.toContain('現在の変更は保存されていません');
+  // The test alert is captured via setup's window.alert spy, not a real
+  // user's modal interaction. Reload a real document without re-seeding.
+  await page.reload({waitUntil:'domcontentloaded'});
+  await page.waitForFunction(()=>window.InsightStorage&&typeof allStores!=='undefined'&&
+    allStores&&allStores.stores&&allStores.stores[allStores.current]&&
+    typeof InsightStorage.snapshotWritesHeld==='function');
+  const recovered=await page.evaluate(({id,year,month})=>({
+    raw:localStorage.getItem('insight_v11'),
+    saved:InsightStorage.readSnapshot().stores[id].data[year][month][0].売上,
+    live:allStores.stores[id].data[year][month][0].売上,
+    report:InsightStorage.reportState(),
+    restoreHeld:InsightStorage.snapshotWritesHeld()
+  }),f);
+  expect(recovered.raw).toBe(fault.committedRaw);
+  expect(recovered).toMatchObject({
+    saved:777,live:777,report:{held:false,conflict:false},restoreHeld:false
+  });
 });

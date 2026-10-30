@@ -118,7 +118,7 @@ test('FICTIONAL postcommit persist failure leaves original guard warning and HEL
   expect(s.current).toBe('fictional_b');
   expect(s.savedCurrent).toBe('fictional_b');
   expect(s.status).toMatchObject({state:'HELD',activeCount:0});
-  expect(s.alerts.join(' ')).toContain('データを保存できませんでした。');
+  expect(s.alerts.join(' ')).toContain('保存結果を確認できないため');
 });
 test('FICTIONAL settings after-save render error leaves HELD with committed store',async({page})=>{
   await fictionalStoreSelector(page);
