@@ -1,7 +1,8 @@
 (function(root){
 'use strict';
 /*
- * OFF-REPOSITORY DESIGN PROTOTYPE ONLY; not wired into Insight.
+ * STEP4 GATE-3 browser module: wired only to explicitly registered operation boundaries.
+ * These observations do not cover all writers or certify application-wide safety.
  * Runs in a browser without bundlers, or in the Node CommonJS test harness.
  * In-memory observation of explicitly registered business operations.
  * This module does NOT certify app-wide cleanliness, provenance, or model use.
