@@ -567,3 +567,74 @@ for(const phase of ['before-write','after-write']){
     });
   });
 }
+
+test('FICTIONAL native two-tab ABA storage events block stale save even when raw returns to baseline',async({page})=>{
+  const f=await setup(page);
+  const other=await page.context().newPage();
+  try{
+    await other.route('**/Index.html*',async route=>{
+      const response=await route.fetch();
+      await route.fulfill({response,body:(await response.text()).replace(/;?\s*upgrade-insecure-requests/g,'')});
+    });
+    await other.goto('/Index.html',{waitUntil:'domcontentloaded'});
+    await other.waitForFunction(()=>window.InsightStorage&&typeof allStores!=='undefined'&&
+      allStores&&allStores.stores&&allStores.stores[allStores.current]);
+    const baseline=await page.evaluate(()=>localStorage.getItem('insight_v11'));
+    await page.evaluate(({id,year,month})=>{
+      window.__fictionalAbaEvents=[];
+      window.addEventListener('storage',event=>{
+        if(event.key==='insight_v11'&&event.newValue){
+          const next=JSON.parse(event.newValue);
+          window.__fictionalAbaEvents.push(next.stores[id].data[year][month][0].売上);
+        }
+      });
+    },f);
+    // A receives real cross-tab browser storage notifications, not synthetic
+    // events. B's FICTIONAL direct write bypasses the canonical writer.
+    for(const [index,value] of [555,111].entries()){
+      await other.evaluate(({id,year,month,value})=>{
+        const next=JSON.parse(localStorage.getItem('insight_v11'));
+        next.stores[id].data[year][month][0].売上=value;
+        localStorage.setItem('insight_v11',JSON.stringify(next));
+      },{...f,value});
+      await page.waitForFunction(count=>
+        Array.isArray(window.__fictionalAbaEvents)&&window.__fictionalAbaEvents.length===count,index+1);
+    }
+    const stale=await page.evaluate(({id,year,month})=>{
+      let errorName='none';
+      try{InsightStorage.persistCurrent(allStores);}
+      catch(error){errorName=error.name;}
+      const raw=localStorage.getItem('insight_v11');
+      return {
+        raw,errorName,events:window.__fictionalAbaEvents,
+        saved:JSON.parse(raw).stores[id].data[year][month][0].売上,
+        live:allStores.stores[id].data[year][month][0].売上,
+        conflict:InsightStorage.reportState().conflict,
+        restoreHeld:InsightStorage.snapshotWritesHeld()
+      };
+    },f);
+    // The raw bytes match A's original baseline; only the persistent
+    // external-change signal can prevent an ABA stale write.
+    expect(stale.raw).toBe(baseline);
+    expect(stale).toMatchObject({
+      errorName:'InsightStorageConflictError',events:[555,111],
+      saved:111,live:111,conflict:true,restoreHeld:false
+    });
+    await page.reload({waitUntil:'domcontentloaded'});
+    await page.waitForFunction(()=>window.InsightStorage&&typeof allStores!=='undefined'&&
+      allStores&&allStores.stores&&allStores.stores[allStores.current]&&
+      typeof InsightStorage.snapshotWritesHeld==='function');
+    const reloaded=await page.evaluate(({id,year,month})=>({
+      raw:localStorage.getItem('insight_v11'),
+      saved:InsightStorage.readSnapshot().stores[id].data[year][month][0].売上,
+      live:allStores.stores[id].data[year][month][0].売上,
+      conflict:InsightStorage.reportState().conflict,
+      restoreHeld:InsightStorage.snapshotWritesHeld()
+    }),f);
+    expect(reloaded).toEqual({
+      raw:baseline,saved:111,live:111,conflict:false,restoreHeld:false
+    });
+  }finally{
+    await other.close();
+  }
+});
