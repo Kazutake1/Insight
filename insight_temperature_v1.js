@@ -182,6 +182,8 @@
         }
         persist();
       }catch(err){
+        // Preserve the original handled error while preventing a completed observation.
+        ctx.state.quickSaveObservationFailed=true;
         alert('気温データを保存できませんでした。\n'+err.message);
       }
     },40);
