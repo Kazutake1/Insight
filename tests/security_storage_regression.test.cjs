@@ -48,7 +48,10 @@ test('共通保存処理は失敗時に成功扱いせずInsightPersistErrorを�
   const quota=new Error('quota');
   const {context,alerts,getErrorHandler}=setupPersistGuard({writer:()=>{throw quota;}});
   assert.throws(()=>context.persist(),error=>error&&error.name==='InsightPersistError'&&error.cause===quota);
-  assert.match(alerts[0],/現在の変更は保存されていません/);
+  assert.match(alerts[0],/保存結果を確認できないため/);
+  assert.match(alerts[0],/追加編集・再保存は控えてください/);
+  assert.match(alerts[0],/入力内容を控えてからInsightを手動で再読み込み/);
+  assert.doesNotMatch(alerts[0],/現在の変更は保存されていません/);
   const handler=getErrorHandler();
   assert.equal(typeof handler,'function');
   let prevented=false;
@@ -56,11 +59,38 @@ test('共通保存処理は失敗時に成功扱いせずInsightPersistErrorを�
   assert.equal(prevented,true);
 });
 
+test('FICTIONAL 保存後例外で保存済みを未保存と断定せず手動再確認を案内する',()=>{
+  const fault=new Error('FICTIONAL postcommit failure');
+  let saved=null;
+  const {context,alerts,calls}=setupPersistGuard({writer:value=>{
+    saved=JSON.stringify(value); // FICTIONAL saved bytes exist before the exception.
+    throw fault;
+  }});
+  assert.throws(()=>context.persist(),error=>error&&error.name==='InsightPersistError'&&error.cause===fault);
+  assert.equal(JSON.parse(saved).stores.a.name,'A');
+  assert.equal(calls.some(call=>call[0]==='legacy'),false);
+  assert.equal(alerts.length,1);
+  assert.match(alerts[0],/保存結果を確認できないため/);
+  assert.match(alerts[0],/追加編集・再保存は控えてください/);
+  assert.match(alerts[0],/入力内容を控えてからInsightを手動で再読み込み/);
+  assert.doesNotMatch(alerts[0],/保存されていません|保存できませんでした/);
+});
+
+test('競合・復元停止エラーは具体的な既存メッセージを変えない',()=>{
+  for(const name of ['InsightStorageConflictError','InsightStorageRestoreHoldError']){
+    const cause=new Error('FICTIONAL distinct protection guidance');
+    cause.name=name;
+    const {context,alerts}=setupPersistGuard({writer:()=>{throw cause;}});
+    assert.throws(()=>context.persist(),error=>error&&error.name==='InsightPersistError'&&error.cause===cause);
+    assert.deepEqual(alerts,['FICTIONAL distinct protection guidance']);
+  }
+});
+
 test('共有Storageが利用できない場合も旧persistへ戻らず失敗を明示する',()=>{
   const {context,alerts}=setupPersistGuard();
   context.InsightStorage=null;
   assert.throws(()=>context.persist(),error=>error&&error.name==='InsightPersistError');
-  assert.match(alerts[0],/データを保存できませんでした/);
+  assert.match(alerts[0],/データの保存処理でエラーが発生しました/);
 });
 
 test('セール実績の内容はHTMLではなく文字列として描画する',()=>{
