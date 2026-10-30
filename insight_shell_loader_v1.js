@@ -24,6 +24,7 @@ var orderedFeatureLoads=[
   './insight_hooks_v1.js?v=20260930-hooks2',
   './insight_storage_v1.js?v=20261021-saved-report-1',
   './insight_persist_guard_v1.js?v=20261011-stale-tab-1',
+  './insight_operation_observer_v0.js?v=20261028-step4-operation-observer-1',
   './insight_year_manager_v1.js?v=20261011-waste-inline-1',
   './insight_ops_v1.js?v=20260930-step5-2',
   './insight_preserve_dailyops_v1.js?v=20260930-hooks3',
