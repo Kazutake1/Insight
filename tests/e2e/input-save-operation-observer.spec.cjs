@@ -182,6 +182,7 @@ test('FICTIONAL actual input save button opens native guarded postcommit warning
     window.__fictionalNativeAlert=window.alert.bind(window);
   });
   await openFictionalInput(page,{type:'sales'});
+  const fixture=await page.evaluate(()=>window.__inputFixture);
   const dialogs=[];
   page.on('dialog',async dialog=>{
     dialogs.push({type:dialog.type(),message:dialog.message()});
@@ -248,7 +249,7 @@ test('FICTIONAL actual input save button opens native guarded postcommit warning
       report:InsightStorage.reportState(),
       restoreHeld:InsightStorage.snapshotWritesHeld()
     };
-  },{year:await page.evaluate(()=>editYear.sales),month:await page.evaluate(()=>editMonth.sales)});
+  },{year:fixture.year,month:fixture.month});
   expect(recovered).toMatchObject({
     raw:fault.raw,saved:123,live:123,
     report:{held:false,conflict:false},restoreHeld:false
