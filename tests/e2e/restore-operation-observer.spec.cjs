@@ -638,3 +638,113 @@ test('FICTIONAL native two-tab ABA storage events block stale save even when raw
     await other.close();
   }
 });
+
+test('FICTIONAL native clear and reinsert of identical snapshot still blocks stale writer',async({page})=>{
+  const f=await setup(page);
+  const other=await page.context().newPage();
+  try{
+    await other.route('**/Index.html*',async route=>{
+      const response=await route.fetch();
+      await route.fulfill({response,body:(await response.text()).replace(/;?\s*upgrade-insecure-requests/g,'')});
+    });
+    await other.goto('/Index.html',{waitUntil:'domcontentloaded'});
+    await other.waitForFunction(()=>window.InsightStorage&&typeof allStores!=='undefined'&&
+      allStores&&allStores.stores&&allStores.stores[allStores.current]);
+    const baseline=await page.evaluate(()=>localStorage.getItem('insight_v11'));
+    await page.evaluate(()=>{
+      window.__fictionalClearEvents=[];
+      window.addEventListener('storage',event=>{
+        if(event.key===null||event.key==='insight_v11'){
+          window.__fictionalClearEvents.push({key:event.key,newValue:event.newValue});
+        }
+      });
+    });
+    // B clears shared localStorage. The native storage event has key=null;
+    // this differs from the primary-key-only ABA scenario in PR #295.
+    await other.evaluate(()=>localStorage.clear());
+    await page.waitForFunction(()=>window.__fictionalClearEvents.some(x=>
+      x.key===null&&x.newValue===null));
+    // B reinserts A's exact original bytes. Byte comparison alone sees no change.
+    await other.evaluate(raw=>localStorage.setItem('insight_v11',raw),baseline);
+    await page.waitForFunction(()=>window.__fictionalClearEvents.some(x=>
+      x.key==='insight_v11'&&x.newValue!==null));
+    const stale=await page.evaluate(({id,year,month})=>{
+      let errorName='none';
+      try{InsightStorage.persistCurrent(allStores);}
+      catch(error){errorName=error.name;}
+      const raw=localStorage.getItem('insight_v11');
+      return {
+        raw,errorName,events:window.__fictionalClearEvents,
+        saved:JSON.parse(raw).stores[id].data[year][month][0].売上,
+        live:allStores.stores[id].data[year][month][0].売上,
+        conflict:InsightStorage.reportState().conflict,
+        restoreHeld:InsightStorage.snapshotWritesHeld()
+      };
+    },f);
+    expect(stale.events).toEqual([
+      {key:null,newValue:null},
+      {key:'insight_v11',newValue:baseline}
+    ]);
+    expect(stale).toMatchObject({
+      raw:baseline,errorName:'InsightStorageConflictError',
+      saved:111,live:111,conflict:true,restoreHeld:false
+    });
+    await page.reload({waitUntil:'domcontentloaded'});
+    await page.waitForFunction(()=>window.InsightStorage&&typeof allStores!=='undefined'&&
+      allStores&&allStores.stores&&allStores.stores[allStores.current]&&
+      typeof InsightStorage.snapshotWritesHeld==='function');
+    const reloaded=await page.evaluate(({id,year,month})=>({
+      raw:localStorage.getItem('insight_v11'),
+      saved:InsightStorage.readSnapshot().stores[id].data[year][month][0].売上,
+      live:allStores.stores[id].data[year][month][0].売上,
+      conflict:InsightStorage.reportState().conflict,
+      restoreHeld:InsightStorage.snapshotWritesHeld()
+    }),f);
+    expect(reloaded).toEqual({
+      raw:baseline,saved:111,live:111,conflict:false,restoreHeld:false
+    });
+  }finally{
+    await other.close();
+  }
+});
+
+test('FICTIONAL native other-tab metadata event does not falsely block snapshot writer',async({page})=>{
+  const f=await setup(page);
+  const other=await page.context().newPage();
+  try{
+    await other.route('**/Index.html*',async route=>{
+      const response=await route.fetch();
+      await route.fulfill({response,body:(await response.text()).replace(/;?\s*upgrade-insecure-requests/g,'')});
+    });
+    await other.goto('/Index.html',{waitUntil:'domcontentloaded'});
+    await other.waitForFunction(()=>window.InsightStorage&&typeof allStores!=='undefined'&&
+      allStores&&allStores.stores&&allStores.stores[allStores.current]);
+    const baseline=await page.evaluate(()=>localStorage.getItem('insight_v11'));
+    await page.evaluate(()=>{
+      window.__fictionalMetadataEvents=[];
+      window.addEventListener('storage',event=>{
+        if(event.key==='insight_last_backup')
+          window.__fictionalMetadataEvents.push({key:event.key,newValue:event.newValue});
+      });
+    });
+    await other.evaluate(()=>InsightStorage.writeMetadata('insight_last_backup','FICTIONAL metadata-only'));
+    await page.waitForFunction(()=>window.__fictionalMetadataEvents.length===1);
+    const unchanged=await page.evaluate(()=>{
+      const before=InsightStorage.reportState();
+      const result=InsightStorage.persistCurrent(allStores);
+      return {
+        events:window.__fictionalMetadataEvents,raw:localStorage.getItem('insight_v11'),
+        backup:localStorage.getItem('insight_last_backup'),result,
+        conflictBefore:before.conflict,conflictAfter:InsightStorage.reportState().conflict,
+        restoreHeld:InsightStorage.snapshotWritesHeld()
+      };
+    });
+    expect(unchanged).toEqual({
+      events:[{key:'insight_last_backup',newValue:'FICTIONAL metadata-only'}],
+      raw:baseline,backup:'FICTIONAL metadata-only',result:true,
+      conflictBefore:false,conflictAfter:false,restoreHeld:false
+    });
+  }finally{
+    await other.close();
+  }
+});
