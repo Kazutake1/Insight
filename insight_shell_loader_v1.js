@@ -11,7 +11,7 @@ function fail(e){
   document.body.replaceChildren(box);
 }
 if(typeof Chart==='undefined'){fail(new Error('グラフライブラリを読み込めませんでした'));return;}
-fetch('./insight_payload_source_v1.html?v=20261021-csp-events-payload-1',{cache:'no-store'}).then(function(r){if(!r.ok)throw new Error('Insight payload の取得に失敗しました ('+r.status+')');return r.text();}).then(function(html){
+fetch('./insight_payload_source_v1.html?v=20261030-step4-gate3-ab-1',{cache:'no-store'}).then(function(r){if(!r.ok)throw new Error('Insight payload の取得に失敗しました ('+r.status+')');return r.text();}).then(function(html){
 if(html.indexOf('<!DOCTYPE html>')!==0&&html.indexOf('<!doctype html>')!==0)throw new Error('HTMLデータの検証に失敗しました');
 // STEP5 complete: payload source is self-contained; feature modules are inserted before document.write().
 var orderedFeatureLoads=[
@@ -21,16 +21,17 @@ var orderedFeatureLoads=[
   './insight_yoy_policy_v1.js?v=20260930-1',
   './insight_ai_compat_core_v1.js?v=20261003-ai-pipeline-1',
   './insight_date_context_v1.js?v=20260930-1',
-  './insight_hooks_v1.js?v=20260930-hooks2',
-  './insight_storage_v1.js?v=20261021-saved-report-1',
-  './insight_persist_guard_v1.js?v=20261011-stale-tab-1',
+  './insight_hooks_v1.js?v=20261030-step4-gate3-ab-1',
+  './insight_storage_v1.js?v=20261030-step4-gate3-ab-1',
+  './insight_persist_guard_v1.js?v=20261030-step4-gate3-ab-1',
+  './insight_operation_observer_v0.js?v=20261030-step4-gate3-ab-1',
   './insight_year_manager_v1.js?v=20261011-waste-inline-1',
   './insight_ops_v1.js?v=20260930-step5-2',
-  './insight_preserve_dailyops_v1.js?v=20260930-hooks3',
-  './insight_quick_date_nav_v1.js?v=20261006-csp-style-quick-date-1',
+  './insight_preserve_dailyops_v1.js?v=20261030-step4-gate3-ab-1',
+  './insight_quick_date_nav_v1.js?v=20261030-step4-gate3-ab-1',
   './insight_ops_kpifix_v1.js?v=20260930-hooks1',
   './insight_ai_ops_v1.js?v=20260930-hooks2',
-  './insight_backup_guard_v1.js?v=20261011-restore-error-state-1',
+  './insight_backup_guard_v1.js?v=20261030-step4-gate3-ab-1',
   './insight_data_health_v1.js?v=20261011-trip-manual-1',
   './insight_prediction_data_health_v1.js?v=20261010-prediction-quality-1',
   './insight_waste_insights_v1.js?v=20260930-hooks2',
@@ -43,13 +44,13 @@ var orderedFeatureLoads=[
   './insight_ai_presentation_v1.js?v=20261009-ai-left-scroll-js-1',
   './insight_ai_visual_v1.js?v=20261006-balanced-layout-1',
   './insight_events_v1.js?v=20261018-caret-end-1',
-  './insight_hourly_customers_v1.js?v=20261006-remove-help',
-  './insight_temperature_v1.js?v=20261019-temperature-trunc-1',
+  './insight_hourly_customers_v1.js?v=20261030-step4-gate3-ab-1',
+  './insight_temperature_v1.js?v=20261030-step4-gate3-ab-1',
   './insight_weather_compact_v1.js?v=20261020-weather-manual-revision-1',
   './insight_weather_temperature_auto_v1.js?v=20261020-weather-fetch-stale-guard-1',
-  './insight_weather_location_v1.js?v=20260930-security1',
+  './insight_weather_location_v1.js?v=20261030-step4-gate3-ab-1',
   './insight_input_weather_temp_v1.js?v=20261019-input-temperature-trunc-1',
-  './insight_sales_count_v1.js?v=20261020-year-nav-guard-2',
+  './insight_sales_count_v1.js?v=20261030-step4-gate3-ab-1',
   './insight_numeric_caret_v1.js?v=20261018-caret-end-1',
   './insight_trip_inference_v1.js?v=20261011-month-infer-1',
   './insight_trip_overrides_v1.js?v=20261011-trip-manual-1',
@@ -82,7 +83,7 @@ var orderedFeatureLoads=[
   './insight_ai_page_comments_v1.js?v=20261001-decision-analysis',
   './insight_settings_v1.js?v=20261007-step3-settings-hidden-class-1',
   './insight_trip_inference_view_v1.js?v=20261011-trip-manual-1',
-  './insight_weather_bulk_v1.js?v=20261019-weather-bulk-1',
+  './insight_weather_bulk_v1.js?v=20261030-step4-gate3-ab-1',
   './insight_year_controls_layout_v1.js?v=20261006-csp-style-year-controls-1',
   './insight_dark_theme_v1.js?v=20261007-csp-style-dark-theme-1',
   './insight_readability_v1.js?v=20261007-csp-style-readability-global-containers-1',
