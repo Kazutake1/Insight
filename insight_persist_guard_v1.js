@@ -20,7 +20,7 @@ function currentSnapshot(){
 function failSave(error){
   try{
     if(typeof root.alert==='function'){
-      root.alert(error&&error.name==='InsightStorageConflictError'?error.message:'データを保存できませんでした。\nブラウザの保存領域を確認して、もう一度お試しください。\n現在の変更は保存されていません。');
+      root.alert(error&&(error.name==='InsightStorageConflictError'||error.name==='InsightStorageRestoreHoldError')?error.message:'データの保存処理でエラーが発生しました。\n保存結果を確認できないため、この画面での追加編集・再保存は控えてください。\n入力内容を控えてからInsightを手動で再読み込みし、保存済みデータを確認してください。');
     }
   }catch(_){}
   var saveError=new Error('Insight data save failed');
