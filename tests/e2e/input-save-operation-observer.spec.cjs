@@ -141,7 +141,7 @@ for(const failureWrite of [1,2]){
     const out=await readInput(page);
     expect(out.writes).toBe(failureWrite);
     expect(out.row.売上).toBe(123);
-    expect(out.alerts.join(' ')).toContain('データを保存できませんでした。');
+    expect(out.alerts.join(' ')).toContain('保存結果を確認できないため');
   });
 }
 

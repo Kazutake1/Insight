@@ -84,7 +84,7 @@ test('FICTIONAL postcommit clear error stays HELD, preserves thrown save error',
   expect(outcome.status.state).toBe('HELD');
   expect(outcome.status.activeCount).toBe(0);
   expect(outcome.savedHasLocation).toBe(false);
-  expect(outcome.alerts.join(' ')).toContain('データを保存できませんでした。');
+  expect(outcome.alerts.join(' ')).toContain('保存結果を確認できないため');
 });
 
 test('FICTIONAL absent observer keeps successful clear, reports UNAVAILABLE',async({page})=>{

@@ -119,7 +119,7 @@ test('FICTIONAL postcommit clear error remains HELD and preserves original persi
   expect(out.status.activeCount).toBe(0);
   expect(out.sales).toBe(0);
   expect(out.customers).toBe(77);
-  expect(out.alerts.join(' ')).toContain('データを保存できませんでした。');
+  expect(out.alerts.join(' ')).toContain('保存結果を確認できないため');
 });
 
 test('FICTIONAL missing observer leaves sales-day clear operational and UNAVAILABLE',async({page})=>{
