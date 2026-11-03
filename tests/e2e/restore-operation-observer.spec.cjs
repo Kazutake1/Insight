@@ -15,7 +15,7 @@ async function setup(page,{missingObserver=false}={}){
     window.InsightDataHealth&&document.getElementById('restoreFile'));
   await page.waitForFunction(()=>window.InsightBackupPasswordV1&&window.InsightReportPreview);
   const fixture=await page.evaluate(()=>{
-    InsightBackupPasswordV1={...InsightBackupPasswordV1,request:async()=> 'FICTIONAL-safety-password'};
+    InsightBackupPasswordV1={...InsightBackupPasswordV1,request:async()=> 'FICTIONAL-safety-password',confirmSaved:async()=>true};
     const original=InsightStorage.migrateSnapshot(JSON.parse(JSON.stringify(allStores)));
     const id=original.current;
     const year=String(original.stores[id].years.at(-1)),month='1月';

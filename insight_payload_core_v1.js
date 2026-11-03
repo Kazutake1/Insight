@@ -2464,13 +2464,36 @@ function updateBackupDaysLabel(){
   const label=document.getElementById("backupDaysLabel");
   if(!label)return;
   label.classList.remove("backup-status-missing","backup-status-today","backup-status-recent","backup-status-stale");
-  const last=localStorage.getItem(BACKUP_KEY);
-  if(!last){label.textContent="未バックアップ";label.classList.add("backup-status-missing");return;}
-  const days=Math.floor((Date.now()-parseInt(last))/(1000*60*60*24));
-  if(days===0){label.textContent="今日ダウンロード開始";label.classList.add("backup-status-today");}
-  else if(days<=7){label.textContent=`${days}日前`;label.classList.add("backup-status-recent");}
-  else{label.textContent=`${days}日経過 ⚠️`;label.classList.add("backup-status-stale");}
+  function record(key,confirmed){
+    try{
+      const raw=localStorage.getItem(key);if(!raw||raw.length>512)return null;
+      const value=JSON.parse(raw);
+      if(!value||value.version!==1||typeof value.id!=="string"||!/^[a-f0-9]{32}$/.test(value.id)||
+         !["normal","preRestore"].includes(value.kind)||!Number.isSafeInteger(value.startedAt)||value.startedAt<=0||value.startedAt>Date.now())return null;
+      if(confirmed&&(value.confirmation!=="user"||!Number.isSafeInteger(value.confirmedAt)||value.confirmedAt<value.startedAt||value.confirmedAt>Date.now()))return null;
+      return value;
+    }catch(_){return null;}
+  }
+  const confirmed=record("insight_backup_confirmed_v1",true),download=record("insight_backup_download_v1",false);
+  const legacy=localStorage.getItem(BACKUP_KEY);
+  label.title="保存確認はご本人の申告です。アプリは端末ファイルの保存完了を検証できません。";
+  if(download&&(!confirmed||download.id!==confirmed.id)){
+    label.textContent="ダウンロード開始・保存未確認"+(confirmed?"（前回の保存確認あり）":"");
+    label.classList.add("backup-status-recent");return;
+  }
+  if(confirmed){
+    const days=Math.max(0,Math.floor((Date.now()-confirmed.confirmedAt)/(1000*60*60*24)));
+    label.textContent=(confirmed.kind==="preRestore"?"復元前 ":"")+(days===0?"今日":days+"日前")+" 保存確認（本人申告）";
+    if(days===0)label.classList.add("backup-status-today");
+    else if(days<=7)label.classList.add("backup-status-recent");
+    else label.classList.add("backup-status-stale");return;
+  }
+  label.textContent=legacy?"旧ダウンロード記録あり・保存未確認":"未バックアップ";
+  if(legacy)label.classList.add("backup-status-recent");else label.classList.add("backup-status-missing");
 }
+window.addEventListener('storage',function(event){
+  if(event&&(event.key===null||[BACKUP_KEY,'insight_backup_confirmed_v1','insight_backup_download_v1'].includes(event.key)))updateBackupDaysLabel();
+});
 
 // Fail closed until the guarded encrypted backup module replaces these entry points.
 // A missing/slow feature script must never expose the old plaintext exporter or

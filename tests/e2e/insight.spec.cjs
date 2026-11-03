@@ -11,7 +11,7 @@ async function openInsight(page){
   await page.waitForFunction(()=>window.InsightBackupPasswordV1&&window.InsightBackupCryptoV1);
   // Legacy restore/UI assertions use a deterministic FICTIONAL password; the
   // dedicated Stage2 suite exercises the real password/confirmation modal.
-  await page.evaluate(()=>{InsightBackupPasswordV1={...InsightBackupPasswordV1,request:async()=> 'FICTIONAL-safety-password'};});
+  await page.evaluate(()=>{InsightBackupPasswordV1={...InsightBackupPasswordV1,request:async()=> 'FICTIONAL-safety-password',confirmSaved:async()=>true};});
   return errors;
 }
 
@@ -359,10 +359,10 @@ test('トップページは外部shellと機能manifestの最新版確認をno-s
     fetch('/insight_payload_source_v1.html?e2e-shell-check=1',{cache:'no-store'}).then(r=>r.text())
   ]));
   const [source,boot,loader,payload]=sources;
-  expect(source).toContain('name="insight-shell-version" content="20261103-backup-stage2-build-98"');
-  expect(source).toContain('insight_shell_boot_v1.js?v=20261103-backup-stage2-build-98');
-  expect(source).toContain('insight_shell_loader_v1.js?v=20261103-backup-stage2-1');
-  expect(source).toContain('insight_shell_v1.css?v=20261103-backup-stage2-build-98');
+  expect(source).toContain('name="insight-shell-version" content="20261103-backup-confirm-build-99"');
+  expect(source).toContain('insight_shell_boot_v1.js?v=20261103-backup-confirm-build-99');
+  expect(source).toContain('insight_shell_loader_v1.js?v=20261103-backup-confirm-1');
+  expect(source).toContain('insight_shell_v1.css?v=20261103-backup-confirm-build-99');
   expect(source).not.toMatch(/<script(?![^>]*\bsrc=)[^>]*>/i);
   expect(source).not.toMatch(/<style\b/i);
   expect(source).not.toMatch(/script-src[^;]*'unsafe-inline'/);
@@ -371,13 +371,13 @@ test('トップページは外部shellと機能manifestの最新版確認をno-s
   expect(source).not.toMatch(/style-src[^;]*'unsafe-inline'/);
   expect(boot).toContain("fetch('./Index.html?insight_probe='+Date.now(),{cache:'no-store'})");
   expect(loader).toContain("fetch('./insight_shell_loader_v1.js?insight_manifest_probe='+Date.now(),{cache:'no-store'})");
-  expect(loader).toContain("fetch('./insight_payload_source_v1.html?v=20261103-backup-stage2-1',{cache:'no-store'})");
+  expect(loader).toContain("fetch('./insight_payload_source_v1.html?v=20261103-backup-confirm-1',{cache:'no-store'})");
   expect(loader).toContain('function featureSignature(entries)');
   expect(source).toContain('https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js');
   expect(source).toContain('integrity="sha512-CQBWl4fJHWbryGE+Pc7UAxWMUMNMWzWxF4SQo9CgkJIN1kx6djDQZjh3Y8SZ1d+6I+1zze6Z7kHXO7q3UyZAWw=="');
   expect(loader).not.toContain('stripPayloadChartScript');
   expect(payload).toContain('insight_payload_core_v1.css?v=20261022-quick-weather-fixed-1');
-  expect(payload).toContain('insight_payload_core_v1.js?v=20261103-backup-stage2-1');
+  expect(payload).toContain('insight_payload_core_v1.js?v=20261103-backup-confirm-1');
   expect(payload).toContain('insight_payload_ai_legacy_v1.js?v=20261020-ai-panel-smooth-1');
   expect(payload).toContain('insight_payload_bindings_v1.js?v=20261030-step4-gate3-ab-1');
   expect(payload).not.toMatch(/\son(?:click|change)\s*=/i);
@@ -984,11 +984,11 @@ test('バックアップ経過表示はinline色ではなく状態classで切り
   await page.evaluate(()=>{localStorage.removeItem('insight_last_backup');updateBackupDaysLabel();});
   expect(await read()).toMatchObject({text:'未バックアップ',color:'rgb(220, 38, 38)',inlineColor:''});
   await page.evaluate(()=>{localStorage.setItem('insight_last_backup',String(Date.now()));updateBackupDaysLabel();});
-  expect(await read()).toMatchObject({text:'今日ダウンロード開始',color:'rgb(21, 128, 61)',inlineColor:''});
-  await page.evaluate(()=>{localStorage.setItem('insight_last_backup',String(Date.now()-3*24*60*60*1000));updateBackupDaysLabel();});
-  expect(await read()).toMatchObject({text:'3日前',color:'rgb(136, 136, 136)',inlineColor:''});
-  await page.evaluate(()=>{localStorage.setItem('insight_last_backup',String(Date.now()-8*24*60*60*1000));updateBackupDaysLabel();});
-  expect(await read()).toMatchObject({text:'8日経過 ⚠️',color:'rgb(220, 38, 38)',inlineColor:''});
+  expect(await read()).toMatchObject({text:'旧ダウンロード記録あり・保存未確認',color:'rgb(136, 136, 136)',inlineColor:''});
+  for(const days of [0,3,8]){
+    await page.evaluate(days=>{const at=Date.now()-days*86400000;localStorage.setItem('insight_backup_confirmed_v1',JSON.stringify({version:1,id:'a'.repeat(32),kind:'normal',startedAt:at,confirmedAt:at,confirmation:'user'}));updateBackupDaysLabel();},days);
+    expect(await read()).toMatchObject({text:(days===0?'今日':days+'日前')+' 保存確認（本人申告）',color:days===0?'rgb(21, 128, 61)':days===3?'rgb(136, 136, 136)':'rgb(220, 38, 38)',inlineColor:''});
+  }
   expect(errors).toEqual([]);
 });
 

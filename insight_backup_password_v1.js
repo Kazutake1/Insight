@@ -67,5 +67,17 @@
     var panel=shell(message),note=document.createElement('p');note.textContent='処理中です。しばらくお待ちください。';note.setAttribute('role','status');panel.appendChild(note);
     cancelBusy=onCancel;var b=button('キャンセル',cancel);panel.appendChild(b);b.focus();
   }
-  root.InsightBackupPasswordV1=Object.freeze({request:request,busy:busy,close:close});
+  function confirmSaved(options){
+    var panel=shell('保存先のファイルを確認してください');
+    var filename=document.createElement('p');filename.textContent='ファイル名：'+options.filename;panel.appendChild(filename);
+    var note=document.createElement('p');
+    note.textContent='ダウンロード処理を開始しましたが、保存完了は未確認です。端末の保存先でこのファイルを確認してから選んでください。確認はご本人の申告であり、アプリによる端末ファイルの検証ではありません。'+(options.kind==='preRestore'?' 確認するまで復元の書き込みは開始しません。':'');
+    panel.appendChild(note);
+    var actions=document.createElement('div');actions.className='insight-backup-actions';
+    var dismiss=button(options.kind==='preRestore'?'復元を中止':'未確認のまま閉じる',cancel);actions.appendChild(dismiss);
+    var confirm=button('保存したファイルを確認した',function(){var resolve=pending;pending=null;if(resolve)resolve(true);});confirm.className='insight-backup-confirm';actions.appendChild(confirm);
+    panel.appendChild(actions);dismiss.focus();
+    return new Promise(function(resolve){pending=resolve;});
+  }
+  root.InsightBackupPasswordV1=Object.freeze({request:request,busy:busy,confirmSaved:confirmSaved,close:close});
 })(window);

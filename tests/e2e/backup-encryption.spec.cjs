@@ -35,6 +35,10 @@ async function password(page,value,confirm=true){
   await page.locator('#insightBackupOverlay button[type=submit]').click();
 }
 async function upload(page,file){await page.locator('#restoreFile').setInputFiles({name:'FICTIONAL.json',mimeType:'application/json',buffer:Buffer.from(JSON.stringify(file))});}
+async function confirmSaved(page){
+  await expect(page.getByRole('button',{name:'保存したファイルを確認した',exact:true})).toBeVisible();
+  await page.getByRole('button',{name:'保存したファイルを確認した',exact:true}).click();
+}
 async function downloaded(event){return JSON.parse(fs.readFileSync(await event.path(),'utf8'));}
 test('FICTIONAL real modal: centered light/dark spacing, mismatch, encrypted two-store download',async({page})=>{
   await setup(page);
@@ -60,6 +64,9 @@ test('FICTIONAL real modal: centered light/dark spacing, mismatch, encrypted two
   expect(file.format).toBe('InsightEncryptedBackup');expect(file.data).toBeUndefined();
   const payload=await page.evaluate(({file,PASSWORD})=>InsightBackupCryptoV1.decrypt(file,PASSWORD),{file,PASSWORD});
   expect(payload.data).toEqual(before);
+  await expect(page.locator('#backupDaysLabel')).toContainText('保存未確認');
+  expect(await page.evaluate(()=>localStorage.getItem('insight_backup_confirmed_v1'))).toBeNull();
+  await confirmSaved(page);
   await expect(page.locator('#insightBackupOverlay')).toHaveCount(0);
   expect(await page.evaluate(()=>localStorage.getItem('insight_v11'))).not.toContain(PASSWORD);
   expect(await page.evaluate(()=>__backupCsp)).toEqual([]);
@@ -87,7 +94,7 @@ for(const initialized of [false,true]){
     if(initialized){
       const raw=await page.evaluate(()=>localStorage.getItem('insight_v11'));
       const initialDownload=page.waitForEvent('download');
-      await upload(page,JSON.parse(raw));await password(page,SAFETY);await initialDownload;
+      await upload(page,JSON.parse(raw));await password(page,SAFETY);await initialDownload;await confirmSaved(page);
       await expect(page.locator('#insightBackupOverlay')).toHaveCount(0);
     }
     const before=await page.evaluate(()=>({raw:localStorage.getItem('insight_v11'),live:JSON.stringify(allStores),observer:InsightRestoreOperationObserverV0.getStatus()}));
@@ -110,7 +117,7 @@ for(const initialized of [false,true]){
     await page.evaluate(()=>{InsightBackupCryptoV1=__originalBackupCrypto;});
     const target=JSON.parse(before.raw);
     for(const st of Object.values(target.stores))st.data[st.years.at(-1)]['1月'][0].売上=987;
-    await upload(page,target);await password(page,SAFETY);
+    await upload(page,target);await password(page,SAFETY);await confirmSaved(page);
     await expect(page.locator('#insightBackupOverlay')).toHaveCount(0);
     expect(await page.evaluate(()=>InsightRestoreOperationObserverV0.getStatus().state)).toBe('IDLE_OBSERVED');
     expect(await page.evaluate(()=>Object.values(InsightStorage.readSnapshot().stores).map(st=>st.data[st.years.at(-1)]['1月'][0].売上))).toEqual([987,987]);
@@ -130,6 +137,8 @@ test('FICTIONAL encrypted restore uses a separately entered safety password and 
   const safety=await downloaded(await event);
   const restoredBefore=await page.evaluate(({safety,SAFETY})=>InsightBackupCryptoV1.decrypt(safety,SAFETY),{safety,SAFETY});
   expect(restoredBefore.data).toEqual(original);
+  expect(await page.evaluate(()=>InsightStorage.readSnapshot())).toEqual(original);
+  await confirmSaved(page);
   await expect(page.locator('#insightBackupOverlay')).toHaveCount(0);
   expect(await page.evaluate(()=>__backupAlerts)).toEqual([]);
   await page.reload();await page.waitForFunction(()=>window.InsightStorage);
@@ -189,6 +198,7 @@ test('FICTIONAL pre-v10 single-store JSON remains importable with encrypted safe
   await expect(page.locator('#insightBackupTitle')).toContainText('復元直前');
   const event=page.waitForEvent('download');await password(page,SAFETY);
   expect((await downloaded(await event)).format).toBe('InsightEncryptedBackup');
+  await confirmSaved(page);
   await expect(page.locator('#insightBackupOverlay')).toHaveCount(0);
   expect(await page.evaluate(()=>{
     const saved=InsightStorage.readSnapshot();return {count:Object.keys(saved.stores).length,sales:saved.stores.store_1.data[saved.stores.store_1.years.at(-1)]['1月'][0].売上};
@@ -206,3 +216,84 @@ test('FICTIONAL missing backup guard leaves fail-closed bootstrap entry points, 
   expect(await page.evaluate(()=>localStorage.getItem('insight_last_backup'))).toBeNull();
   expect(downloads).toHaveLength(0);
 });
+
+async function seedConfirmationHistory(page){
+  return page.evaluate(()=>{
+    const at=Date.now()-86400000;
+    const old=JSON.stringify({version:1,id:'a'.repeat(32),kind:'normal',startedAt:at,confirmedAt:at,confirmation:'user'});
+    localStorage.setItem('insight_last_backup','1700000000000');localStorage.setItem('insight_backup_confirmed_v1',old);updateBackupDaysLabel();
+    return {raw:localStorage.getItem('insight_v11'),old};
+  });
+}
+async function beginConfirmedDownload(page,kind,raw){
+  const event=page.waitForEvent('download');
+  if(kind==='normal'){await page.locator('#backupBtn').click();await password(page,PASSWORD);}
+  else{
+    const target=JSON.parse(raw);for(const st of Object.values(target.stores))st.data[st.years.at(-1)]['1月'][0].売上=852;
+    await upload(page,target);await password(page,SAFETY);
+  }
+  await event;
+  await expect(page.getByRole('button',{name:'保存したファイルを確認した',exact:true})).toBeVisible();
+}
+for(const kind of ['normal','preRestore']){
+  for(const choice of ['close','reload','confirm']){
+    test('FICTIONAL '+kind+' file verification '+choice+' preserves history and gates primary writes',async({page})=>{
+      await setup(page);const before=await seedConfirmationHistory(page);
+      await beginConfirmedDownload(page,kind,before.raw);
+      expect(await page.evaluate(()=>localStorage.getItem('insight_v11'))).toBe(before.raw);
+      expect(await page.evaluate(()=>localStorage.getItem('insight_backup_confirmed_v1'))).toBe(before.old);
+      await expect(page.locator('#backupDaysLabel')).toContainText('保存未確認');
+      await expect(page.getByRole('dialog')).toContainText('アプリによる端末ファイルの検証ではありません');
+      if(kind==='preRestore')expect(await page.evaluate(()=>InsightRestoreOperationObserverV0.getStatus().state)).toBe('UNAVAILABLE');
+      // The confirmation modal remains a single owner, including duplicate clicks.
+      await page.evaluate(()=>backupData());
+      expect(await page.evaluate(()=>localStorage.getItem('insight_backup_confirmed_v1'))).toBe(before.old);
+      for(const dark of [false,true]){
+        await page.evaluate(dark=>document.documentElement.classList.toggle('dark',dark),dark);
+        const panel=await page.locator('.insight-backup-panel').boundingBox(),viewport=page.viewportSize();
+        expect(Math.abs(panel.x+panel.width/2-viewport.width/2)).toBeLessThan(2);
+        expect(Math.abs(panel.y+panel.height/2-viewport.height/2)).toBeLessThan(2);
+        const buttons=await page.locator('.insight-backup-actions button').all();
+        const a=await buttons[0].boundingBox(),b=await buttons[1].boundingBox();
+        expect(a.x).toBeGreaterThanOrEqual(panel.x+20);expect(b.x+b.width).toBeLessThanOrEqual(panel.x+panel.width-20);
+        expect(Math.abs(a.y-b.y)<2?b.x-a.x-a.width:b.y-a.y-a.height).toBeGreaterThanOrEqual(12);
+      }
+      if(choice==='confirm')await confirmSaved(page);
+      else if(choice==='close')await page.getByRole('button',{name:kind==='normal'?'未確認のまま閉じる':'復元を中止',exact:true}).click();
+      else{
+        await page.reload();await page.waitForFunction(()=>window.InsightReportPreview);await page.evaluate(()=>gotoNav('settings'));
+      }
+      await expect(page.locator('#insightBackupOverlay')).toHaveCount(0);
+      expect(await page.evaluate(()=>localStorage.getItem('insight_last_backup'))).toBe('1700000000000');
+      if(choice==='confirm'){
+        const record=await page.evaluate(()=>JSON.parse(localStorage.getItem('insight_backup_confirmed_v1')));
+        expect(record.confirmation).toBe('user');expect(record.kind).toBe(kind);expect(record.id).not.toBe('a'.repeat(32));
+        await expect(page.locator('#backupDaysLabel')).toContainText('保存確認（本人申告）');
+        if(kind==='preRestore'){
+          expect(await page.evaluate(()=>Object.values(InsightStorage.readSnapshot().stores).map(st=>st.data[st.years.at(-1)]['1月'][0].売上))).toEqual([852,852]);
+        }else expect(await page.evaluate(()=>localStorage.getItem('insight_v11'))).toBe(before.raw);
+      }else{
+        expect(await page.evaluate(()=>localStorage.getItem('insight_backup_confirmed_v1'))).toBe(before.old);
+        expect(await page.evaluate(()=>localStorage.getItem('insight_v11'))).toBe(before.raw);
+        await expect(page.locator('#backupDaysLabel')).toContainText('保存未確認');
+      }
+      if(choice!=='reload')expect(await page.evaluate(()=>__backupCsp)).toEqual([]);
+    });
+  }
+  for(const change of ['download','snapshot']){
+    test('FICTIONAL '+kind+' confirmation rejects other-tab '+change+' changes',async({page,context})=>{
+      await setup(page);const before=await seedConfirmationHistory(page);await beginConfirmedDownload(page,kind,before.raw);
+      const other=await context.newPage();await other.goto('/');
+      const expectedRaw=await other.evaluate(({change,raw})=>{
+        if(change==='download')localStorage.setItem('insight_backup_download_v1',JSON.stringify({version:1,id:'b'.repeat(32),kind:'normal',startedAt:Date.now()}));
+        else{const data=JSON.parse(raw);data.stores[data.current].data[data.stores[data.current].years.at(-1)]['1月'][0].売上=963;localStorage.setItem('insight_v11',JSON.stringify(data));}
+        return localStorage.getItem('insight_v11');
+      },{change,raw:before.raw});
+      await other.close();await confirmSaved(page);
+      await expect(page.locator('#insightBackupOverlay')).toHaveCount(0);
+      expect(await page.evaluate(()=>localStorage.getItem('insight_backup_confirmed_v1'))).toBe(before.old);
+      expect(await page.evaluate(()=>localStorage.getItem('insight_v11'))).toBe(expectedRaw);
+      expect(await page.evaluate(()=>__backupAlerts.join(' '))).toMatch(/別のバックアップ処理|処理中にデータが変更/);
+    });
+  }
+}

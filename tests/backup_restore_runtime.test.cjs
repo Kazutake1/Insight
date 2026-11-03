@@ -36,7 +36,8 @@ function snapshot(sales){
 function fixture(options={}){
   const original=snapshot(100);
   let persisted=clone(original),writeCount=0,readFaultOnce=!!options.corruptAfterWrite;
-  const downloads=[],blobs=[],passwordRequests=[],metadataWrites=[],alerts=[],toasts=[],samples=[],readers=[];
+  const downloads=[],blobs=[],passwordRequests=[],confirmationRequests=[],metadataWrites=[],alerts=[],toasts=[],samples=[],readers=[];
+  const metadata=new Map(Object.entries(options.metadata||{}));
   let confirmation=options.confirm!==false,confirmationCount=0;
   let writeHeld=false;
   let failWriteOnce=!!options.quotaOnce;
@@ -56,9 +57,10 @@ function fixture(options={}){
   };
   const window={
     btoa:value=>Buffer.from(value,'binary').toString('base64'),atob:value=>Buffer.from(value,'base64').toString('binary'),
-    isSecureContext:options.insecure!==true,crypto:options.realCrypto?webcrypto:{subtle:{}},
+    isSecureContext:options.insecure!==true,crypto:options.realCrypto?webcrypto:{subtle:{},getRandomValues:array=>webcrypto.getRandomValues(array)},
     InsightBackupCryptoV1:{async encrypt(payload){return {format:'InsightEncryptedBackup',testOnlyPayload:clone(payload)};}},
-    InsightBackupPasswordV1:{async request(request){passwordRequests.push(request);return options.requestPassword?options.requestPassword(request):'FICTIONAL-safety-password';},busy(){},close(){}},
+    InsightBackupPasswordV1:{async request(request){passwordRequests.push(request);return options.requestPassword?options.requestPassword(request):'FICTIONAL-safety-password';},async confirmSaved(request){confirmationRequests.push(request);return options.confirmDownload?options.confirmDownload(request):true;},busy(){},close(){}},
+    localStorage:{getItem(key){return key==='insight_v11'?JSON.stringify(persisted):metadata.get(key)??null;}},
     __INSIGHT_SHELL_VERSION__:'test',
     InsightOperationObserverV0:options.missingObserver?undefined:{createOperationObserver},
     InsightStorage:{
@@ -91,7 +93,7 @@ function fixture(options={}){
         if(window.InsightRestoreOperationObserverV0)samples.push({point:'after-write',...window.InsightRestoreOperationObserverV0.getStatus()});
         if(options.postcommitThrow&&writeCount===1)throw new Error('FICTIONAL postcommit write throw');
       },
-      writeMetadata(key,value){metadataWrites.push({key,value});return true;},
+      writeMetadata(key,value){if(options.metadataFailureKey===key)throw new Error('FICTIONAL metadata failure');metadata.set(key,String(value));metadataWrites.push({key,value});return true;},
       holdSnapshotWrites(){writeHeld=true;return true;},
       snapshotWritesHeld(){return writeHeld;}
     },
@@ -136,7 +138,7 @@ function fixture(options={}){
     const count=readers.length;ctx.restoreData({target:input});
     return options.deferReader||readers.length===count?input:Promise.resolve(readers.at(-1)?.completion).then(()=>input);
   }
-  return {ctx,window,original,restore,downloads,blobs,passwordRequests,metadataWrites,alerts,toasts,samples,readers,
+  return {ctx,window,original,restore,downloads,blobs,passwordRequests,confirmationRequests,metadata,metadataWrites,alerts,toasts,samples,readers,
     flushReader(){const r=readers.at(-1);return r.onload({target:{result:r._file.contents}});},
     repeatReader(){const r=readers.at(-1);return r.onload({target:{result:r._file.contents}});},
     get persisted(){return persisted;},
@@ -636,8 +638,10 @@ test('Stage2 FICTIONAL normal backup encrypts all metadata; cancellation never u
   assert.equal(file.backupInfo,undefined);
   const payload=await f.window.InsightBackupCryptoV1.decrypt(file,'FICTIONAL-safety-password');
   assert.deepEqual(clone(payload.data),f.original);
-  assert.equal(f.metadataWrites.length,1);
-  assert.match(f.toasts[0],/ダウンロード処理を開始/);
+  assert.equal(f.metadataWrites.length,2);
+  assert.equal(f.metadata.has('insight_last_backup'),false);
+  assert.equal(JSON.parse(f.metadata.get('insight_backup_confirmed_v1')).confirmation,'user');
+  assert.match(f.toasts[0],/ご本人の申告/);
   const cancelled=fixture({realCrypto:true,requestPassword:()=>null});
   await cancelled.ctx.backupData();
   assert.equal(cancelled.blobs.length,0);
@@ -729,4 +733,82 @@ test('Stage2 FICTIONAL rollback failure releases only the private clone; encrypt
   // Download completion cannot be guaranteed; no in-page retry is presented.
   // The exported file remains decryptable after cleanup and blocked writes.
   assert.deepEqual(clone((await f.window.InsightBackupCryptoV1.decrypt(safety,SAFETY_PASSWORD)).data),f.original);
+});
+
+const DOWNLOAD_KEY='insight_backup_download_v1',CONFIRMED_KEY='insight_backup_confirmed_v1';
+function oldConfirmation(){const at=Date.now()-86400000;return JSON.stringify({version:1,id:'a'.repeat(32),kind:'normal',startedAt:at,confirmedAt:at,confirmation:'user'});}
+function backupLabel(metadata){
+  const core=fs.readFileSync(path.join(__dirname,'..','insight_payload_core_v1.js'),'utf8');
+  const start=core.indexOf('function updateBackupDaysLabel(){'),end=core.indexOf("window.addEventListener('storage'",start);
+  const classes=new Set(),label={textContent:'',classList:{remove(...names){names.forEach(n=>classes.delete(n));},add(name){classes.add(name);}}};
+  const ctx={localStorage:{getItem:key=>metadata.get(key)??null},document:{getElementById:()=>label},BACKUP_KEY:'insight_last_backup',Date,JSON,Number,Math};
+  vm.runInNewContext(core.slice(start,end)+';updateBackupDaysLabel();',ctx);
+  return {text:label.textContent,classes:[...classes]};
+}
+test('Backup confirmation labels never promote legacy dates or pending downloads to confirmed',()=>{
+  const map=new Map();assert.equal(backupLabel(map).text,'未バックアップ');
+  map.set('insight_last_backup',String(Date.now()));
+  assert.equal(backupLabel(map).text,'旧ダウンロード記録あり・保存未確認');
+  const old=oldConfirmation();map.set(CONFIRMED_KEY,old);
+  assert.match(backupLabel(map).text,/保存確認（本人申告）/);
+  map.set(DOWNLOAD_KEY,JSON.stringify({version:1,id:'b'.repeat(32),kind:'normal',startedAt:Date.now()}));
+  assert.match(backupLabel(map).text,/保存未確認（前回の保存確認あり）/);
+  assert.equal(map.get(CONFIRMED_KEY),old);
+});
+for(const kind of ['normal','preRestore']){
+  for(const confirmed of [false,true]){
+    test('Backup confirmation '+kind+' waits for explicit choice '+confirmed,{timeout:10000},async()=>{
+      let decide,ready;const waiting=new Promise(resolve=>{ready=resolve;});
+      const old=oldConfirmation(),legacy='1700000000000';
+      const f=fixture({metadata:{[CONFIRMED_KEY]:old,insight_last_backup:legacy},confirmDownload:request=>{assert.equal(request.kind,kind);ready();return new Promise(resolve=>{decide=resolve;});}});
+      const job=kind==='normal'?f.ctx.backupData():f.restore(snapshot(750));
+      await waiting;
+      assert.equal(f.downloads.length,1);assert.equal(f.writeCount,0);
+      assert.deepEqual(f.persisted,f.original);assert.deepEqual(clone(f.ctx.allStores),f.original);
+      assert.equal(f.metadata.get(CONFIRMED_KEY),old);assert.equal(f.metadata.get('insight_last_backup'),legacy);
+      assert.match(backupLabel(f.metadata).text,/保存未確認/);
+      decide(confirmed);await job;
+      assert.equal(f.metadata.get('insight_last_backup'),legacy);
+      if(confirmed){
+        const record=JSON.parse(f.metadata.get(CONFIRMED_KEY));assert.equal(record.confirmation,'user');assert.equal(record.kind,kind);
+        assert.equal(record.id,JSON.parse(f.metadata.get(DOWNLOAD_KEY)).id);
+        assert.equal(f.writeCount,kind==='preRestore'?1:0);
+        assert.match(backupLabel(f.metadata).text,/保存確認（本人申告）/);
+      }else{
+        assert.equal(f.metadata.get(CONFIRMED_KEY),old);assert.equal(f.writeCount,0);
+        // A fresh runtime sees the pending attempt and preserves the last confirmation.
+        const restarted=fixture({metadata:Object.fromEntries(f.metadata)});
+        assert.equal(restarted.metadata.get(CONFIRMED_KEY),old);
+        assert.match(backupLabel(restarted.metadata).text,/保存未確認/);
+      }
+    });
+  }
+}
+for(const kind of ['normal','preRestore']){
+  test('Backup confirmation '+kind+' rejects another tab replacing its pending record',{timeout:10000},async()=>{
+    let decide,ready;const waiting=new Promise(resolve=>{ready=resolve;});const old=oldConfirmation();
+    const f=fixture({metadata:{[CONFIRMED_KEY]:old},confirmDownload:()=>{ready();return new Promise(resolve=>{decide=resolve;});}});
+    const job=kind==='normal'?f.ctx.backupData():f.restore(snapshot(750));await waiting;
+    f.metadata.set(DOWNLOAD_KEY,JSON.stringify({version:1,id:'b'.repeat(32),kind:'normal',startedAt:Date.now()}));
+    decide(true);await job;
+    assert.equal(f.metadata.get(CONFIRMED_KEY),old);assert.equal(f.writeCount,0);assert.deepEqual(f.persisted,f.original);
+    assert.match(f.alerts.join(' '),/別のバックアップ処理/);
+  });
+}
+for(const key of [DOWNLOAD_KEY,CONFIRMED_KEY]){
+  test('Backup confirmation metadata failure '+key+' prevents the primary restore write',async()=>{
+    const old=oldConfirmation();const f=fixture({metadata:{[CONFIRMED_KEY]:old},metadataFailureKey:key});
+    await f.restore(snapshot(750));assert.equal(f.writeCount,0);assert.deepEqual(f.persisted,f.original);
+    assert.equal(f.metadata.get(CONFIRMED_KEY),old);assert.match(f.alerts.join(' '),/復元を中止/);
+  });
+}
+test('Backup confirmation keeps old records on password cancel, encryption failure and download failure',async()=>{
+  for(const options of [{requestPassword:()=>null},{insecure:true},{realCrypto:true,requestPassword:()=> 'short'},{backupDownloadFailure:true}]){
+    for(const kind of ['normal','preRestore']){
+      const old=oldConfirmation();const f=fixture({...options,metadata:{[CONFIRMED_KEY]:old,insight_last_backup:'1700000000000'}});
+      if(kind==='normal')await f.ctx.backupData();else await f.restore(snapshot(750));
+      assert.equal(f.metadata.get(CONFIRMED_KEY),old);assert.equal(f.metadata.get('insight_last_backup'),'1700000000000');
+      assert.equal(f.metadata.has(DOWNLOAD_KEY),false);assert.equal(f.writeCount,0);assert.deepEqual(f.persisted,f.original);
+    }
+  }
 });

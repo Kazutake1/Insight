@@ -88,6 +88,7 @@ var preRestoreMemorySnapshot=null;
 var restoreFileReaderActive=null;
 var backupOperationActive=false;
 var PLAIN_FILE_LIMIT=20*1024*1024,ENCRYPTED_FILE_LIMIT=21*1024*1024;
+var DOWNLOAD_KEY='insight_backup_download_v1',CONFIRMED_KEY='insight_backup_confirmed_v1';
 function cryptoCodec(){
   if(!window.isSecureContext||!window.crypto||!window.crypto.subtle||!window.InsightBackupCryptoV1||!window.InsightBackupPasswordV1)
     throw new Error('暗号化には安全なHTTPS環境とWebCryptoが必要です。平文では保存しません。');
@@ -114,6 +115,22 @@ function ensureBackupContinuing(operation,state){
   assertBackupState(state);
 }
 function backupBusy(message,operation){window.InsightBackupPasswordV1.busy(message,function(){operation.cancelled=true;});}
+async function confirmBackupDownload(filename,kind,operation,state){
+  var bytes=new Uint8Array(16);window.crypto.getRandomValues(bytes);
+  var id=Array.from(bytes,function(n){return n.toString(16).padStart(2,'0');}).join('');
+  var record={version:1,id:id,startedAt:Date.now(),kind:kind};
+  var raw=JSON.stringify(record);
+  window.InsightStorage.writeMetadata(DOWNLOAD_KEY,raw);
+  if(typeof updateBackupDaysLabel==='function')updateBackupDaysLabel();
+  if(await window.InsightBackupPasswordV1.confirmSaved({filename:filename,kind:kind})!==true)throw cancelledBackup();
+  ensureBackupContinuing(operation,state);
+  // Another tab may have initiated a newer download while this modal waited.
+  // Never confirm its file, or replace an existing confirmation on its behalf.
+  if(window.localStorage.getItem(DOWNLOAD_KEY)!==raw)throw new Error('別のバックアップ処理が開始されたため、確認を記録しませんでした。');
+  record.confirmedAt=Date.now();record.confirmation='user';
+  window.InsightStorage.writeMetadata(CONFIRMED_KEY,JSON.stringify(record));
+  if(typeof updateBackupDaysLabel==='function')updateBackupDaysLabel();
+}
 async function backupPassword(title,confirmPassword,operation){
   cryptoCodec();
   var password=await window.InsightBackupPasswordV1.request({title:title,confirm:confirmPassword});
@@ -215,6 +232,7 @@ async function createPreRestoreBackup(operation,state){
   }finally{password=null;}
   ensureBackupContinuing(operation,state);
   downloadBackupPayload(encrypted,filename);
+  await confirmBackupDownload(filename,'preRestore',operation,state);
   preRestoreMemorySnapshot=snapshot;
   return {snapshot:snapshot,filename:filename};
 }
@@ -368,9 +386,8 @@ backupData=async function(){
     var encrypted=await cryptoCodec().encrypt(payload,password);password=null;
     ensureBackupContinuing(operation,state);
     downloadBackupPayload(encrypted,filename);
-    window.InsightStorage.writeMetadata("insight_last_backup",String(Date.now()));
-    if(typeof updateBackupDaysLabel==="function")updateBackupDaysLabel();
-    showToast("📥 暗号化バックアップのダウンロード処理を開始しました。保存先を確認してください。","#15803d","#f0fdf4");
+    await confirmBackupDownload(filename,'normal',operation,state);
+    showToast("📥 保存したファイルの確認を記録しました（ご本人の申告）","#15803d","#f0fdf4");
   }catch(err){
     if(err&&err.name==='InsightBackupCancelled')return;
     alert("バックアップ処理を完了できませんでした。\n"+String(err&&err.message?err.message:err));
