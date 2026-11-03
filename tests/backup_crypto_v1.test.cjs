@@ -92,3 +92,49 @@ test('existing plain JSON remains distinguishable; codec never rewrites the snap
   assert.deepEqual(original,storeSnapshot);
   assert.equal(api.isEncryptedEnvelope(encrypted),true);
 });
+
+test('FICTIONAL multi-MiB backups round-trip up to the plaintext byte limit',async()=>{
+  const api=codec();
+  const limit=15*1024*1024;
+  const overhead=Buffer.byteLength(JSON.stringify({fictional:''}));
+  for(const size of [4*1024*1024,limit-1,limit]){
+    const original={fictional:'A'.repeat(size-overhead)};
+    assert.equal(Buffer.byteLength(JSON.stringify(original)),size);
+    const encrypted=await api.encrypt(original,PASSWORD);
+    const decrypted=await api.decrypt(encrypted,PASSWORD);
+    assert.deepEqual(clone(decrypted),original);
+  }
+  await assert.rejects(
+    api.encrypt({fictional:'A'.repeat(limit+1-overhead)},PASSWORD),/大きすぎます/
+  );
+});
+
+test('FICTIONAL malformed and noncanonical Base64 never reaches key derivation',async()=>{
+  let keyImports=0;
+  const window={
+    isSecureContext:true,
+    crypto:{getRandomValues(){},subtle:{importKey(){keyImports++;throw new Error('unexpected key derivation');}}},
+    btoa(value){return Buffer.from(value,'binary').toString('base64');},
+    atob(value){return Buffer.from(value,'base64').toString('binary');}
+  };
+  vm.runInNewContext(source,{window,TextEncoder,TextDecoder,Uint8Array,ArrayBuffer});
+  const api=window.InsightBackupCryptoV1;
+  const base={
+    format:'InsightEncryptedBackup',formatVersion:1,
+    kdf:{algorithm:'PBKDF2-HMAC-SHA256',iterations:600000,salt:Buffer.alloc(16).toString('base64')},
+    cipher:{algorithm:'AES-256-GCM',iv:Buffer.alloc(12).toString('base64')}
+  };
+  const large='A'.repeat(4*1024*1024);
+  for(const ciphertext of [
+    '', 'AAA', '====', 'A===', 'AA=A', 'AA==AAAA', 'AA\nA', 'AA-_', 'AAéA',
+    'AB==', 'AAB=', // Nonzero unused bits: permissive atob would accept these.
+    large+'AAA@', large+'AA=A', large+'AB==',
+    'A'.repeat(Math.ceil((15*1024*1024+16)/3)*4+8)
+  ]){
+    await assert.rejects(api.decrypt({...base,ciphertext},PASSWORD),/形式が不正です/);
+  }
+  // Within the encoded-length bound, but one byte beyond the decoded limit.
+  const oversized=Buffer.alloc(15*1024*1024+17).toString('base64');
+  await assert.rejects(api.decrypt({...base,ciphertext:oversized},PASSWORD),/大きすぎます/);
+  assert.equal(keyImports,0);
+});

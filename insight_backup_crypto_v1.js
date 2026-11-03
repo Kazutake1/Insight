@@ -35,9 +35,21 @@
     return root.btoa(result);
   }
   function fromBase64(value,maxBytes){
-    if(typeof value!=='string'||value.length===0||value.length>Math.ceil(maxBytes/3)*4+4||
-       !/^(?:[A-Za-z0-9+/]{4})*(?:[A-Za-z0-9+/]{2}==|[A-Za-z0-9+/]{3}=)?$/.test(value)){
+    if(typeof value!=='string'||value.length===0||value.length%4!==0||
+       value.length>Math.ceil(maxBytes/3)*4+4){
       throw new Error('暗号化バックアップの形式が不正です。');
+    }
+    // Scan without repeated regex groups: valid multi-MiB input must not
+    // exhaust the regular-expression stack before it can be decrypted.
+    var dataEnd=value.length;
+    if(value.charAt(dataEnd-1)==='=')dataEnd--;
+    if(value.charAt(dataEnd-1)==='=')dataEnd--;
+    for(var index=0;index<dataEnd;index++){
+      var code=value.charCodeAt(index);
+      if(!((code>=65&&code<=90)||(code>=97&&code<=122)||
+           (code>=48&&code<=57)||code===43||code===47)){
+        throw new Error('暗号化バックアップの形式が不正です。');
+      }
     }
     var binary;
     try{binary=root.atob(value);}catch(_){throw new Error('暗号化バックアップの形式が不正です。');}
