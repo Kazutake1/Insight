@@ -81,23 +81,42 @@ for(const mode of ['unavailable','safety-failure']){
     expect(downloads).toHaveLength(0);
   });
 }
-test('FICTIONAL cancellation during encryption and duplicate operation never downloads or mutates',async({page})=>{
-  await setup(page);const raw=await page.evaluate(()=>localStorage.getItem('insight_v11'));
-  const downloads=[];page.on('download',event=>downloads.push(event));
-  await page.evaluate(()=>{
-    const original=InsightBackupCryptoV1;
-    InsightBackupCryptoV1={...original,encrypt:(...args)=>new Promise(resolve=>{window.__releaseCrypto=async()=>resolve(await original.encrypt(...args));})};
+for(const initialized of [false,true]){
+  test('FICTIONAL backup rejection preserves '+(initialized?'idle':'unavailable')+' restore observation and permits later restore',async({page})=>{
+    await setup(page);
+    if(initialized){
+      const raw=await page.evaluate(()=>localStorage.getItem('insight_v11'));
+      const initialDownload=page.waitForEvent('download');
+      await upload(page,JSON.parse(raw));await password(page,SAFETY);await initialDownload;
+      await expect(page.locator('#insightBackupOverlay')).toHaveCount(0);
+    }
+    const before=await page.evaluate(()=>({raw:localStorage.getItem('insight_v11'),live:JSON.stringify(allStores),observer:InsightRestoreOperationObserverV0.getStatus()}));
+    expect(before.observer.state).toBe(initialized?'IDLE_OBSERVED':'UNAVAILABLE');
+    const downloads=[];page.on('download',event=>downloads.push(event));
+    await page.evaluate(()=>{
+      const original=InsightBackupCryptoV1;window.__originalBackupCrypto=original;
+      InsightBackupCryptoV1={...original,encrypt:(...args)=>new Promise(resolve=>{window.__releaseCrypto=async()=>resolve(await original.encrypt(...args));})};
+    });
+    await page.locator('#backupBtn').click();await password(page,PASSWORD);
+    await page.waitForFunction(()=>typeof __releaseCrypto==='function');
+    await page.evaluate(()=>restoreData({target:{value:'selected',files:[{name:'FICTIONAL.json',size:1}]}}));
+    expect(await page.evaluate(()=>({raw:localStorage.getItem('insight_v11'),live:JSON.stringify(allStores),observer:InsightRestoreOperationObserverV0.getStatus()}))).toEqual(before);
+    await page.getByRole('button',{name:'キャンセル',exact:true}).click();
+    await page.evaluate(()=>__releaseCrypto());
+    await expect(page.locator('#insightBackupOverlay')).toHaveCount(0);
+    expect(await page.evaluate(()=>({raw:localStorage.getItem('insight_v11'),live:JSON.stringify(allStores),observer:InsightRestoreOperationObserverV0.getStatus()}))).toEqual(before);
+    expect(await page.evaluate(()=>localStorage.getItem('insight_last_backup'))).toBeNull();
+    expect(downloads).toHaveLength(0);
+    await page.evaluate(()=>{InsightBackupCryptoV1=__originalBackupCrypto;});
+    const target=JSON.parse(before.raw);
+    for(const st of Object.values(target.stores))st.data[st.years.at(-1)]['1月'][0].売上=987;
+    await upload(page,target);await password(page,SAFETY);
+    await expect(page.locator('#insightBackupOverlay')).toHaveCount(0);
+    expect(await page.evaluate(()=>InsightRestoreOperationObserverV0.getStatus().state)).toBe('IDLE_OBSERVED');
+    expect(await page.evaluate(()=>Object.values(InsightStorage.readSnapshot().stores).map(st=>st.data[st.years.at(-1)]['1月'][0].売上))).toEqual([987,987]);
+    expect(downloads).toHaveLength(1); // Only the later confirmed restore's encrypted safety backup.
   });
-  await page.locator('#backupBtn').click();await password(page,PASSWORD);
-  await page.waitForFunction(()=>typeof __releaseCrypto==='function');
-  await page.evaluate(()=>restoreData({target:{value:'selected',files:[{name:'FICTIONAL.json',size:1}]}}));
-  await page.getByRole('button',{name:'キャンセル',exact:true}).click();
-  await page.evaluate(()=>__releaseCrypto());
-  await expect(page.locator('#insightBackupOverlay')).toHaveCount(0);
-  expect(await page.evaluate(()=>localStorage.getItem('insight_v11'))).toBe(raw);
-  expect(await page.evaluate(()=>localStorage.getItem('insight_last_backup'))).toBeNull();
-  expect(downloads).toHaveLength(0);
-});
+}
 test('FICTIONAL encrypted restore uses a separately entered safety password and persists across reload',async({page})=>{
   await setup(page);
   const original=await page.evaluate(()=>JSON.parse(JSON.stringify(allStores)));

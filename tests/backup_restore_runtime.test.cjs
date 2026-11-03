@@ -708,3 +708,25 @@ test('Stage2 FICTIONAL maximum plaintext restores through the 21MiB encrypted fi
   assert.deepEqual(f.persisted,target);
   assert.equal(f.alerts.length,0);
 });
+test('Stage2 FICTIONAL rollback failure releases only the private clone; encrypted recovery file and sticky hold survive',async()=>{
+  const f=fixture({realCrypto:true,corruptAfterWrite:true,rollbackFailure:true,requestPassword:()=>SAFETY_PASSWORD});
+  await f.restore(snapshot(750));
+  assert.equal(f.writeCount,1);
+  assert.equal(f.window.InsightStorage.snapshotWritesHeld(),true);
+  assert.equal(f.window.InsightRestoreOperationObserverV0.getStatus().state,'HELD');
+  assert.deepEqual(clone(f.ctx.allStores),f.original);
+  const safety=JSON.parse(await f.blobs[0].text());
+  assert.equal(safety.format,'InsightEncryptedBackup');
+  const recovered=await f.window.InsightBackupCryptoV1.decrypt(safety,SAFETY_PASSWORD);
+  assert.deepEqual(clone(recovered.data),f.original);
+  assert.equal(recovered.backupInfo.backupType,'preRestore');
+  const savedBefore=clone(f.persisted);
+  assert.throws(()=>f.window.InsightStorage.writeSnapshot(recovered.data),error=>error.name==='InsightStorageRestoreHoldError');
+  assert.deepEqual(f.persisted,savedBefore);
+  assert.equal(f.writeCount,1);
+  assert.match(f.alerts[0],/自動復旧にも失敗/);
+  assert.match(f.alerts[0],/手動で再読み込み/);
+  // Download completion cannot be guaranteed; no in-page retry is presented.
+  // The exported file remains decryptable after cleanup and blocked writes.
+  assert.deepEqual(clone((await f.window.InsightBackupCryptoV1.decrypt(safety,SAFETY_PASSWORD)).data),f.original);
+});

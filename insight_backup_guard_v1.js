@@ -379,7 +379,9 @@ backupData=async function(){
 restoreData=function(e){
   var file=e.target.files[0];if(!file)return;
   if(restoreFileReaderActive||backupOperationActive){
-    markRestoreObservationFault();
+    // A normal backup owns the UI, but is outside the restore observer's
+    // scope. Only a conflicting restore reader invalidates that observer.
+    if(restoreFileReaderActive)markRestoreObservationFault();
     alert('別のバックアップ復元処理が進行中です。完了後にもう一度お試しください。');
     e.target.value='';return;
   }
@@ -446,6 +448,10 @@ restoreData=function(e){
       ?"バックアップ復元中にエラーが発生し、現在の保存状態を確認できませんでした。\n"+detail+"\n\n追加の編集・保存や再復元は行わず、復元直前バックアップを保管してからInsightを再読み込みし、保存内容を確認してください。"
       :"バックアップを復元できませんでした。\n"+detail+"\n\n現在のデータは変更されていません。");
   }e.target.value="";}finally{
+    // This private clone is used only by the synchronous rollback above.
+    // After an uncertain/failed rollback, the sticky write hold and the
+    // encrypted safety download remain; recovery requires a manual reload.
+    // Retaining a second plaintext clone here provides no recovery API.
     password=null;preRestoreMemorySnapshot=null;e.target.value='';
     try{if(window.InsightBackupPasswordV1)window.InsightBackupPasswordV1.close();}catch(_){markRestoreObservationFault();}
     readerPhase='finished';
