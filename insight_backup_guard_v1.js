@@ -86,6 +86,40 @@ function restoreSummary(fileName,info,snapshot,report){
 var preRestoreMemorySnapshot=null;
 // A single FileReader may own the restore path at a time; no snapshot/schema changes.
 var restoreFileReaderActive=null;
+var backupOperationActive=false;
+var PLAIN_FILE_LIMIT=20*1024*1024,ENCRYPTED_FILE_LIMIT=21*1024*1024;
+function cryptoCodec(){
+  if(!window.isSecureContext||!window.crypto||!window.crypto.subtle||!window.InsightBackupCryptoV1||!window.InsightBackupPasswordV1)
+    throw new Error('暗号化には安全なHTTPS環境とWebCryptoが必要です。平文では保存しません。');
+  return window.InsightBackupCryptoV1;
+}
+function captureBackupState(){
+  var storage=window.InsightStorage;
+  if(!storage)throw new Error('保存機能を初期化できませんでした');
+  // Compare raw saved bytes without acknowledging another tab or invoking the
+  // restore readback/postflight path during the asynchronous preparation.
+  return {live:storage.serialize(allStores),saved:window.localStorage
+    ?window.localStorage.getItem(currentStorageKey()):storage.serialize(allStores)};
+}
+function assertBackupState(state){
+  var current=captureBackupState();
+  if(current.live!==state.live||current.saved!==state.saved){
+    var error=new Error('処理中にデータが変更されたため中止しました。現在の内容を確認し、もう一度お試しください。');
+    error.name='InsightBackupStateChanged';throw error;
+  }
+}
+function cancelledBackup(){var error=new Error('キャンセルしました。');error.name='InsightBackupCancelled';return error;}
+function ensureBackupContinuing(operation,state){
+  if(operation.cancelled)throw cancelledBackup();
+  assertBackupState(state);
+}
+function backupBusy(message,operation){window.InsightBackupPasswordV1.busy(message,function(){operation.cancelled=true;});}
+async function backupPassword(title,confirmPassword,operation){
+  cryptoCodec();
+  var password=await window.InsightBackupPasswordV1.request({title:title,confirm:confirmPassword});
+  if(password===null||operation.cancelled)throw cancelledBackup();
+  return password;
+}
 
 /* The registered operation begins at the confirmed restore write, not at
  * file selection/reading or preflight. It neither authorizes data use nor
@@ -157,6 +191,7 @@ function backupStamp(now){
 }
 function downloadBackupPayload(payload,filename){
   var blob=new Blob([JSON.stringify(payload,null,2)],{type:"application/json"});
+  if(blob.size>ENCRYPTED_FILE_LIMIT)throw new Error('暗号化バックアップのサイズが大きすぎます。');
   var url=URL.createObjectURL(blob),a=document.createElement("a");
   try{
     a.href=url;a.download=filename;document.body.appendChild(a);a.click();
@@ -166,13 +201,20 @@ function downloadBackupPayload(payload,filename){
   }
   return filename;
 }
-function createPreRestoreBackup(){
+async function createPreRestoreBackup(operation,state){
   if(!window.InsightStorage)throw new Error("保存機能を初期化できませんでした");
   var now=new Date(),snapshot=window.InsightStorage.migrateSnapshot(allStores);
   var payload={backupInfo:buildBackupInfo(snapshot,now),data:snapshot};
   payload.backupInfo.backupType="preRestore";
   var filename="Insight_pre_restore_"+backupStamp(now)+".json";
-  downloadBackupPayload(payload,filename);
+  var password=await backupPassword('復元直前の安全バックアップ用パスワード',true,operation);
+  var encrypted;
+  try{
+    backupBusy('復元直前の安全バックアップを暗号化中',operation);
+    encrypted=await cryptoCodec().encrypt(payload,password);
+  }finally{password=null;}
+  ensureBackupContinuing(operation,state);
+  downloadBackupPayload(encrypted,filename);
   preRestoreMemorySnapshot=snapshot;
   return {snapshot:snapshot,filename:filename};
 }
@@ -309,39 +351,61 @@ function rollbackPreRestoreSnapshot(){
   if(window.InsightStorage.serialize(restored)!==window.InsightStorage.serialize(preRestoreMemorySnapshot))throw new Error("復元前データの再保存結果が一致しません。");
   return restored;
 }
-backupData=function(){
+backupData=async function(){
+  if(backupOperationActive||restoreFileReaderActive){alert('別のバックアップ・復元処理が進行中です。');return;}
+  backupOperationActive=true;
+  var operation={cancelled:false},password=null;
   try{
+    cryptoCodec();
+    var state=captureBackupState();
     if(!window.InsightStorage)throw new Error("保存機能を初期化できませんでした");
     var snapshot=window.InsightStorage.migrateSnapshot(allStores),now=new Date();
     var payload={backupInfo:buildBackupInfo(snapshot,now),data:snapshot};
     var stamp=backupStamp(now);
     var filename="Insight_backup_all_stores_"+stamp+".json";
-    var blob=new Blob([JSON.stringify(payload,null,2)],{type:"application/json"});
-    var url=URL.createObjectURL(blob),a=document.createElement("a");
-    a.href=url;a.download=filename;document.body.appendChild(a);a.click();a.remove();
-    setTimeout(function(){URL.revokeObjectURL(url);},1000);
+    password=await backupPassword('バックアップ用パスワード',true,operation);
+    backupBusy('バックアップを暗号化中',operation);
+    var encrypted=await cryptoCodec().encrypt(payload,password);password=null;
+    ensureBackupContinuing(operation,state);
+    downloadBackupPayload(encrypted,filename);
     window.InsightStorage.writeMetadata("insight_last_backup",String(Date.now()));
     if(typeof updateBackupDaysLabel==="function")updateBackupDaysLabel();
-    showToast("📥 バックアップを保存しました","#15803d","#f0fdf4");
+    showToast("📥 暗号化バックアップのダウンロード処理を開始しました。保存先を確認してください。","#15803d","#f0fdf4");
   }catch(err){
-    console.warn("Insight backup failed:",err);
-    alert("バックアップを保存できませんでした。\n"+String(err&&err.message?err.message:err));
-  }
+    if(err&&err.name==='InsightBackupCancelled')return;
+    alert("バックアップ処理を完了できませんでした。\n"+String(err&&err.message?err.message:err));
+  }finally{password=null;backupOperationActive=false;if(window.InsightBackupPasswordV1)window.InsightBackupPasswordV1.close();}
 };
 restoreData=function(e){
   var file=e.target.files[0];if(!file)return;
-  if(restoreFileReaderActive){
+  if(restoreFileReaderActive||backupOperationActive){
     markRestoreObservationFault();
     alert('別のバックアップ復元処理が進行中です。完了後にもう一度お試しください。');
     e.target.value='';return;
   }
-  if(file.size>20*1024*1024){alert("バックアップファイルが大きすぎます。\n20MB以下のファイルを選択してください。");e.target.value="";return;}
-  var reader=new FileReader(),restoreLoadCount=0,readerPhase='pending';restoreFileReaderActive=reader;reader.onload=function(ev){if(++restoreLoadCount>1||readerPhase!=='pending'||restoreFileReaderActive!==reader){markRestoreObservationFault();return;}readerPhase='processing';var restoreCommitted=false,restoreTicket=null,restoreOutcome='unknown',restoreWriteCheck=null;try{try{
-    var parsed=JSON.parse(ev.target.result),envelope=parseBackupEnvelope(parsed),newAll=normalizeBackup(envelope.data);
+  if(file.size>ENCRYPTED_FILE_LIMIT){alert("バックアップファイルが大きすぎます。\n暗号化形式は21MiB、平文JSONは20MiB以下にしてください。");e.target.value="";return;}
+  var state;
+  try{state=captureBackupState();}catch(_){alert('現在の保存内容を確認できないため復元を開始できません。');e.target.value='';return;}
+  var operation={cancelled:false};
+  var reader=new FileReader(),restoreLoadCount=0,readerPhase='pending';restoreFileReaderActive=reader;reader.onload=async function(ev){if(++restoreLoadCount>1||readerPhase!=='pending'||restoreFileReaderActive!==reader){markRestoreObservationFault();return;}readerPhase='processing';var restoreCommitted=false,restoreTicket=null,restoreOutcome='unknown',restoreWriteCheck=null,password=null;try{try{
+    var parsed=JSON.parse(ev.target.result);
+    // Any encryption-shaped input must authenticate; never reinterpret a broken
+    // or unknown encrypted envelope as a legacy plaintext snapshot.
+    var encrypted=isPlainObject(parsed)&&(['format','kdf','cipher','ciphertext'].some(function(key){return Object.prototype.hasOwnProperty.call(parsed,key);}));
+    if(encrypted){
+      password=await backupPassword('復元ファイルのパスワード',false,operation);
+      backupBusy('バックアップを復号中',operation);
+      try{parsed=await cryptoCodec().decrypt(parsed,password);}finally{password=null;}
+    }else{
+      if(file.size>PLAIN_FILE_LIMIT)throw validationError('平文JSONは20MiB以下にしてください。');
+    }
+    ensureBackupContinuing(operation,state);
+    var envelope=parseBackupEnvelope(parsed),newAll=normalizeBackup(envelope.data);
     if(envelope.info)validateBackupInfo(envelope.info,newAll);
     var preflight=runRestorePreflight(newAll);
-    if(!confirm(restoreSummary(file.name,envelope.info,newAll,preflight))){e.target.value="";return;}
-    try{createPreRestoreBackup();}catch(safetyErr){throw new Error("復元直前バックアップを作成できないため、復元を中止しました。 "+String(safetyErr&&safetyErr.message?safetyErr.message:safetyErr));}
+    if(!confirm((encrypted?'':'このファイルは暗号化されていない平文JSONです。\n\n')+restoreSummary(file.name,envelope.info,newAll,preflight))){e.target.value="";return;}
+    try{await createPreRestoreBackup(operation,state);}catch(safetyErr){if(safetyErr&&['InsightBackupCancelled','InsightBackupStateChanged'].indexOf(safetyErr.name)>=0)throw safetyErr;throw new Error("復元直前バックアップを作成できないため、復元を中止しました。 "+String(safetyErr&&safetyErr.message?safetyErr.message:safetyErr));}
+    ensureBackupContinuing(operation,state);
     var verifiedRestore=null,writeCompleted=false,writeAttempted=false;
     try{
       if(!window.InsightStorage)throw new Error("保存機能を初期化できませんでした");
@@ -359,7 +423,7 @@ restoreData=function(e){
       try{
         rollbackPreRestoreSnapshot();
         preRestoreMemorySnapshot=null;
-        alert("復元後の整合性確認に失敗したため、復元前の状態へ自動で戻しました。\n\n"+String(postErr&&postErr.message?postErr.message:postErr)+"\n\n復元直前バックアップも保存されています。");
+        alert("復元後の整合性確認に失敗したため、復元前の状態へ自動で戻しました。\n\n"+String(postErr&&postErr.message?postErr.message:postErr)+"\n\n復元直前バックアップのダウンロード処理は開始済みです。保存先を確認してください。");
       }catch(rollbackErr){
         holdRestoreSnapshotWrites();
         alert("重大なエラー：復元後の整合性確認に失敗し、自動復旧にも失敗しました。\n\n"+String(postErr&&postErr.message?postErr.message:postErr)+"\n\n自動復旧エラー："+String(rollbackErr&&rollbackErr.message?rollbackErr.message:rollbackErr)+"\n\n復元直前バックアップ Insight_pre_restore_...json を保管してください。\n\n追加の編集・保存や、この画面での再復元は行わないでください。\nInsightを手動で再読み込みし、保存内容を確認してください。\nその後、必要な場合のみ保管したバックアップから復元してください。");
@@ -371,7 +435,8 @@ restoreData=function(e){
     restoreCommitted=true;
     allStores=newAll;store=allStores.stores[allStores.current];baseYear=store.years[store.years.length-1];cmpYear=store.years.length>1?store.years[store.years.length-2]:null;editYear={sales:baseYear,kyaku:baseYear,haiki:baseYear};editMonth={sales:todayFY().month,kyaku:todayFY().month,haiki:todayFY().month};renderStoreSel();if(currentNav==='salesCounts'){if(window.InsightSalesCount&&typeof window.InsightSalesCount.reloadFromStore==="function")window.InsightSalesCount.reloadFromStore();else gotoNav('salesCounts');}else if(currentNav==='settings'){if(window.InsightSettings&&typeof window.InsightSettings.open==="function")window.InsightSettings.open();}else if(currentNav===1)refreshDash();else if(currentNav>1)initInputPage(["","","sales","kyaku","haiki"][currentNav]);else initQuickPage();if(window.InsightPagePeriodSync&&typeof window.InsightPagePeriodSync.reconcileCurrentStore==="function")window.InsightPagePeriodSync.reconcileCurrentStore();if(window.InsightDataHealth&&typeof window.InsightDataHealth.refresh==="function")window.InsightDataHealth.refresh();updateMissingBadge();showToast("📤 データを復元しました（整合性確認済み）","#1d4ed8","#eff6ff");restoreOutcome="completed";
   }catch(err){
-    console.warn("Insight restore rejected:",err);
+    if(err&&err.name==='InsightBackupCancelled')return;
+    if(err&&err.name==='InsightBackupStateChanged'){alert(err.message+'\nこの復元による書き込みは行っていません。');return;}
     var detail=String(err&&err.message?err.message:err);
     alert(restoreCommitted
       ?"バックアップの保存と整合性確認は完了しましたが、画面の更新に失敗しました。\n"+detail+"\n\n復元したデータは保存されています。Insightを再読み込みして表示を更新してください。もう一度復元する必要はありません。"
@@ -381,6 +446,8 @@ restoreData=function(e){
       ?"バックアップ復元中にエラーが発生し、現在の保存状態を確認できませんでした。\n"+detail+"\n\n追加の編集・保存や再復元は行わず、復元直前バックアップを保管してからInsightを再読み込みし、保存内容を確認してください。"
       :"バックアップを復元できませんでした。\n"+detail+"\n\n現在のデータは変更されていません。");
   }e.target.value="";}finally{
+    password=null;preRestoreMemorySnapshot=null;e.target.value='';
+    try{if(window.InsightBackupPasswordV1)window.InsightBackupPasswordV1.close();}catch(_){markRestoreObservationFault();}
     readerPhase='finished';
     finishRestoreObservation(restoreTicket,restoreOutcome);
     if(restoreFileReaderActive===reader)restoreFileReaderActive=null;

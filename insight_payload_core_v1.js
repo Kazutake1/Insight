@@ -2467,65 +2467,20 @@ function updateBackupDaysLabel(){
   const last=localStorage.getItem(BACKUP_KEY);
   if(!last){label.textContent="未バックアップ";label.classList.add("backup-status-missing");return;}
   const days=Math.floor((Date.now()-parseInt(last))/(1000*60*60*24));
-  if(days===0){label.textContent="今日バックアップ済";label.classList.add("backup-status-today");}
+  if(days===0){label.textContent="今日ダウンロード開始";label.classList.add("backup-status-today");}
   else if(days<=7){label.textContent=`${days}日前`;label.classList.add("backup-status-recent");}
   else{label.textContent=`${days}日経過 ⚠️`;label.classList.add("backup-status-stale");}
 }
 
+// Fail closed until the guarded encrypted backup module replaces these entry points.
+// A missing/slow feature script must never expose the old plaintext exporter or
+// unvalidated restore writer during bootstrap.
 function backupData(){
-  const now=new Date();
-  const pad=n=>String(n).padStart(2,"0");
-  const storeName=allStores.stores[allStores.current]?.name||"店舗";
-  const filename=`insight_backup_${storeName}_${now.getFullYear()}${pad(now.getMonth()+1)}${pad(now.getDate())}.json`;
-  const json=JSON.stringify(allStores,null,2);
-  const blob=new Blob([json],{type:"application/json"});
-  const url=URL.createObjectURL(blob);
-  const a=document.createElement("a");
-  a.href=url;a.download=filename;
-  document.body.appendChild(a);a.click();
-  document.body.removeChild(a);
-  URL.revokeObjectURL(url);
-  localStorage.setItem(BACKUP_KEY,String(Date.now()));
-  updateBackupDaysLabel();
-  showToast("📥 バックアップを保存しました","success");
+  alert("バックアップ機能の初期化が完了していません。再読み込みしてからお試しください。平文では保存しません。");
 }
-
 function restoreData(e){
-  const file=e.target.files[0];
-  if(!file)return;
-  const reader=new FileReader();
-  reader.onload=ev=>{
-    try{
-      const data=JSON.parse(ev.target.result);
-      // 新形式(allStores)・旧形式(単店舗)どちらも対応
-      let newAll;
-      if(data.stores&&data.current){
-        newAll=data;
-      }else if(data.years&&data.data){
-        newAll=migrateOldData(data);
-      }else throw new Error("invalid");
-      if(!confirm(`${file.name}\nのデータを復元します。現在の全データは上書きされます。よろしいですか？`)){
-        e.target.value="";return;
-      }
-      allStores=newAll;
-      store=allStores.stores[allStores.current];
-      persist();
-      baseYear=store.years[store.years.length-1];
-      cmpYear=store.years.length>1?store.years[store.years.length-2]:null;
-      editYear={sales:baseYear,kyaku:baseYear,haiki:baseYear};
-      editMonth={sales:todayFY().month,kyaku:todayFY().month,haiki:todayFY().month};
-      renderStoreSel();
-      if(currentNav===1)refreshDash();
-      else if(currentNav>1)initInputPage(["","","sales","kyaku","haiki"][currentNav]);
-      else initQuickPage();
-      updateMissingBadge();
-      showToast("📤 データを復元しました","info");
-    }catch(err){
-      alert("ファイルの読み込みに失敗しました。\n正しいバックアップファイルを選択してください。");
-    }
-    e.target.value="";
-  };
-  reader.readAsText(file);
+  if(e&&e.target)e.target.value="";
+  alert("復元機能の初期化が完了していません。現在のデータは変更されていません。再読み込みしてからお試しください。");
 }
 
 function importCSV(e){

@@ -270,11 +270,11 @@ test('新旧バックアップ形式を復元対象として維持する',()=>{
 
 test('復元直前に現在データをv2形式で自動退避してから上書きする',()=>{
   const source=fs.readFileSync(path.join(root,'insight_backup_guard_v1.js'),'utf8');
-  assert.match(source,/function createPreRestoreBackup\(\)/);
+  assert.match(source,/async function createPreRestoreBackup\(operation,state\)/);
   assert.match(source,/Insight_pre_restore_/);
   assert.match(source,/backupType="preRestore"/);
   assert.match(source,/preRestoreMemorySnapshot=snapshot/);
-  assert.ok(source.indexOf('createPreRestoreBackup()')<source.indexOf('InsightStorage.writeSnapshot(newAll)'));
+  assert.ok(source.indexOf('await createPreRestoreBackup(operation,state)')<source.indexOf('InsightStorage.writeSnapshot(newAll)'));
   assert.match(source,/復元直前バックアップを作成できないため、復元を中止しました/);
 });
 
@@ -328,7 +328,7 @@ test('復元の保存前エラーは容量不足と決めつけず元の原因�
 
 test('復元確定後の画面更新エラーは保存成功を伝えて再読込を促す',()=>{
   const source=fs.readFileSync(path.join(root,'insight_backup_guard_v1.js'),'utf8');
-  assert.ok(source.includes("reader.onload=function(ev){if(++restoreLoadCount>1||readerPhase!=='pending'||restoreFileReaderActive!==reader){markRestoreObservationFault();return;}readerPhase='processing';var restoreCommitted=false"));
+  assert.ok(source.includes("reader.onload=async function(ev){if(++restoreLoadCount>1||readerPhase!=='pending'||restoreFileReaderActive!==reader){markRestoreObservationFault();return;}readerPhase='processing';var restoreCommitted=false"));
   assert.ok(source.indexOf('verifiedRestore=verifyRestoredSnapshot(newAll)')<source.indexOf('restoreCommitted=true'));
   assert.ok(source.indexOf('restoreCommitted=true')<source.indexOf('allStores=newAll'));
   assert.match(source,/復元したデータは保存されています。Insightを再読み込み/);

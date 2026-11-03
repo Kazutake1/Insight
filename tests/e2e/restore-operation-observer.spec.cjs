@@ -1,4 +1,5 @@
 const {test,expect}=require('@playwright/test');
+require('./helpers/verified-chart.cjs')(test);
 
 // All browser state and imported files are FICTIONAL, created in a fresh
 // Playwright context. Never inspect a real user's stored Insight records.
@@ -12,7 +13,9 @@ async function setup(page,{missingObserver=false}={}){
   await page.goto('/Index.html',{waitUntil:'domcontentloaded'});
   await page.waitForFunction(()=>window.InsightRestoreOperationObserverV0&&window.InsightStorage&&
     window.InsightDataHealth&&document.getElementById('restoreFile'));
+  await page.waitForFunction(()=>window.InsightBackupPasswordV1&&window.InsightReportPreview);
   const fixture=await page.evaluate(()=>{
+    InsightBackupPasswordV1={...InsightBackupPasswordV1,request:async()=> 'FICTIONAL-safety-password'};
     const original=InsightStorage.migrateSnapshot(JSON.parse(JSON.stringify(allStores)));
     const id=original.current;
     const year=String(original.stores[id].years.at(-1)),month='1月';
@@ -521,7 +524,8 @@ for(const phase of ['before-write','after-write']){
       }
     },{...f,phase});
     await upload(page,f.json);
-    await endState(page,phase==='before-write'?1:2,'HELD');
+    if(phase==='before-write')await page.waitForFunction(()=>__restoreAlerts.some(m=>m.includes('処理中にデータが変更')));
+    else await endState(page,2,'HELD');
     const before=await page.evaluate(({id,year,month})=>{
       const raw=localStorage.getItem('insight_v11');
       let blocked='not blocked';
@@ -538,13 +542,13 @@ for(const phase of ['before-write','after-write']){
     },f);
     expect(before.raw).toBe(before.externalRaw);
     expect([before.saved,before.live,before.writes]).toEqual([
-      555,111,phase==='before-write'?1:2
+      555,111,phase==='before-write'?0:2
     ]);
-    expect(before.held).toBe(true);
+    expect(before.held).toBe(phase==='after-write');
     expect(before.conflict).toBe(true);
-    expect(before.blocked).toBe('InsightStorageRestoreHoldError');
+    expect(before.blocked).toBe(phase==='before-write'?'InsightStorageConflictError':'InsightStorageRestoreHoldError');
     if(phase==='before-write'){
-      expect(before.alerts.join(' ')).toContain('保存状態を確認できませんでした');
+      expect(before.alerts.join(' ')).toContain('この復元による書き込みは行っていません');
     }else{
       expect(before.alerts.join(' ')).toContain('自動復旧にも失敗しました');
     }

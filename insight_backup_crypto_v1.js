@@ -1,4 +1,4 @@
-/* Insight encrypted backup codec v1. Isolated until the UI and restore guard are integrated.
+/* Insight encrypted backup codec v1. Used by the password UI and asynchronous backup/restore guard.
  * File encryption only: Insight's existing localStorage schema is unchanged.
  * Requires a secure context. Never logs or persists passwords or plaintext. */
 (function(root){
