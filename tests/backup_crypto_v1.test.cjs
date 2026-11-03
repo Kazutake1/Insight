@@ -37,7 +37,7 @@ test('FICTIONAL two-store snapshot round-trips through authenticated AES-256-GCM
   assert.equal(encrypted.cipher.algorithm,'AES-256-GCM');
   assert.ok(encrypted.ciphertext.length>40);
   assert.equal(JSON.stringify(encrypted).includes('架空店舗A'),false);
-  assert.equal(JSON.stringify(encrypted).includes('123'),false);
+  assert.equal(JSON.stringify(encrypted).includes('"売上"'),false);
   const decrypted=await api.decrypt(encrypted,PASSWORD);
   assert.deepEqual(clone(decrypted),original);
 });
