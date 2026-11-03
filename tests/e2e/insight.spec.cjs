@@ -1374,7 +1374,7 @@ test('手動判定は月・カテゴリー・便ごとに保存され再読込�
   const downloadPromise=page.waitForEvent('download');
   await page.locator('#backupBtn').click();
   const download=await downloadPromise;
-  const backup=JSON.parse(fs.readFileSync(await download.path(),'utf8'));
+  const backup=await readEncryptedBackup(page,await download.path());
   expect(backup.data.stores[ids.store].tripHistoryOverrides.categories[ids.category]['2026-09']['3']).toBe('active');
 
   await page.reload();
