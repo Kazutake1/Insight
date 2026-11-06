@@ -2464,69 +2464,73 @@ function updateBackupDaysLabel(){
   const label=document.getElementById("backupDaysLabel");
   if(!label)return;
   label.classList.remove("backup-status-missing","backup-status-today","backup-status-recent","backup-status-stale");
-  const last=localStorage.getItem(BACKUP_KEY);
-  if(!last){label.textContent="未バックアップ";label.classList.add("backup-status-missing");return;}
-  const days=Math.floor((Date.now()-parseInt(last))/(1000*60*60*24));
-  if(days===0){label.textContent="今日バックアップ済";label.classList.add("backup-status-today");}
-  else if(days<=7){label.textContent=`${days}日前`;label.classList.add("backup-status-recent");}
-  else{label.textContent=`${days}日経過 ⚠️`;label.classList.add("backup-status-stale");}
-}
-
-function backupData(){
-  const now=new Date();
-  const pad=n=>String(n).padStart(2,"0");
-  const storeName=allStores.stores[allStores.current]?.name||"店舗";
-  const filename=`insight_backup_${storeName}_${now.getFullYear()}${pad(now.getMonth()+1)}${pad(now.getDate())}.json`;
-  const json=JSON.stringify(allStores,null,2);
-  const blob=new Blob([json],{type:"application/json"});
-  const url=URL.createObjectURL(blob);
-  const a=document.createElement("a");
-  a.href=url;a.download=filename;
-  document.body.appendChild(a);a.click();
-  document.body.removeChild(a);
-  URL.revokeObjectURL(url);
-  localStorage.setItem(BACKUP_KEY,String(Date.now()));
-  updateBackupDaysLabel();
-  showToast("📥 バックアップを保存しました","success");
-}
-
-function restoreData(e){
-  const file=e.target.files[0];
-  if(!file)return;
-  const reader=new FileReader();
-  reader.onload=ev=>{
+  function record(key,confirmed){
     try{
-      const data=JSON.parse(ev.target.result);
-      // 新形式(allStores)・旧形式(単店舗)どちらも対応
-      let newAll;
-      if(data.stores&&data.current){
-        newAll=data;
-      }else if(data.years&&data.data){
-        newAll=migrateOldData(data);
-      }else throw new Error("invalid");
-      if(!confirm(`${file.name}\nのデータを復元します。現在の全データは上書きされます。よろしいですか？`)){
-        e.target.value="";return;
-      }
-      allStores=newAll;
-      store=allStores.stores[allStores.current];
-      persist();
-      baseYear=store.years[store.years.length-1];
-      cmpYear=store.years.length>1?store.years[store.years.length-2]:null;
-      editYear={sales:baseYear,kyaku:baseYear,haiki:baseYear};
-      editMonth={sales:todayFY().month,kyaku:todayFY().month,haiki:todayFY().month};
-      renderStoreSel();
-      if(currentNav===1)refreshDash();
-      else if(currentNav>1)initInputPage(["","","sales","kyaku","haiki"][currentNav]);
-      else initQuickPage();
-      updateMissingBadge();
-      showToast("📤 データを復元しました","info");
-    }catch(err){
-      alert("ファイルの読み込みに失敗しました。\n正しいバックアップファイルを選択してください。");
-    }
-    e.target.value="";
-  };
-  reader.readAsText(file);
+      const raw=localStorage.getItem(key);if(!raw||raw.length>512)return null;
+      const value=JSON.parse(raw);
+      if(!value||value.version!==1||typeof value.id!=="string"||!/^[a-f0-9]{32}$/.test(value.id)||
+         !["normal","preRestore"].includes(value.kind)||!Number.isSafeInteger(value.startedAt)||value.startedAt<=0||value.startedAt>Date.now())return null;
+      if(confirmed&&(value.confirmation!=="user"||!Number.isSafeInteger(value.confirmedAt)||value.confirmedAt<value.startedAt||value.confirmedAt>Date.now()))return null;
+      return value;
+    }catch(_){return null;}
+  }
+  const confirmed=record("insight_backup_confirmed_v1",true),download=record("insight_backup_download_v1",false);
+  const legacy=localStorage.getItem(BACKUP_KEY);
+  label.title="保存確認はご本人の申告です。アプリは端末ファイルの保存完了を検証できません。";
+  if(download&&(!confirmed||download.id!==confirmed.id)){
+    label.textContent="ダウンロード開始・保存未確認"+(confirmed?"（前回の保存確認あり）":"");
+    label.classList.add("backup-status-recent");return;
+  }
+  if(confirmed){
+    const days=Math.max(0,Math.floor((Date.now()-confirmed.confirmedAt)/(1000*60*60*24)));
+    label.textContent=(confirmed.kind==="preRestore"?"復元前 ":"")+(days===0?"今日":days+"日前")+" 保存確認（本人申告）";
+    if(days===0)label.classList.add("backup-status-today");
+    else if(days<=7)label.classList.add("backup-status-recent");
+    else label.classList.add("backup-status-stale");return;
+  }
+  label.textContent=legacy?"旧ダウンロード記録あり・保存未確認":"未バックアップ";
+  if(legacy)label.classList.add("backup-status-recent");else label.classList.add("backup-status-missing");
 }
+window.addEventListener('storage',function(event){
+  if(event&&(event.key===null||[BACKUP_KEY,'insight_backup_confirmed_v1','insight_backup_download_v1'].includes(event.key)))updateBackupDaysLabel();
+});
+
+// Own immutable operation entry points before any cacheable feature script can
+// arrive.  Old guards assign directly to backupData/restoreData; the no-op
+// setters below keep those late assignments from reopening plaintext export or
+// an obsolete restore writer.  Only the current encrypted guard knows the
+// explicit, one-time registration contract.
+(function installBackupEntrypoints(root){
+  var backupHandler=null,restoreHandler=null,registered=false;
+  function unavailableBackup(){
+    alert("バックアップ機能の初期化が完了していません。再読み込みしてからお試しください。平文では保存しません。");
+  }
+  function unavailableRestore(e){
+    if(e&&e.target)e.target.value="";
+    alert("復元機能の初期化が完了していません。現在のデータは変更されていません。再読み込みしてからお試しください。");
+  }
+  function dispatchBackup(){return (backupHandler||unavailableBackup).apply(root,arguments);}
+  function dispatchRestore(){return (restoreHandler||unavailableRestore).apply(root,arguments);}
+  function register(candidate){
+    if(registered||!candidate||candidate.version!==1||
+      typeof candidate.backup!=="function"||typeof candidate.restore!=="function"||
+      !root.isSecureContext||!root.crypto||!root.crypto.subtle||
+      !root.InsightBackupCryptoV1||typeof root.InsightBackupCryptoV1.encrypt!=="function"||
+      typeof root.InsightBackupCryptoV1.decrypt!=="function"||
+      !root.InsightBackupPasswordV1||typeof root.InsightBackupPasswordV1.request!=="function"||
+      typeof root.InsightBackupPasswordV1.confirmSaved!=="function"||
+      !root.InsightStorage)return false;
+    backupHandler=candidate.backup;restoreHandler=candidate.restore;registered=true;
+    return true;
+  }
+  function install(name,dispatcher){
+    Object.defineProperty(root,name,{configurable:false,enumerable:true,
+      get:function(){return dispatcher;},set:function(){}});
+  }
+  install("backupData",dispatchBackup);install("restoreData",dispatchRestore);
+  Object.defineProperty(root,"InsightBackupEntrypointsV1",{configurable:false,enumerable:false,writable:false,
+    value:Object.freeze({version:1,register:register,status:function(){return registered?"ready":"pending";}})});
+})(window);
 
 function importCSV(e){
   const file=e.target.files[0];

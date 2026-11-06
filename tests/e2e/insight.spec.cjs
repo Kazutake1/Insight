@@ -1,4 +1,5 @@
 const {test,expect}=require('@playwright/test');
+require('./helpers/verified-chart.cjs')(test);
 const fs=require('node:fs');
 
 async function openInsight(page){
@@ -7,7 +8,15 @@ async function openInsight(page){
   await page.goto('/Index.html',{waitUntil:'domcontentloaded'});
   await expect(page.locator('#nav1')).toBeVisible();
   await page.waitForFunction(()=>window.InsightPagePeriodSync&&window.InsightInputPeriodControls&&window.InsightSalesPeriodSelector&&window.InsightSalesCount&&window.InsightSaleResults&&window.InsightHourlyCustomers&&window.InsightEventResults&&window.InsightAIVisual&&window.InsightAIInterpretation&&window.InsightAnalysisPeriodLock&&window.InsightMultiYearAnalysis&&window.InsightWeekdayAnalysis&&window.InsightSaleImpactAnalysis&&window.InsightEventImpactAnalysis&&window.InsightSeasonalityAnalysis&&window.InsightAnomalyExplanation&&window.InsightAnalysisBundle&&window.InsightSettings&&window.InsightDarkTheme&&window.InsightReadability&&document.getElementById('navSettings')&&document.getElementById('pageSettings'));
+  await page.waitForFunction(()=>window.InsightBackupPasswordV1&&window.InsightBackupCryptoV1);
+  // Legacy restore/UI assertions use a deterministic FICTIONAL password; the
+  // dedicated Stage2 suite exercises the real password/confirmation modal.
+  await page.evaluate(()=>{InsightBackupPasswordV1={...InsightBackupPasswordV1,request:async()=> 'FICTIONAL-safety-password',confirmSaved:async()=>true};});
   return errors;
+}
+
+async function readEncryptedBackup(page,filePath){
+  return page.evaluate(file=>InsightBackupCryptoV1.decrypt(file,'FICTIONAL-safety-password'),JSON.parse(fs.readFileSync(filePath,'utf8')));
 }
 
 async function selectDashboardSeptember(page){
@@ -350,10 +359,10 @@ test('トップページは外部shellと機能manifestの最新版確認をno-s
     fetch('/insight_payload_source_v1.html?e2e-shell-check=1',{cache:'no-store'}).then(r=>r.text())
   ]));
   const [source,boot,loader,payload]=sources;
-  expect(source).toContain('name="insight-shell-version" content="20261030-step4-gate3-ab-build-97"');
-  expect(source).toContain('insight_shell_boot_v1.js?v=20261030-step4-gate3-ab-build-97');
-  expect(source).toContain('insight_shell_loader_v1.js?v=20261030-step4-gate3-ab-1');
-  expect(source).toContain('insight_shell_v1.css?v=20261030-step4-gate3-ab-build-97');
+  expect(source).toContain('name="insight-shell-version" content="20261106-backup-fallback-build-101"');
+  expect(source).toContain('insight_shell_boot_v1.js?v=20261106-backup-fallback-build-101');
+  expect(source).toContain('insight_shell_loader_v1.js?v=20261106-backup-fallback-2');
+  expect(source).toContain('insight_shell_v1.css?v=20261106-backup-fallback-build-101');
   expect(source).not.toMatch(/<script(?![^>]*\bsrc=)[^>]*>/i);
   expect(source).not.toMatch(/<style\b/i);
   expect(source).not.toMatch(/script-src[^;]*'unsafe-inline'/);
@@ -362,13 +371,13 @@ test('トップページは外部shellと機能manifestの最新版確認をno-s
   expect(source).not.toMatch(/style-src[^;]*'unsafe-inline'/);
   expect(boot).toContain("fetch('./Index.html?insight_probe='+Date.now(),{cache:'no-store'})");
   expect(loader).toContain("fetch('./insight_shell_loader_v1.js?insight_manifest_probe='+Date.now(),{cache:'no-store'})");
-  expect(loader).toContain("fetch('./insight_payload_source_v1.html?v=20261030-step4-gate3-ab-1',{cache:'no-store'})");
+  expect(loader).toContain("fetch('./insight_payload_source_v1.html?v=20261106-backup-entrypoints-1',{cache:'no-store'})");
   expect(loader).toContain('function featureSignature(entries)');
   expect(source).toContain('https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js');
   expect(source).toContain('integrity="sha512-CQBWl4fJHWbryGE+Pc7UAxWMUMNMWzWxF4SQo9CgkJIN1kx6djDQZjh3Y8SZ1d+6I+1zze6Z7kHXO7q3UyZAWw=="');
   expect(loader).not.toContain('stripPayloadChartScript');
   expect(payload).toContain('insight_payload_core_v1.css?v=20261022-quick-weather-fixed-1');
-  expect(payload).toContain('insight_payload_core_v1.js?v=20261030-step4-gate3-ab-1');
+  expect(payload).toContain('insight_payload_core_v1.js?v=20261106-backup-entrypoints-1');
   expect(payload).toContain('insight_payload_ai_legacy_v1.js?v=20261020-ai-panel-smooth-1');
   expect(payload).toContain('insight_payload_bindings_v1.js?v=20261030-step4-gate3-ab-1');
   expect(payload).not.toMatch(/\son(?:click|change)\s*=/i);
@@ -975,11 +984,11 @@ test('バックアップ経過表示はinline色ではなく状態classで切り
   await page.evaluate(()=>{localStorage.removeItem('insight_last_backup');updateBackupDaysLabel();});
   expect(await read()).toMatchObject({text:'未バックアップ',color:'rgb(220, 38, 38)',inlineColor:''});
   await page.evaluate(()=>{localStorage.setItem('insight_last_backup',String(Date.now()));updateBackupDaysLabel();});
-  expect(await read()).toMatchObject({text:'今日バックアップ済',color:'rgb(21, 128, 61)',inlineColor:''});
-  await page.evaluate(()=>{localStorage.setItem('insight_last_backup',String(Date.now()-3*24*60*60*1000));updateBackupDaysLabel();});
-  expect(await read()).toMatchObject({text:'3日前',color:'rgb(136, 136, 136)',inlineColor:''});
-  await page.evaluate(()=>{localStorage.setItem('insight_last_backup',String(Date.now()-8*24*60*60*1000));updateBackupDaysLabel();});
-  expect(await read()).toMatchObject({text:'8日経過 ⚠️',color:'rgb(220, 38, 38)',inlineColor:''});
+  expect(await read()).toMatchObject({text:'旧ダウンロード記録あり・保存未確認',color:'rgb(136, 136, 136)',inlineColor:''});
+  for(const days of [0,3,8]){
+    await page.evaluate(days=>{const at=Date.now()-days*86400000;localStorage.setItem('insight_backup_confirmed_v1',JSON.stringify({version:1,id:'a'.repeat(32),kind:'normal',startedAt:at,confirmedAt:at,confirmation:'user'}));updateBackupDaysLabel();},days);
+    expect(await read()).toMatchObject({text:(days===0?'今日':days+'日前')+' 保存確認（本人申告）',color:days===0?'rgb(21, 128, 61)':days===3?'rgb(136, 136, 136)':'rgb(220, 38, 38)',inlineColor:''});
+  }
   expect(errors).toEqual([]);
 });
 
@@ -997,7 +1006,7 @@ test('通常バックアップはメタ情報を含み復元前に内容と検�
   const download=await downloadPromise;
   expect(download.suggestedFilename()).toMatch(/^Insight_backup_all_stores_\d{8}_\d{6}\.json$/);
   const downloadPath=await download.path();
-  const backup=JSON.parse(fs.readFileSync(downloadPath,'utf8'));
+  const backup=await readEncryptedBackup(page,downloadPath);
   expect(backup.backupInfo.format).toBe('InsightBackup');
   expect(backup.backupInfo.formatVersion).toBe(2);
   expect(Number.isFinite(Date.parse(backup.backupInfo.createdAt))).toBe(true);
@@ -1042,7 +1051,7 @@ test('復元確定時は上書き前のデータを自動ダウンロードし�
 
   expect(safetyDownload.suggestedFilename()).toMatch(/^Insight_pre_restore_\d{8}_\d{6}\.json$/);
   const safetyPath=await safetyDownload.path();
-  const safety=JSON.parse(fs.readFileSync(safetyPath,'utf8'));
+  const safety=await readEncryptedBackup(page,safetyPath);
   expect(safety.backupInfo.format).toBe('InsightBackup');
   expect(safety.backupInfo.formatVersion).toBe(2);
   expect(safety.backupInfo.backupType).toBe('preRestore');
@@ -1060,7 +1069,7 @@ test('復元保存・整合性検証の完了後に画面更新が失敗して�
   const downloadPromise=page.waitForEvent('download');
   await page.locator('#backupBtn').click();
   const backup=await downloadPromise,restorePath=await backup.path();
-  const snapshot=JSON.parse(fs.readFileSync(restorePath,'utf8')).data;
+  const snapshot=(await readEncryptedBackup(page,restorePath)).data;
 
   await page.evaluate(()=>{
     const st=allStores.stores[allStores.current],year=String(st.years[0]);
@@ -1233,6 +1242,7 @@ test('年度一覧にない古い疎データは起動を妨げず正式年度�
   await page.reload({waitUntil:'domcontentloaded'});
   await expect(page.locator('#nav1')).toBeVisible();
   await expect(page.locator('#insightStorageLoadError')).toHaveCount(0);
+  await page.waitForFunction(()=>window.InsightStorage&&typeof allStores!=='undefined'&&allStores.stores);
   const restored=await page.evaluate(({storeId,activeYear})=>{
     const st=allStores.stores[storeId];
     return {
@@ -1364,7 +1374,7 @@ test('手動判定は月・カテゴリー・便ごとに保存され再読込�
   const downloadPromise=page.waitForEvent('download');
   await page.locator('#backupBtn').click();
   const download=await downloadPromise;
-  const backup=JSON.parse(fs.readFileSync(await download.path(),'utf8'));
+  const backup=await readEncryptedBackup(page,await download.path());
   expect(backup.data.stores[ids.store].tripHistoryOverrides.categories[ids.category]['2026-09']['3']).toBe('active');
 
   await page.reload();

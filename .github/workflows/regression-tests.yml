@@ -100,6 +100,7 @@ jobs:
           - script_load_order.test.cjs
           - security_storage_regression.test.cjs
           - backup_restore_runtime.test.cjs
+          - backup_crypto_v1.test.cjs
           - storage_layer.test.cjs
           - report_preview.test.cjs
           - weather_future_guard.test.cjs
