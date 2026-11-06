@@ -250,6 +250,44 @@ test('通常バックアップは日時・店舗数・対象年度を持つv2形
   assert.match(source,/Insight_backup_all_stores_/);
 });
 
+test('暗号化バックアップ入口は旧guardの直接再代入を前後とも拒否する',()=>{
+  const core=fs.readFileSync(path.join(root,'insight_payload_core_v1.js'),'utf8');
+  const oldGuard=fs.readFileSync(path.join(root,'tests','fixtures','cache-main-90e','insight_backup_guard_v1.js'),'utf8');
+  const start=core.indexOf('(function installBackupEntrypoints(root){');
+  const end=core.indexOf('})(window);',start)+11;
+  assert.ok(start>=0&&end>start);
+  const alerts=[];
+  const context={isSecureContext:true,crypto:{subtle:{}},
+    InsightBackupCryptoV1:{encrypt(){},decrypt(){}},
+    InsightBackupPasswordV1:{request(){},confirmSaved(){}},InsightStorage:{},
+    alert:message=>alerts.push(String(message))};
+  context.window=context;vm.createContext(context);vm.runInContext(core.slice(start,end),context);
+  const backupDescriptor=Object.getOwnPropertyDescriptor(context,'backupData');
+  const restoreDescriptor=Object.getOwnPropertyDescriptor(context,'restoreData');
+  assert.equal(backupDescriptor.configurable,false);assert.equal(restoreDescriptor.configurable,false);
+  vm.runInContext('backupData=function(){throw new Error("old plaintext")}; restoreData=function(){throw new Error("old restore")}; backupData();',context);
+  assert.match(alerts.pop(),/初期化が完了していません/);
+  const calls=[];
+  assert.equal(context.InsightBackupEntrypointsV1.register({version:1,
+    backup(){calls.push('encrypted-backup');},restore(){calls.push('guarded-restore');}}),true);
+  context.backupData();context.restoreData({target:{value:'selected'}});
+  assert.deepEqual(calls,['encrypted-backup','guarded-restore']);
+  vm.runInContext('backupData=function(){throw new Error("late old plaintext")}; restoreData=function(){throw new Error("late old restore")};',context);
+  context.backupData();context.restoreData({target:{value:'selected'}});
+  assert.deepEqual(calls,['encrypted-backup','guarded-restore','encrypted-backup','guarded-restore']);
+  assert.equal(context.InsightBackupEntrypointsV1.register({version:1,backup(){},restore(){}}),false);
+
+  const oldFirst={alert:message=>alerts.push(String(message))};oldFirst.window=oldFirst;
+  vm.createContext(oldFirst);vm.runInContext(oldGuard,oldFirst);
+  const plaintextEntry=oldFirst.backupData;
+  Object.assign(oldFirst,{isSecureContext:true,crypto:{subtle:{}},
+    InsightBackupCryptoV1:{encrypt(){},decrypt(){}},InsightBackupPasswordV1:{request(){},confirmSaved(){}},InsightStorage:{}});
+  vm.runInContext(core.slice(start,end),oldFirst);
+  assert.notEqual(oldFirst.backupData,plaintextEntry);
+  assert.equal(Object.getOwnPropertyDescriptor(oldFirst,'backupData').configurable,false);
+  oldFirst.backupData();assert.match(alerts.pop(),/初期化が完了していません/);
+});
+
 test('復元前検査はデータ健全性を確認し重大エラーを保存前に拒否する',()=>{
   const source=fs.readFileSync(path.join(root,'insight_backup_guard_v1.js'),'utf8');
   assert.match(source,/InsightDataHealth\.check\(snapshot\)/);

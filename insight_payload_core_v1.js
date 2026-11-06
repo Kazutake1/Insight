@@ -2495,16 +2495,42 @@ window.addEventListener('storage',function(event){
   if(event&&(event.key===null||[BACKUP_KEY,'insight_backup_confirmed_v1','insight_backup_download_v1'].includes(event.key)))updateBackupDaysLabel();
 });
 
-// Fail closed until the guarded encrypted backup module replaces these entry points.
-// A missing/slow feature script must never expose the old plaintext exporter or
-// unvalidated restore writer during bootstrap.
-function backupData(){
-  alert("バックアップ機能の初期化が完了していません。再読み込みしてからお試しください。平文では保存しません。");
-}
-function restoreData(e){
-  if(e&&e.target)e.target.value="";
-  alert("復元機能の初期化が完了していません。現在のデータは変更されていません。再読み込みしてからお試しください。");
-}
+// Own immutable operation entry points before any cacheable feature script can
+// arrive.  Old guards assign directly to backupData/restoreData; the no-op
+// setters below keep those late assignments from reopening plaintext export or
+// an obsolete restore writer.  Only the current encrypted guard knows the
+// explicit, one-time registration contract.
+(function installBackupEntrypoints(root){
+  var backupHandler=null,restoreHandler=null,registered=false;
+  function unavailableBackup(){
+    alert("バックアップ機能の初期化が完了していません。再読み込みしてからお試しください。平文では保存しません。");
+  }
+  function unavailableRestore(e){
+    if(e&&e.target)e.target.value="";
+    alert("復元機能の初期化が完了していません。現在のデータは変更されていません。再読み込みしてからお試しください。");
+  }
+  function dispatchBackup(){return (backupHandler||unavailableBackup).apply(root,arguments);}
+  function dispatchRestore(){return (restoreHandler||unavailableRestore).apply(root,arguments);}
+  function register(candidate){
+    if(registered||!candidate||candidate.version!==1||
+      typeof candidate.backup!=="function"||typeof candidate.restore!=="function"||
+      !root.isSecureContext||!root.crypto||!root.crypto.subtle||
+      !root.InsightBackupCryptoV1||typeof root.InsightBackupCryptoV1.encrypt!=="function"||
+      typeof root.InsightBackupCryptoV1.decrypt!=="function"||
+      !root.InsightBackupPasswordV1||typeof root.InsightBackupPasswordV1.request!=="function"||
+      typeof root.InsightBackupPasswordV1.confirmSaved!=="function"||
+      !root.InsightStorage)return false;
+    backupHandler=candidate.backup;restoreHandler=candidate.restore;registered=true;
+    return true;
+  }
+  function install(name,dispatcher){
+    Object.defineProperty(root,name,{configurable:false,enumerable:true,
+      get:function(){return dispatcher;},set:function(){}});
+  }
+  install("backupData",dispatchBackup);install("restoreData",dispatchRestore);
+  Object.defineProperty(root,"InsightBackupEntrypointsV1",{configurable:false,enumerable:false,writable:false,
+    value:Object.freeze({version:1,register:register,status:function(){return registered?"ready":"pending";}})});
+})(window);
 
 function importCSV(e){
   const file=e.target.files[0];

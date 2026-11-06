@@ -1,4 +1,14 @@
 (function(){
+var entrypoints=window.InsightBackupEntrypointsV1;
+if(!entrypoints||entrypoints.version!==1||typeof entrypoints.register!=="function"){
+  // A new guard paired with an old core must fail closed as well.  This is a
+  // defensive cache-mix fallback; the normal path is owned by the new core.
+  function unavailableBackup(){alert("バックアップ機能を安全に初期化できませんでした。再読み込みしてください。平文では保存しません。");}
+  function unavailableRestore(e){if(e&&e.target)e.target.value="";alert("復元機能を安全に初期化できませんでした。現在のデータは変更されていません。再読み込みしてください。");}
+  try{Object.defineProperty(window,"backupData",{configurable:false,enumerable:true,get:function(){return unavailableBackup;},set:function(){}});}catch(_){window.backupData=unavailableBackup;}
+  try{Object.defineProperty(window,"restoreData",{configurable:false,enumerable:true,get:function(){return unavailableRestore;},set:function(){}});}catch(_){window.restoreData=unavailableRestore;}
+  return;
+}
 function isPlainObject(v){return !!v&&typeof v==="object"&&!Array.isArray(v);}
 function validYear(v){return /^\d{4}$/.test(String(v));}
 function nonNegativeNumber(v,label){if(v===undefined||v===null||v==="")return 0;var n=Number(v);if(!Number.isFinite(n)||n<0)throw new Error(label+" が不正です");return n;}
@@ -369,7 +379,7 @@ function rollbackPreRestoreSnapshot(){
   if(window.InsightStorage.serialize(restored)!==window.InsightStorage.serialize(preRestoreMemorySnapshot))throw new Error("復元前データの再保存結果が一致しません。");
   return restored;
 }
-backupData=async function(){
+async function encryptedBackupData(){
   if(backupOperationActive||restoreFileReaderActive){alert('別のバックアップ・復元処理が進行中です。');return;}
   backupOperationActive=true;
   var operation={cancelled:false},password=null;
@@ -392,8 +402,8 @@ backupData=async function(){
     if(err&&err.name==='InsightBackupCancelled')return;
     alert("バックアップ処理を完了できませんでした。\n"+String(err&&err.message?err.message:err));
   }finally{password=null;backupOperationActive=false;if(window.InsightBackupPasswordV1)window.InsightBackupPasswordV1.close();}
-};
-restoreData=function(e){
+}
+function encryptedRestoreData(e){
   var file=e.target.files[0];if(!file)return;
   if(restoreFileReaderActive||backupOperationActive){
     // A normal backup owns the UI, but is outside the restore observer's
@@ -490,5 +500,7 @@ restoreData=function(e){
     }
     throw readErr;
   }
-};
+}
+if(entrypoints.register({version:1,backup:encryptedBackupData,restore:encryptedRestoreData})!==true)
+  throw new Error("Encrypted backup entry points could not be registered safely");
 })();

@@ -128,6 +128,10 @@ function fixture(options={}){
     todayFY(){return {month:'10月'};}
   };
   ctx.store=ctx.allStores.stores.a;
+  window.InsightBackupEntrypointsV1=Object.freeze({version:1,register(candidate){
+    if(!candidate||candidate.version!==1||typeof candidate.backup!=='function'||typeof candidate.restore!=='function')return false;
+    ctx.backupData=candidate.backup;ctx.restoreData=candidate.restore;return true;
+  }});
   vm.createContext(ctx);
   if(options.realCrypto){delete window.InsightBackupCryptoV1;vm.runInContext(cryptoSource,ctx);}
   vm.runInContext(backupSource,ctx);

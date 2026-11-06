@@ -11,7 +11,7 @@ function fail(e){
   document.body.replaceChildren(box);
 }
 if(typeof Chart==='undefined'){fail(new Error('グラフライブラリを読み込めませんでした'));return;}
-fetch('./insight_payload_source_v1.html?v=20261103-backup-confirm-1',{cache:'no-store'}).then(function(r){if(!r.ok)throw new Error('Insight payload の取得に失敗しました ('+r.status+')');return r.text();}).then(function(html){
+fetch('./insight_payload_source_v1.html?v=20261106-backup-entrypoints-1',{cache:'no-store'}).then(function(r){if(!r.ok)throw new Error('Insight payload の取得に失敗しました ('+r.status+')');return r.text();}).then(function(html){
 if(html.indexOf('<!DOCTYPE html>')!==0&&html.indexOf('<!doctype html>')!==0)throw new Error('HTMLデータの検証に失敗しました');
 // STEP5 complete: payload source is self-contained; feature modules are inserted before document.write().
 var orderedFeatureLoads=[
@@ -33,7 +33,7 @@ var orderedFeatureLoads=[
   './insight_ai_ops_v1.js?v=20260930-hooks2',
   './insight_backup_crypto_v1.js?v=20261103-backup-stage2-1',
   './insight_backup_password_v1.js?v=20261103-backup-confirm-1',
-  './insight_backup_guard_v1.js?v=20261103-backup-confirm-1',
+  './insight_backup_guard_v1.js?v=20261106-backup-entrypoints-1',
   './insight_data_health_v1.js?v=20261011-trip-manual-1',
   './insight_prediction_data_health_v1.js?v=20261010-prediction-quality-1',
   './insight_waste_insights_v1.js?v=20260930-hooks2',
