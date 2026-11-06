@@ -1,6 +1,7 @@
 const {test,expect}=require('@playwright/test');
 const fs=require('node:fs');
 const path=require('node:path');
+const crypto=require('node:crypto');
 
 const REPO=path.join(__dirname,'..','..');
 const OLD=path.join(REPO,'tests','fixtures','cache-main-90e');
@@ -14,6 +15,18 @@ const indexSource=readCurrent('Index.html').toString();
 const loaderSource=readCurrent('insight_shell_loader_v1.js').toString();
 const BUILD=indexSource.match(/insight-shell-version" content="([^"]+)/)[1];
 const oldGuard=readOld('insight_backup_guard_v1.js');
+const oldCoreEntries=readOld('insight_payload_core_backup_restore_declarations.js');
+if(crypto.createHash('sha256').update(oldCoreEntries).digest('hex')!=='44f8f9ceeeae5ed86d21416aed491919af9b13675b79594151bb2652cb344fba')
+  throw new Error('main 90e backup/restore declaration fixture mismatch');
+const productionCsp=indexSource.match(/<meta http-equiv="Content-Security-Policy"[^>]+>/)[0];
+const fallbackHtml='<!DOCTYPE html><html><head><meta charset="UTF-8">'+productionCsp+'</head><body>'+
+  '<button id="backupBtn" type="button">backup</button><input id="restoreFile" type="file">'+
+  '<script src="/fallback-old-core-entry.js"></scr'+'ipt><script src="/fallback-capture-before.js"></scr'+'ipt>'+
+  '<script src="/fallback-new-guard.js"></scr'+'ipt><script src="/fallback-capture-after.js"></scr'+'ipt>'+
+  '<script src="/fallback-old-guard.js"></scr'+'ipt></body></html>';
+const impossibleHtml='<!DOCTYPE html><html><head><meta charset="UTF-8">'+productionCsp+'</head><body>'+
+  '<button id="backupBtn" type="button">backup</button><input id="restoreFile" type="file">'+
+  '<script src="/fallback-impossible-core.js"></scr'+'ipt><script src="/fallback-new-guard.js"></scr'+'ipt></body></html>';
 
 function featureSignature(source){
   const start=source.indexOf('var orderedFeatureLoads=['),end=source.indexOf('];',start);
@@ -42,6 +55,23 @@ async function installNetwork(context,mode){
       if(navigations>4)return route.abort();
       if(navigations>1)phase='new';
     }
+    if(name==='fallback.html')return route.fulfill({body:fallbackHtml,contentType:'text/html'});
+    if(name==='fallback-impossible.html')return route.fulfill({body:impossibleHtml,contentType:'text/html'});
+    if(name==='fallback-old-core-entry.js')return route.fulfill({body:oldCoreEntries,contentType:'application/javascript'});
+    if(name==='fallback-new-guard.js')return route.fulfill({body:readCurrent('insight_backup_guard_v1.js'),contentType:'application/javascript'});
+    if(name==='fallback-old-guard.js')return route.fulfill({body:oldGuard,contentType:'application/javascript'});
+    if(name==='fallback-capture-before.js')return route.fulfill({contentType:'application/javascript',body:Buffer.from(
+      'window.__oldBackupDescriptor=Object.getOwnPropertyDescriptor(window,"backupData");'+
+      'window.__oldRestoreDescriptor=Object.getOwnPropertyDescriptor(window,"restoreData");')});
+    if(name==='fallback-capture-after.js')return route.fulfill({contentType:'application/javascript',body:Buffer.from(
+      'window.__fallbackBackup=backupData;window.__fallbackRestore=restoreData;'+
+      'window.__fallbackBackupDescriptor=Object.getOwnPropertyDescriptor(window,"backupData");'+
+      'window.__fallbackRestoreDescriptor=Object.getOwnPropertyDescriptor(window,"restoreData");'+
+      'document.getElementById("backupBtn").addEventListener("click",function(){backupData();});'+
+      'document.getElementById("restoreFile").addEventListener("change",function(event){restoreData(event);});')});
+    if(name==='fallback-impossible-core.js')return route.fulfill({contentType:'application/javascript',body:Buffer.from(
+      'Object.defineProperty(window,"backupData",{value:function(){return "plaintext";},writable:false,configurable:false});'+
+      'Object.defineProperty(window,"restoreData",{value:function(){return "unguarded";},writable:false,configurable:false});')});
     if(name==='test-old-guard-late.js')return route.fulfill({body:oldGuard,contentType:'application/javascript'});
     let source='new',cached=false;
     if(phase==='initial'){
@@ -186,4 +216,44 @@ test('FICTIONAL old guard cannot replace fail-closed or registered encrypted ent
     expect(await fixture.page.evaluate(()=>localStorage.getItem('insight_v11'))).toBe(rawSnapshot);
     fs.writeFileSync(testInfo.outputPath('cache-trace.json'),JSON.stringify(fixture.network.trace,null,2));
   }finally{fixture.network.releaseProbes();fixture.network.releaseOldGuard();await fixture.context.close();}
+});
+
+test('FICTIONAL actual main old core fallback becomes non-writable before actual old guard arrives',async({browser},testInfo)=>{
+  const fixture=await newContext(browser,'fresh',rawSnapshot);
+  try{
+    await fixture.page.goto(ORIGIN+'/fallback.html');
+    const state=await fixture.page.evaluate(()=>({
+      oldBackup:{configurable:__oldBackupDescriptor.configurable,writable:__oldBackupDescriptor.writable},
+      oldRestore:{configurable:__oldRestoreDescriptor.configurable,writable:__oldRestoreDescriptor.writable},
+      lockedBackup:{configurable:__fallbackBackupDescriptor.configurable,writable:__fallbackBackupDescriptor.writable},
+      lockedRestore:{configurable:__fallbackRestoreDescriptor.configurable,writable:__fallbackRestoreDescriptor.writable},
+      backupPreserved:backupData===__fallbackBackup,restorePreserved:restoreData===__fallbackRestore
+    }));
+    expect(state).toEqual({
+      oldBackup:{configurable:false,writable:true},oldRestore:{configurable:false,writable:true},
+      lockedBackup:{configurable:false,writable:false},lockedRestore:{configurable:false,writable:false},
+      backupPreserved:true,restorePreserved:true
+    });
+    const directBackup=fixture.page.waitForEvent('dialog');await fixture.page.evaluate(()=>backupData());await directBackup;
+    expect(fixture.dialogs.at(-1)).toContain('平文では保存しません');
+    const uiBackup=fixture.page.waitForEvent('dialog');await fixture.page.locator('#backupBtn').click();await uiBackup;
+    expect(fixture.dialogs.at(-1)).toContain('平文では保存しません');
+    const uiRestore=fixture.page.waitForEvent('dialog');
+    await fixture.page.locator('#restoreFile').setInputFiles({name:'FICTIONAL.json',mimeType:'application/json',buffer:Buffer.from('{}')});
+    await uiRestore;expect(fixture.dialogs.at(-1)).toContain('現在のデータは変更されていません');
+    expect(await fixture.page.evaluate(()=>localStorage.getItem('insight_v11'))).toBe(rawSnapshot);
+    expect(fixture.errors).toEqual([]);
+    fs.writeFileSync(testInfo.outputPath('fallback-trace.json'),JSON.stringify(fixture.network.trace,null,2));
+  }finally{await fixture.context.close();}
+});
+
+test('FICTIONAL unreplaceable foreign entries produce a terminal fail-closed page',async({browser})=>{
+  const fixture=await newContext(browser,'fresh',rawSnapshot);
+  try{
+    await fixture.page.goto(ORIGIN+'/fallback-impossible.html');
+    await expect(fixture.page.locator('body')).toContainText('安全に初期化できませんでした');
+    await expect(fixture.page.locator('#backupBtn,#restoreFile')).toHaveCount(0);
+    expect(await fixture.page.evaluate(()=>localStorage.getItem('insight_v11'))).toBe(rawSnapshot);
+    expect(fixture.errors).toEqual([]);
+  }finally{await fixture.context.close();}
 });

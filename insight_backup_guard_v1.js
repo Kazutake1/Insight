@@ -5,8 +5,44 @@ if(!entrypoints||entrypoints.version!==1||typeof entrypoints.register!=="functio
   // defensive cache-mix fallback; the normal path is owned by the new core.
   function unavailableBackup(){alert("バックアップ機能を安全に初期化できませんでした。再読み込みしてください。平文では保存しません。");}
   function unavailableRestore(e){if(e&&e.target)e.target.value="";alert("復元機能を安全に初期化できませんでした。現在のデータは変更されていません。再読み込みしてください。");}
-  try{Object.defineProperty(window,"backupData",{configurable:false,enumerable:true,get:function(){return unavailableBackup;},set:function(){}});}catch(_){window.backupData=unavailableBackup;}
-  try{Object.defineProperty(window,"restoreData",{configurable:false,enumerable:true,get:function(){return unavailableRestore;},set:function(){}});}catch(_){window.restoreData=unavailableRestore;}
+  function lockLegacyEntry(name,safe){
+    try{
+      var descriptor=Object.getOwnPropertyDescriptor(window,name);
+      if(!descriptor||descriptor.configurable){
+        Object.defineProperty(window,name,{configurable:false,enumerable:true,get:function(){return safe;},set:function(){}});
+      }else if(Object.prototype.hasOwnProperty.call(descriptor,"value")&&descriptor.writable){
+        // Classic-script top-level functions in the deployed old core are
+        // non-configurable but writable. ECMAScript still permits replacing
+        // their value while changing writable from true to false.
+        Object.defineProperty(window,name,{value:safe,writable:false});
+      }
+      descriptor=Object.getOwnPropertyDescriptor(window,name);
+      return !!descriptor&&descriptor.configurable===false&&window[name]===safe&&
+        (Object.prototype.hasOwnProperty.call(descriptor,"value")?descriptor.writable===false:typeof descriptor.set==="function");
+    }catch(_){return false;}
+  }
+  var backupLocked=lockLegacyEntry("backupData",unavailableBackup);
+  var restoreLocked=lockLegacyEntry("restoreData",unavailableRestore);
+  if(!backupLocked||!restoreLocked){
+    // A non-configurable/non-writable foreign value cannot be replaced by
+    // JavaScript. Remove user operation paths and show a terminal reload state
+    // rather than continue with an unverifiable backup/restore entry point.
+    try{
+      ["click","change"].forEach(function(type){document.addEventListener(type,function(event){
+        var target=event&&event.target;
+        if(target&&(target.id==="backupBtn"||target.id==="restoreBtn"||target.id==="restoreFile")){
+          event.preventDefault();event.stopImmediatePropagation();
+        }
+      },true);});
+      function showFailure(){
+        document.body.replaceChildren();var box=document.createElement("div");box.className="insight-load-failure";
+        box.textContent="バックアップ・復元機能を安全に初期化できませんでした。Insightを再読み込みしてください。";
+        document.body.appendChild(box);
+      }
+      if(document.readyState==="loading")document.addEventListener("DOMContentLoaded",showFailure,{once:true});
+      else showFailure();
+    }catch(_){}
+  }
   return;
 }
 function isPlainObject(v){return !!v&&typeof v==="object"&&!Array.isArray(v);}

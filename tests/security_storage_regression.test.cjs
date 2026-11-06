@@ -288,6 +288,16 @@ test('暗号化バックアップ入口は旧guardの直接再代入を前後と
   oldFirst.backupData();assert.match(alerts.pop(),/初期化が完了していません/);
 });
 
+test('旧core fallbackはnonconfigurable writable関数をnon-writable fail-closed値へ固定する',()=>{
+  const source=fs.readFileSync(path.join(root,'insight_backup_guard_v1.js'),'utf8');
+  assert.match(source,/Object\.getOwnPropertyDescriptor\(window,name\)/);
+  assert.match(source,/Object\.defineProperty\(window,name,\{value:safe,writable:false\}\)/);
+  assert.match(source,/descriptor\.configurable===false&&window\[name\]===safe/);
+  assert.doesNotMatch(source,/catch\(_\)\{window\.(?:backupData|restoreData)=/);
+  assert.match(source,/event\.stopImmediatePropagation\(\)/);
+  assert.match(source,/document\.body\.replaceChildren\(\)/);
+});
+
 test('復元前検査はデータ健全性を確認し重大エラーを保存前に拒否する',()=>{
   const source=fs.readFileSync(path.join(root,'insight_backup_guard_v1.js'),'utf8');
   assert.match(source,/InsightDataHealth\.check\(snapshot\)/);
