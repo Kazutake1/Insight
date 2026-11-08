@@ -40,12 +40,19 @@ function loadAll(){
       const exportButton=document.createElement("button");
       exportButton.id="insightStorageExportRaw";
       exportButton.type="button";
-      exportButton.textContent="保存データを書き出す";
+      exportButton.textContent="復旧用データを書き出す（未暗号化）";
       exportButton.className="storage-load-error-export";
       exportButton.onclick=function(){
         try{
           const raw=localStorage.getItem(SK);
           if(raw===null)throw new Error("保存データが見つかりません");
+          const approved=window.confirm(
+            "この復旧用ファイルは暗号化されず、パスワードで保護されません。\n"+
+            "店舗データなどの機密情報を含む可能性があります。\n"+
+            "端末内の安全な場所に保管し、第三者への共有やメール添付はしないでください。\n\n"+
+            "未暗号化のJSONファイルを書き出しますか？"
+          );
+          if(!approved)return;
           const blob=new Blob([raw],{type:"application/json"});
           const url=URL.createObjectURL(blob);
           const a=document.createElement("a");

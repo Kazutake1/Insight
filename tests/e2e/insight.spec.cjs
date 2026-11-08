@@ -377,7 +377,7 @@ test('トップページは外部shellと機能manifestの最新版確認をno-s
   expect(source).toContain('integrity="sha512-CQBWl4fJHWbryGE+Pc7UAxWMUMNMWzWxF4SQo9CgkJIN1kx6djDQZjh3Y8SZ1d+6I+1zze6Z7kHXO7q3UyZAWw=="');
   expect(loader).not.toContain('stripPayloadChartScript');
   expect(payload).toContain('insight_payload_core_v1.css?v=20261022-quick-weather-fixed-1');
-  expect(payload).toContain('insight_payload_core_v1.js?v=20261106-backup-entrypoints-1');
+  expect(payload).toContain('insight_payload_core_v1.js?v=20261108-recovery-warning-1');
   expect(payload).toContain('insight_payload_ai_legacy_v1.js?v=20261020-ai-panel-smooth-1');
   expect(payload).toContain('insight_payload_bindings_v1.js?v=20261030-step4-gate3-ab-1');
   expect(payload).not.toMatch(/\son(?:click|change)\s*=/i);
@@ -1541,6 +1541,37 @@ test('データ状態チェックは店舗イベントの異常を店舗名付�
   expect(result.matched[0].storeName).toBeTruthy();
   expect(await page.evaluate(()=>localStorage.getItem('insight_v11'))).toBe(rawBefore);
   expect(errors).toEqual([]);
+});
+
+test('破損データの復旧用書き出しは未暗号化の確認を要しキャンセル時は保存しない',async({page})=>{
+  const corrupt='{"current":"fictional-broken","stores":';
+  await page.addInitScript(raw=>localStorage.setItem('insight_v11',raw),corrupt);
+  await page.goto('/Index.html',{waitUntil:'domcontentloaded'});
+  const button=page.locator('#insightStorageExportRaw');
+  await expect(button).toBeVisible();
+  await expect(button).toHaveText('復旧用データを書き出す（未暗号化）');
+  const dialogs=[],downloads=[];
+  page.on('download',d=>downloads.push(d));
+  page.on('dialog',async dialog=>{
+    dialogs.push({type:dialog.type(),message:dialog.message()});
+    await dialog.dismiss();
+  });
+  await button.click();
+  expect(dialogs).toHaveLength(1);
+  expect(dialogs[0].type).toBe('confirm');
+  expect(dialogs[0].message).toContain('暗号化されず');
+  expect(dialogs[0].message).toContain('メール添付');
+  expect(downloads).toHaveLength(0);
+  expect(await page.evaluate(()=>localStorage.getItem('insight_v11'))).toBe(corrupt);
+
+  page.removeAllListeners('dialog');
+  page.on('dialog',dialog=>dialog.accept());
+  const event=page.waitForEvent('download');
+  await button.click();
+  const downloaded=await event;
+  expect(downloaded.suggestedFilename()).toMatch(/^Insight_raw_storage_\d{4}-\d{2}-\d{2}\.json$/);
+  expect(fs.readFileSync(await downloaded.path(),'utf8')).toBe(corrupt);
+  expect(await page.evaluate(()=>localStorage.getItem('insight_v11'))).toBe(corrupt);
 });
 
 test('保存済みデータが壊れている場合は空データで起動せず保存データを保持する',async({page})=>{
