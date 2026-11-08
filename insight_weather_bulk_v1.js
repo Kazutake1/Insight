@@ -7,6 +7,62 @@ var DAILY='weather_code,temperature_2m_max,temperature_2m_min';
 var running=false;
 var cancelRequested=false;
 
+// STEP4 GATE-3: one independent, non-authorizing observer for the public
+// asynchronous weather backfill run. This does not aggregate sales operations.
+var weatherObserver=null,weatherObserverFault=false,weatherObserverActive=0;
+function weatherStatus(){
+  var scope='weather-bulk-run-only';
+  if(weatherObserverFault)return Object.freeze({scope:scope,state:'HELD',activeCount:null,epoch:null});
+  if(!weatherObserver)return Object.freeze({scope:scope,state:'UNAVAILABLE',activeCount:null,epoch:null});
+  try{
+    var s=weatherObserver.status();
+    if(!s||s.scope!=='registered-operations-only'||
+       !['IDLE_OBSERVED','ACTIVE','HELD'].includes(s.state)||
+       !Number.isSafeInteger(s.activeCount)||s.activeCount<0||
+       !Number.isSafeInteger(s.epoch)||s.epoch<0||
+       (s.state==='IDLE_OBSERVED'&&s.activeCount!==0)||
+       (s.state==='ACTIVE'&&s.activeCount===0)||
+       s.activeCount<weatherObserverActive||
+       (weatherObserverActive>0&&s.state!=='ACTIVE'&&s.state!=='HELD'))
+      throw new Error('weather observer status invalid');
+    return Object.freeze({scope:scope,state:s.state,activeCount:s.activeCount,epoch:s.epoch});
+  }catch(_){
+    weatherObserverFault=true;
+    return Object.freeze({scope:scope,state:'HELD',activeCount:null,epoch:null});
+  }
+}
+(function initWeatherObserver(){
+  try{
+    var factory=root.InsightOperationObserverV0&&root.InsightOperationObserverV0.createOperationObserver;
+    if(typeof factory!=='function')return;
+    var candidate=factory();
+    if(!candidate||['initialize','begin','end','invalidate','status'].some(function(name){
+      return typeof candidate[name]!=='function';
+    })||candidate.initialize()!==true){weatherObserverFault=true;return;}
+    weatherObserver=candidate;
+    var initial=weatherStatus();
+    if(initial.state!=='IDLE_OBSERVED'||initial.activeCount!==0||initial.epoch<1)
+      weatherObserverFault=true;
+  }catch(_){weatherObserverFault=true;}
+})();
+function beginWeatherRun(){
+  if(!weatherObserver||weatherObserverFault)return null;
+  try{
+    var token=weatherObserver.begin('weather_bulk_run');
+    if(!token||typeof token!=='object'||weatherObserverActive!==0){weatherObserverFault=true;return null;}
+    weatherObserverActive=1;
+    if(weatherStatus().state!=='ACTIVE')weatherObserverFault=true;
+    return token;
+  }catch(_){weatherObserverFault=true;return null;}
+}
+function endWeatherRun(token,outcome){
+  if(!token)return;
+  try{if(weatherObserver.end(token,outcome)!==true)weatherObserverFault=true;}
+  catch(_){weatherObserverFault=true;}
+  weatherObserverActive=0;
+  if(!weatherObserverFault)weatherStatus();
+}
+
 function pad(n){return String(n).padStart(2,'0');}
 function localDate(d){return d.getFullYear()+'-'+pad(d.getMonth()+1)+'-'+pad(d.getDate());}
 function today(){
@@ -213,6 +269,7 @@ async function run(onProgress){
   if(!snapshot||!snapshot.stores)throw new Error('店舗データを読み込めません');
   var plan=scan(snapshot);
   if(!plan.groups.length)return {plan:plan,days:0,fields:0,requests:0,sourceCounts:{}};
+  var ticket=beginWeatherRun(),outcome='unknown';
   running=true;cancelRequested=false;
   var total={plan:plan,days:0,fields:0,requests:0,sourceCounts:{}};
   try{
@@ -231,8 +288,11 @@ async function run(onProgress){
       if(typeof onProgress==='function')onProgress({done:i+1,total:plan.groups.length,store:group.storeName,source:fetched.source,summary:total});
     }
     total.cancelled=cancelRequested;
+    if(!cancelRequested)outcome='completed';
+    // A cancellation, whether before or after a write, remains conservatively
+    // unknown/HELD. We do not infer that earlier groups were uncommitted.
     return total;
-  }finally{running=false;cancelRequested=false;}
+  }finally{running=false;cancelRequested=false;endWeatherRun(ticket,outcome);}
 }
 function button(id,title){
   var b=root.document.createElement('button');
@@ -300,7 +360,7 @@ if(root.document){
   if(root.document.readyState==='loading')root.document.addEventListener('DOMContentLoaded',startInstall,{once:true});
   else startInstall();
 }
-root.InsightWeatherBulk={scan:scan,run:run,applyGroup:applyGroup,urlFor:urlFor,
+root.InsightWeatherBulk={scan:scan,run:run,getWeatherBulkOperationStatus:weatherStatus,applyGroup:applyGroup,urlFor:urlFor,
   fetchSeries:fetchSeries,isValidLocation:isValidLocation,codeToWeather:codeToWeather,
   cancel:function(){cancelRequested=true;},install:install};
 })(typeof window!=='undefined'?window:globalThis);
