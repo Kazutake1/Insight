@@ -92,17 +92,84 @@
   if(window.InsightHooks){
     window.InsightHooks.on('quick:save:after','quick-date-clear-dirty',function(){dirty=false;},30);
   }
+
+  // STEP4 GATE-3: selected-date Quick clear only; no app-wide authorization.
+  // The operation-observer script is loaded before this effective handler.
+  var quickClearObserver=null,quickClearFault=false,quickClearActive=0;
+  var quickClearScope='quick-selected-date-confirmed-clear-only';
+  function quickClearStatus(){
+    var scope=quickClearScope;
+    if(quickClearFault)return Object.freeze({scope:scope,state:'HELD',activeCount:null,epoch:null});
+    if(!quickClearObserver)return Object.freeze({scope:scope,state:'UNAVAILABLE',activeCount:null,epoch:null});
+    try{
+      var s=quickClearObserver.status();
+      if(!s||s.scope!=='registered-operations-only'||
+        ['IDLE_OBSERVED','ACTIVE','HELD'].indexOf(s.state)<0||
+        !Number.isSafeInteger(s.activeCount)||s.activeCount<0||
+        !Number.isSafeInteger(s.epoch)||s.epoch<1||
+        s.activeCount<quickClearActive||
+        (s.state==='IDLE_OBSERVED'&&s.activeCount!==0)||
+        (s.state==='ACTIVE'&&s.activeCount===0)||
+        (quickClearActive>0&&s.state!=='ACTIVE'&&s.state!=='HELD'))
+        throw new Error('invalid quick clear observer status');
+      return Object.freeze({scope:scope,state:s.state,activeCount:s.activeCount,epoch:s.epoch});
+    }catch(_){quickClearFault=true;return Object.freeze({scope:scope,state:'HELD',activeCount:null,epoch:null});}
+  }
+  (function initQuickClearObserver(){
+    try{
+      var factory=window.InsightOperationObserverV0&&window.InsightOperationObserverV0.createOperationObserver;
+      if(typeof factory!=='function')return;
+      var candidate=factory();
+      if(!candidate||['initialize','begin','end','invalidate','status'].some(function(k){
+        return typeof candidate[k]!=='function';
+      })||candidate.initialize()!==true){quickClearFault=true;return;}
+      quickClearObserver=candidate;
+      var initial=quickClearStatus();
+      if(initial.state!=='IDLE_OBSERVED'||initial.activeCount!==0)quickClearFault=true;
+    }catch(_){quickClearFault=true;}
+  })();
+  function observeQuickClear(action){
+    var ref=quickClearObserver,token=null,registered=false,outcome='unknown';
+    if(ref&&!quickClearFault){
+      try{
+        token=ref.begin('quick_selected_date_clear');
+        if(!token||typeof token!=='object'||quickClearActive>=Number.MAX_SAFE_INTEGER){
+          quickClearFault=true;
+        }else{
+          registered=true;quickClearActive++;
+          if(quickClearStatus().state!=='ACTIVE')quickClearFault=true;
+        }
+      }catch(_){quickClearFault=true;}
+    }
+    try{
+      var result=action();
+      outcome='completed';
+      return result;
+    }finally{
+      if(registered){
+        try{if(ref.end(token,outcome)!==true)quickClearFault=true;}
+        catch(_){quickClearFault=true;}
+        quickClearActive--;
+        if(!quickClearFault)quickClearStatus();
+      }
+    }
+  }
+  // Exposes state only, never business data or permission decisions.
+  window.InsightQuickClearObserverV0=Object.freeze({getStatus:quickClearStatus});
+
   window.clearTodayData=function(){
     var t=dateContext.getSelectedInfo(),rows=store.data[t.fy]&&store.data[t.fy][t.month];
     var target=t.fy+'年'+t.month+t.day+'日';
     if(!window.confirm(store.name+' の '+target+'の入力データを削除します。\n売上・客数・買上点数・廃棄・店舗メモをクリアし、天気・店舗イベント（共通セールを含む）は保持します。\n\nこの操作は元に戻せません。よろしいですか？'))return;
     if(!rows||!rows[t.day-1])return;
-    var row=rows[t.day-1];
-    row.売上=0;row.客数=0;row.買上点数=0;row.廃棄金額=0;
-    row.haiki=blankHaiki();delete row.storeMemo;
-    persist();dirty=false;
-    window.renderQuickNav();window.renderQuickPage();updateMissingBadge();
-    showToast('🗑 '+target+'の入力データをクリアしました','#dc2626','#fef2f2');
+    return observeQuickClear(function(){
+      var row=rows[t.day-1];
+      row.売上=0;row.客数=0;row.買上点数=0;row.廃棄金額=0;
+      row.haiki=blankHaiki();delete row.storeMemo;
+      persist();dirty=false;
+      window.renderQuickNav();window.renderQuickPage();updateMissingBadge();
+      showToast('🗑 '+target+'の入力データをクリアしました','#dc2626','#fef2f2');
+    });
   };
   if(typeof currentNav!=='undefined'&&currentNav===0)window.renderQuickNav();
 })();
