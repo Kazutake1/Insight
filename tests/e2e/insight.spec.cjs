@@ -377,7 +377,7 @@ test('トップページは外部shellと機能manifestの最新版確認をno-s
   expect(source).toContain('integrity="sha512-CQBWl4fJHWbryGE+Pc7UAxWMUMNMWzWxF4SQo9CgkJIN1kx6djDQZjh3Y8SZ1d+6I+1zze6Z7kHXO7q3UyZAWw=="');
   expect(loader).not.toContain('stripPayloadChartScript');
   expect(payload).toContain('insight_payload_core_v1.css?v=20261022-quick-weather-fixed-1');
-  expect(payload).toContain('insight_payload_core_v1.js?v=20261106-backup-entrypoints-1');
+  expect(payload).toContain('insight_payload_core_v1.js?v=20261108-recovery-warning-1');
   expect(payload).toContain('insight_payload_ai_legacy_v1.js?v=20261020-ai-panel-smooth-1');
   expect(payload).toContain('insight_payload_bindings_v1.js?v=20261030-step4-gate3-ab-1');
   expect(payload).not.toMatch(/\son(?:click|change)\s*=/i);
