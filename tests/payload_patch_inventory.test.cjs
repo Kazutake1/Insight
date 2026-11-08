@@ -50,7 +50,7 @@ test('canonical payloadはinline script/styleを持たず外部assetを順序固
   const readability=read('insight_readability_v1.js');
   const css=read('insight_payload_core_v1.css');
   assert.match(payload,/insight_payload_core_v1\.css\?v=20261022-quick-weather-fixed-1/);
-  assert.match(payload,/insight_payload_core_v1\.js\?v=20261106-backup-entrypoints-1/);
+  assert.match(payload,/insight_payload_core_v1\.js\?v=20261108-recovery-warning-1/);
   assert.doesNotMatch(core,/label\.style\.color/);
   assert.doesNotMatch(core,/msg\.style\.display/);
   assert.doesNotMatch(core,/badge\.style\.display/);
