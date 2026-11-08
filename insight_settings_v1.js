@@ -50,7 +50,12 @@
       '</div>';
 
     main.appendChild(page);
-    page.querySelector('#insightSettingsDataActions').append(backup,restore,health,csv,restoreFile,csvFile);
+    var restoreSafety=doc.createElement('label');
+    restoreSafety.className='insight-theme-toggle';
+    restoreSafety.innerHTML='<span>復元直前の安全バックアップを保存する（任意）</span><span class="insight-theme-switch"><input id="insightRestoreSafetyBackup" type="checkbox" role="switch"><span class="insight-theme-switch-track"></span></span>';
+    // Always start unchecked; never persist this optional choice across visits.
+    restoreSafety.querySelector('#insightRestoreSafetyBackup').checked=false;
+    page.querySelector('#insightSettingsDataActions').append(backup,restore,restoreSafety,health,csv,restoreFile,csvFile);
     var themeWrap=doc.createElement('div');
     themeWrap.className='insight-theme-toggle';
     themeWrap.innerHTML='<svg class="insight-theme-icon insight-theme-sun" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.93 4.93l1.42 1.42M17.65 17.65l1.42 1.42M2 12h2M20 12h2M4.93 19.07l1.42-1.42M17.65 6.35l1.42-1.42"/></svg><label class="insight-theme-switch" aria-label="ライト／ダークモード"><input id="insightThemeToggle" type="checkbox" role="switch"><span class="insight-theme-switch-track"></span></label><svg class="insight-theme-icon insight-theme-moon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/></svg>';
