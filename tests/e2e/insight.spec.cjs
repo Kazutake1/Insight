@@ -359,10 +359,10 @@ test('トップページは外部shellと機能manifestの最新版確認をno-s
     fetch('/insight_payload_source_v1.html?e2e-shell-check=1',{cache:'no-store'}).then(r=>r.text())
   ]));
   const [source,boot,loader,payload]=sources;
-  expect(source).toContain('name="insight-shell-version" content="20261108-gate3-integration-build-102"');
-  expect(source).toContain('insight_shell_boot_v1.js?v=20261108-gate3-integration-build-102');
-  expect(source).toContain('insight_shell_loader_v1.js?v=20261108-gate3-integration-loader-1');
-  expect(source).toContain('insight_shell_v1.css?v=20261108-gate3-integration-build-102');
+  expect(source).toContain('name="insight-shell-version" content="20261108-optional-backup-build-103"');
+  expect(source).toContain('insight_shell_boot_v1.js?v=20261108-optional-backup-build-103');
+  expect(source).toContain('insight_shell_loader_v1.js?v=20261108-optional-backup-loader-1');
+  expect(source).toContain('insight_shell_v1.css?v=20261108-optional-backup-build-103');
   expect(source).not.toMatch(/<script(?![^>]*\bsrc=)[^>]*>/i);
   expect(source).not.toMatch(/<style\b/i);
   expect(source).not.toMatch(/script-src[^;]*'unsafe-inline'/);
