@@ -1543,6 +1543,37 @@ test('データ状態チェックは店舗イベントの異常を店舗名付�
   expect(errors).toEqual([]);
 });
 
+test('破損データの復旧用書き出しは未暗号化の確認を要しキャンセル時は保存しない',async({page})=>{
+  const corrupt='{"current":"fictional-broken","stores":';
+  await page.addInitScript(raw=>localStorage.setItem('insight_v11',raw),corrupt);
+  await page.goto('/Index.html',{waitUntil:'domcontentloaded'});
+  const button=page.locator('#insightStorageExportRaw');
+  await expect(button).toBeVisible();
+  await expect(button).toHaveText('復旧用データを書き出す（未暗号化）');
+  const dialogs=[],downloads=[];
+  page.on('download',d=>downloads.push(d));
+  page.on('dialog',async dialog=>{
+    dialogs.push({type:dialog.type(),message:dialog.message()});
+    await dialog.dismiss();
+  });
+  await button.click();
+  expect(dialogs).toHaveLength(1);
+  expect(dialogs[0].type).toBe('confirm');
+  expect(dialogs[0].message).toContain('暗号化されず');
+  expect(dialogs[0].message).toContain('メール添付');
+  expect(downloads).toHaveLength(0);
+  expect(await page.evaluate(()=>localStorage.getItem('insight_v11'))).toBe(corrupt);
+
+  page.removeAllListeners('dialog');
+  page.on('dialog',dialog=>dialog.accept());
+  const event=page.waitForEvent('download');
+  await button.click();
+  const downloaded=await event;
+  expect(downloaded.suggestedFilename()).toMatch(/^Insight_raw_storage_\d{4}-\d{2}-\d{2}\.json$/);
+  expect(fs.readFileSync(await downloaded.path(),'utf8')).toBe(corrupt);
+  expect(await page.evaluate(()=>localStorage.getItem('insight_v11'))).toBe(corrupt);
+});
+
 test('保存済みデータが壊れている場合は空データで起動せず保存データを保持する',async({page})=>{
   await page.addInitScript(()=>localStorage.setItem('insight_v11','{"current":"broken","stores":'));
   await page.goto('/Index.html',{waitUntil:'domcontentloaded'});
