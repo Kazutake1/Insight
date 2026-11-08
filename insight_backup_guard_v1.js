@@ -114,7 +114,7 @@ function runRestorePreflight(snapshot){
   }
   return report;
 }
-function restoreSummary(fileName,info,snapshot,report){
+function restoreSummary(fileName,info,snapshot,report,includeSafetyBackup){
   var created="記録なし（従来形式）";
   if(info&&typeof info.createdAt==="string"){try{created=new Date(info.createdAt).toLocaleString("ja-JP");}catch(_){}}
   var years=backupYears(snapshot);
@@ -125,11 +125,15 @@ function restoreSummary(fileName,info,snapshot,report){
     if(warnings)message+="\n\n注意事項\n"+warnings;
   }
   if(countWasteRecords(allStores)>0){message+=countWasteRecords(snapshot)===0?"\n\n注意：このバックアップに廃棄数データはありません。復元すると現在の廃棄数は失われます。":"\n\n注意：現在の廃棄数もバックアップの値に置き換わります。";}
-  return message+"\n\n現在の全データは上書きされます。復元しますか？";
+  return message+(includeSafetyBackup?"":"\n\n復元直前の安全バックアップは作成しません。復元に失敗した場合、元の状態に戻せなくなる可能性があります。")+"\n\n現在の全データは上書きされます。復元しますか？";
 }
 
 
 var preRestoreMemorySnapshot=null;
+function shouldCreatePreRestoreBackup(){
+  var option=document.getElementById("insightRestoreSafetyBackup");
+  return !!(option&&option.checked===true);
+}
 // A single FileReader may own the restore path at a time; no snapshot/schema changes.
 var restoreFileReaderActive=null;
 var backupOperationActive=false;
@@ -452,7 +456,7 @@ function encryptedRestoreData(e){
   var state;
   try{state=captureBackupState();}catch(_){alert('現在の保存内容を確認できないため復元を開始できません。');e.target.value='';return;}
   var operation={cancelled:false};
-  var reader=new FileReader(),restoreLoadCount=0,readerPhase='pending';restoreFileReaderActive=reader;reader.onload=async function(ev){if(++restoreLoadCount>1||readerPhase!=='pending'||restoreFileReaderActive!==reader){markRestoreObservationFault();return;}readerPhase='processing';var restoreCommitted=false,restoreTicket=null,restoreOutcome='unknown',restoreWriteCheck=null,password=null;try{try{
+  var reader=new FileReader(),restoreLoadCount=0,readerPhase='pending';restoreFileReaderActive=reader;reader.onload=async function(ev){if(++restoreLoadCount>1||readerPhase!=='pending'||restoreFileReaderActive!==reader){markRestoreObservationFault();return;}readerPhase='processing';var restoreCommitted=false,restoreTicket=null,restoreOutcome='unknown',restoreWriteCheck=null,password=null,safetyBackupCreated=false;try{try{
     var parsed=JSON.parse(ev.target.result);
     // Any encryption-shaped input must authenticate; never reinterpret a broken
     // or unknown encrypted envelope as a legacy plaintext snapshot.
@@ -468,8 +472,13 @@ function encryptedRestoreData(e){
     var envelope=parseBackupEnvelope(parsed),newAll=normalizeBackup(envelope.data);
     if(envelope.info)validateBackupInfo(envelope.info,newAll);
     var preflight=runRestorePreflight(newAll);
-    if(!confirm((encrypted?'':'このファイルは暗号化されていない平文JSONです。\n\n')+restoreSummary(file.name,envelope.info,newAll,preflight))){e.target.value="";return;}
-    try{await createPreRestoreBackup(operation,state);}catch(safetyErr){if(safetyErr&&['InsightBackupCancelled','InsightBackupStateChanged'].indexOf(safetyErr.name)>=0)throw safetyErr;throw new Error("復元直前バックアップを作成できないため、復元を中止しました。 "+String(safetyErr&&safetyErr.message?safetyErr.message:safetyErr));}
+    var safetyBackupSelected=shouldCreatePreRestoreBackup();
+    if(!confirm((encrypted?'':'このファイルは暗号化されていない平文JSONです。\n\n')+restoreSummary(file.name,envelope.info,newAll,preflight,safetyBackupSelected))){e.target.value="";return;}
+    // Keep a private rollback snapshot even when the optional file export is skipped.
+    preRestoreMemorySnapshot=window.InsightStorage.migrateSnapshot(allStores);
+    if(safetyBackupSelected){
+      try{await createPreRestoreBackup(operation,state);safetyBackupCreated=true;}catch(safetyErr){if(safetyErr&&['InsightBackupCancelled','InsightBackupStateChanged'].indexOf(safetyErr.name)>=0)throw safetyErr;throw new Error("復元直前バックアップを作成できないため、復元を中止しました。 "+String(safetyErr&&safetyErr.message?safetyErr.message:safetyErr));}
+    }
     ensureBackupContinuing(operation,state);
     var verifiedRestore=null,writeCompleted=false,writeAttempted=false;
     try{
@@ -488,10 +497,10 @@ function encryptedRestoreData(e){
       try{
         rollbackPreRestoreSnapshot();
         preRestoreMemorySnapshot=null;
-        alert("復元後の整合性確認に失敗したため、復元前の状態へ自動で戻しました。\n\n"+String(postErr&&postErr.message?postErr.message:postErr)+"\n\n復元直前バックアップのダウンロード処理は開始済みです。保存先を確認してください。");
+        alert("復元後の整合性確認に失敗したため、復元前の状態へ自動で戻しました。\n\n"+String(postErr&&postErr.message?postErr.message:postErr)+"\n\n"+(safetyBackupCreated?"復元直前バックアップのダウンロード処理は開始済みです。保存先を確認してください。":"復元直前の安全バックアップは作成していません。")+"");
       }catch(rollbackErr){
         holdRestoreSnapshotWrites();
-        alert("重大なエラー：復元後の整合性確認に失敗し、自動復旧にも失敗しました。\n\n"+String(postErr&&postErr.message?postErr.message:postErr)+"\n\n自動復旧エラー："+String(rollbackErr&&rollbackErr.message?rollbackErr.message:rollbackErr)+"\n\n復元直前バックアップ Insight_pre_restore_...json を保管してください。\n\n追加の編集・保存や、この画面での再復元は行わないでください。\nInsightを手動で再読み込みし、保存内容を確認してください。\nその後、必要な場合のみ保管したバックアップから復元してください。");
+        alert("重大なエラー：復元後の整合性確認に失敗し、自動復旧にも失敗しました。\n\n"+String(postErr&&postErr.message?postErr.message:postErr)+"\n\n自動復旧エラー："+String(rollbackErr&&rollbackErr.message?rollbackErr.message:rollbackErr)+"\n\n"+(safetyBackupCreated?"復元直前バックアップ Insight_pre_restore_...json を保管してください。":"復元直前の安全バックアップは作成していません。復元前の状態に戻せない可能性があります。手元の既存バックアップを確認してください。")+"\n\n追加の編集・保存や、この画面での再復元は行わないでください。\nInsightを手動で再読み込みし、保存内容を確認してください。\n"+(safetyBackupCreated?"その後、必要な場合のみ保管したバックアップから復元してください。":"その後、必要な場合のみ手元の既存バックアップからの復元を検討してください。")+"");
       }
       e.target.value="";return;
     }
@@ -506,9 +515,9 @@ function encryptedRestoreData(e){
     alert(restoreCommitted
       ?"バックアップの保存と整合性確認は完了しましたが、画面の更新に失敗しました。\n"+detail+"\n\n復元したデータは保存されています。Insightを再読み込みして表示を更新してください。もう一度復元する必要はありません。"
       :restoreWriteCheck==="target-observed"
-      ?"復元処理は途中で失敗しましたが、保存領域に復元対象と一致するデータが確認されました。\n"+detail+"\n\n保存後の整合性確認・画面更新は完了していません。追加の編集・保存や再復元は行わず、復元直前バックアップを保管してからInsightを再読み込みし、表示内容を確認してください。"
+      ?"復元処理は途中で失敗しましたが、保存領域に復元対象と一致するデータが確認されました。\n"+detail+"\n\n保存後の整合性確認・画面更新は完了していません。追加の編集・保存や再復元は行わず、"+(safetyBackupCreated?"復元直前バックアップを保管してから":"復元直前の安全バックアップは作成していません。手元の既存バックアップを確認してから")+"Insightを再読み込みし、表示内容を確認してください。"
       :restoreWriteCheck==="uncertain"
-      ?"バックアップ復元中にエラーが発生し、現在の保存状態を確認できませんでした。\n"+detail+"\n\n追加の編集・保存や再復元は行わず、復元直前バックアップを保管してからInsightを再読み込みし、保存内容を確認してください。"
+      ?"バックアップ復元中にエラーが発生し、現在の保存状態を確認できませんでした。\n"+detail+"\n\n追加の編集・保存や再復元は行わず、"+(safetyBackupCreated?"復元直前バックアップを保管してから":"復元直前の安全バックアップは作成していません。手元の既存バックアップを確認してから")+"Insightを再読み込みし、保存内容を確認してください。"
       :"バックアップを復元できませんでした。\n"+detail+"\n\n現在のデータは変更されていません。");
   }e.target.value="";}finally{
     // This private clone is used only by the synchronous rollback above.
