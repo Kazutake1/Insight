@@ -417,3 +417,43 @@ for(const mode of ['cancel','invalid','quota','rollback','rollback-failure','pos
     }
   });
 }
+
+test('FICTIONAL capacity confirmation uses normalized sizes without storage writes and cancellation preserves all keys',async({page})=>{
+  await setup(page);
+  const fixture=await page.evaluate(()=>{
+    const target=JSON.parse(JSON.stringify(allStores));
+    for(const st of Object.values(target.stores))for(const year of st.years)for(const rows of Object.values(st.data[year]))for(const row of rows)delete row.haiki;
+    for(const st of Object.values(target.stores))st.data[st.years.at(-1)]['1月'][0].売上=741;
+    window.__capacityCandidates=[];
+    const serialize=InsightStorage.serialize;
+    InsightStorage.serialize=function(value){
+      const raw=serialize.apply(this,arguments);
+      const st=value.stores[value.current];
+      if(st.data[st.years.at(-1)]['1月'][0].売上===741)__capacityCandidates.push({units:raw.length,haiki:st.data[st.years.at(-1)]['1月'][0].haiki});
+      return raw;
+    };
+    const before=Object.fromEntries(Object.keys(localStorage).map(k=>[k,localStorage.getItem(k)]));
+    window.__capacityWrites=0;
+    for(const method of ['setItem','removeItem','clear']){
+      const original=Storage.prototype[method];
+      Storage.prototype[method]=function(...args){__capacityWrites++;return original.apply(this,args);};
+    }
+    return {target,before};
+  });
+  page.removeAllListeners('dialog');
+  const confirmation=page.waitForEvent('dialog');
+  const action=upload(page,fixture.target);
+  const dialog=await confirmation;
+  expect(dialog.type()).toBe('confirm');
+  const candidates=await page.evaluate(()=>__capacityCandidates);
+  expect(candidates).toHaveLength(1);
+  expect(candidates[0].haiki).toBeTruthy();
+  expect(dialog.message()).toContain('復元後：'+(candidates[0].units*2/1048576).toFixed(2)+' MiB');
+  expect(dialog.message()).toContain('端末の空き容量・保存可能量ではありません');
+  expect(dialog.message()).toContain('現在の全データは上書きされます');
+  expect(await page.evaluate(()=>__capacityWrites)).toBe(0);
+  await dialog.dismiss();await action;
+  await page.waitForFunction(()=>document.getElementById('restoreFile').value==='');
+  expect(await page.evaluate(()=>__capacityWrites)).toBe(0);
+  expect(await page.evaluate(()=>Object.fromEntries(Object.keys(localStorage).map(k=>[k,localStorage.getItem(k)])))).toEqual(fixture.before);
+});

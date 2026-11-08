@@ -900,3 +900,42 @@ test('Optional safety OFF: postcommit error holds writes without suggesting none
     assert.doesNotMatch(f.alerts.join(' '),/復元直前バックアップを保管してから/);
   }
 });
+
+test('Capacity diagnosis measures normalized UTF-16 values with one serialization and zero writes',async()=>{
+  const f=fixture({confirm:false,safetyBackup:false});const input=snapshot(750);
+  for(const st of Object.values(input.stores))for(const rows of Object.values(st.data['2026']))for(const row of rows)delete row.haiki;
+  input.stores.a.name='架空😀';
+  let normalized;
+  const values=new Map([['insight_v11',JSON.stringify(f.original)],['insight_theme','dark😀'],['unrelated','ignored']]);
+  let serializations=0,writes=0;
+  f.window.InsightStorage.serialize=value=>{if(value.stores.a.data['2026']['1月'][0].売上===750){serializations++;normalized=clone(value);}return JSON.stringify(value);};
+  f.window.localStorage={get length(){return values.size;},key:i=>[...values.keys()][i],getItem:k=>values.get(k)??null,setItem(){writes++;},removeItem(){writes++;},clear(){writes++;}};
+  await f.restore(input);
+  assert.ok(JSON.stringify(normalized).length>JSON.stringify(input).length);
+  assert.deepEqual(normalized.stores.a.data['2026']['1月'][0].haiki,{米飯:0});
+  const mib=value=>(value.length*2/1048576).toFixed(2)+' MiB';
+  assert.ok(f.confirmMessages[0].includes('復元後：'+mib(JSON.stringify(normalized))));
+  assert.ok(f.confirmMessages[0].includes('現在：'+mib(values.get('insight_v11'))));
+  assert.ok(f.confirmMessages[0].includes('その他のInsight保存値：'+mib('dark😀')));
+  assert.equal(serializations,1);assert.equal(writes,0);assert.equal(f.writeCount,0);
+});
+test('Capacity diagnosis leaves unavailable values unknown and never blocks a valid restore',async()=>{
+  const f=fixture({safetyBackup:false});
+  Object.defineProperty(f.window.localStorage,'length',{get(){throw Error('FICTIONAL denied enumeration');}});
+  await f.restore(snapshot(750));
+  assert.equal(f.writeCount,1);
+  assert.match(f.confirmMessages[0],/その他のInsight保存値：確認できません/);
+  assert.match(f.confirmMessages[0],/空き容量・保存可能量ではありません/);
+  assert.equal(f.persisted.stores.b.data['2026']['12月'][30].売上,750);
+});
+test('Capacity estimate above common quota remains advisory and cancellation writes nothing',async()=>{
+  for(const confirm of [false,true]){
+    const f=fixture({safetyBackup:false,confirm});const target=snapshot(750);
+    target.stores.a.name='架空'+ 'A'.repeat(3*1024*1024);
+    await f.restore(target);
+    assert.match(f.confirmMessages[0],/復元後：6\./);
+    assert.equal(f.writeCount,confirm?1:0);
+    assert.equal(f.downloads.length,0);
+    if(!confirm)assert.deepEqual(f.persisted,f.original);
+  }
+});

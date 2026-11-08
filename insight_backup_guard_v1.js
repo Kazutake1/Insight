@@ -114,6 +114,35 @@ function runRestorePreflight(snapshot){
   }
   return report;
 }
+// Advisory only: UTF-16 value sizes are not browser quota or free space.
+// Never probe capacity with writes, retain serialized values, or log contents.
+function restoreCapacityEstimate(snapshot){
+  var result={candidateUnits:null,currentUnits:null,relatedUnits:null};
+  try{result.candidateUnits=window.InsightStorage.serialize(snapshot).length;}catch(_){}
+  try{
+    var storage=window.localStorage,key=currentStorageKey();
+    var current=storage.getItem(key);
+    result.currentUnits=current===null?0:current.length;
+    var total=0;
+    if(!Number.isSafeInteger(storage.length)||typeof storage.key!=="function")return result;
+    for(var i=0;i<storage.length;i++){
+      var name=storage.key(i);
+      if(name!==key&&typeof name==='string'&&name.indexOf('insight_')===0){
+        var value=storage.getItem(name);
+        if(value!==null)total+=value.length;
+      }
+    }
+    result.relatedUnits=total;
+  }catch(_){} // Incomplete reads remain unknown; they never authorize a write.
+  return result;
+}
+function restoreCapacitySummary(snapshot){
+  var estimate=restoreCapacityEstimate(snapshot);
+  function size(units){return units===null?'確認できません':(units*2/1048576).toFixed(2)+' MiB';}
+  return '\n\n保存量の概算（文字数×2バイト）\n復元後：'+size(estimate.candidateUnits)+
+    ' ／ 現在：'+size(estimate.currentUnits)+'\nその他のInsight保存値：'+size(estimate.relatedUnits)+
+    '\n端末の空き容量・保存可能量ではありません。キー名や端末差を含まない参考値です。容量不足で復元できない場合があります。';
+}
 function restoreSummary(fileName,info,snapshot,report,includeSafetyBackup){
   var created="記録なし（従来形式）";
   if(info&&typeof info.createdAt==="string"){try{created=new Date(info.createdAt).toLocaleString("ja-JP");}catch(_){}}
@@ -125,6 +154,7 @@ function restoreSummary(fileName,info,snapshot,report,includeSafetyBackup){
     if(warnings)message+="\n\n注意事項\n"+warnings;
   }
   if(countWasteRecords(allStores)>0){message+=countWasteRecords(snapshot)===0?"\n\n注意：このバックアップに廃棄数データはありません。復元すると現在の廃棄数は失われます。":"\n\n注意：現在の廃棄数もバックアップの値に置き換わります。";}
+  message+=restoreCapacitySummary(snapshot);
   return message+(includeSafetyBackup?"":"\n\n復元直前の安全バックアップは作成しません。復元に失敗した場合、元の状態に戻せなくなる可能性があります。")+"\n\n現在の全データは上書きされます。復元しますか？";
 }
 
