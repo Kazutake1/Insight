@@ -39,6 +39,7 @@ function fixture(options={}){
   const downloads=[],blobs=[],passwordRequests=[],confirmationRequests=[],metadataWrites=[],alerts=[],toasts=[],samples=[],readers=[];
   const metadata=new Map(Object.entries(options.metadata||{}));
   let confirmation=options.confirm!==false,confirmationCount=0;
+  const confirmMessages=[];
   let writeHeld=false;
   let failWriteOnce=!!options.quotaOnce;
   const body={
@@ -46,6 +47,8 @@ function fixture(options={}){
   };
   const document={
     body,
+    // Legacy cases deliberately exercise safety-on; use false/null for off/missing-option cases.
+    getElementById(id){return id==='insightRestoreSafetyBackup'&&options.safetyBackup!==null?{checked:options.safetyBackup!==false}:null;},
     createElement(name){
       assert.equal(name,'a');
       if(options.backupDownloadFailure)throw new Error('download was blocked');
@@ -111,7 +114,7 @@ function fixture(options={}){
     URL:{createObjectURL(blob){blobs.push(blob);return 'blob:fake';},revokeObjectURL(){}},
     Blob,Date,Number,Set,Map,String,Object,Array,Math,JSON,Promise,TextEncoder,TextDecoder,Uint8Array,ArrayBuffer,
     setTimeout(){return 1;},
-    confirm(){confirmationCount++;if(typeof options.duringConfirm==='function')options.duringConfirm({ctx,readers});return confirmation;},
+    confirm(message){confirmationCount++;confirmMessages.push(String(message));if(typeof options.duringConfirm==='function')options.duringConfirm({ctx,readers});return confirmation;},
     alert(message){alerts.push(String(message));},
     console:{warn(){},log(){}},
     FileReader:class FileReader{
@@ -142,7 +145,7 @@ function fixture(options={}){
     const count=readers.length;ctx.restoreData({target:input});
     return options.deferReader||readers.length===count?input:Promise.resolve(readers.at(-1)?.completion).then(()=>input);
   }
-  return {ctx,window,original,restore,downloads,blobs,passwordRequests,confirmationRequests,metadata,metadataWrites,alerts,toasts,samples,readers,
+  return {ctx,window,original,restore,downloads,blobs,passwordRequests,confirmationRequests,confirmMessages,metadata,metadataWrites,alerts,toasts,samples,readers,
     flushReader(){const r=readers.at(-1);return r.onload({target:{result:r._file.contents}});},
     repeatReader(){const r=readers.at(-1);return r.onload({target:{result:r._file.contents}});},
     get persisted(){return persisted;},
@@ -814,5 +817,86 @@ test('Backup confirmation keeps old records on password cancel, encryption failu
       assert.equal(f.metadata.get(CONFIRMED_KEY),old);assert.equal(f.metadata.get('insight_last_backup'),'1700000000000');
       assert.equal(f.metadata.has(DOWNLOAD_KEY),false);assert.equal(f.writeCount,0);assert.deepEqual(f.persisted,f.original);
     }
+  }
+});
+
+
+test('Optional pre-restore safety setting renders unchecked on every new Settings page',()=>{
+  const settings=fs.readFileSync(path.join(__dirname,'..','insight_settings_v1.js'),'utf8');
+  assert.match(settings,/id="insightRestoreSafetyBackup" type="checkbox"/);
+  assert.match(settings,/querySelector\('#insightRestoreSafetyBackup'\)\.checked=false/);
+  assert.match(settings,/append\(backup,restore,restoreSafety,health,csv,restoreFile,csvFile\)/);
+});
+test('Optional safety OFF or unavailable: two-store plain restore requires no extra password, file or metadata',async()=>{
+  for(const safetyBackup of [false,null]){
+    const f=fixture({safetyBackup});
+    await f.restore(snapshot(750));
+    assert.equal(f.writeCount,1);
+    assert.equal(f.persisted.stores.a.data['2026']['1月'][0].売上,750);
+    assert.equal(f.persisted.stores.b.data['2026']['12月'][30].売上,750);
+    assert.equal(f.downloads.length,0);
+    assert.equal(f.blobs.length,0);
+    assert.equal(f.passwordRequests.length,0);
+    assert.equal(f.confirmationRequests.length,0);
+    assert.equal(f.metadataWrites.length,0);
+    assert.equal(f.confirmationCount,1);
+    assert.match(f.confirmMessages[0],/安全バックアップは作成しません/);
+    assert.match(f.confirmMessages[0],/現在の全データは上書きされます/);
+    assert.equal(f.window.InsightStorage.snapshotWritesHeld(),false);
+  }
+});
+test('Optional safety OFF: encrypted restore only requests original backup password',async()=>{
+  const f=fixture({realCrypto:true,safetyBackup:false,requestPassword:()=>FILE_PASSWORD});
+  const encrypted=await f.window.InsightBackupCryptoV1.encrypt(snapshot(750),FILE_PASSWORD);
+  await f.restore(encrypted);
+  assert.equal(f.writeCount,1);
+  assert.deepEqual(f.passwordRequests.map(p=>p.confirm),[false]);
+  assert.equal(f.downloads.length,0);
+  assert.equal(f.confirmationRequests.length,0);
+  assert.equal(f.persisted.stores.a.data['2026']['1月'][0].売上,750);
+});
+test('Optional safety OFF: failed validation, cancellation and quota never overwrite prior bytes',async()=>{
+  for(const opts of [{confirm:false},{quotaOnce:true}]){
+    const f=fixture({...opts,safetyBackup:false});
+    await f.restore(snapshot(750));
+    assert.equal(f.writeCount,0);
+    assert.deepEqual(f.persisted,f.original);
+    assert.equal(f.downloads.length,0);
+    assert.equal(f.window.InsightStorage.snapshotWritesHeld(),false);
+  }
+  const invalid=fixture({safetyBackup:false});
+  await invalid.restore('{invalid');
+  assert.equal(invalid.writeCount,0);
+  assert.deepEqual(invalid.persisted,invalid.original);
+});
+test('Optional safety OFF: readback mismatch uses in-memory rollback without a download',async()=>{
+  const f=fixture({safetyBackup:false,corruptAfterWrite:true});
+  await f.restore(snapshot(750));
+  assert.equal(f.writeCount,2);
+  assert.deepEqual(f.persisted,f.original);
+  assert.equal(f.downloads.length,0);
+  assert.match(f.alerts.join(' '),/復元前の状態へ自動で戻しました/);
+  assert.match(f.alerts.join(' '),/安全バックアップは作成していません/);
+  assert.doesNotMatch(f.alerts.join(' '),/ダウンロード処理は開始済み/);
+});
+test('Optional safety OFF: failed rollback retains write hold and never claims a safety file exists',async()=>{
+  const f=fixture({safetyBackup:false,corruptAfterWrite:true,rollbackFailure:true});
+  await f.restore(snapshot(750));
+  assert.equal(f.writeCount,1);
+  assert.equal(f.downloads.length,0);
+  assert.equal(f.window.InsightStorage.snapshotWritesHeld(),true);
+  assert.match(f.alerts.join(' '),/自動復旧にも失敗/);
+  assert.match(f.alerts.join(' '),/安全バックアップは作成していません/);
+  assert.doesNotMatch(f.alerts.join(' '),/Insight_pre_restore_\.\.\.json を保管してください/);
+});
+test('Optional safety OFF: postcommit error holds writes without suggesting nonexistent file',async()=>{
+  for(const opts of [{postcommitThrow:true},{postcommitThrow:true,readbackUnavailableAfterCommit:true}]){
+    const f=fixture({...opts,safetyBackup:false});
+    await f.restore(snapshot(750));
+    assert.equal(f.writeCount,1);
+    assert.equal(f.downloads.length,0);
+    assert.equal(f.window.InsightStorage.snapshotWritesHeld(),true);
+    assert.match(f.alerts.join(' '),/安全バックアップは作成していません/);
+    assert.doesNotMatch(f.alerts.join(' '),/復元直前バックアップを保管してから/);
   }
 });
