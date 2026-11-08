@@ -40,12 +40,19 @@ function loadAll(){
       const exportButton=document.createElement("button");
       exportButton.id="insightStorageExportRaw";
       exportButton.type="button";
-      exportButton.textContent="保存データを書き出す";
+      exportButton.textContent="復旧用データを書き出す（未暗号化）";
       exportButton.className="storage-load-error-export";
       exportButton.onclick=function(){
         try{
           const raw=localStorage.getItem(SK);
           if(raw===null)throw new Error("保存データが見つかりません");
+          const approved=window.confirm(
+            "この復旧用ファイルは暗号化されず、パスワードで保護されません。\n"+
+            "店舗データなどの機密情報を含む可能性があります。\n"+
+            "端末内の安全な場所に保管し、第三者への共有やメール添付はしないでください。\n\n"+
+            "未暗号化のJSONファイルを書き出しますか？"
+          );
+          if(!approved)return;
           const blob=new Blob([raw],{type:"application/json"});
           const url=URL.createObjectURL(blob);
           const a=document.createElement("a");
@@ -1492,21 +1499,88 @@ function closeBudgetModal(){
   document.getElementById("budgetModalBg").classList.remove("show");
 }
 
+
+// STEP4 GATE-3: local, non-authorizing observer for saveBudget() only.
+// This does NOT observe getHaikiBudget's default creation during other render paths.
+const InsightWasteBudgetSaveObserverV0=(function(){
+  let observer=null,fault=false,active=0;
+  function getStatus(){
+    const scope='waste-budget-dialog-save-only';
+    if(fault)return Object.freeze({scope,state:'HELD',activeCount:null,epoch:null});
+    if(!observer)return Object.freeze({scope,state:'UNAVAILABLE',activeCount:null,epoch:null});
+    try{
+      const s=observer.status();
+      if(!s||s.scope!=='registered-operations-only'||
+        !['IDLE_OBSERVED','ACTIVE','HELD'].includes(s.state)||
+        !Number.isSafeInteger(s.activeCount)||s.activeCount<0||
+        !Number.isSafeInteger(s.epoch)||s.epoch<1||s.activeCount<active||
+        (s.state==='IDLE_OBSERVED'&&s.activeCount!==0)||
+        (s.state==='ACTIVE'&&s.activeCount===0)||
+        (active>0&&s.state!=='ACTIVE'&&s.state!=='HELD'))throw new Error('invalid budget status');
+      return Object.freeze({scope,state:s.state,activeCount:s.activeCount,epoch:s.epoch});
+    }catch(_){fault=true;return Object.freeze({scope,state:'HELD',activeCount:null,epoch:null});}
+  }
+  function initialize(){
+    try{
+      const factory=window.InsightOperationObserverV0&&window.InsightOperationObserverV0.createOperationObserver;
+      if(typeof factory!=='function')return;
+      const candidate=factory();
+      if(!candidate||['initialize','begin','end','invalidate','status'].some(name=>typeof candidate[name]!=='function')||
+        candidate.initialize()!==true){fault=true;return;}
+      observer=candidate;
+      const initial=getStatus();
+      if(initial.state!=='IDLE_OBSERVED'||initial.activeCount!==0)fault=true;
+    }catch(_){fault=true;}
+  }
+  // The core payload is parsed before the feature scripts; initialize only after they load.
+  if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',initialize);
+  else initialize();
+  function observe(operation){
+    let ticket=null,registered=false,outcome='unknown';
+    const ref=observer;
+    if(ref&&!fault){
+      try{
+        ticket=ref.begin('waste_budget_save');
+        if(!ticket||typeof ticket!=='object'||active>=Number.MAX_SAFE_INTEGER)fault=true;
+        else{
+          registered=true;active++;
+          if(getStatus().state!=='ACTIVE')fault=true;
+        }
+      }catch(_){fault=true;}
+    }
+    try{
+      const value=operation();
+      outcome='completed';
+      return value;
+    }finally{
+      if(registered){
+        try{if(ref.end(ticket,outcome)!==true)fault=true;}
+        catch(_){fault=true;}
+        active--;
+        if(!fault)getStatus();
+      }
+    }
+  }
+  return Object.freeze({getStatus,observe});
+})();
+
 function saveBudget(){
-  const budget=getHaikiBudget();
-  HAIKI_CATS.forEach(c=>{
-    const el=document.getElementById(`be_${c}`);
-    budget.cats[c]=el?fromComma(el.value):0;
+  return InsightWasteBudgetSaveObserverV0.observe(()=>{
+    const budget=getHaikiBudget();
+    HAIKI_CATS.forEach(c=>{
+      const el=document.getElementById(`be_${c}`);
+      budget.cats[c]=el?fromComma(el.value):0;
+    });
+    const tot=document.getElementById("be_total");
+    budget.total=tot?fromComma(tot.value):0;
+    store.haikibudget=budget;
+    persist();
+    closeBudgetModal();
+    // フォームを再描画して予算セクションを更新
+    const fy=editYear.haiki;
+    const mi=MONTHS.indexOf(editMonth.haiki);
+    if(window.haikiSelDay)renderHaikiForm(fy,mi,window.haikiSelDay);
   });
-  const tot=document.getElementById("be_total");
-  budget.total=tot?fromComma(tot.value):0;
-  store.haikibudget=budget;
-  persist();
-  closeBudgetModal();
-  // フォームを再描画して予算セクションを更新
-  const fy=editYear.haiki;
-  const mi=MONTHS.indexOf(editMonth.haiki);
-  if(window.haikiSelDay)renderHaikiForm(fy,mi,window.haikiSelDay);
 }
 
 /* ══ 日本祝日計算 ══ */
@@ -2290,6 +2364,73 @@ function clearDayData(type){
   showToast(`🗑 ${m}${day}日のデータをクリアしました`,"danger");
 }
 
+
+/* STEP4 GATE-3: local observer of confirmed month-level customer data clearing only.
+   It does not observe confirmation, cancel, missing-data, or other writers. */
+const InsightKyakuMonthClearObserverV0=(function(){
+  let observer=null,fault=false,active=0;
+  const scope='kyaku-month-confirmed-clear-only';
+  function getStatus(){
+    if(fault)return Object.freeze({scope,state:'HELD',activeCount:null,epoch:null});
+    if(!observer)return Object.freeze({scope,state:'UNAVAILABLE',activeCount:null,epoch:null});
+    try{
+      const s=observer.status();
+      if(!s||s.scope!=='registered-operations-only'||
+        !['IDLE_OBSERVED','ACTIVE','HELD'].includes(s.state)||
+        !Number.isSafeInteger(s.activeCount)||s.activeCount<0||
+        !Number.isSafeInteger(s.epoch)||s.epoch<1||
+        s.activeCount<active||
+        (s.state==='IDLE_OBSERVED'&&s.activeCount!==0)||
+        (s.state==='ACTIVE'&&s.activeCount===0)||
+        (active>0&&s.state!=='ACTIVE'&&s.state!=='HELD'))throw new Error('invalid kyaku month clear status');
+      return Object.freeze({scope,state:s.state,activeCount:s.activeCount,epoch:s.epoch});
+    }catch(_){fault=true;return Object.freeze({scope,state:'HELD',activeCount:null,epoch:null});}
+  }
+  function initialize(){
+    try{
+      const factory=window.InsightOperationObserverV0&&window.InsightOperationObserverV0.createOperationObserver;
+      if(typeof factory!=='function')return;
+      const candidate=factory();
+      if(!candidate||['initialize','begin','end','invalidate','status'].some(k=>typeof candidate[k]!=='function')||
+         candidate.initialize()!==true){fault=true;return;}
+      observer=candidate;
+      const initial=getStatus();
+      if(initial.state!=='IDLE_OBSERVED'||initial.activeCount!==0)fault=true;
+    }catch(_){fault=true;}
+  }
+  // Core payload is loaded before the feature scripts; initialize after they finish.
+  if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',initialize);
+  else initialize();
+  function observe(action){
+    const ref=observer;
+    let token=null,registered=false,outcome='unknown';
+    if(ref&&!fault){
+      try{
+        token=ref.begin('kyaku_month_clear');
+        if(!token||typeof token!=='object'||active>=Number.MAX_SAFE_INTEGER)fault=true;
+        else{
+          registered=true;
+          active++;
+          if(getStatus().state!=='ACTIVE')fault=true;
+        }
+      }catch(_){fault=true;}
+    }
+    try{
+      const result=action();
+      outcome='completed';
+      return result;
+    }finally{
+      if(registered){
+        try{if(ref.end(token,outcome)!==true)fault=true;}
+        catch(_){fault=true;}
+        active--;
+        if(!fault)getStatus();
+      }
+    }
+  }
+  return Object.freeze({getStatus,observe});
+})();
+
 function clearKyakuMonth(){
   const y=editYear.kyaku,m=editMonth.kyaku;
   const storeName=store.name;
@@ -2330,69 +2471,73 @@ function updateBackupDaysLabel(){
   const label=document.getElementById("backupDaysLabel");
   if(!label)return;
   label.classList.remove("backup-status-missing","backup-status-today","backup-status-recent","backup-status-stale");
-  const last=localStorage.getItem(BACKUP_KEY);
-  if(!last){label.textContent="未バックアップ";label.classList.add("backup-status-missing");return;}
-  const days=Math.floor((Date.now()-parseInt(last))/(1000*60*60*24));
-  if(days===0){label.textContent="今日バックアップ済";label.classList.add("backup-status-today");}
-  else if(days<=7){label.textContent=`${days}日前`;label.classList.add("backup-status-recent");}
-  else{label.textContent=`${days}日経過 ⚠️`;label.classList.add("backup-status-stale");}
-}
-
-function backupData(){
-  const now=new Date();
-  const pad=n=>String(n).padStart(2,"0");
-  const storeName=allStores.stores[allStores.current]?.name||"店舗";
-  const filename=`insight_backup_${storeName}_${now.getFullYear()}${pad(now.getMonth()+1)}${pad(now.getDate())}.json`;
-  const json=JSON.stringify(allStores,null,2);
-  const blob=new Blob([json],{type:"application/json"});
-  const url=URL.createObjectURL(blob);
-  const a=document.createElement("a");
-  a.href=url;a.download=filename;
-  document.body.appendChild(a);a.click();
-  document.body.removeChild(a);
-  URL.revokeObjectURL(url);
-  localStorage.setItem(BACKUP_KEY,String(Date.now()));
-  updateBackupDaysLabel();
-  showToast("📥 バックアップを保存しました","success");
-}
-
-function restoreData(e){
-  const file=e.target.files[0];
-  if(!file)return;
-  const reader=new FileReader();
-  reader.onload=ev=>{
+  function record(key,confirmed){
     try{
-      const data=JSON.parse(ev.target.result);
-      // 新形式(allStores)・旧形式(単店舗)どちらも対応
-      let newAll;
-      if(data.stores&&data.current){
-        newAll=data;
-      }else if(data.years&&data.data){
-        newAll=migrateOldData(data);
-      }else throw new Error("invalid");
-      if(!confirm(`${file.name}\nのデータを復元します。現在の全データは上書きされます。よろしいですか？`)){
-        e.target.value="";return;
-      }
-      allStores=newAll;
-      store=allStores.stores[allStores.current];
-      persist();
-      baseYear=store.years[store.years.length-1];
-      cmpYear=store.years.length>1?store.years[store.years.length-2]:null;
-      editYear={sales:baseYear,kyaku:baseYear,haiki:baseYear};
-      editMonth={sales:todayFY().month,kyaku:todayFY().month,haiki:todayFY().month};
-      renderStoreSel();
-      if(currentNav===1)refreshDash();
-      else if(currentNav>1)initInputPage(["","","sales","kyaku","haiki"][currentNav]);
-      else initQuickPage();
-      updateMissingBadge();
-      showToast("📤 データを復元しました","info");
-    }catch(err){
-      alert("ファイルの読み込みに失敗しました。\n正しいバックアップファイルを選択してください。");
-    }
-    e.target.value="";
-  };
-  reader.readAsText(file);
+      const raw=localStorage.getItem(key);if(!raw||raw.length>512)return null;
+      const value=JSON.parse(raw);
+      if(!value||value.version!==1||typeof value.id!=="string"||!/^[a-f0-9]{32}$/.test(value.id)||
+         !["normal","preRestore"].includes(value.kind)||!Number.isSafeInteger(value.startedAt)||value.startedAt<=0||value.startedAt>Date.now())return null;
+      if(confirmed&&(value.confirmation!=="user"||!Number.isSafeInteger(value.confirmedAt)||value.confirmedAt<value.startedAt||value.confirmedAt>Date.now()))return null;
+      return value;
+    }catch(_){return null;}
+  }
+  const confirmed=record("insight_backup_confirmed_v1",true),download=record("insight_backup_download_v1",false);
+  const legacy=localStorage.getItem(BACKUP_KEY);
+  label.title="保存確認はご本人の申告です。アプリは端末ファイルの保存完了を検証できません。";
+  if(download&&(!confirmed||download.id!==confirmed.id)){
+    label.textContent="ダウンロード開始・保存未確認"+(confirmed?"（前回の保存確認あり）":"");
+    label.classList.add("backup-status-recent");return;
+  }
+  if(confirmed){
+    const days=Math.max(0,Math.floor((Date.now()-confirmed.confirmedAt)/(1000*60*60*24)));
+    label.textContent=(confirmed.kind==="preRestore"?"復元前 ":"")+(days===0?"今日":days+"日前")+" 保存確認（本人申告）";
+    if(days===0)label.classList.add("backup-status-today");
+    else if(days<=7)label.classList.add("backup-status-recent");
+    else label.classList.add("backup-status-stale");return;
+  }
+  label.textContent=legacy?"旧ダウンロード記録あり・保存未確認":"未バックアップ";
+  if(legacy)label.classList.add("backup-status-recent");else label.classList.add("backup-status-missing");
 }
+window.addEventListener('storage',function(event){
+  if(event&&(event.key===null||[BACKUP_KEY,'insight_backup_confirmed_v1','insight_backup_download_v1'].includes(event.key)))updateBackupDaysLabel();
+});
+
+// Own immutable operation entry points before any cacheable feature script can
+// arrive.  Old guards assign directly to backupData/restoreData; the no-op
+// setters below keep those late assignments from reopening plaintext export or
+// an obsolete restore writer.  Only the current encrypted guard knows the
+// explicit, one-time registration contract.
+(function installBackupEntrypoints(root){
+  var backupHandler=null,restoreHandler=null,registered=false;
+  function unavailableBackup(){
+    alert("バックアップ機能の初期化が完了していません。再読み込みしてからお試しください。平文では保存しません。");
+  }
+  function unavailableRestore(e){
+    if(e&&e.target)e.target.value="";
+    alert("復元機能の初期化が完了していません。現在のデータは変更されていません。再読み込みしてからお試しください。");
+  }
+  function dispatchBackup(){return (backupHandler||unavailableBackup).apply(root,arguments);}
+  function dispatchRestore(){return (restoreHandler||unavailableRestore).apply(root,arguments);}
+  function register(candidate){
+    if(registered||!candidate||candidate.version!==1||
+      typeof candidate.backup!=="function"||typeof candidate.restore!=="function"||
+      !root.isSecureContext||!root.crypto||!root.crypto.subtle||
+      !root.InsightBackupCryptoV1||typeof root.InsightBackupCryptoV1.encrypt!=="function"||
+      typeof root.InsightBackupCryptoV1.decrypt!=="function"||
+      !root.InsightBackupPasswordV1||typeof root.InsightBackupPasswordV1.request!=="function"||
+      typeof root.InsightBackupPasswordV1.confirmSaved!=="function"||
+      !root.InsightStorage)return false;
+    backupHandler=candidate.backup;restoreHandler=candidate.restore;registered=true;
+    return true;
+  }
+  function install(name,dispatcher){
+    Object.defineProperty(root,name,{configurable:false,enumerable:true,
+      get:function(){return dispatcher;},set:function(){}});
+  }
+  install("backupData",dispatchBackup);install("restoreData",dispatchRestore);
+  Object.defineProperty(root,"InsightBackupEntrypointsV1",{configurable:false,enumerable:false,writable:false,
+    value:Object.freeze({version:1,register:register,status:function(){return registered?"ready":"pending";}})});
+})(window);
 
 function importCSV(e){
   const file=e.target.files[0];

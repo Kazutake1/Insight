@@ -6,6 +6,9 @@ const path=require('node:path');
 const vm=require('node:vm');
 
 const backupSource=fs.readFileSync(path.join(__dirname,'..','insight_backup_guard_v1.js'),'utf8');
+const {webcrypto}=require('node:crypto');
+const cryptoSource=fs.readFileSync(path.join(__dirname,'..','insight_backup_crypto_v1.js'),'utf8');
+const {createOperationObserver}=require('../insight_operation_observer_v0.js');
 const months=Array.from({length:12},(_,i)=>(i+1)+'月');
 const days=[31,28,31,30,31,30,31,31,30,31,30,31];
 const clone=value=>JSON.parse(JSON.stringify(value));
@@ -33,14 +36,19 @@ function snapshot(sales){
 function fixture(options={}){
   const original=snapshot(100);
   let persisted=clone(original),writeCount=0,readFaultOnce=!!options.corruptAfterWrite;
-  const downloads=[],alerts=[],toasts=[];
-  let confirmation=options.confirm!==false;
+  const downloads=[],blobs=[],passwordRequests=[],confirmationRequests=[],metadataWrites=[],alerts=[],toasts=[],samples=[],readers=[];
+  const metadata=new Map(Object.entries(options.metadata||{}));
+  let confirmation=options.confirm!==false,confirmationCount=0;
+  const confirmMessages=[];
+  let writeHeld=false;
   let failWriteOnce=!!options.quotaOnce;
   const body={
     appendChild(node){node.parentNode=body;}
   };
   const document={
     body,
+    // Legacy cases deliberately exercise safety-on; use false/null for off/missing-option cases.
+    getElementById(id){return id==='insightRestoreSafetyBackup'&&options.safetyBackup!==null?{checked:options.safetyBackup!==false}:null;},
     createElement(name){
       assert.equal(name,'a');
       if(options.backupDownloadFailure)throw new Error('download was blocked');
@@ -51,13 +59,22 @@ function fixture(options={}){
     }
   };
   const window={
+    btoa:value=>Buffer.from(value,'binary').toString('base64'),atob:value=>Buffer.from(value,'base64').toString('binary'),
+    isSecureContext:options.insecure!==true,crypto:options.realCrypto?webcrypto:{subtle:{},getRandomValues:array=>webcrypto.getRandomValues(array)},
+    InsightBackupCryptoV1:{async encrypt(payload){return {format:'InsightEncryptedBackup',testOnlyPayload:clone(payload)};}},
+    InsightBackupPasswordV1:{async request(request){passwordRequests.push(request);return options.requestPassword?options.requestPassword(request):'FICTIONAL-safety-password';},async confirmSaved(request){confirmationRequests.push(request);return options.confirmDownload?options.confirmDownload(request):true;},busy(){},close(){}},
+    localStorage:{getItem(key){return key==='insight_v11'?JSON.stringify(persisted):metadata.get(key)??null;}},
     __INSIGHT_SHELL_VERSION__:'test',
+    InsightOperationObserverV0:options.missingObserver?undefined:{createOperationObserver},
     InsightStorage:{
       CURRENT_SCHEMA_VERSION:1,
       migrateSnapshot(value){const valueCopy=clone(value);valueCopy.schemaVersion=1;return valueCopy;},
-      serialize(value){return JSON.stringify(value);},
+      serialize(value){return options.indistinguishableSnapshots?'FICTIONAL identical serialized snapshots':JSON.stringify(value);},
       readSnapshot(){
+        if(options.readbackUnavailableAfterCommit&&writeCount>0)throw Error('FICTIONAL readback unavailable');
+        if(window.InsightRestoreOperationObserverV0)samples.push({point:'readback',...window.InsightRestoreOperationObserverV0.getStatus()});
         const result=clone(persisted);
+        if(options.unexpectedReadbackAfterCommit&&writeCount>0){result.stores.a.data['2026']['1月'][0].売上=4242;}
         if(readFaultOnce&&writeCount>0){
           readFaultOnce=false;
           result.stores.a.data['2026']['1月'][0].売上+=1;
@@ -65,6 +82,9 @@ function fixture(options={}){
         return result;
       },
       writeSnapshot(value){
+        if(writeHeld){const err=new Error('FICTIONAL restore hold');err.name='InsightStorageRestoreHoldError';throw err;}
+        if(window.InsightRestoreOperationObserverV0)samples.push({point:'before-write',...window.InsightRestoreOperationObserverV0.getStatus()});
+        if(options.rollbackFailure&&writeCount===1)throw new Error('FICTIONAL rollback failed');
         if(failWriteOnce){
           failWriteOnce=false;
           const error=new Error('simulated quota exceeded');
@@ -72,9 +92,13 @@ function fixture(options={}){
           throw error;
         }
         writeCount++;
-        persisted=clone(value);
+        persisted=options.revertAfterWrite&&writeCount===1?clone(original):clone(value);
+        if(window.InsightRestoreOperationObserverV0)samples.push({point:'after-write',...window.InsightRestoreOperationObserverV0.getStatus()});
+        if(options.postcommitThrow&&writeCount===1)throw new Error('FICTIONAL postcommit write throw');
       },
-      writeMetadata(){return true;}
+      writeMetadata(key,value){if(options.metadataFailureKey===key)throw new Error('FICTIONAL metadata failure');metadata.set(key,String(value));metadataWrites.push({key,value});return true;},
+      holdSnapshotWrites(){writeHeld=true;return true;},
+      snapshotWritesHeld(){return writeHeld;}
     },
     InsightDataHealth:{
       check(){return {status:'ok',counts:{errors:0,warnings:0},issues:[]};}
@@ -87,40 +111,53 @@ function fixture(options={}){
     blankHaiki(){return {米飯:0};},
     migrateOldData(){throw new Error('legacy not expected in test');},
     document,
-    URL:{createObjectURL(){return 'blob:fake';},revokeObjectURL(){}},
-    Blob,Date,Number,Set,Map,String,Object,Array,Math,JSON,Promise,
+    URL:{createObjectURL(blob){blobs.push(blob);return 'blob:fake';},revokeObjectURL(){}},
+    Blob,Date,Number,Set,Map,String,Object,Array,Math,JSON,Promise,TextEncoder,TextDecoder,Uint8Array,ArrayBuffer,
     setTimeout(){return 1;},
-    confirm(){return confirmation;},
+    confirm(message){confirmationCount++;confirmMessages.push(String(message));if(typeof options.duringConfirm==='function')options.duringConfirm({ctx,readers});return confirmation;},
     alert(message){alerts.push(String(message));},
     console:{warn(){},log(){}},
     FileReader:class FileReader{
-      readAsText(file){this.onload({target:{result:file.contents}});}
+      constructor(){readers.push(this);}
+      readAsText(file){
+        this._file=file;
+        if(options.readThrows||(options.readThrowsOnce&&readers.length===1))throw new Error('FICTIONAL readAsText failed');
+        if(!options.deferReader)this.completion=this.onload({target:{result:file.contents}});
+      }
     },
     currentNav:1,
-    renderStoreSel(){},refreshDash(){},updateMissingBadge(){},
+    renderStoreSel(){},refreshDash(){if(options.uiFailure)throw new Error('FICTIONAL UI failure');},updateMissingBadge(){},
     showToast(message){toasts.push(message);},
     todayFY(){return {month:'10月'};}
   };
   ctx.store=ctx.allStores.stores.a;
+  window.InsightBackupEntrypointsV1=Object.freeze({version:1,register(candidate){
+    if(!candidate||candidate.version!==1||typeof candidate.backup!=='function'||typeof candidate.restore!=='function')return false;
+    ctx.backupData=candidate.backup;ctx.restoreData=candidate.restore;return true;
+  }});
   vm.createContext(ctx);
+  if(options.realCrypto){delete window.InsightBackupCryptoV1;vm.runInContext(cryptoSource,ctx);}
   vm.runInContext(backupSource,ctx);
 
   function restore(source){
     const contents=typeof source==='string'?source:JSON.stringify(source);
     const input={value:'selected',files:[{name:'backup.json',size:contents.length,contents}]};
-    ctx.restoreData({target:input});
-    return input;
+    const count=readers.length;ctx.restoreData({target:input});
+    return options.deferReader||readers.length===count?input:Promise.resolve(readers.at(-1)?.completion).then(()=>input);
   }
-  return {ctx,window,original,restore,downloads,alerts,toasts,
+  return {ctx,window,original,restore,downloads,blobs,passwordRequests,confirmationRequests,confirmMessages,metadata,metadataWrites,alerts,toasts,samples,readers,
+    flushReader(){const r=readers.at(-1);return r.onload({target:{result:r._file.contents}});},
+    repeatReader(){const r=readers.at(-1);return r.onload({target:{result:r._file.contents}});},
     get persisted(){return persisted;},
     get writeCount(){return writeCount;},
+    get confirmationCount(){return confirmationCount;},
     setConfirmation(value){confirmation=!!value;}
   };
 }
 
-test('valid backup of two stores restores and saves a pre-restore download first',()=>{
+test('valid backup of two stores restores and saves a pre-restore download first',async()=>{
   const f=fixture();
-  const input=f.restore(snapshot(750));
+  const input=await f.restore(snapshot(750));
   assert.equal(f.persisted.stores.a.data['2026']['1月'][0].売上,750);
   assert.equal(f.persisted.stores.b.data['2026']['12月'][30].売上,750);
   assert.equal(f.ctx.allStores.stores.a.data['2026']['1月'][0].売上,750);
@@ -131,9 +168,9 @@ test('valid backup of two stores restores and saves a pre-restore download first
   assert.equal(f.alerts.length,0);
 });
 
-test('malformed JSON is rejected without modifying the current storage',()=>{
+test('malformed JSON is rejected without modifying the current storage',async()=>{
   const f=fixture();
-  const input=f.restore('{not json');
+  const input=await f.restore('{not json');
   assert.equal(f.writeCount,0);
   assert.deepEqual(f.persisted,f.original);
   assert.equal(f.downloads.length,0);
@@ -141,47 +178,725 @@ test('malformed JSON is rejected without modifying the current storage',()=>{
   assert.match(f.alerts.join('\n'),/復元できませんでした/);
 });
 
-test('invalid calendar rows reject before any backup replacement',()=>{
+test('invalid calendar rows reject before any backup replacement',async()=>{
   const f=fixture();
   const invalid=snapshot(750);
   invalid.stores.a.data['2026']['2月'].pop();
-  f.restore(invalid);
+  await f.restore(invalid);
   assert.equal(f.writeCount,0);
   assert.deepEqual(f.persisted,f.original);
   assert.equal(f.downloads.length,0);
   assert.match(f.alerts.join('\n'),/日別データ件数が不正/);
 });
 
-test('canceling a restore does not download or modify storage',()=>{
+test('canceling a restore does not download or modify storage',async()=>{
   const f=fixture({confirm:false});
-  f.restore(snapshot(750));
+  await f.restore(snapshot(750));
   assert.equal(f.writeCount,0);
   assert.deepEqual(f.persisted,f.original);
   assert.equal(f.downloads.length,0);
 });
 
-test('a failed safety-backup download stops restoration before a write',()=>{
+test('a failed safety-backup download stops restoration before a write',async()=>{
   const f=fixture({backupDownloadFailure:true});
-  f.restore(snapshot(750));
+  await f.restore(snapshot(750));
   assert.equal(f.writeCount,0);
   assert.deepEqual(f.persisted,f.original);
   assert.match(f.alerts.join('\n'),/復元直前バックアップを作成できない/);
 });
 
-test('storage quota failure leaves prior data untouched',()=>{
+test('storage quota failure leaves prior data untouched',async()=>{
   const f=fixture({quotaOnce:true});
-  f.restore(snapshot(750));
+  await f.restore(snapshot(750));
   assert.equal(f.writeCount,0);
   assert.deepEqual(f.persisted,f.original);
   assert.equal(f.downloads.length,1);
   assert.match(f.alerts.join('\n'),/保存容量が不足/);
 });
 
-test('post-restore readback mismatch automatically rolls back to original data',()=>{
+test('post-restore readback mismatch automatically rolls back to original data',async()=>{
   const f=fixture({corruptAfterWrite:true});
-  f.restore(snapshot(750));
+  await f.restore(snapshot(750));
   assert.equal(f.writeCount,2,'restore then rollback');
   assert.deepEqual(f.persisted,f.original);
   assert.equal(f.downloads.length,1);
   assert.match(f.alerts.join('\n'),/復元前の状態へ自動で戻しました/);
+});
+
+
+test('BR01 FICTIONAL deferred FileReader starts observation at write, stays ACTIVE through readback',async()=>{
+  const f=fixture({deferReader:true});
+  const input=await f.restore(snapshot(750));
+  assert.equal(f.writeCount,0);
+  assert.equal(f.window.InsightRestoreOperationObserverV0.getStatus().state,'UNAVAILABLE');
+  await f.flushReader();
+  assert.equal(input.value,'');
+  assert.equal(f.writeCount,1);
+  assert.equal(f.samples.filter(x=>['before-write','after-write','readback'].includes(x.point)).length,3);
+  assert.ok(f.samples.every(x=>x.state==='ACTIVE'&&x.activeCount===1));
+  assert.deepEqual({state:f.window.InsightRestoreOperationObserverV0.getStatus().state,activeCount:f.window.InsightRestoreOperationObserverV0.getStatus().activeCount},
+    {state:'IDLE_OBSERVED',activeCount:0});
+  assert.equal(f.persisted.stores.b.data['2026']['12月'][30].売上,750);
+});
+test('BR02 FICTIONAL invalid file and confirmation cancellation never register a write token',async()=>{
+  for(const mode of ['cancel','invalid']){
+    const f=fixture(mode==='cancel'?{confirm:false}:{});
+    await f.restore(mode==='cancel'?snapshot(750):'{bad json');
+    assert.equal(f.writeCount,0);
+    assert.deepEqual(f.persisted,f.original);
+    assert.equal(f.window.InsightRestoreOperationObserverV0.getStatus().state,'UNAVAILABLE');
+  }
+});
+test('BR03 FICTIONAL quota exception holds without mutating persisted bytes',async()=>{
+  const f=fixture({quotaOnce:true});
+  await f.restore(snapshot(750));
+  assert.equal(f.writeCount,0);
+  assert.deepEqual(f.persisted,f.original);
+  assert.equal(f.window.InsightRestoreOperationObserverV0.getStatus().state,'HELD');
+  assert.equal(f.samples[0].state,'ACTIVE');
+});
+test('BR04 FICTIONAL postflight mismatch rolls back but observation remains sticky HELD',async()=>{
+  const f=fixture({corruptAfterWrite:true});
+  await f.restore(snapshot(750));
+  assert.equal(f.writeCount,2);
+  assert.deepEqual(f.persisted,f.original);
+  assert.ok(f.samples.filter(x=>x.point==='before-write').every(x=>x.state==='ACTIVE'));
+  assert.equal(f.window.InsightRestoreOperationObserverV0.getStatus().state,'HELD');
+});
+test('BR05 FICTIONAL rollback failure leaves partial commit and HELD without extra writes',async()=>{
+  const f=fixture({corruptAfterWrite:true,rollbackFailure:true});
+  await f.restore(snapshot(750));
+  assert.equal(f.writeCount,1);
+  assert.equal(f.persisted.stores.a.data['2026']['1月'][0].売上,750);
+  assert.match(f.alerts.join(' '),/自動復旧にも失敗/);
+  assert.equal(f.window.InsightRestoreOperationObserverV0.getStatus().state,'HELD');
+});
+test('BR06 FICTIONAL committed bytes survive UI failure; observation remains HELD',async()=>{
+  const f=fixture({uiFailure:true});
+  await f.restore(snapshot(750));
+  assert.equal(f.writeCount,1);
+  assert.equal(f.persisted.stores.a.data['2026']['1月'][0].売上,750);
+  assert.match(f.alerts.join(' '),/復元したデータは保存されています/);
+  assert.equal(f.window.InsightRestoreOperationObserverV0.getStatus().state,'HELD');
+});
+test('BR07 FICTIONAL observer missing never blocks original restore',async()=>{
+  const f=fixture({missingObserver:true});
+  await f.restore(snapshot(750));
+  assert.equal(f.writeCount,1);
+  assert.equal(f.persisted.stores.a.data['2026']['1月'][0].売上,750);
+  assert.equal(f.window.InsightRestoreOperationObserverV0.getStatus().state,'UNAVAILABLE');
+});
+test('BR08 FICTIONAL duplicate FileReader onload is not silently accepted as clean',async()=>{
+  const f=fixture({deferReader:true});
+  await f.restore(snapshot(750));
+  await f.flushReader();
+  assert.equal(f.window.InsightRestoreOperationObserverV0.getStatus().state,'IDLE_OBSERVED');
+  await f.repeatReader(); // FICTIONAL duplicate completion is held, never committed twice.
+  assert.equal(f.writeCount,1);
+  assert.equal(f.downloads.length,1);
+  assert.equal(f.persisted.stores.a.data['2026']['1月'][0].売上,750);
+  assert.equal(f.window.InsightRestoreOperationObserverV0.getStatus().state,'HELD');
+});
+test('BR09 FICTIONAL observer factory failure never blocks the original write',async()=>{
+  const f=fixture({deferReader:true});
+  f.window.InsightOperationObserverV0={createOperationObserver(){throw Error('FICTIONAL factory failure');}};
+  await f.restore(snapshot(750));
+  await f.flushReader();
+  assert.equal(f.writeCount,1);
+  assert.equal(f.window.InsightRestoreOperationObserverV0.getStatus().state,'HELD');
+});
+test('BR10 FICTIONAL postcommit write throw is HELD even if the original guard shows an optimistic warning',async()=>{
+  const f=fixture({postcommitThrow:true});
+  await f.restore(snapshot(750));
+  assert.equal(f.writeCount,1);
+  assert.equal(f.persisted.stores.a.data['2026']['1月'][0].売上,750);
+  assert.equal(f.window.InsightRestoreOperationObserverV0.getStatus().state,'HELD');
+});
+test('BR11 FICTIONAL readAsText synchronous exception keeps original exception and HELD',async()=>{
+  const f=fixture({readThrows:true});
+  assert.throws(()=>f.restore(snapshot(750)),/FICTIONAL readAsText failed/);
+  assert.equal(f.writeCount,0);
+  assert.equal(f.window.InsightRestoreOperationObserverV0.getStatus().state,'HELD');
+});
+test('BR12 FICTIONAL reader abort leaves existing data untouched and conservatively HELD',async()=>{
+  const f=fixture({deferReader:true});
+  await f.restore(snapshot(750));
+  f.readers[0].onabort();
+  assert.equal(f.writeCount,0);
+  assert.deepEqual(f.persisted,f.original);
+  assert.equal(f.window.InsightRestoreOperationObserverV0.getStatus().state,'HELD');
+});
+
+
+test('BR13 FICTIONAL saved-after-throw identifies target data without falsely claiming unchanged',async()=>{
+  const f=fixture({postcommitThrow:true});
+  await f.restore(snapshot(750));
+  assert.equal(f.writeCount,1);
+  assert.equal(f.persisted.stores.a.data['2026']['1月'][0].売上,750);
+  assert.equal(f.ctx.allStores.stores.a.data['2026']['1月'][0].売上,100);
+  assert.equal(f.alerts.length,1);
+  assert.match(f.alerts[0],/保存領域に復元対象と一致するデータ/);
+  assert.match(f.alerts[0],/整合性確認・画面更新は完了していません/);
+  assert.doesNotMatch(f.alerts[0],/現在のデータは変更されていません/);
+  assert.equal(f.window.InsightRestoreOperationObserverV0.getStatus().state,'HELD');
+});
+test('BR14 FICTIONAL unreadable postthrow state is uncertain and does not retry writes',async()=>{
+  const f=fixture({postcommitThrow:true,readbackUnavailableAfterCommit:true});
+  await f.restore(snapshot(750));
+  assert.equal(f.writeCount,1);
+  assert.equal(f.persisted.stores.a.data['2026']['1月'][0].売上,750);
+  assert.match(f.alerts.join(' '),/現在の保存状態を確認できませんでした/);
+  assert.doesNotMatch(f.alerts.join(' '),/現在のデータは変更されていません/);
+  assert.equal(f.window.InsightRestoreOperationObserverV0.getStatus().state,'HELD');
+});
+test('BR15 FICTIONAL prewrite quota error retains previous-data warning and never retries',async()=>{
+  const f=fixture({quotaOnce:true});
+  await f.restore(snapshot(750));
+  assert.equal(f.writeCount,0);
+  assert.deepEqual(f.persisted,f.original);
+  assert.match(f.alerts.join(' '),/現在のデータは変更されていません/);
+  assert.equal(f.window.InsightRestoreOperationObserverV0.getStatus().state,'HELD');
+});
+test('BR16 FICTIONAL third-state readback does not classify an unknown writer as target',async()=>{
+  const f=fixture({postcommitThrow:true,unexpectedReadbackAfterCommit:true});
+  await f.restore(snapshot(750));
+  assert.equal(f.writeCount,1);
+  assert.match(f.alerts.join(' '),/現在の保存状態を確認できませんでした/);
+  assert.doesNotMatch(f.alerts.join(' '),/現在のデータは変更されていません/);
+  assert.equal(f.window.InsightRestoreOperationObserverV0.getStatus().state,'HELD');
+});
+test('BR17 FICTIONAL indistinguishable previous and target serialized values stay uncertain',async()=>{
+  const f=fixture({postcommitThrow:true,indistinguishableSnapshots:true});
+  await f.restore(snapshot(100));
+  assert.equal(f.writeCount,1);
+  assert.match(f.alerts.join(' '),/現在の保存状態を確認できませんでした/);
+  assert.equal(f.window.InsightRestoreOperationObserverV0.getStatus().state,'HELD');
+});
+
+test('BR18 FICTIONAL postwrite throw latches hold against later stale-live writer',async()=>{
+  const f=fixture({postcommitThrow:true});
+  await f.restore(snapshot(750));
+  assert.equal(f.window.InsightStorage.snapshotWritesHeld(),true);
+  assert.equal(f.ctx.allStores.stores.a.data['2026']['1月'][0].売上,100);
+  assert.equal(f.persisted.stores.a.data['2026']['1月'][0].売上,750);
+  assert.throws(()=>f.window.InsightStorage.writeSnapshot(f.ctx.allStores),error=>error.name==='InsightStorageRestoreHoldError');
+  assert.equal(f.writeCount,1);
+  assert.equal(f.persisted.stores.a.data['2026']['1月'][0].売上,750);
+});
+test('BR19 FICTIONAL rollback failure holds writes and guides manual reload before recovery',async()=>{
+  const f=fixture({corruptAfterWrite:true,rollbackFailure:true});
+  await f.restore(snapshot(750));
+  assert.equal(f.window.InsightStorage.snapshotWritesHeld(),true);
+  assert.throws(()=>f.window.InsightStorage.writeSnapshot(f.ctx.allStores),/FICTIONAL restore hold/);
+  assert.equal(f.writeCount,1);
+  assert.equal(f.alerts.length,1);
+  const notice=f.alerts[0];
+  const steps=[
+    'Insight_pre_restore_...json を保管してください',
+    '追加の編集・保存',
+    'この画面での再復元は行わないでください',
+    'Insightを手動で再読み込み',
+    '保存内容を確認してください',
+    'その後、必要な場合のみ保管したバックアップから復元してください'
+  ];
+  const positions=steps.map(step=>notice.indexOf(step));
+  assert.ok(positions.every(position=>position>=0),'復旧案内の必須手順が欠落しています');
+  assert.ok(positions.every((position,i)=>i===0||position>positions[i-1]),'復旧案内の順序が不正です');
+  assert.doesNotMatch(notice,/json を使って手動で復元してください/);
+});
+test('BR20 FICTIONAL uncertain postthrow latches hold without retry',async()=>{
+  const f=fixture({postcommitThrow:true,readbackUnavailableAfterCommit:true});
+  await f.restore(snapshot(750));
+  assert.equal(f.window.InsightStorage.snapshotWritesHeld(),true);
+  assert.equal(f.writeCount,1);
+});
+test('BR21 FICTIONAL previous-observed, prewrite quota and successful rollback do not latch',async()=>{
+  for(const options of [{postcommitThrow:true,revertAfterWrite:true},{quotaOnce:true},{corruptAfterWrite:true}]){
+    const f=fixture(options);
+    await f.restore(snapshot(750));
+    assert.equal(f.window.InsightStorage.snapshotWritesHeld(),false,JSON.stringify(options));
+  }
+});
+test('BR22 FICTIONAL successful restore, UI error and duplicate onload do not latch',async()=>{
+  for(const options of [{},{uiFailure:true},{deferReader:true}]){
+    const f=fixture(options);
+    await f.restore(snapshot(750));
+    if(options.deferReader){await f.flushReader();await f.repeatReader();assert.equal(f.writeCount,1);}
+    assert.equal(f.window.InsightStorage.snapshotWritesHeld(),false,JSON.stringify(options));
+  }
+});
+
+test('BR23 FICTIONAL overlapping restore requests reject the second without backup or writer',async()=>{
+  const f=fixture({deferReader:true});
+  const first=await f.restore(snapshot(750));
+  const rejected=await f.restore(snapshot(800));
+  assert.equal(first.value,'selected');
+  assert.equal(rejected.value,'');
+  assert.equal(f.readers.length,1);
+  assert.equal(f.writeCount,0);
+  assert.equal(f.downloads.length,0);
+  assert.match(f.alerts.join(' '),/別のバックアップ復元処理が進行中/);
+  await f.flushReader();
+  assert.equal(f.writeCount,1);
+  assert.equal(f.downloads.length,1);
+  assert.equal(f.persisted.stores.a.data['2026']['1月'][0].売上,750);
+  await f.restore(snapshot(850)); // Reader ownership is released after completion.
+  assert.equal(f.readers.length,2);
+  await f.flushReader();
+  assert.equal(f.writeCount,2);
+  assert.equal(f.persisted.stores.a.data['2026']['1月'][0].売上,850);
+  assert.equal(f.window.InsightStorage.snapshotWritesHeld(),false);
+});
+test('BR24 FICTIONAL cancelled or invalid restore releases the reader for a normal retry',async()=>{
+  const cancelled=fixture({confirm:false});
+  await cancelled.restore(snapshot(750));
+  assert.equal(cancelled.writeCount,0);
+  cancelled.setConfirmation(true);
+  await cancelled.restore(snapshot(850));
+  assert.equal(cancelled.writeCount,1);
+  assert.equal(cancelled.persisted.stores.a.data['2026']['1月'][0].売上,850);
+  const malformed=fixture();
+  await malformed.restore('{FICTIONAL invalid JSON');
+  assert.equal(malformed.writeCount,0);
+  await malformed.restore(snapshot(850));
+  assert.equal(malformed.writeCount,1);
+  assert.equal(malformed.persisted.stores.a.data['2026']['1月'][0].売上,850);
+});
+test('BR25 FICTIONAL reader error and abort release ownership without writes',async()=>{
+  for(const failure of ['onerror','onabort']){
+    const f=fixture({deferReader:true});
+    await f.restore(snapshot(750));
+    f.readers[0][failure]();
+    assert.equal(f.writeCount,0);
+    await f.restore(snapshot(850));
+    assert.equal(f.readers.length,2,failure);
+    await f.flushReader();
+    assert.equal(f.writeCount,1);
+    assert.equal(f.persisted.stores.a.data['2026']['1月'][0].売上,850);
+  }
+});
+test('BR26 FICTIONAL late duplicate from old reader cannot release a newer pending reader',async()=>{
+  const f=fixture({deferReader:true});
+  await f.restore(snapshot(750));
+  await f.flushReader();
+  await f.restore(snapshot(800));
+  f.readers[0].onload({target:{result:f.readers[0]._file.contents}});
+  assert.equal(f.writeCount,1);
+  await f.restore(snapshot(900)); // Must still be refused while reader 2 owns the path.
+  assert.equal(f.readers.length,2);
+  await f.flushReader();
+  assert.equal(f.writeCount,2);
+  assert.equal(f.persisted.stores.a.data['2026']['1月'][0].売上,800);
+  assert.equal(f.downloads.length,2);
+  assert.equal(f.window.InsightRestoreOperationObserverV0.getStatus().state,'HELD');
+});
+
+test('BR27 FICTIONAL late first onload after error or abort cannot overwrite a newer pending restore',async()=>{
+  for(const failure of ['onerror','onabort']){
+    const f=fixture({deferReader:true});
+    await f.restore(snapshot(750));
+    const a=f.readers[0];
+    a[failure]();
+    await f.restore(snapshot(850));
+    const notices=f.confirmationCount;
+    await a.onload({target:{result:a._file.contents}});
+    assert.equal(f.writeCount,0,failure);
+    assert.equal(f.downloads.length,0,failure);
+    assert.equal(f.confirmationCount,notices,failure);
+    await f.restore(snapshot(950)); // B must still own the operation.
+    assert.equal(f.readers.length,2,failure);
+    await f.flushReader();
+    assert.equal(f.writeCount,1,failure);
+    assert.equal(f.downloads.length,1,failure);
+    assert.equal(f.persisted.stores.a.data['2026']['1月'][0].売上,850,failure);
+    const confirmations=f.confirmationCount;
+    await a.onload({target:{result:a._file.contents}});
+    assert.equal(f.writeCount,1,failure);
+    assert.equal(f.confirmationCount,confirmations,failure);
+    assert.equal(f.downloads.length,1,failure);
+  }
+});
+test('BR28 FICTIONAL readAsText sync exception permanently rejects its late first load',async()=>{
+  const f=fixture({deferReader:true,readThrowsOnce:true});
+  assert.throws(()=>f.restore(snapshot(750)),/FICTIONAL readAsText failed/);
+  const a=f.readers[0];
+  await f.restore(snapshot(850));
+  await a.onload({target:{result:a._file.contents}});
+  assert.equal(f.writeCount,0);
+  assert.equal(f.confirmationCount,0);
+  assert.equal(f.downloads.length,0);
+  await f.flushReader();
+  assert.equal(f.writeCount,1);
+  assert.equal(f.confirmationCount,1);
+  assert.equal(f.persisted.stores.a.data['2026']['1月'][0].売上,850);
+  assert.equal(f.downloads.length,1);
+});
+test('BR29 FICTIONAL late reader error does not cancel the next reader',async()=>{
+  const f=fixture({deferReader:true});
+  await f.restore(snapshot(750));
+  const a=f.readers[0];
+  a.onabort();
+  await f.restore(snapshot(850));
+  a.onerror();
+  await f.restore(snapshot(950)); // Still refused; B has not finished.
+  assert.equal(f.readers.length,2);
+  assert.equal(f.writeCount,0);
+  await f.flushReader();
+  assert.equal(f.writeCount,1);
+  assert.equal(f.persisted.stores.a.data['2026']['1月'][0].売上,850);
+});
+
+test('BR30 FICTIONAL first late load after newer reader already completed never restores stale snapshot',async()=>{
+  for(const termination of ['onerror','onabort','readAsText exception']){
+    const options={deferReader:true};
+    if(termination==='readAsText exception')options.readThrowsOnce=true;
+    const f=fixture(options);
+    if(termination==='readAsText exception'){
+      assert.throws(()=>f.restore(snapshot(750)),/FICTIONAL readAsText failed/);
+    }else{
+      await f.restore(snapshot(750));
+      f.readers[0][termination]();
+    }
+    const staleReader=f.readers[0];
+    // Reader B has already completed its first (and only) restoration before
+    // A receives the first ever delayed onload callback.
+    await f.restore(snapshot(850));
+    await f.flushReader();
+    assert.equal(f.persisted.stores.a.data['2026']['1月'][0].売上,850,termination);
+    assert.equal(f.writeCount,1,termination);
+    assert.equal(f.confirmationCount,1,termination);
+    assert.equal(f.downloads.length,1,termination);
+    staleReader.onload({target:{result:staleReader._file.contents}});
+    assert.equal(f.writeCount,1,termination);
+    assert.equal(f.confirmationCount,1,termination);
+    assert.equal(f.downloads.length,1,termination);
+    assert.equal(f.persisted.stores.a.data['2026']['1月'][0].売上,850,termination);
+    assert.equal(f.ctx.allStores.stores.a.data['2026']['1月'][0].売上,850,termination);
+    // A's rejected first load must not prevent a fresh Reader C from saving.
+    await f.restore(snapshot(900));
+    await f.flushReader();
+    assert.equal(f.readers.length,3,termination);
+    assert.equal(f.writeCount,2,termination);
+    assert.equal(f.confirmationCount,2,termination);
+    assert.equal(f.downloads.length,2,termination);
+    assert.equal(f.persisted.stores.a.data['2026']['1月'][0].売上,900,termination);
+    assert.equal(f.window.InsightStorage.snapshotWritesHeld(),false,termination);
+  }
+});
+
+test('BR31 FICTIONAL synchronous reader error or abort during accepted onload does not release active restore',async()=>{
+  for(const signal of ['onerror','onabort']){
+    let injected=false;
+    const captured=[];
+    const f=fixture({duringConfirm({ctx,readers}){
+      if(injected)return;
+      injected=true;
+      const a=readers[0];
+      a[signal](); // FICTIONAL event synchronously inside onload/confirm.
+      const nested={value:'selected',files:[{name:'FICTIONAL_nested.json',size:100,contents:JSON.stringify(snapshot(900))}]};
+      ctx.restoreData({target:nested}); // Must be rejected while first onload still owns restore.
+      captured.push({value:nested.value,readers:readers.length});
+    }});
+    await f.restore(snapshot(750));
+    assert.equal(injected,true,signal);
+    assert.equal(captured.length,1,signal);
+    assert.deepEqual(captured[0],{value:'',readers:1},signal);
+    assert.equal(f.readers.length,1,signal);
+    assert.equal(f.writeCount,1,signal); // Already accepted onload remains synchronous.
+    assert.equal(f.confirmationCount,1,signal);
+    assert.equal(f.downloads.length,1,signal);
+    assert.equal(f.persisted.stores.a.data['2026']['1月'][0].売上,750,signal);
+    assert.equal(f.ctx.allStores.stores.a.data['2026']['1月'][0].売上,750,signal);
+    assert.equal(f.window.InsightRestoreOperationObserverV0.getStatus().state,'HELD',signal);
+    assert.equal(f.window.InsightStorage.snapshotWritesHeld(),false,signal);
+    assert.match(f.alerts.join(' '),/別のバックアップ復元処理が進行中/,signal);
+    assert.doesNotMatch(f.alerts.join(' '),/ファイルを読み込めませんでした/,signal);
+    await f.restore(snapshot(850)); // Reader ownership released after original onload finishes.
+    assert.equal(f.readers.length,2,signal);
+    assert.equal(f.writeCount,2,signal);
+    assert.equal(f.persisted.stores.a.data['2026']['1月'][0].売上,850,signal);
+    assert.equal(f.window.InsightStorage.snapshotWritesHeld(),false,signal);
+  }
+});
+
+const FILE_PASSWORD='FICTIONAL-source-password-2026';
+const SAFETY_PASSWORD='FICTIONAL-distinct-safety-password';
+test('Stage2 FICTIONAL encrypted two-store restore and separately encrypted safety backup',async()=>{
+  const f=fixture({realCrypto:true,requestPassword:request=>request.confirm?SAFETY_PASSWORD:FILE_PASSWORD});
+  const target=snapshot(750);
+  const file=await f.window.InsightBackupCryptoV1.encrypt(target,FILE_PASSWORD);
+  await f.restore(file);
+  assert.equal(f.writeCount,1);
+  assert.equal(f.persisted.stores.a.data['2026']['1月'][0].売上,750);
+  assert.equal(f.persisted.stores.b.data['2026']['12月'][30].売上,750);
+  assert.deepEqual(f.passwordRequests.map(x=>x.confirm),[false,true]);
+  const safety=JSON.parse(await f.blobs[0].text());
+  const before=await f.window.InsightBackupCryptoV1.decrypt(safety,SAFETY_PASSWORD);
+  assert.deepEqual(clone(before.data),f.original);
+  assert.equal(before.backupInfo.backupType,'preRestore');
+  await assert.rejects(f.window.InsightBackupCryptoV1.decrypt(safety,FILE_PASSWORD));
+});
+test('Stage2 FICTIONAL normal backup encrypts all metadata; cancellation never updates backup date',async()=>{
+  const f=fixture({realCrypto:true});
+  await f.ctx.backupData();
+  assert.equal(f.blobs.length,1);
+  const file=JSON.parse(await f.blobs[0].text());
+  assert.equal(file.format,'InsightEncryptedBackup');
+  assert.equal(file.backupInfo,undefined);
+  const payload=await f.window.InsightBackupCryptoV1.decrypt(file,'FICTIONAL-safety-password');
+  assert.deepEqual(clone(payload.data),f.original);
+  assert.equal(f.metadataWrites.length,2);
+  assert.equal(f.metadata.has('insight_last_backup'),false);
+  assert.equal(JSON.parse(f.metadata.get('insight_backup_confirmed_v1')).confirmation,'user');
+  assert.match(f.toasts[0],/ご本人の申告/);
+  const cancelled=fixture({realCrypto:true,requestPassword:()=>null});
+  await cancelled.ctx.backupData();
+  assert.equal(cancelled.blobs.length,0);
+  assert.equal(cancelled.metadataWrites.length,0);
+});
+test('Stage2 FICTIONAL wrong password, tampering, unknown version and broken header preserve snapshot',async()=>{
+  const source=fixture({realCrypto:true});
+  const encrypted=await source.window.InsightBackupCryptoV1.encrypt(snapshot(750),FILE_PASSWORD);
+  for(const mode of ['wrong','tampered','version','header']){
+    const f=fixture({realCrypto:true,requestPassword:()=>mode==='wrong'?'FICTIONAL-wrong-password':FILE_PASSWORD});
+    const file=clone(encrypted);
+    if(mode==='tampered')file.ciphertext=(file.ciphertext[0]==='A'?'B':'A')+file.ciphertext.slice(1);
+    if(mode==='version')file.formatVersion=999;
+    if(mode==='header')delete file.kdf;
+    await f.restore(file);
+    assert.equal(f.writeCount,0,mode);assert.equal(f.downloads.length,0,mode);
+    assert.deepEqual(f.persisted,f.original,mode);
+    assert.equal(f.confirmationCount,0,mode);
+  }
+});
+test('Stage2 FICTIONAL cancellation, unavailable crypto and failed safety encryption never write',async()=>{
+  for(const options of [
+    {realCrypto:true,requestPassword:()=>null},
+    {realCrypto:true,insecure:true},
+    {realCrypto:true,requestPassword:()=> 'short'}
+  ]){
+    const f=fixture(options);await f.restore(snapshot(750));
+    assert.equal(f.writeCount,0);assert.equal(f.downloads.length,0);
+    assert.deepEqual(f.persisted,f.original);
+  }
+});
+test('Stage2 FICTIONAL pending safety password owns restore; changed live data aborts instead of overwriting',async()=>{
+  let release;
+  const f=fixture({realCrypto:true,requestPassword:()=>new Promise(resolve=>{release=resolve;})});
+  const first=f.restore(snapshot(750));
+  assert.equal(f.passwordRequests.length,1);
+  await f.restore(snapshot(850));
+  assert.equal(f.readers.length,1);assert.equal(f.writeCount,0);
+  await f.ctx.backupData();assert.equal(f.passwordRequests.length,1);
+  f.ctx.allStores.stores.a.data['2026']['1月'][0].売上=222;
+  release(SAFETY_PASSWORD);await first;
+  assert.equal(f.writeCount,0);assert.equal(f.downloads.length,0);
+  assert.equal(f.ctx.allStores.stores.a.data['2026']['1月'][0].売上,222);
+  assert.match(f.alerts.join(' '),/処理中にデータが変更/);
+});
+test('Stage2 FICTIONAL plain JSON keeps 20MiB limit and huge encrypted files fail before reading',async()=>{
+  const f=fixture({realCrypto:true});
+  const plain=' '.repeat(20*1024*1024)+JSON.stringify(snapshot(750));
+  await f.restore(plain);
+  assert.equal(f.writeCount,0);assert.equal(f.passwordRequests.length,0);
+  assert.match(f.alerts.join(' '),/20MiB/);
+  const input={value:'selected',files:[{name:'FICTIONAL.json',size:21*1024*1024+1}]};
+  f.ctx.restoreData({target:input});
+  assert.equal(f.readers.length,1);assert.equal(input.value,'');
+});
+test('Stage2 FICTIONAL maximum plaintext restores through the 21MiB encrypted file gate',async()=>{
+  const f=fixture({realCrypto:true,requestPassword:request=>request.confirm?SAFETY_PASSWORD:FILE_PASSWORD});
+  const target=snapshot(750);
+  target.stores.a.salesCounts={};target.stores.b.salesCounts={};
+  const row=target.stores.a.data['2026']['1月'][0];row.storeMemo='';
+  row.storeMemo='A'.repeat(15*1024*1024-Buffer.byteLength(JSON.stringify(target)));
+  assert.equal(Buffer.byteLength(JSON.stringify(target)),15*1024*1024);
+  const file=await f.window.InsightBackupCryptoV1.encrypt(target,FILE_PASSWORD);
+  assert.ok(Buffer.byteLength(JSON.stringify(file))>20*1024*1024);
+  assert.ok(Buffer.byteLength(JSON.stringify(file))<21*1024*1024);
+  await f.restore(file);
+  assert.equal(f.writeCount,1);
+  assert.deepEqual(f.persisted,target);
+  assert.equal(f.alerts.length,0);
+});
+test('Stage2 FICTIONAL rollback failure releases only the private clone; encrypted recovery file and sticky hold survive',async()=>{
+  const f=fixture({realCrypto:true,corruptAfterWrite:true,rollbackFailure:true,requestPassword:()=>SAFETY_PASSWORD});
+  await f.restore(snapshot(750));
+  assert.equal(f.writeCount,1);
+  assert.equal(f.window.InsightStorage.snapshotWritesHeld(),true);
+  assert.equal(f.window.InsightRestoreOperationObserverV0.getStatus().state,'HELD');
+  assert.deepEqual(clone(f.ctx.allStores),f.original);
+  const safety=JSON.parse(await f.blobs[0].text());
+  assert.equal(safety.format,'InsightEncryptedBackup');
+  const recovered=await f.window.InsightBackupCryptoV1.decrypt(safety,SAFETY_PASSWORD);
+  assert.deepEqual(clone(recovered.data),f.original);
+  assert.equal(recovered.backupInfo.backupType,'preRestore');
+  const savedBefore=clone(f.persisted);
+  assert.throws(()=>f.window.InsightStorage.writeSnapshot(recovered.data),error=>error.name==='InsightStorageRestoreHoldError');
+  assert.deepEqual(f.persisted,savedBefore);
+  assert.equal(f.writeCount,1);
+  assert.match(f.alerts[0],/自動復旧にも失敗/);
+  assert.match(f.alerts[0],/手動で再読み込み/);
+  // Download completion cannot be guaranteed; no in-page retry is presented.
+  // The exported file remains decryptable after cleanup and blocked writes.
+  assert.deepEqual(clone((await f.window.InsightBackupCryptoV1.decrypt(safety,SAFETY_PASSWORD)).data),f.original);
+});
+
+const DOWNLOAD_KEY='insight_backup_download_v1',CONFIRMED_KEY='insight_backup_confirmed_v1';
+function oldConfirmation(){const at=Date.now()-86400000;return JSON.stringify({version:1,id:'a'.repeat(32),kind:'normal',startedAt:at,confirmedAt:at,confirmation:'user'});}
+function backupLabel(metadata){
+  const core=fs.readFileSync(path.join(__dirname,'..','insight_payload_core_v1.js'),'utf8');
+  const start=core.indexOf('function updateBackupDaysLabel(){'),end=core.indexOf("window.addEventListener('storage'",start);
+  const classes=new Set(),label={textContent:'',classList:{remove(...names){names.forEach(n=>classes.delete(n));},add(name){classes.add(name);}}};
+  const ctx={localStorage:{getItem:key=>metadata.get(key)??null},document:{getElementById:()=>label},BACKUP_KEY:'insight_last_backup',Date,JSON,Number,Math};
+  vm.runInNewContext(core.slice(start,end)+';updateBackupDaysLabel();',ctx);
+  return {text:label.textContent,classes:[...classes]};
+}
+test('Backup confirmation labels never promote legacy dates or pending downloads to confirmed',()=>{
+  const map=new Map();assert.equal(backupLabel(map).text,'未バックアップ');
+  map.set('insight_last_backup',String(Date.now()));
+  assert.equal(backupLabel(map).text,'旧ダウンロード記録あり・保存未確認');
+  const old=oldConfirmation();map.set(CONFIRMED_KEY,old);
+  assert.match(backupLabel(map).text,/保存確認（本人申告）/);
+  map.set(DOWNLOAD_KEY,JSON.stringify({version:1,id:'b'.repeat(32),kind:'normal',startedAt:Date.now()}));
+  assert.match(backupLabel(map).text,/保存未確認（前回の保存確認あり）/);
+  assert.equal(map.get(CONFIRMED_KEY),old);
+});
+for(const kind of ['normal','preRestore']){
+  for(const confirmed of [false,true]){
+    test('Backup confirmation '+kind+' waits for explicit choice '+confirmed,{timeout:10000},async()=>{
+      let decide,ready;const waiting=new Promise(resolve=>{ready=resolve;});
+      const old=oldConfirmation(),legacy='1700000000000';
+      const f=fixture({metadata:{[CONFIRMED_KEY]:old,insight_last_backup:legacy},confirmDownload:request=>{assert.equal(request.kind,kind);ready();return new Promise(resolve=>{decide=resolve;});}});
+      const job=kind==='normal'?f.ctx.backupData():f.restore(snapshot(750));
+      await waiting;
+      assert.equal(f.downloads.length,1);assert.equal(f.writeCount,0);
+      assert.deepEqual(f.persisted,f.original);assert.deepEqual(clone(f.ctx.allStores),f.original);
+      assert.equal(f.metadata.get(CONFIRMED_KEY),old);assert.equal(f.metadata.get('insight_last_backup'),legacy);
+      assert.match(backupLabel(f.metadata).text,/保存未確認/);
+      decide(confirmed);await job;
+      assert.equal(f.metadata.get('insight_last_backup'),legacy);
+      if(confirmed){
+        const record=JSON.parse(f.metadata.get(CONFIRMED_KEY));assert.equal(record.confirmation,'user');assert.equal(record.kind,kind);
+        assert.equal(record.id,JSON.parse(f.metadata.get(DOWNLOAD_KEY)).id);
+        assert.equal(f.writeCount,kind==='preRestore'?1:0);
+        assert.match(backupLabel(f.metadata).text,/保存確認（本人申告）/);
+      }else{
+        assert.equal(f.metadata.get(CONFIRMED_KEY),old);assert.equal(f.writeCount,0);
+        // A fresh runtime sees the pending attempt and preserves the last confirmation.
+        const restarted=fixture({metadata:Object.fromEntries(f.metadata)});
+        assert.equal(restarted.metadata.get(CONFIRMED_KEY),old);
+        assert.match(backupLabel(restarted.metadata).text,/保存未確認/);
+      }
+    });
+  }
+}
+for(const kind of ['normal','preRestore']){
+  test('Backup confirmation '+kind+' rejects another tab replacing its pending record',{timeout:10000},async()=>{
+    let decide,ready;const waiting=new Promise(resolve=>{ready=resolve;});const old=oldConfirmation();
+    const f=fixture({metadata:{[CONFIRMED_KEY]:old},confirmDownload:()=>{ready();return new Promise(resolve=>{decide=resolve;});}});
+    const job=kind==='normal'?f.ctx.backupData():f.restore(snapshot(750));await waiting;
+    f.metadata.set(DOWNLOAD_KEY,JSON.stringify({version:1,id:'b'.repeat(32),kind:'normal',startedAt:Date.now()}));
+    decide(true);await job;
+    assert.equal(f.metadata.get(CONFIRMED_KEY),old);assert.equal(f.writeCount,0);assert.deepEqual(f.persisted,f.original);
+    assert.match(f.alerts.join(' '),/別のバックアップ処理/);
+  });
+}
+for(const key of [DOWNLOAD_KEY,CONFIRMED_KEY]){
+  test('Backup confirmation metadata failure '+key+' prevents the primary restore write',async()=>{
+    const old=oldConfirmation();const f=fixture({metadata:{[CONFIRMED_KEY]:old},metadataFailureKey:key});
+    await f.restore(snapshot(750));assert.equal(f.writeCount,0);assert.deepEqual(f.persisted,f.original);
+    assert.equal(f.metadata.get(CONFIRMED_KEY),old);assert.match(f.alerts.join(' '),/復元を中止/);
+  });
+}
+test('Backup confirmation keeps old records on password cancel, encryption failure and download failure',async()=>{
+  for(const options of [{requestPassword:()=>null},{insecure:true},{realCrypto:true,requestPassword:()=> 'short'},{backupDownloadFailure:true}]){
+    for(const kind of ['normal','preRestore']){
+      const old=oldConfirmation();const f=fixture({...options,metadata:{[CONFIRMED_KEY]:old,insight_last_backup:'1700000000000'}});
+      if(kind==='normal')await f.ctx.backupData();else await f.restore(snapshot(750));
+      assert.equal(f.metadata.get(CONFIRMED_KEY),old);assert.equal(f.metadata.get('insight_last_backup'),'1700000000000');
+      assert.equal(f.metadata.has(DOWNLOAD_KEY),false);assert.equal(f.writeCount,0);assert.deepEqual(f.persisted,f.original);
+    }
+  }
+});
+
+
+test('Optional pre-restore safety setting renders unchecked on every new Settings page',()=>{
+  const settings=fs.readFileSync(path.join(__dirname,'..','insight_settings_v1.js'),'utf8');
+  assert.match(settings,/id="insightRestoreSafetyBackup" type="checkbox"/);
+  assert.match(settings,/querySelector\('#insightRestoreSafetyBackup'\)\.checked=false/);
+  assert.match(settings,/append\(backup,restore,restoreSafety,health,csv,restoreFile,csvFile\)/);
+});
+test('Optional safety OFF or unavailable: two-store plain restore requires no extra password, file or metadata',async()=>{
+  for(const safetyBackup of [false,null]){
+    const f=fixture({safetyBackup});
+    await f.restore(snapshot(750));
+    assert.equal(f.writeCount,1);
+    assert.equal(f.persisted.stores.a.data['2026']['1月'][0].売上,750);
+    assert.equal(f.persisted.stores.b.data['2026']['12月'][30].売上,750);
+    assert.equal(f.downloads.length,0);
+    assert.equal(f.blobs.length,0);
+    assert.equal(f.passwordRequests.length,0);
+    assert.equal(f.confirmationRequests.length,0);
+    assert.equal(f.metadataWrites.length,0);
+    assert.equal(f.confirmationCount,1);
+    assert.match(f.confirmMessages[0],/安全バックアップは作成しません/);
+    assert.match(f.confirmMessages[0],/現在の全データは上書きされます/);
+    assert.equal(f.window.InsightStorage.snapshotWritesHeld(),false);
+  }
+});
+test('Optional safety OFF: encrypted restore only requests original backup password',async()=>{
+  const f=fixture({realCrypto:true,safetyBackup:false,requestPassword:()=>FILE_PASSWORD});
+  const encrypted=await f.window.InsightBackupCryptoV1.encrypt(snapshot(750),FILE_PASSWORD);
+  await f.restore(encrypted);
+  assert.equal(f.writeCount,1);
+  assert.deepEqual(f.passwordRequests.map(p=>p.confirm),[false]);
+  assert.equal(f.downloads.length,0);
+  assert.equal(f.confirmationRequests.length,0);
+  assert.equal(f.persisted.stores.a.data['2026']['1月'][0].売上,750);
+});
+test('Optional safety OFF: failed validation, cancellation and quota never overwrite prior bytes',async()=>{
+  for(const opts of [{confirm:false},{quotaOnce:true}]){
+    const f=fixture({...opts,safetyBackup:false});
+    await f.restore(snapshot(750));
+    assert.equal(f.writeCount,0);
+    assert.deepEqual(f.persisted,f.original);
+    assert.equal(f.downloads.length,0);
+    assert.equal(f.window.InsightStorage.snapshotWritesHeld(),false);
+  }
+  const invalid=fixture({safetyBackup:false});
+  await invalid.restore('{invalid');
+  assert.equal(invalid.writeCount,0);
+  assert.deepEqual(invalid.persisted,invalid.original);
+});
+test('Optional safety OFF: readback mismatch uses in-memory rollback without a download',async()=>{
+  const f=fixture({safetyBackup:false,corruptAfterWrite:true});
+  await f.restore(snapshot(750));
+  assert.equal(f.writeCount,2);
+  assert.deepEqual(f.persisted,f.original);
+  assert.equal(f.downloads.length,0);
+  assert.match(f.alerts.join(' '),/復元前の状態へ自動で戻しました/);
+  assert.match(f.alerts.join(' '),/安全バックアップは作成していません/);
+  assert.doesNotMatch(f.alerts.join(' '),/ダウンロード処理は開始済み/);
+});
+test('Optional safety OFF: failed rollback retains write hold and never claims a safety file exists',async()=>{
+  const f=fixture({safetyBackup:false,corruptAfterWrite:true,rollbackFailure:true});
+  await f.restore(snapshot(750));
+  assert.equal(f.writeCount,1);
+  assert.equal(f.downloads.length,0);
+  assert.equal(f.window.InsightStorage.snapshotWritesHeld(),true);
+  assert.match(f.alerts.join(' '),/自動復旧にも失敗/);
+  assert.match(f.alerts.join(' '),/安全バックアップは作成していません/);
+  assert.doesNotMatch(f.alerts.join(' '),/Insight_pre_restore_\.\.\.json を保管してください/);
+});
+test('Optional safety OFF: postcommit error holds writes without suggesting nonexistent file',async()=>{
+  for(const opts of [{postcommitThrow:true},{postcommitThrow:true,readbackUnavailableAfterCommit:true}]){
+    const f=fixture({...opts,safetyBackup:false});
+    await f.restore(snapshot(750));
+    assert.equal(f.writeCount,1);
+    assert.equal(f.downloads.length,0);
+    assert.equal(f.window.InsightStorage.snapshotWritesHeld(),true);
+    assert.match(f.alerts.join(' '),/安全バックアップは作成していません/);
+    assert.doesNotMatch(f.alerts.join(' '),/復元直前バックアップを保管してから/);
+  }
 });

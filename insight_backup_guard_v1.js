@@ -1,4 +1,50 @@
 (function(){
+var entrypoints=window.InsightBackupEntrypointsV1;
+if(!entrypoints||entrypoints.version!==1||typeof entrypoints.register!=="function"){
+  // A new guard paired with an old core must fail closed as well.  This is a
+  // defensive cache-mix fallback; the normal path is owned by the new core.
+  function unavailableBackup(){alert("バックアップ機能を安全に初期化できませんでした。再読み込みしてください。平文では保存しません。");}
+  function unavailableRestore(e){if(e&&e.target)e.target.value="";alert("復元機能を安全に初期化できませんでした。現在のデータは変更されていません。再読み込みしてください。");}
+  function lockLegacyEntry(name,safe){
+    try{
+      var descriptor=Object.getOwnPropertyDescriptor(window,name);
+      if(!descriptor||descriptor.configurable){
+        Object.defineProperty(window,name,{configurable:false,enumerable:true,get:function(){return safe;},set:function(){}});
+      }else if(Object.prototype.hasOwnProperty.call(descriptor,"value")&&descriptor.writable){
+        // Classic-script top-level functions in the deployed old core are
+        // non-configurable but writable. ECMAScript still permits replacing
+        // their value while changing writable from true to false.
+        Object.defineProperty(window,name,{value:safe,writable:false});
+      }
+      descriptor=Object.getOwnPropertyDescriptor(window,name);
+      return !!descriptor&&descriptor.configurable===false&&window[name]===safe&&
+        (Object.prototype.hasOwnProperty.call(descriptor,"value")?descriptor.writable===false:typeof descriptor.set==="function");
+    }catch(_){return false;}
+  }
+  var backupLocked=lockLegacyEntry("backupData",unavailableBackup);
+  var restoreLocked=lockLegacyEntry("restoreData",unavailableRestore);
+  if(!backupLocked||!restoreLocked){
+    // A non-configurable/non-writable foreign value cannot be replaced by
+    // JavaScript. Remove user operation paths and show a terminal reload state
+    // rather than continue with an unverifiable backup/restore entry point.
+    try{
+      ["click","change"].forEach(function(type){document.addEventListener(type,function(event){
+        var target=event&&event.target;
+        if(target&&(target.id==="backupBtn"||target.id==="restoreBtn"||target.id==="restoreFile")){
+          event.preventDefault();event.stopImmediatePropagation();
+        }
+      },true);});
+      function showFailure(){
+        document.body.replaceChildren();var box=document.createElement("div");box.className="insight-load-failure";
+        box.textContent="バックアップ・復元機能を安全に初期化できませんでした。Insightを再読み込みしてください。";
+        document.body.appendChild(box);
+      }
+      if(document.readyState==="loading")document.addEventListener("DOMContentLoaded",showFailure,{once:true});
+      else showFailure();
+    }catch(_){}
+  }
+  return;
+}
 function isPlainObject(v){return !!v&&typeof v==="object"&&!Array.isArray(v);}
 function validYear(v){return /^\d{4}$/.test(String(v));}
 function nonNegativeNumber(v,label){if(v===undefined||v===null||v==="")return 0;var n=Number(v);if(!Number.isFinite(n)||n<0)throw new Error(label+" が不正です");return n;}
@@ -68,7 +114,7 @@ function runRestorePreflight(snapshot){
   }
   return report;
 }
-function restoreSummary(fileName,info,snapshot,report){
+function restoreSummary(fileName,info,snapshot,report,includeSafetyBackup){
   var created="記録なし（従来形式）";
   if(info&&typeof info.createdAt==="string"){try{created=new Date(info.createdAt).toLocaleString("ja-JP");}catch(_){}}
   var years=backupYears(snapshot);
@@ -79,17 +125,140 @@ function restoreSummary(fileName,info,snapshot,report){
     if(warnings)message+="\n\n注意事項\n"+warnings;
   }
   if(countWasteRecords(allStores)>0){message+=countWasteRecords(snapshot)===0?"\n\n注意：このバックアップに廃棄数データはありません。復元すると現在の廃棄数は失われます。":"\n\n注意：現在の廃棄数もバックアップの値に置き換わります。";}
-  return message+"\n\n現在の全データは上書きされます。復元しますか？";
+  return message+(includeSafetyBackup?"":"\n\n復元直前の安全バックアップは作成しません。復元に失敗した場合、元の状態に戻せなくなる可能性があります。")+"\n\n現在の全データは上書きされます。復元しますか？";
 }
 
 
 var preRestoreMemorySnapshot=null;
+function shouldCreatePreRestoreBackup(){
+  var option=document.getElementById("insightRestoreSafetyBackup");
+  return !!(option&&option.checked===true);
+}
+// A single FileReader may own the restore path at a time; no snapshot/schema changes.
+var restoreFileReaderActive=null;
+var backupOperationActive=false;
+var PLAIN_FILE_LIMIT=20*1024*1024,ENCRYPTED_FILE_LIMIT=21*1024*1024;
+var DOWNLOAD_KEY='insight_backup_download_v1',CONFIRMED_KEY='insight_backup_confirmed_v1';
+function cryptoCodec(){
+  if(!window.isSecureContext||!window.crypto||!window.crypto.subtle||!window.InsightBackupCryptoV1||!window.InsightBackupPasswordV1)
+    throw new Error('暗号化には安全なHTTPS環境とWebCryptoが必要です。平文では保存しません。');
+  return window.InsightBackupCryptoV1;
+}
+function captureBackupState(){
+  var storage=window.InsightStorage;
+  if(!storage)throw new Error('保存機能を初期化できませんでした');
+  // Compare raw saved bytes without acknowledging another tab or invoking the
+  // restore readback/postflight path during the asynchronous preparation.
+  return {live:storage.serialize(allStores),saved:window.localStorage
+    ?window.localStorage.getItem(currentStorageKey()):storage.serialize(allStores)};
+}
+function assertBackupState(state){
+  var current=captureBackupState();
+  if(current.live!==state.live||current.saved!==state.saved){
+    var error=new Error('処理中にデータが変更されたため中止しました。現在の内容を確認し、もう一度お試しください。');
+    error.name='InsightBackupStateChanged';throw error;
+  }
+}
+function cancelledBackup(){var error=new Error('キャンセルしました。');error.name='InsightBackupCancelled';return error;}
+function ensureBackupContinuing(operation,state){
+  if(operation.cancelled)throw cancelledBackup();
+  assertBackupState(state);
+}
+function backupBusy(message,operation){window.InsightBackupPasswordV1.busy(message,function(){operation.cancelled=true;});}
+async function confirmBackupDownload(filename,kind,operation,state){
+  var bytes=new Uint8Array(16);window.crypto.getRandomValues(bytes);
+  var id=Array.from(bytes,function(n){return n.toString(16).padStart(2,'0');}).join('');
+  var record={version:1,id:id,startedAt:Date.now(),kind:kind};
+  var raw=JSON.stringify(record);
+  window.InsightStorage.writeMetadata(DOWNLOAD_KEY,raw);
+  if(typeof updateBackupDaysLabel==='function')updateBackupDaysLabel();
+  if(await window.InsightBackupPasswordV1.confirmSaved({filename:filename,kind:kind})!==true)throw cancelledBackup();
+  ensureBackupContinuing(operation,state);
+  // Another tab may have initiated a newer download while this modal waited.
+  // Never confirm its file, or replace an existing confirmation on its behalf.
+  if(window.localStorage.getItem(DOWNLOAD_KEY)!==raw)throw new Error('別のバックアップ処理が開始されたため、確認を記録しませんでした。');
+  record.confirmedAt=Date.now();record.confirmation='user';
+  window.InsightStorage.writeMetadata(CONFIRMED_KEY,JSON.stringify(record));
+  if(typeof updateBackupDaysLabel==='function')updateBackupDaysLabel();
+}
+async function backupPassword(title,confirmPassword,operation){
+  cryptoCodec();
+  var password=await window.InsightBackupPasswordV1.request({title:title,confirm:confirmPassword});
+  if(password===null||operation.cancelled)throw cancelledBackup();
+  return password;
+}
+
+/* The registered operation begins at the confirmed restore write, not at
+ * file selection/reading or preflight. It neither authorizes data use nor
+ * changes the backup, rollback, or UI control flow. */
+var restoreObserver=null,restoreObserverFault=false,restoreObserverActive=0,restoreInitClosed=false;
+var restoreScope='confirmed-backup-restore-write-and-sync-ui-only';
+function restoreObservationStatus(){
+  if(restoreObserverFault)return Object.freeze({scope:restoreScope,state:'HELD',activeCount:null,epoch:null});
+  if(!restoreObserver)return Object.freeze({scope:restoreScope,state:'UNAVAILABLE',activeCount:null,epoch:null});
+  try{
+    var s=restoreObserver.status();
+    if(!s||s.scope!=='registered-operations-only'||
+       ['IDLE_OBSERVED','ACTIVE','HELD'].indexOf(s.state)<0||
+       !Number.isSafeInteger(s.activeCount)||s.activeCount<0||
+       !Number.isSafeInteger(s.epoch)||s.epoch<1||
+       s.activeCount<restoreObserverActive||
+       (s.state==='IDLE_OBSERVED'&&s.activeCount!==0)||
+       (s.state==='ACTIVE'&&s.activeCount===0)||
+       (restoreObserverActive>0&&s.state!=='ACTIVE'&&s.state!=='HELD'))
+      throw new Error('invalid restore observer status');
+    return Object.freeze({scope:restoreScope,state:s.state,activeCount:s.activeCount,epoch:s.epoch});
+  }catch(_){markRestoreObservationFault();return Object.freeze({scope:restoreScope,state:'HELD',activeCount:null,epoch:null});}
+}
+function markRestoreObservationFault(){
+  restoreObserverFault=true;
+  try{if(restoreObserver)restoreObserver.invalidate();}catch(_){}
+}
+function initRestoreObservation(){
+  if(restoreObserver||restoreObserverFault||restoreInitClosed)return;
+  try{
+    var factory=window.InsightOperationObserverV0&&window.InsightOperationObserverV0.createOperationObserver;
+    if(typeof factory!=='function')return;
+    var candidate=factory();
+    if(!candidate||['initialize','begin','end','invalidate','status'].some(function(k){return typeof candidate[k]!=='function';})||
+       candidate.initialize()!==true){markRestoreObservationFault();return;}
+    restoreObserver=candidate;
+    if(restoreObservationStatus().state!=='IDLE_OBSERVED')markRestoreObservationFault();
+  }catch(_){markRestoreObservationFault();}
+}
+function beginRestoreObservation(){
+  initRestoreObservation();
+  // No factory discovered after a previously unobserved write may assert IDLE.
+  restoreInitClosed=true;
+  if(!restoreObserver||restoreObserverFault)return null;
+  try{
+    var token=restoreObserver.begin('confirmed_backup_restore');
+    if(!token||typeof token!=='object'||restoreObserverActive>=Number.MAX_SAFE_INTEGER){
+      markRestoreObservationFault();return null;
+    }
+    restoreObserverActive++;
+    if(restoreObservationStatus().state!=='ACTIVE')markRestoreObservationFault();
+    return {observer:restoreObserver,token:token};
+  }catch(_){markRestoreObservationFault();return null;}
+}
+function finishRestoreObservation(ticket,outcome){
+  if(!ticket)return;
+  try{if(ticket.observer.end(ticket.token,outcome)!==true)markRestoreObservationFault();}
+  catch(_){markRestoreObservationFault();}
+  restoreObserverActive--;
+  if(!restoreObserverFault)restoreObservationStatus();
+}
+window.InsightRestoreOperationObserverV0=Object.freeze({getStatus:function(){
+  return restoreObservationStatus();
+}});
+
 function backupStamp(now){
   var pad=function(n){return String(n).padStart(2,"0");};
   return now.getFullYear()+pad(now.getMonth()+1)+pad(now.getDate())+"_"+pad(now.getHours())+pad(now.getMinutes())+pad(now.getSeconds());
 }
 function downloadBackupPayload(payload,filename){
   var blob=new Blob([JSON.stringify(payload,null,2)],{type:"application/json"});
+  if(blob.size>ENCRYPTED_FILE_LIMIT)throw new Error('暗号化バックアップのサイズが大きすぎます。');
   var url=URL.createObjectURL(blob),a=document.createElement("a");
   try{
     a.href=url;a.download=filename;document.body.appendChild(a);a.click();
@@ -99,13 +268,21 @@ function downloadBackupPayload(payload,filename){
   }
   return filename;
 }
-function createPreRestoreBackup(){
+async function createPreRestoreBackup(operation,state){
   if(!window.InsightStorage)throw new Error("保存機能を初期化できませんでした");
   var now=new Date(),snapshot=window.InsightStorage.migrateSnapshot(allStores);
   var payload={backupInfo:buildBackupInfo(snapshot,now),data:snapshot};
   payload.backupInfo.backupType="preRestore";
   var filename="Insight_pre_restore_"+backupStamp(now)+".json";
-  downloadBackupPayload(payload,filename);
+  var password=await backupPassword('復元直前の安全バックアップ用パスワード',true,operation);
+  var encrypted;
+  try{
+    backupBusy('復元直前の安全バックアップを暗号化中',operation);
+    encrypted=await cryptoCodec().encrypt(payload,password);
+  }finally{password=null;}
+  ensureBackupContinuing(operation,state);
+  downloadBackupPayload(encrypted,filename);
+  await confirmBackupDownload(filename,'preRestore',operation,state);
   preRestoreMemorySnapshot=snapshot;
   return {snapshot:snapshot,filename:filename};
 }
@@ -211,6 +388,29 @@ function verifyRestoredSnapshot(expected){
   if(window.InsightStorage.serialize(normalized)!==window.InsightStorage.serialize(expected))throw validationError("復元後検査で保存内容が復元対象と一致しませんでした。");
   return {snapshot:normalized,report:report};
 }
+function classifyInterruptedRestoreWrite(expected,previous){
+  // Read-only diagnosis: never retry, rollback, or acknowledge a write here.
+  // A matching snapshot does not establish writer provenance or atomicity.
+  try{
+    if(!window.InsightStorage||typeof window.InsightStorage.readSnapshot!=="function"||
+       typeof window.InsightStorage.serialize!=="function")return "uncertain";
+    var saved=window.InsightStorage.serialize(window.InsightStorage.readSnapshot());
+    var expectedBytes=window.InsightStorage.serialize(expected);
+    var previousBytes=previous?window.InsightStorage.serialize(previous):null;
+    if(saved===expectedBytes)return previousBytes===expectedBytes?"uncertain":"target-observed";
+    if(previousBytes!==null&&saved===previousBytes)return "previous-observed";
+  }catch(_){}
+  return "uncertain";
+}
+function holdRestoreSnapshotWrites(){
+  // Only an uncertain restored snapshot may set the latch; observer HELD alone never does.
+  try{
+    if(window.InsightStorage&&typeof window.InsightStorage.holdSnapshotWrites==='function')
+      return window.InsightStorage.holdSnapshotWrites()===true;
+  }catch(err){console.warn('Restore write hold failed:',err);}
+  console.warn('Restore write hold unavailable; stop editing and reload manually.');
+  return false;
+}
 function rollbackPreRestoreSnapshot(){
   if(!preRestoreMemorySnapshot)throw new Error("復元前データがメモリにありません。");
   if(!window.InsightStorage||typeof window.InsightStorage.readSnapshot!=="function")throw new Error("保存済みデータを読み戻せません。");
@@ -219,62 +419,133 @@ function rollbackPreRestoreSnapshot(){
   if(window.InsightStorage.serialize(restored)!==window.InsightStorage.serialize(preRestoreMemorySnapshot))throw new Error("復元前データの再保存結果が一致しません。");
   return restored;
 }
-backupData=function(){
+async function encryptedBackupData(){
+  if(backupOperationActive||restoreFileReaderActive){alert('別のバックアップ・復元処理が進行中です。');return;}
+  backupOperationActive=true;
+  var operation={cancelled:false},password=null;
   try{
+    cryptoCodec();
+    var state=captureBackupState();
     if(!window.InsightStorage)throw new Error("保存機能を初期化できませんでした");
     var snapshot=window.InsightStorage.migrateSnapshot(allStores),now=new Date();
     var payload={backupInfo:buildBackupInfo(snapshot,now),data:snapshot};
     var stamp=backupStamp(now);
     var filename="Insight_backup_all_stores_"+stamp+".json";
-    var blob=new Blob([JSON.stringify(payload,null,2)],{type:"application/json"});
-    var url=URL.createObjectURL(blob),a=document.createElement("a");
-    a.href=url;a.download=filename;document.body.appendChild(a);a.click();a.remove();
-    setTimeout(function(){URL.revokeObjectURL(url);},1000);
-    window.InsightStorage.writeMetadata("insight_last_backup",String(Date.now()));
-    if(typeof updateBackupDaysLabel==="function")updateBackupDaysLabel();
-    showToast("📥 バックアップを保存しました","#15803d","#f0fdf4");
+    password=await backupPassword('バックアップ用パスワード',true,operation);
+    backupBusy('バックアップを暗号化中',operation);
+    var encrypted=await cryptoCodec().encrypt(payload,password);password=null;
+    ensureBackupContinuing(operation,state);
+    downloadBackupPayload(encrypted,filename);
+    await confirmBackupDownload(filename,'normal',operation,state);
+    showToast("📥 保存したファイルの確認を記録しました（ご本人の申告）","#15803d","#f0fdf4");
   }catch(err){
-    console.warn("Insight backup failed:",err);
-    alert("バックアップを保存できませんでした。\n"+String(err&&err.message?err.message:err));
+    if(err&&err.name==='InsightBackupCancelled')return;
+    alert("バックアップ処理を完了できませんでした。\n"+String(err&&err.message?err.message:err));
+  }finally{password=null;backupOperationActive=false;if(window.InsightBackupPasswordV1)window.InsightBackupPasswordV1.close();}
+}
+function encryptedRestoreData(e){
+  var file=e.target.files[0];if(!file)return;
+  if(restoreFileReaderActive||backupOperationActive){
+    // A normal backup owns the UI, but is outside the restore observer's
+    // scope. Only a conflicting restore reader invalidates that observer.
+    if(restoreFileReaderActive)markRestoreObservationFault();
+    alert('別のバックアップ復元処理が進行中です。完了後にもう一度お試しください。');
+    e.target.value='';return;
   }
-};
-restoreData=function(e){
-  var file=e.target.files[0];if(!file)return;if(file.size>20*1024*1024){alert("バックアップファイルが大きすぎます。\n20MB以下のファイルを選択してください。");e.target.value="";return;}
-  var reader=new FileReader();reader.onload=function(ev){var restoreCommitted=false;try{
-    var parsed=JSON.parse(ev.target.result),envelope=parseBackupEnvelope(parsed),newAll=normalizeBackup(envelope.data);
+  if(file.size>ENCRYPTED_FILE_LIMIT){alert("バックアップファイルが大きすぎます。\n暗号化形式は21MiB、平文JSONは20MiB以下にしてください。");e.target.value="";return;}
+  var state;
+  try{state=captureBackupState();}catch(_){alert('現在の保存内容を確認できないため復元を開始できません。');e.target.value='';return;}
+  var operation={cancelled:false};
+  var reader=new FileReader(),restoreLoadCount=0,readerPhase='pending';restoreFileReaderActive=reader;reader.onload=async function(ev){if(++restoreLoadCount>1||readerPhase!=='pending'||restoreFileReaderActive!==reader){markRestoreObservationFault();return;}readerPhase='processing';var restoreCommitted=false,restoreTicket=null,restoreOutcome='unknown',restoreWriteCheck=null,password=null,safetyBackupCreated=false;try{try{
+    var parsed=JSON.parse(ev.target.result);
+    // Any encryption-shaped input must authenticate; never reinterpret a broken
+    // or unknown encrypted envelope as a legacy plaintext snapshot.
+    var encrypted=isPlainObject(parsed)&&(['format','kdf','cipher','ciphertext'].some(function(key){return Object.prototype.hasOwnProperty.call(parsed,key);}));
+    if(encrypted){
+      password=await backupPassword('復元ファイルのパスワード',false,operation);
+      backupBusy('バックアップを復号中',operation);
+      try{parsed=await cryptoCodec().decrypt(parsed,password);}finally{password=null;}
+    }else{
+      if(file.size>PLAIN_FILE_LIMIT)throw validationError('平文JSONは20MiB以下にしてください。');
+    }
+    ensureBackupContinuing(operation,state);
+    var envelope=parseBackupEnvelope(parsed),newAll=normalizeBackup(envelope.data);
     if(envelope.info)validateBackupInfo(envelope.info,newAll);
     var preflight=runRestorePreflight(newAll);
-    if(!confirm(restoreSummary(file.name,envelope.info,newAll,preflight))){e.target.value="";return;}
-    try{createPreRestoreBackup();}catch(safetyErr){throw new Error("復元直前バックアップを作成できないため、復元を中止しました。 "+String(safetyErr&&safetyErr.message?safetyErr.message:safetyErr));}
-    var verifiedRestore=null,writeCompleted=false;
+    var safetyBackupSelected=shouldCreatePreRestoreBackup();
+    if(!confirm((encrypted?'':'このファイルは暗号化されていない平文JSONです。\n\n')+restoreSummary(file.name,envelope.info,newAll,preflight,safetyBackupSelected))){e.target.value="";return;}
+    // Keep a private rollback snapshot even when the optional file export is skipped.
+    preRestoreMemorySnapshot=window.InsightStorage.migrateSnapshot(allStores);
+    if(safetyBackupSelected){
+      try{await createPreRestoreBackup(operation,state);safetyBackupCreated=true;}catch(safetyErr){if(safetyErr&&['InsightBackupCancelled','InsightBackupStateChanged'].indexOf(safetyErr.name)>=0)throw safetyErr;throw new Error("復元直前バックアップを作成できないため、復元を中止しました。 "+String(safetyErr&&safetyErr.message?safetyErr.message:safetyErr));}
+    }
+    ensureBackupContinuing(operation,state);
+    var verifiedRestore=null,writeCompleted=false,writeAttempted=false;
     try{
       if(!window.InsightStorage)throw new Error("保存機能を初期化できませんでした");
+      restoreTicket=beginRestoreObservation();
+      writeAttempted=true;
       window.InsightStorage.writeSnapshot(newAll);writeCompleted=true;
       verifiedRestore=verifyRestoredSnapshot(newAll);
     }catch(postErr){
       if(!writeCompleted){
+        if(writeAttempted)restoreWriteCheck=classifyInterruptedRestoreWrite(newAll,preRestoreMemorySnapshot);
+        if(writeAttempted&&(restoreWriteCheck==='target-observed'||restoreWriteCheck==='uncertain'))holdRestoreSnapshotWrites();
         if(postErr&&postErr.name==="QuotaExceededError")throw new Error("保存容量が不足しているため復元できません");
         throw postErr;
       }
       try{
         rollbackPreRestoreSnapshot();
         preRestoreMemorySnapshot=null;
-        alert("復元後の整合性確認に失敗したため、復元前の状態へ自動で戻しました。\n\n"+String(postErr&&postErr.message?postErr.message:postErr)+"\n\n復元直前バックアップも保存されています。");
+        alert("復元後の整合性確認に失敗したため、復元前の状態へ自動で戻しました。\n\n"+String(postErr&&postErr.message?postErr.message:postErr)+"\n\n"+(safetyBackupCreated?"復元直前バックアップのダウンロード処理は開始済みです。保存先を確認してください。":"復元直前の安全バックアップは作成していません。")+"");
       }catch(rollbackErr){
-        alert("重大なエラー：復元後の整合性確認に失敗し、自動復旧にも失敗しました。\n\n"+String(postErr&&postErr.message?postErr.message:postErr)+"\n\n自動復旧エラー："+String(rollbackErr&&rollbackErr.message?rollbackErr.message:rollbackErr)+"\n\n保存された Insight_pre_restore_...json を使って手動で復元してください。");
+        holdRestoreSnapshotWrites();
+        alert("重大なエラー：復元後の整合性確認に失敗し、自動復旧にも失敗しました。\n\n"+String(postErr&&postErr.message?postErr.message:postErr)+"\n\n自動復旧エラー："+String(rollbackErr&&rollbackErr.message?rollbackErr.message:rollbackErr)+"\n\n"+(safetyBackupCreated?"復元直前バックアップ Insight_pre_restore_...json を保管してください。":"復元直前の安全バックアップは作成していません。復元前の状態に戻せない可能性があります。手元の既存バックアップを確認してください。")+"\n\n追加の編集・保存や、この画面での再復元は行わないでください。\nInsightを手動で再読み込みし、保存内容を確認してください。\n"+(safetyBackupCreated?"その後、必要な場合のみ保管したバックアップから復元してください。":"その後、必要な場合のみ手元の既存バックアップからの復元を検討してください。")+"");
       }
       e.target.value="";return;
     }
     newAll=verifiedRestore.snapshot;preRestoreMemorySnapshot=null;
     // Persisted data has passed readback and health checks. UI failures cannot undo it.
     restoreCommitted=true;
-    allStores=newAll;store=allStores.stores[allStores.current];baseYear=store.years[store.years.length-1];cmpYear=store.years.length>1?store.years[store.years.length-2]:null;editYear={sales:baseYear,kyaku:baseYear,haiki:baseYear};editMonth={sales:todayFY().month,kyaku:todayFY().month,haiki:todayFY().month};renderStoreSel();if(currentNav==='salesCounts'){if(window.InsightSalesCount&&typeof window.InsightSalesCount.reloadFromStore==="function")window.InsightSalesCount.reloadFromStore();else gotoNav('salesCounts');}else if(currentNav==='settings'){if(window.InsightSettings&&typeof window.InsightSettings.open==="function")window.InsightSettings.open();}else if(currentNav===1)refreshDash();else if(currentNav>1)initInputPage(["","","sales","kyaku","haiki"][currentNav]);else initQuickPage();if(window.InsightPagePeriodSync&&typeof window.InsightPagePeriodSync.reconcileCurrentStore==="function")window.InsightPagePeriodSync.reconcileCurrentStore();if(window.InsightDataHealth&&typeof window.InsightDataHealth.refresh==="function")window.InsightDataHealth.refresh();updateMissingBadge();showToast("📤 データを復元しました（整合性確認済み）","#1d4ed8","#eff6ff");
+    allStores=newAll;store=allStores.stores[allStores.current];baseYear=store.years[store.years.length-1];cmpYear=store.years.length>1?store.years[store.years.length-2]:null;editYear={sales:baseYear,kyaku:baseYear,haiki:baseYear};editMonth={sales:todayFY().month,kyaku:todayFY().month,haiki:todayFY().month};renderStoreSel();if(currentNav==='salesCounts'){if(window.InsightSalesCount&&typeof window.InsightSalesCount.reloadFromStore==="function")window.InsightSalesCount.reloadFromStore();else gotoNav('salesCounts');}else if(currentNav==='settings'){if(window.InsightSettings&&typeof window.InsightSettings.open==="function")window.InsightSettings.open();}else if(currentNav===1)refreshDash();else if(currentNav>1)initInputPage(["","","sales","kyaku","haiki"][currentNav]);else initQuickPage();if(window.InsightPagePeriodSync&&typeof window.InsightPagePeriodSync.reconcileCurrentStore==="function")window.InsightPagePeriodSync.reconcileCurrentStore();if(window.InsightDataHealth&&typeof window.InsightDataHealth.refresh==="function")window.InsightDataHealth.refresh();updateMissingBadge();showToast("📤 データを復元しました（整合性確認済み）","#1d4ed8","#eff6ff");restoreOutcome="completed";
   }catch(err){
-    console.warn("Insight restore rejected:",err);
+    if(err&&err.name==='InsightBackupCancelled')return;
+    if(err&&err.name==='InsightBackupStateChanged'){alert(err.message+'\nこの復元による書き込みは行っていません。');return;}
     var detail=String(err&&err.message?err.message:err);
     alert(restoreCommitted
       ?"バックアップの保存と整合性確認は完了しましたが、画面の更新に失敗しました。\n"+detail+"\n\n復元したデータは保存されています。Insightを再読み込みして表示を更新してください。もう一度復元する必要はありません。"
+      :restoreWriteCheck==="target-observed"
+      ?"復元処理は途中で失敗しましたが、保存領域に復元対象と一致するデータが確認されました。\n"+detail+"\n\n保存後の整合性確認・画面更新は完了していません。追加の編集・保存や再復元は行わず、"+(safetyBackupCreated?"復元直前バックアップを保管してから":"復元直前の安全バックアップは作成していません。手元の既存バックアップを確認してから")+"Insightを再読み込みし、表示内容を確認してください。"
+      :restoreWriteCheck==="uncertain"
+      ?"バックアップ復元中にエラーが発生し、現在の保存状態を確認できませんでした。\n"+detail+"\n\n追加の編集・保存や再復元は行わず、"+(safetyBackupCreated?"復元直前バックアップを保管してから":"復元直前の安全バックアップは作成していません。手元の既存バックアップを確認してから")+"Insightを再読み込みし、保存内容を確認してください。"
       :"バックアップを復元できませんでした。\n"+detail+"\n\n現在のデータは変更されていません。");
-  }e.target.value="";};reader.onerror=function(){alert("ファイルを読み込めませんでした。\n現在のデータは変更されていません。");e.target.value="";};reader.readAsText(file);
-};
+  }e.target.value="";}finally{
+    // This private clone is used only by the synchronous rollback above.
+    // After an uncertain/failed rollback, the sticky write hold and the
+    // encrypted safety download remain; recovery requires a manual reload.
+    // Retaining a second plaintext clone here provides no recovery API.
+    password=null;preRestoreMemorySnapshot=null;e.target.value='';
+    try{if(window.InsightBackupPasswordV1)window.InsightBackupPasswordV1.close();}catch(_){markRestoreObservationFault();}
+    readerPhase='finished';
+    finishRestoreObservation(restoreTicket,restoreOutcome);
+    if(restoreFileReaderActive===reader)restoreFileReaderActive=null;
+  }};reader.onerror=function(){
+    markRestoreObservationFault();
+    if(readerPhase!=='pending'||restoreFileReaderActive!==reader)return;
+    readerPhase='finished';restoreFileReaderActive=null;
+    alert("ファイルを読み込めませんでした。\n現在のデータは変更されていません。");e.target.value="";
+  };reader.onabort=function(){
+    markRestoreObservationFault();
+    if(readerPhase!=='pending'||restoreFileReaderActive!==reader)return;
+    readerPhase='finished';restoreFileReaderActive=null;
+  };try{reader.readAsText(file);}catch(readErr){
+    markRestoreObservationFault();
+    if(readerPhase==='pending'&&restoreFileReaderActive===reader){
+      readerPhase='finished';restoreFileReaderActive=null;
+    }
+    throw readErr;
+  }
+}
+if(entrypoints.register({version:1,backup:encryptedBackupData,restore:encryptedRestoreData})!==true)
+  throw new Error("Encrypted backup entry points could not be registered safely");
 })();
