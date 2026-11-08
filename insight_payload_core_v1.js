@@ -1492,21 +1492,88 @@ function closeBudgetModal(){
   document.getElementById("budgetModalBg").classList.remove("show");
 }
 
+
+// STEP4 GATE-3: local, non-authorizing observer for saveBudget() only.
+// This does NOT observe getHaikiBudget's default creation during other render paths.
+const InsightWasteBudgetSaveObserverV0=(function(){
+  let observer=null,fault=false,active=0;
+  function getStatus(){
+    const scope='waste-budget-dialog-save-only';
+    if(fault)return Object.freeze({scope,state:'HELD',activeCount:null,epoch:null});
+    if(!observer)return Object.freeze({scope,state:'UNAVAILABLE',activeCount:null,epoch:null});
+    try{
+      const s=observer.status();
+      if(!s||s.scope!=='registered-operations-only'||
+        !['IDLE_OBSERVED','ACTIVE','HELD'].includes(s.state)||
+        !Number.isSafeInteger(s.activeCount)||s.activeCount<0||
+        !Number.isSafeInteger(s.epoch)||s.epoch<1||s.activeCount<active||
+        (s.state==='IDLE_OBSERVED'&&s.activeCount!==0)||
+        (s.state==='ACTIVE'&&s.activeCount===0)||
+        (active>0&&s.state!=='ACTIVE'&&s.state!=='HELD'))throw new Error('invalid budget status');
+      return Object.freeze({scope,state:s.state,activeCount:s.activeCount,epoch:s.epoch});
+    }catch(_){fault=true;return Object.freeze({scope,state:'HELD',activeCount:null,epoch:null});}
+  }
+  function initialize(){
+    try{
+      const factory=window.InsightOperationObserverV0&&window.InsightOperationObserverV0.createOperationObserver;
+      if(typeof factory!=='function')return;
+      const candidate=factory();
+      if(!candidate||['initialize','begin','end','invalidate','status'].some(name=>typeof candidate[name]!=='function')||
+        candidate.initialize()!==true){fault=true;return;}
+      observer=candidate;
+      const initial=getStatus();
+      if(initial.state!=='IDLE_OBSERVED'||initial.activeCount!==0)fault=true;
+    }catch(_){fault=true;}
+  }
+  // The core payload is parsed before the feature scripts; initialize only after they load.
+  if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',initialize);
+  else initialize();
+  function observe(operation){
+    let ticket=null,registered=false,outcome='unknown';
+    const ref=observer;
+    if(ref&&!fault){
+      try{
+        ticket=ref.begin('waste_budget_save');
+        if(!ticket||typeof ticket!=='object'||active>=Number.MAX_SAFE_INTEGER)fault=true;
+        else{
+          registered=true;active++;
+          if(getStatus().state!=='ACTIVE')fault=true;
+        }
+      }catch(_){fault=true;}
+    }
+    try{
+      const value=operation();
+      outcome='completed';
+      return value;
+    }finally{
+      if(registered){
+        try{if(ref.end(ticket,outcome)!==true)fault=true;}
+        catch(_){fault=true;}
+        active--;
+        if(!fault)getStatus();
+      }
+    }
+  }
+  return Object.freeze({getStatus,observe});
+})();
+
 function saveBudget(){
-  const budget=getHaikiBudget();
-  HAIKI_CATS.forEach(c=>{
-    const el=document.getElementById(`be_${c}`);
-    budget.cats[c]=el?fromComma(el.value):0;
+  return InsightWasteBudgetSaveObserverV0.observe(()=>{
+    const budget=getHaikiBudget();
+    HAIKI_CATS.forEach(c=>{
+      const el=document.getElementById(`be_${c}`);
+      budget.cats[c]=el?fromComma(el.value):0;
+    });
+    const tot=document.getElementById("be_total");
+    budget.total=tot?fromComma(tot.value):0;
+    store.haikibudget=budget;
+    persist();
+    closeBudgetModal();
+    // フォームを再描画して予算セクションを更新
+    const fy=editYear.haiki;
+    const mi=MONTHS.indexOf(editMonth.haiki);
+    if(window.haikiSelDay)renderHaikiForm(fy,mi,window.haikiSelDay);
   });
-  const tot=document.getElementById("be_total");
-  budget.total=tot?fromComma(tot.value):0;
-  store.haikibudget=budget;
-  persist();
-  closeBudgetModal();
-  // フォームを再描画して予算セクションを更新
-  const fy=editYear.haiki;
-  const mi=MONTHS.indexOf(editMonth.haiki);
-  if(window.haikiSelDay)renderHaikiForm(fy,mi,window.haikiSelDay);
 }
 
 /* ══ 日本祝日計算 ══ */
@@ -2289,6 +2356,73 @@ function clearDayData(type){
   updateMissingBadge();
   showToast(`🗑 ${m}${day}日のデータをクリアしました`,"danger");
 }
+
+
+/* STEP4 GATE-3: local observer of confirmed month-level customer data clearing only.
+   It does not observe confirmation, cancel, missing-data, or other writers. */
+const InsightKyakuMonthClearObserverV0=(function(){
+  let observer=null,fault=false,active=0;
+  const scope='kyaku-month-confirmed-clear-only';
+  function getStatus(){
+    if(fault)return Object.freeze({scope,state:'HELD',activeCount:null,epoch:null});
+    if(!observer)return Object.freeze({scope,state:'UNAVAILABLE',activeCount:null,epoch:null});
+    try{
+      const s=observer.status();
+      if(!s||s.scope!=='registered-operations-only'||
+        !['IDLE_OBSERVED','ACTIVE','HELD'].includes(s.state)||
+        !Number.isSafeInteger(s.activeCount)||s.activeCount<0||
+        !Number.isSafeInteger(s.epoch)||s.epoch<1||
+        s.activeCount<active||
+        (s.state==='IDLE_OBSERVED'&&s.activeCount!==0)||
+        (s.state==='ACTIVE'&&s.activeCount===0)||
+        (active>0&&s.state!=='ACTIVE'&&s.state!=='HELD'))throw new Error('invalid kyaku month clear status');
+      return Object.freeze({scope,state:s.state,activeCount:s.activeCount,epoch:s.epoch});
+    }catch(_){fault=true;return Object.freeze({scope,state:'HELD',activeCount:null,epoch:null});}
+  }
+  function initialize(){
+    try{
+      const factory=window.InsightOperationObserverV0&&window.InsightOperationObserverV0.createOperationObserver;
+      if(typeof factory!=='function')return;
+      const candidate=factory();
+      if(!candidate||['initialize','begin','end','invalidate','status'].some(k=>typeof candidate[k]!=='function')||
+         candidate.initialize()!==true){fault=true;return;}
+      observer=candidate;
+      const initial=getStatus();
+      if(initial.state!=='IDLE_OBSERVED'||initial.activeCount!==0)fault=true;
+    }catch(_){fault=true;}
+  }
+  // Core payload is loaded before the feature scripts; initialize after they finish.
+  if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',initialize);
+  else initialize();
+  function observe(action){
+    const ref=observer;
+    let token=null,registered=false,outcome='unknown';
+    if(ref&&!fault){
+      try{
+        token=ref.begin('kyaku_month_clear');
+        if(!token||typeof token!=='object'||active>=Number.MAX_SAFE_INTEGER)fault=true;
+        else{
+          registered=true;
+          active++;
+          if(getStatus().state!=='ACTIVE')fault=true;
+        }
+      }catch(_){fault=true;}
+    }
+    try{
+      const result=action();
+      outcome='completed';
+      return result;
+    }finally{
+      if(registered){
+        try{if(ref.end(token,outcome)!==true)fault=true;}
+        catch(_){fault=true;}
+        active--;
+        if(!fault)getStatus();
+      }
+    }
+  }
+  return Object.freeze({getStatus,observe});
+})();
 
 function clearKyakuMonth(){
   const y=editYear.kyaku,m=editMonth.kyaku;
