@@ -25,9 +25,9 @@ test('Index shellはinline script/styleを持たず外部assetへ分離する',(
   const boot=read('insight_shell_boot_v1.js');
   const loader=read('insight_shell_loader_v1.js');
   const css=read('insight_shell_v1.css');
-  assert.match(index,/insight_shell_boot_v1\.js\?v=20261108-optional-backup-build-103/);
-  assert.match(index,/insight_shell_loader_v1\.js\?v=20261108-optional-backup-loader-1/);
-  assert.match(index,/insight_shell_v1\.css\?v=20261108-optional-backup-build-103/);
+  assert.match(index,/insight_shell_boot_v1\.js\?v=20261108-optional-backup-build-104/);
+  assert.match(index,/insight_shell_loader_v1\.js\?v=20261108-optional-backup-loader-2/);
+  assert.match(index,/insight_shell_v1\.css\?v=20261108-optional-backup-build-104/);
   assert.doesNotMatch(index,/<script(?![^>]*\bsrc=)[^>]*>/i);
   assert.doesNotMatch(index,/<style\b/i);
   assert.doesNotMatch(index,/script-src[^;]*'unsafe-inline'/);
@@ -37,7 +37,7 @@ test('Index shellはinline script/styleを持たず外部assetへ分離する',(
   assert.match(boot,/fetch\('\.\/Index\.html\?insight_probe='/);
   assert.match(loader,/fetch\('\.\/insight_shell_loader_v1\.js\?insight_manifest_probe='/);
   assert.match(loader,/document\.open\(\);document\.write\(html\);document\.close\(\)/);
-  assert.match(loader,/fetch\('\.\/insight_payload_source_v1\.html\?v=20261108-gate3-integration-payload-1'/);
+  assert.match(loader,/fetch\('\.\/insight_payload_source_v1\.html\?v=20261108-optional-safety-payload-2'/);
   assert.doesNotMatch(index+loader,/pako|insight_payload_v1_part0/);
   assert.match(css,/#loading\{/);
 });
@@ -49,7 +49,7 @@ test('canonical payloadはinline script/styleを持たず外部assetを順序固
   const aiPresentation=read('insight_ai_presentation_v1.js');
   const readability=read('insight_readability_v1.js');
   const css=read('insight_payload_core_v1.css');
-  assert.match(payload,/insight_payload_core_v1\.css\?v=20261022-quick-weather-fixed-1/);
+  assert.match(payload,/insight_payload_core_v1\.css\?v=20261108-optional-safety-style-2/);
   assert.match(payload,/insight_payload_core_v1\.js\?v=20261108-recovery-warning-1/);
   assert.doesNotMatch(core,/label\.style\.color/);
   assert.doesNotMatch(core,/msg\.style\.display/);
@@ -186,8 +186,8 @@ test('canonical payloadはinline script/styleを持たず外部assetを順序固
 
 test('トップページはキャッシュ抑止とシェル・機能manifestの自己更新を持つ',()=>{
   const index=readShell();
-  assert.match(index,/insight-shell-version" content="20261108-optional-backup-build-103/);
-  assert.match(index,/var BUILD="20261108-optional-backup-build-103"/);
+  assert.match(index,/insight-shell-version" content="20261108-optional-backup-build-104/);
+  assert.match(index,/var BUILD="20261108-optional-backup-build-104"/);
   assert.match(index,/Shell rule: bump BUILD whenever the loader/);
   assert.match(index,/Cache-Control" content="no-cache, no-store, must-revalidate/);
   assert.match(index,/insight_probe=/);
@@ -568,12 +568,12 @@ test('設定ページはサイドバー下部の管理項目を集約する',()=
   const index=readShell();
   const settings=fs.readFileSync(path.join(root,'insight_settings_v1.js'),'utf8');
   const css=read('insight_payload_core_v1.css');
-  assert.match(index,/insight_settings_v1\.js\?v=20261108-optional-safety-ui-1/);
+  assert.match(index,/insight_settings_v1\.js\?v=20261108-optional-safety-ui-2/);
   assert.ok(index.indexOf('insight_data_health_v1.js')<index.indexOf('insight_settings_v1.js'));
   assert.match(settings,/nav\.id='navSettings'/);
   assert.match(settings,/page\.id='pageSettings'/);
   assert.match(settings,/insightSettingsDataActions/);
-  assert.match(settings,/append\(backup,restore,health,csv,restoreFile,csvFile\)/);
+  assert.match(settings,/append\(backup,restore,restoreSafety,health,csv,restoreFile,csvFile\)/);
   assert.doesNotMatch(settings,/insightSettingsDisplayActions/);
   assert.match(settings,/themeBridge\.append\(dark\)/);
   assert.match(settings,/dark\.classList\.add\('insight-settings-legacy-hidden'\)/);

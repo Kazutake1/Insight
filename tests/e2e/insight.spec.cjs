@@ -359,10 +359,10 @@ test('トップページは外部shellと機能manifestの最新版確認をno-s
     fetch('/insight_payload_source_v1.html?e2e-shell-check=1',{cache:'no-store'}).then(r=>r.text())
   ]));
   const [source,boot,loader,payload]=sources;
-  expect(source).toContain('name="insight-shell-version" content="20261108-optional-backup-build-103"');
-  expect(source).toContain('insight_shell_boot_v1.js?v=20261108-optional-backup-build-103');
-  expect(source).toContain('insight_shell_loader_v1.js?v=20261108-optional-backup-loader-1');
-  expect(source).toContain('insight_shell_v1.css?v=20261108-optional-backup-build-103');
+  expect(source).toContain('name="insight-shell-version" content="20261108-optional-backup-build-104"');
+  expect(source).toContain('insight_shell_boot_v1.js?v=20261108-optional-backup-build-104');
+  expect(source).toContain('insight_shell_loader_v1.js?v=20261108-optional-backup-loader-2');
+  expect(source).toContain('insight_shell_v1.css?v=20261108-optional-backup-build-104');
   expect(source).not.toMatch(/<script(?![^>]*\bsrc=)[^>]*>/i);
   expect(source).not.toMatch(/<style\b/i);
   expect(source).not.toMatch(/script-src[^;]*'unsafe-inline'/);
@@ -371,7 +371,7 @@ test('トップページは外部shellと機能manifestの最新版確認をno-s
   expect(source).not.toMatch(/style-src[^;]*'unsafe-inline'/);
   expect(boot).toContain("fetch('./Index.html?insight_probe='+Date.now(),{cache:'no-store'})");
   expect(loader).toContain("fetch('./insight_shell_loader_v1.js?insight_manifest_probe='+Date.now(),{cache:'no-store'})");
-  expect(loader).toContain("fetch('./insight_payload_source_v1.html?v=20261108-gate3-integration-payload-1',{cache:'no-store'})");
+  expect(loader).toContain("fetch('./insight_payload_source_v1.html?v=20261108-optional-safety-payload-2',{cache:'no-store'})");
   expect(loader).toContain('function featureSignature(entries)');
   expect(source).toContain('https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js');
   expect(source).toContain('integrity="sha512-CQBWl4fJHWbryGE+Pc7UAxWMUMNMWzWxF4SQo9CgkJIN1kx6djDQZjh3Y8SZ1d+6I+1zze6Z7kHXO7q3UyZAWw=="');
@@ -1031,6 +1031,7 @@ test('通常バックアップはメタ情報を含み復元前に内容と検�
 test('復元確定時は上書き前のデータを自動ダウンロードして設定ページを維持する',async({page})=>{
   const errors=await openInsight(page);
   await page.locator('#navSettings').click();
+  await page.locator('.insight-restore-safety-switch-track').click();
   await expect(page.locator('#pageSettings')).toHaveClass(/show/);
 
   const manualDownloadPromise=page.waitForEvent('download');
@@ -1066,6 +1067,7 @@ test('復元確定時は上書き前のデータを自動ダウンロードし�
 test('復元保存・整合性検証の完了後に画面更新が失敗しても保存済みと案内する',async({page})=>{
   const errors=await openInsight(page);
   await page.locator('#navSettings').click();
+  await page.locator('.insight-restore-safety-switch-track').click();
   const downloadPromise=page.waitForEvent('download');
   await page.locator('#backupBtn').click();
   const backup=await downloadPromise,restorePath=await backup.path();
@@ -1104,6 +1106,7 @@ test('復元保存・整合性検証の完了後に画面更新が失敗して�
 test('復元前の保存競合では容量不足と誤表示せず元データを保持する',async({page})=>{
   const errors=await openInsight(page);
   await page.locator('#navSettings').click();
+  await page.locator('.insight-restore-safety-switch-track').click();
   const downloadPromise=page.waitForEvent('download');
   await page.locator('#backupBtn').click();
   const backup=await downloadPromise,restorePath=await backup.path();
@@ -1137,6 +1140,7 @@ test('復元前の保存競合では容量不足と誤表示せず元データ�
 test('復元後検査で異常を検出した場合は復元前データへ自動で戻す',async({page})=>{
   const errors=await openInsight(page);
   await page.locator('#navSettings').click();
+  await page.locator('.insight-restore-safety-switch-track').click();
 
   const backupDownloadPromise=page.waitForEvent('download');
   await page.locator('#backupBtn').click();

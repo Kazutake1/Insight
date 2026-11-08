@@ -39,6 +39,10 @@ async function confirmSaved(page){
   await expect(page.getByRole('button',{name:'保存したファイルを確認した',exact:true})).toBeVisible();
   await page.getByRole('button',{name:'保存したファイルを確認した',exact:true}).click();
 }
+async function enableSafetyBackup(page){
+  if(!await page.locator('#insightRestoreSafetyBackup').isChecked())await page.locator('.insight-restore-safety-switch-track').click();
+  await expect(page.locator('#insightRestoreSafetyBackup')).toBeChecked();
+}
 async function downloaded(event){return JSON.parse(fs.readFileSync(await event.path(),'utf8'));}
 test('FICTIONAL real modal: centered light/dark spacing, mismatch, encrypted two-store download',async({page})=>{
   await setup(page);
@@ -74,7 +78,7 @@ test('FICTIONAL real modal: centered light/dark spacing, mismatch, encrypted two
 
 for(const mode of ['unavailable','safety-failure']){
   test('FICTIONAL '+mode+' stops legacy restore before any snapshot write or plaintext download',async({page})=>{
-    await setup(page);const raw=await page.evaluate(()=>localStorage.getItem('insight_v11'));
+    await setup(page);await enableSafetyBackup(page);const raw=await page.evaluate(()=>localStorage.getItem('insight_v11'));
     const downloads=[];page.on('download',event=>downloads.push(event));
     await page.evaluate(mode=>{
       if(mode==='unavailable')InsightBackupCryptoV1=undefined;
@@ -90,7 +94,7 @@ for(const mode of ['unavailable','safety-failure']){
 }
 for(const initialized of [false,true]){
   test('FICTIONAL backup rejection preserves '+(initialized?'idle':'unavailable')+' restore observation and permits later restore',async({page})=>{
-    await setup(page);
+    await setup(page);await enableSafetyBackup(page);
     if(initialized){
       const raw=await page.evaluate(()=>localStorage.getItem('insight_v11'));
       const initialDownload=page.waitForEvent('download');
@@ -125,7 +129,7 @@ for(const initialized of [false,true]){
   });
 }
 test('FICTIONAL encrypted restore uses a separately entered safety password and persists across reload',async({page})=>{
-  await setup(page);
+  await setup(page);await enableSafetyBackup(page);
   const original=await page.evaluate(()=>JSON.parse(JSON.stringify(allStores)));
   const file=await page.evaluate(async PASSWORD=>{
     const target=JSON.parse(JSON.stringify(allStores));for(const st of Object.values(target.stores))st.data[st.years.at(-1)]['1月'][0].売上=789;
@@ -144,8 +148,9 @@ test('FICTIONAL encrypted restore uses a separately entered safety password and 
   await page.reload();await page.waitForFunction(()=>window.InsightStorage);
   expect(await page.evaluate(()=>Object.values(InsightStorage.readSnapshot().stores).map(st=>st.data[st.years.at(-1)]['1月'][0].売上))).toEqual([789,789]);
 });
-test('FICTIONAL cancel/wrong password/tamper/unknown encryption never changes current bytes',async({page})=>{
-  await setup(page);
+for(const safetyBackup of [false,true]){
+test('FICTIONAL safety '+(safetyBackup?'ON':'OFF')+' cancel/wrong password/tamper/unknown encryption never changes current bytes',async({page})=>{
+  await setup(page);if(safetyBackup)await enableSafetyBackup(page);
   const raw=await page.evaluate(()=>localStorage.getItem('insight_v11'));
   const file=await page.evaluate(PASSWORD=>InsightBackupCryptoV1.encrypt(JSON.parse(JSON.stringify(allStores)),PASSWORD),PASSWORD);
   for(const mode of ['cancel','wrong','tamper','version']){
@@ -159,8 +164,9 @@ test('FICTIONAL cancel/wrong password/tamper/unknown encryption never changes cu
     expect(await page.evaluate(()=>localStorage.getItem('insight_v11'))).toBe(raw);
   }
 });
+}
 test('FICTIONAL legacy plaintext imports but safety encryption cancellation preserves bytes',async({page})=>{
-  await setup(page);const raw=await page.evaluate(()=>localStorage.getItem('insight_v11'));
+  await setup(page);await enableSafetyBackup(page);const raw=await page.evaluate(()=>localStorage.getItem('insight_v11'));
   await upload(page,JSON.parse(raw));
   await expect(page.locator('#insightBackupTitle')).toContainText('復元直前');
   await page.getByRole('button',{name:'キャンセル',exact:true}).click();
@@ -188,7 +194,7 @@ test('FICTIONAL maximum 15MiB plaintext produces a restorable envelope above old
 });
 
 test('FICTIONAL pre-v10 single-store JSON remains importable with encrypted safety backup',async({page})=>{
-  await setup(page);
+  await setup(page);await enableSafetyBackup(page);
   const legacy=await page.evaluate(()=>{
     const st=JSON.parse(JSON.stringify(allStores.stores[allStores.current]));
     st.data[st.years.at(-1)]['1月'][0].売上=654;
@@ -229,6 +235,7 @@ async function beginConfirmedDownload(page,kind,raw){
   const event=page.waitForEvent('download');
   if(kind==='normal'){await page.locator('#backupBtn').click();await password(page,PASSWORD);}
   else{
+    await enableSafetyBackup(page);
     const target=JSON.parse(raw);for(const st of Object.values(target.stores))st.data[st.years.at(-1)]['1月'][0].売上=852;
     await upload(page,target);await password(page,SAFETY);
   }
@@ -296,4 +303,117 @@ for(const kind of ['normal','preRestore']){
       expect(await page.evaluate(()=>__backupAlerts.join(' '))).toMatch(/別のバックアップ処理|処理中にデータが変更/);
     });
   }
+}
+
+// Real browser/modal coverage of the new initial-OFF path. These cases must
+// never inherit enableSafetyBackup() from the legacy safety-download tests.
+for(const encrypted of [false,true]){
+  test('FICTIONAL initial safety OFF restores '+(encrypted?'encrypted':'legacy')+' two-store file without extra password or download',async({page})=>{
+    await setup(page);
+    await expect(page.locator('#insightRestoreSafetyBackup')).not.toBeChecked();
+    const target=await page.evaluate(()=>{
+      const data=JSON.parse(JSON.stringify(allStores));
+      for(const st of Object.values(data.stores))st.data[st.years.at(-1)]['1月'][0].売上=741;
+      return data;
+    });
+    const file=encrypted?await page.evaluate(({target,PASSWORD})=>InsightBackupCryptoV1.encrypt(target,PASSWORD),{target,PASSWORD}):target;
+    const downloads=[],dialogs=[];page.on('download',d=>downloads.push(d));
+    page.removeAllListeners('dialog');
+    page.on('dialog',async d=>{dialogs.push({type:d.type(),message:d.message()});await d.accept();});
+    await upload(page,file);
+    if(encrypted)await password(page,PASSWORD,false);
+    await page.waitForFunction(()=>document.getElementById('restoreFile').value==='');
+    expect(await page.evaluate(()=>InsightStorage.readSnapshot())).toEqual(target);
+    expect(dialogs).toHaveLength(1);
+    expect(dialogs[0].type).toBe('confirm');
+    expect(dialogs[0].message).toContain('現在の全データは上書きされます');
+    expect(dialogs[0].message).toContain('安全バックアップは作成しません');
+    expect(downloads).toHaveLength(0);
+    await expect(page.locator('#insightBackupOverlay')).toHaveCount(0);
+    expect(await page.evaluate(()=>localStorage.getItem('insight_backup_download_v1'))).toBeNull();
+    expect(await page.evaluate(()=>InsightStorage.snapshotWritesHeld())).toBe(false);
+    await page.reload();await page.waitForFunction(()=>window.InsightReportPreview);
+    expect(await page.evaluate(()=>InsightStorage.readSnapshot())).toEqual(target);
+    await expect(page.locator('#insightRestoreSafetyBackup')).not.toBeChecked();
+  });
+}
+
+test('FICTIONAL optional safety switch stays independent of theme with light/dark spacing and resets after reload',async({page})=>{
+  await setup(page);
+  const safety=page.locator('#insightRestoreSafetyBackup');
+  const theme=page.locator('.insight-theme-switch-track');
+  await expect(theme).toHaveCount(1);
+  for(const dark of [false,true]){
+    await page.evaluate(dark=>{document.documentElement.classList.toggle('dark',dark);document.body.classList.toggle('dark',dark);},dark);
+    await expect(page.locator('#insightThemeToggle')).toBeChecked({checked:dark});
+    await page.locator('.insight-restore-safety-switch-track').click();
+    await expect(safety).toBeChecked({checked:!dark});
+    await expect(page.locator('#insightThemeToggle')).toBeChecked({checked:dark});
+    const row=await safety.locator('xpath=../..').boundingBox();
+    const restore=await page.locator('#restoreBtn').boundingBox();
+    const health=await page.locator('#insightDataHealthButton').boundingBox();
+    expect(row.y).toBeGreaterThanOrEqual(restore.y+restore.height);
+    expect(health.y).toBeGreaterThanOrEqual(row.y+row.height);
+    const track=await page.locator('.insight-restore-safety-switch-track').evaluate(n=>({width:n.getBoundingClientRect().width,bg:getComputedStyle(n).backgroundColor}));
+    expect(track.width).toBeGreaterThan(30);expect(track.bg).not.toBe('rgba(0, 0, 0, 0)');
+  }
+  await enableSafetyBackup(page);
+  await theme.click();await expect(safety).toBeChecked();
+  await page.reload();await page.waitForFunction(()=>window.InsightReportPreview);
+  await expect(safety).not.toBeChecked();
+});
+
+for(const mode of ['cancel','invalid','quota','rollback','rollback-failure','postcommit','uncertain']){
+  test('FICTIONAL initial safety OFF '+mode+' preserves recovery and accurate no-file warning',async({page})=>{
+    await setup(page);await expect(page.locator('#insightRestoreSafetyBackup')).not.toBeChecked();
+    const raw=await page.evaluate(()=>localStorage.getItem('insight_v11'));
+    const target=JSON.parse(raw);for(const st of Object.values(target.stores))st.data[st.years.at(-1)]['1月'][0].売上=852;
+    const downloads=[];page.on('download',d=>downloads.push(d));
+    if(mode==='cancel'){
+      page.removeAllListeners('dialog');page.on('dialog',d=>d.dismiss());
+    }
+    await page.evaluate(mode=>{
+      const write=InsightStorage.writeSnapshot,read=InsightStorage.readSnapshot;
+      window.__optionalWrites=0;
+      InsightStorage.writeSnapshot=function(...args){
+        __optionalWrites++;
+        if(mode==='quota')throw new DOMException('FICTIONAL quota','QuotaExceededError');
+        if(mode==='rollback-failure'&&__optionalWrites===2)throw Error('FICTIONAL rollback failed');
+        const result=write.apply(this,args);
+        if(mode==='postcommit'||mode==='uncertain')throw Error('FICTIONAL postcommit failure');
+        return result;
+      };
+      InsightStorage.readSnapshot=function(...args){
+        if(mode==='uncertain'&&__optionalWrites)throw Error('FICTIONAL unreadable storage');
+        const data=read.apply(this,args);
+        if((mode==='rollback'||mode==='rollback-failure')&&__optionalWrites===1)data.current='FICTIONAL-invalid';
+        return data;
+      };
+    },mode);
+    await upload(page,mode==='invalid'?{stores:{},current:'missing'}:target);
+    await page.waitForFunction(()=>document.getElementById('restoreFile').value==='');
+    expect(downloads).toHaveLength(0);
+    await expect(page.locator('#insightBackupOverlay')).toHaveCount(0);
+    const state=await page.evaluate(()=>({raw:localStorage.getItem('insight_v11'),alerts:__backupAlerts.join(' '),held:InsightStorage.snapshotWritesHeld()}));
+    if(['cancel','invalid','quota','rollback'].includes(mode))expect(state.raw).toBe(raw);
+    const held=['rollback-failure','postcommit','uncertain'].includes(mode);
+    expect(state.held).toBe(held);
+    if(['rollback','rollback-failure','postcommit','uncertain'].includes(mode)){
+      expect(state.alerts).toContain('安全バックアップは作成していません');
+      expect(state.alerts).not.toMatch(/Insight_pre_restore_.*保管|ダウンロード処理は開始済み|復元直前バックアップを保管してから/);
+    }
+    if(mode==='quota')expect(state.alerts).toContain('保存容量が不足');
+    if(mode==='rollback')expect(state.alerts).toContain('自動で戻しました');
+    if(mode==='rollback-failure')expect(state.alerts).toContain('自動復旧にも失敗');
+    if(mode==='postcommit')expect(state.alerts).toContain('保存領域に復元対象と一致');
+    if(mode==='uncertain')expect(state.alerts).toContain('現在の保存状態を確認できません');
+    if(held){
+      const blocked=await page.evaluate(()=>{
+        const before=localStorage.getItem('insight_v11');let error='';
+        try{InsightStorage.persistCurrent(allStores);}catch(e){error=e.name;}
+        return {error,unchanged:before===localStorage.getItem('insight_v11')};
+      });
+      expect(blocked).toEqual({error:'InsightStorageRestoreHoldError',unchanged:true});
+    }
+  });
 }

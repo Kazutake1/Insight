@@ -52,7 +52,7 @@
     main.appendChild(page);
     var restoreSafety=doc.createElement('label');
     restoreSafety.className='insight-theme-toggle';
-    restoreSafety.innerHTML='<span>復元直前の安全バックアップを保存する（任意）</span><span class="insight-theme-switch"><input id="insightRestoreSafetyBackup" type="checkbox" role="switch"><span class="insight-theme-switch-track"></span></span>';
+    restoreSafety.innerHTML='<span>復元直前の安全バックアップを保存する（任意）</span><span class="insight-theme-switch"><input id="insightRestoreSafetyBackup" type="checkbox" role="switch"><span class="insight-restore-safety-switch-track"></span></span>';
     // Always start unchecked; never persist this optional choice across visits.
     restoreSafety.querySelector('#insightRestoreSafetyBackup').checked=false;
     page.querySelector('#insightSettingsDataActions').append(backup,restore,restoreSafety,health,csv,restoreFile,csvFile);
