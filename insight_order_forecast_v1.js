@@ -157,18 +157,86 @@
       return {kind:kind,name:name?name.trim():'名称未登録'};
     });
   }
-  var model={addDays:addDays,today:today,deliveryLeadDays:deliveryLeadDays,defaultDelivery:defaultDelivery,dates:dates,hasRecord:hasRecord,collect:collect,resolveLocation:resolveLocation,parseForecast:parseForecast,createClient:createClient,weatherDayTone:weatherDayTone,weatherIconKind:weatherIconKind,displayWeatherDays:displayWeatherDays,savedWeatherDay:savedWeatherDay,eventItems:eventItems};
+  function buildCapture(storeId,categoryId,delivery,issued,forecast,history,mask){
+    if(!storeId||!categoryId||!isoDate(delivery)||delivery<=today(new Date(issued)))throw new Error('未来の納品日を選択してください。');
+    var day=forecast&&forecast.days.find(function(item){return item.date===delivery;});
+    if(!day||!day.weatherCode||!Number.isFinite(forecast.fetchedAt)||forecast.fetchedAt>issued||
+       !Number.isFinite(Date.parse(forecast.reportDatetime))||Date.parse(forecast.reportDatetime)>forecast.fetchedAt)
+      throw new Error('対象日の天気予報を更新してください。');
+    var trips=mask.map(function(active,i){
+      return {trip:i+1,active:active,average:active===true?history.trips[i]:null,
+        sampleDays:active===true?history.tripDays[i]:0};
+    }).filter(function(trip){return trip.active===true;});
+    if(!trips.length)throw new Error('記録できる対象便がありません。');
+    return {version:1,storeId:storeId,categoryId:categoryId,delivery:delivery,issuedAt:new Date(issued).toISOString(),
+      baseline:'same-weekday-six-weeks',trips:trips,weather:{source:'JMA',reportAt:forecast.reportDatetime,
+        fetchedAt:new Date(forecast.fetchedAt).toISOString(),location:forecast.location,
+        temperatureLocation:forecast.temperatureLocation,code:day.weatherCode,max:day.max,min:day.min,pop:day.pop}};
+  }
+  function saveCapture(storage,capture){
+    return new Promise(function(resolve,reject){
+      var open=storage.open('insight-forecast-pilot-v1',1);
+      open.onupgradeneeded=function(){open.result.createObjectStore('captures');};
+      open.onerror=function(){reject(open.error);};
+      open.onblocked=function(){reject(new Error('記録用データベースを開けません。'));};
+      open.onsuccess=function(){
+        var db=open.result,tx;
+        try{tx=db.transaction('captures','readwrite');}catch(e){db.close();reject(e);return;}
+        var records=tx.objectStore('captures'),scope=records.get('scope'),result='saved';
+        tx.oncomplete=function(){db.close();resolve(result);};
+        tx.onabort=function(){db.close();reject(tx.error||new Error('記録を保存できません。'));};
+        scope.onsuccess=function(){
+          var locked=scope.result;
+          if(locked&&(locked.storeId!==capture.storeId||locked.categoryId!==capture.categoryId)){result='scope';return;}
+          var existing=records.get(capture.delivery);
+          existing.onsuccess=function(){
+            if(existing.result){result='duplicate';return;}
+            if(!locked)records.add({storeId:capture.storeId,categoryId:capture.categoryId},'scope');
+            records.add(capture,capture.delivery);
+          };
+        };
+      };
+    });
+  }
+  var model={buildCapture:buildCapture,saveCapture:saveCapture,addDays:addDays,today:today,deliveryLeadDays:deliveryLeadDays,defaultDelivery:defaultDelivery,dates:dates,hasRecord:hasRecord,collect:collect,resolveLocation:resolveLocation,parseForecast:parseForecast,createClient:createClient,weatherDayTone:weatherDayTone,weatherIconKind:weatherIconKind,displayWeatherDays:displayWeatherDays,savedWeatherDay:savedWeatherDay,eventItems:eventItems};
   if(typeof module!=='undefined'&&module.exports)module.exports=model;
   root.InsightOrderForecast=model;if(!root.document)return;
   function init(){
     if(root.__insightOrderForecastV1)return;
     var sales=root.InsightSalesCount,doc=root.document;if(!sales||!sales.createReadOnlyDayCard||!root.InsightTripHistoryResolver||!doc.getElementById('navSaleResults')){setTimeout(init,20);return;}root.__insightOrderForecastV1=true;
-    var state={storeId:allStores.current,delivery:defaultDelivery(),categoryId:null},autoDelivery=true,forecast=null,error='',loading=false,request=0,client=createClient(root.fetch.bind(root));
+    var state={storeId:allStores.current,delivery:defaultDelivery(),categoryId:null},autoDelivery=true,forecast=null,forecastLocation=null,error='',loading=false,request=0,client=createClient(root.fetch.bind(root));
     function el(tag,text,cls){var node=doc.createElement(tag);if(text!==undefined)node.textContent=text;if(cls)node.className=cls;return node;}
     var link=el('link');link.rel='stylesheet';link.href='./insight_order_forecast_v1.css?v=20261021-history-restore-1';doc.head.append(link);
     var nav=el('button',undefined,'nav-btn');nav.id='navOrderForecast';nav.type='button';nav.innerHTML='<svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M3 4h18v16H3zM3 9h18M8 4v16"/></svg><span>発注予測</span>';nav.onclick=function(){root.gotoNav('orderForecast');};var navList=doc.querySelector('#sidebar .nav-list'),divider=el('div',undefined,'of-nav-divider');divider.setAttribute('role','separator');navList.append(divider,nav);
     var analysisNav=doc.getElementById('aiAnalysisToggle');if(analysisNav)nav.insertAdjacentElement('afterend',analysisNav);
     var page=el('div',undefined,'page of-page');page.id='pageOrderForecast';page.innerHTML='<div class="page-header"><div class="page-title">発注予測</div></div><div class="of-toolbar"><label>納品日 <input id="ofDelivery" type="date" min="1900-01-01" max="9998-12-31"></label><label>カテゴリー <select id="ofCategory"></select></label></div><section class="of-section"><div class="of-heading"><h2>天気予報 <details class="of-source-info"><summary aria-label="天気予報の出典を確認" title="出典を確認">ⓘ</summary><div class="of-source-description"><a href="https://www.jma.go.jp/bosai/forecast/" target="_blank" rel="noopener noreferrer">出典：気象庁ホームページ（天気予報データを加工して表示）</a></div></details></h2><button id="ofRefresh" type="button">更新</button></div><div id="ofWeatherStatus" role="status" class="of-meta"></div><div id="ofWeather" class="of-grid"></div></section><section class="of-section"><h2>前年同時期7日間</h2><div id="ofPreviousYear" class="of-meta"></div><div id="ofYearCards" class="of-grid"></div></section><section class="of-section"><h2>過去6週間の同曜日実績</h2><div id="ofWeekCards" class="of-grid"></div></section><section class="of-section"><h2>納品日前7日間の実績</h2><div id="ofRecentCards" class="of-grid"></div><div id="ofRecentEmpty" class="of-meta"></div></section>';doc.getElementById('main').append(page);
+    var captureSection=el('section',undefined,'of-section'),captureHeading=el('div',undefined,'of-heading');
+    var captureButton=el('button','この納品日の比較用記録を保存'),captureStatus=el('div',undefined,'of-meta');
+    captureButton.type='button';captureStatus.setAttribute('role','status');
+    captureHeading.append(el('h2','予測検証用の記録'),captureButton);
+    captureSection.append(captureHeading,el('div','初回の店舗・カテゴリーに固定し、納品日ごとの初回値をこのブラウザーに記録します。','of-meta'),captureStatus);
+    doc.getElementById('ofRecentCards').parentNode.after(captureSection);
+    captureButton.onclick=async function(){
+      captureButton.disabled=true;captureStatus.textContent='';
+      try{
+        var issued=Date.now(),delivery=state.delivery,storage=root.InsightStorage;
+        if(autoDelivery&&delivery!==defaultDelivery(new Date(issued)))throw new Error('納品日を表示し直してください。');
+        var snapshot=storage.readSnapshot(),store=snapshot&&snapshot.stores[state.storeId];
+        var available=snapshot&&snapshot.salesCountManagement&&snapshot.salesCountManagement.categories||[];
+        var category=available.find(function(item){return item.id===state.categoryId&&!item.hidden;});
+        if(!store||!category)throw new Error('保存済みの店舗・カテゴリーを選択してください。');
+        if(loading||error||!forecast||forecastLocation!==JSON.stringify(store.weatherLocation||null))
+          throw new Error('対象店舗の天気予報を更新してください。');
+        var resolver=root.InsightTripHistoryResolver;
+        var data=collect(store.salesCounts,category,delivery,sales,weatherStartDate(),
+          {snapshot:snapshot,storeId:state.storeId,resolver:resolver,today:today(new Date(issued))});
+        var target=resolver.resolveDate(snapshot,state.storeId,category.id,delivery,{today:today(new Date(issued))});
+        var result=await saveCapture(root.indexedDB,buildCapture(state.storeId,category.id,delivery,issued,forecast,data.salesAverage,target.mask));
+        captureStatus.textContent=result==='scope'?'最初に記録した店舗・カテゴリーを選択してください。':
+          result==='duplicate'?'この納品日の初回記録が保存済みです。':'比較用の記録を保存しました。';
+      }catch(e){captureStatus.textContent=e&&e.message||'記録を保存できませんでした。';}
+      finally{captureButton.disabled=false;}
+    };
     var eventDialog=el('dialog',undefined,'of-event-dialog');eventDialog.id='ofEventDialog';
     var eventHead=el('div',undefined,'of-event-dialog-head'),eventTitle=el('h2',undefined),closeEvent=el('button','閉じる','of-event-dialog-close');
     eventTitle.id='ofEventDialogTitle';eventDialog.setAttribute('aria-labelledby',eventTitle.id);
@@ -213,7 +281,7 @@
     function weatherStartDate(){return forecast&&Array.isArray(forecast.days)&&forecast.days.length&&isoDate(forecast.days[0].date)?addDays(forecast.days[0].date,deliveryLeadDays()-3):addDays(today(),deliveryLeadDays()-3);}
     function render(){if(autoDelivery)state.delivery=defaultDelivery();if(!dataStore())state.storeId=allStores.current;var available=categories(),category=available.find(function(c){return c.id===state.categoryId;})||available[0];state.categoryId=category&&category.id||null;var catSelect=doc.getElementById('ofCategory');catSelect.replaceChildren();available.forEach(function(c){var option=el('option',c.name);option.value=c.id;catSelect.append(option);});catSelect.value=state.categoryId||'';doc.getElementById('ofDelivery').value=state.delivery;doc.getElementById('ofPreviousYear').textContent='基準日 '+addDays(state.delivery,-364)+'（52週間前）';['ofYearCards','ofWeekCards','ofRecentCards'].forEach(function(id){doc.getElementById(id).replaceChildren();});if(category){var data=collect(dataStore().salesCounts,category,state.delivery,sales,weatherStartDate(),
         {snapshot:allStores,storeId:state.storeId,resolver:root.InsightTripHistoryResolver});data.previousYear.forEach(function(item){doc.getElementById('ofYearCards').append(dayCard(item,category));});data.weeks.forEach(function(item){doc.getElementById('ofWeekCards').append(dayCard(item,category));});var averageCard=sales.createAverageCard('6週平均',data.deliveryAverage,data.salesAverage,null,category,data.averageMask),spacer=el('div',undefined,'sc-history-weather of-average-weather-spacer');spacer.setAttribute('aria-hidden','true');spacer.append(el('span','—'));averageCard.querySelector('.sc-day-title').after(spacer);doc.getElementById('ofWeekCards').append(averageCard);data.recent.forEach(function(item){doc.getElementById('ofRecentCards').append(dayCard(item,category));});doc.getElementById('ofRecentEmpty').textContent=data.recent.length?'':'対象期間の実績はありません。';}else doc.getElementById('ofRecentEmpty').textContent='表示するカテゴリーがありません。';weather();}
-    async function load(force){var token=++request;loading=true;error='';weather();try{var result=await client.load(dataStore().weatherLocation,force);if(token!==request)return;forecast=result;}catch(e){if(token!==request)return;error=(e&&e.message||'天気予報を取得できませんでした。')+(forecast?'（前回取得分を表示）':'');}finally{if(token===request){loading=false;render();}}}
+    async function load(force){var token=++request;loading=true;error='';weather();try{var location=dataStore().weatherLocation,locationKey=JSON.stringify(location||null),result=await client.load(location,force);if(token!==request)return;forecast=result;forecastLocation=locationKey;}catch(e){if(token!==request)return;error=(e&&e.message||'天気予報を取得できませんでした。')+(forecast?'（前回取得分を表示）':'');}finally{if(token===request){loading=false;render();}}}
 doc.getElementById('ofCategory').onchange=function(e){state.categoryId=e.target.value;render();};doc.getElementById('ofDelivery').onchange=function(e){if(!isoDate(e.target.value)||e.target.value<'1900-01-01'||e.target.value>'9998-12-31'){e.target.value=state.delivery;return;}autoDelivery=false;state.delivery=e.target.value;render();};doc.getElementById('ofRefresh').onclick=function(){load(true);};
     var originalGoto=root.gotoNav;root.gotoNav=function(target){if(target==='orderForecast'){originalGoto.apply(this,arguments);if(currentNav!==target)return;state.storeId=allStores.current;doc.querySelectorAll('.nav-btn').forEach(function(n){n.classList.remove('active');});doc.querySelectorAll('.page').forEach(function(n){n.classList.remove('show');});nav.classList.add('active');page.classList.add('show');render();load(false);return;}var result=originalGoto.apply(this,arguments);if(currentNav!=='orderForecast'){nav.classList.remove('active');page.classList.remove('show');}return result;};
     var originalSwitch=root.switchStore;root.switchStore=function(id){if(currentNav!=='orderForecast')return originalSwitch.apply(this,arguments);if(!allStores.stores[id]){doc.getElementById('storeSel').value=allStores.current;return;}var view=currentNav;currentNav=1;try{originalSwitch.apply(this,arguments);}finally{currentNav=view;}state.storeId=allStores.current;forecast=null;render();load(false);};

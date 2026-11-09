@@ -373,3 +373,39 @@ test('天気予報の更新ボタンとカード間に12pxの余白がある（i
   }
   expect(result.errors).toEqual([]);
 });
+
+test('比較用記録は初回値を保持し実績データを書き換えない',async({page})=>{
+  await page.clock.install({time:new Date('2026-10-11T12:00:00Z')});
+  await open(page,false,'2026-10-11');
+  const original=await page.evaluate(()=>{
+    InsightStorage.writeSnapshot(allStores);
+    return localStorage.getItem('insight_v11');
+  });
+  await page.locator('#navOrderForecast').click();
+  await expect(page.locator('#ofWeather .of-weather-card')).toHaveCount(7);
+  const button=page.getByRole('button',{name:'この納品日の比較用記録を保存'});
+  await button.click();
+  await expect(page.getByText('比較用の記録を保存しました。',{exact:true})).toBeVisible();
+  await button.click();
+  await expect(page.getByText('この納品日の初回記録が保存済みです。',{exact:true})).toBeVisible();
+  const persisted=await page.evaluate(async()=>{
+    const day=document.getElementById('ofDelivery').value;
+    const record=await new Promise((resolve,reject)=>{
+      const open=indexedDB.open('insight-forecast-pilot-v1',1);
+      open.onerror=()=>reject(open.error);
+      open.onsuccess=()=>{
+        const db=open.result;
+        const get=db.transaction('captures').objectStore('captures').get(day);
+        get.onsuccess=()=>{db.close();resolve(get.result);};
+        get.onerror=()=>{db.close();reject(get.error);};
+      };
+    });
+    return {record,raw:localStorage.getItem('insight_v11')};
+  });
+  expect(persisted.raw).toBe(original);
+  expect(persisted.record.delivery).toBe('2026-10-13');
+  expect(persisted.record.trips.map(t=>t.trip)).toEqual([1,3]);
+  expect(persisted.record.weather.source).toBe('JMA');
+  const outcome=await page.evaluate(record=>InsightOrderForecast.saveCapture(indexedDB,{...record,storeId:'ofTestStore',delivery:'2026-10-14'}),persisted.record);
+  expect(outcome).toBe('scope');
+});

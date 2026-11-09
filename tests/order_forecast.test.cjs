@@ -87,8 +87,8 @@ test('通信エラーを伝え再試行の連打を抑える',async()=>{
   await assert.rejects(client.load(location),/時間をおいて/);assert.equal(calls,2);
   now=61000;await assert.rejects(client.load(location),/取得できません/);assert.equal(calls,4);
 });
-test('新機能は永続保存・実績保存・外部記憶更新を持たない',()=>{
-  const text=fs.readFileSync(require.resolve('../insight_order_forecast_v1.js'),'utf8');assert.doesNotMatch(text,/localStorage|sessionStorage|indexedDB|writeSnapshot|\bpersist\s*\(|INSIGHT_MEMORY/);
+test('発注予測画面は実績保存・外部記憶更新を行わない',()=>{
+  const text=fs.readFileSync(require.resolve('../insight_order_forecast_v1.js'),'utf8');assert.doesNotMatch(text,/localStorage|sessionStorage|writeSnapshot|\bpersist\s*\(|INSIGHT_MEMORY/);
 });
 
 
@@ -301,4 +301,17 @@ test('現在月の便設定を基本としつつ、現在対象外でも入力�
   assert.equal(actual.weeks[5].record.trips[1].sales,0);
   assert.equal(actual.salesAverage.total,null,'3便未入力なので部分合計は使わない');
   assert.equal(actual.recent[0].date,'2026-10-11');
+});
+
+
+test('比較用記録は対象便の実績0と欠損、予報の取得時点を保持する',()=>{
+  const issued=Date.parse('2026-11-09T10:00:00+09:00');
+  const forecast={days:[{date:'2026-11-10',weatherCode:'100',max:20,min:0,pop:null}],
+    reportDatetime:'2026-11-09T05:00:00+09:00',fetchedAt:issued,location:'test',temperatureLocation:'test'};
+  const history={trips:[0,null,99],tripDays:[4,0,6]};
+  const capture=model.buildCapture('s','c','2026-11-10',issued,forecast,history,[true,true,false]);
+  assert.deepEqual(capture.trips,[{trip:1,active:true,average:0,sampleDays:4},{trip:2,active:true,average:null,sampleDays:0}]);
+  assert.equal(capture.weather.min,0);
+  assert.throws(()=>model.buildCapture('s','c','2026-11-10',issued,{...forecast,fetchedAt:issued+1},history,[true,true,false]),/天気予報/);
+  assert.throws(()=>model.buildCapture('s','c','2026-11-09',issued,forecast,history,[true,true,false]),/未来/);
 });

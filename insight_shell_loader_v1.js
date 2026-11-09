@@ -89,7 +89,7 @@ var orderedFeatureLoads=[
   './insight_input_chart_cleanup_v1.js?v=20261006-remove-chart-copy-1',
   './insight_weekday_chart_fix_v1.js?v=20261006-waste-zero-past-1',
   './insight_weekday_chart_spacing_v1.js?v=20261006-csp-style-weekday-1',
-  './insight_order_forecast_v1.js?v=20261021-history-restore-1',
+  './insight_order_forecast_v1.js?v=20261109-forecast-record-1',
   './insight_report_v1.js?v=20261021-report-calendar-1',
   './insight_report_preview_v1.js?v=20261022-recorded-focus-1'
 ];
