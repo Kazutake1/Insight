@@ -389,6 +389,13 @@ test('比較用記録は初回値を保持し実績データを書き換えな�
   await button.click();
   await expect(page.getByText('この納品日の初回記録が保存済みです。',{exact:true})).toBeVisible();
   const day=await page.locator('#ofDelivery').inputValue();
+  await page.clock.fastForward(31*60*1000);
+  await button.click();
+  await expect(page.getByText('予報の取得から30分以上経過しました。「更新」を押してから保存してください。',{exact:true})).toBeVisible();
+  await page.locator('#ofRefresh').click();
+  await expect(page.locator('#ofRefresh')).toBeEnabled();
+  await button.click();
+  await expect(page.getByText('この納品日の初回記録が保存済みです。',{exact:true})).toBeVisible();
   await page.reload();
   const persisted=await page.evaluate(async day=>{
     const record=await new Promise((resolve,reject)=>{
