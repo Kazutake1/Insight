@@ -312,6 +312,10 @@ test('比較用記録は対象便の実績0と欠損、予報の取得時点を�
   const capture=model.buildCapture('s','c','2026-11-10',issued,forecast,history,[true,true,false]);
   assert.deepEqual(capture.trips,[{trip:1,active:true,average:0,sampleDays:4},{trip:2,active:true,average:null,sampleDays:0}]);
   assert.equal(capture.weather.min,0);
+  const saveAt=(age)=>model.buildCapture('s','c','2026-11-10',issued,{...forecast,fetchedAt:issued-age},history,[true,true,false]);
+  assert.doesNotThrow(()=>saveAt(30*60*1000-1));
+  assert.throws(()=>saveAt(30*60*1000),/30分以上経過/);
+  assert.throws(()=>saveAt(30*60*1000+1),/30分以上経過/);
   assert.throws(()=>model.buildCapture('s','c','2026-11-10',issued,{...forecast,fetchedAt:issued+1},history,[true,true,false]),/天気予報/);
   assert.throws(()=>model.buildCapture('s','c','2026-11-09',issued,forecast,history,[true,true,false]),/未来/);
 });

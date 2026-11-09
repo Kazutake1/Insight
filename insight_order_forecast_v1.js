@@ -142,11 +142,12 @@
     if(!Object.values(days).some(function(d){return d.weather!=='—';}))throw new Error('設定地点の予報がありません。');
     return {days:Object.values(days),location:location.label,temperatureLocation:Array.from(temperatureNames).join(' / '),reportDatetime:data[0].reportDatetime};
   }
+  var FORECAST_TTL_MS=30*60*1000;
   function createClient(fetcher,clock){
     var cache=new Map(),pending=new Map(),attempts=new Map();clock=clock||Date.now;
     async function json(url){var controller=new AbortController(),timer=setTimeout(function(){controller.abort();},15000);try{var response=await fetcher(url,{cache:'no-store',credentials:'omit',referrerPolicy:'no-referrer',signal:controller.signal});if(!response.ok)throw new Error('気象庁の予報を取得できませんでした。');return await response.json();}finally{clearTimeout(timer);}}
     async function memo(key,url,ttl,force){if(pending.has(key))return pending.get(key);var entry=cache.get(key),now=clock();if(entry&&now-entry.at<ttl&&!force)return entry.value;if(attempts.has(key)&&now-attempts.get(key)<60000){if(entry)return entry.value;throw new Error('少し時間をおいて更新してください。');}attempts.set(key,now);var promise=json(url).then(function(value){cache.set(key,{at:clock(),value:value});return value;}).finally(function(){pending.delete(key);});pending.set(key,promise);return promise;}
-    return {load:async function(location,force){var constants=await Promise.all([memo('areas',BASE+'common/const/area.json',86400000,false),memo('points',BASE+'amedas/const/amedastable.json',86400000,false)]),target=resolveLocation(location,constants[0]),raw=await memo(target.office,BASE+'forecast/data/forecast/'+target.office+'.json',1800000,force),entry=cache.get(target.office),result=parseForecast(raw,target,constants[0],constants[1],today(new Date(clock())));result.fetchedAt=entry.at;return result;}};
+    return {load:async function(location,force){var constants=await Promise.all([memo('areas',BASE+'common/const/area.json',86400000,false),memo('points',BASE+'amedas/const/amedastable.json',86400000,false)]),target=resolveLocation(location,constants[0]),raw=await memo(target.office,BASE+'forecast/data/forecast/'+target.office+'.json',FORECAST_TTL_MS,force),entry=cache.get(target.office),result=parseForecast(raw,target,constants[0],constants[1],today(new Date(clock())));result.fetchedAt=entry.at;return result;}};
   }
   // Existing event records store their display names in snapshot.title.
   // Retain every matching record; never infer or overwrite persisted names.
@@ -163,6 +164,8 @@
     if(!day||!day.weatherCode||!Number.isFinite(forecast.fetchedAt)||forecast.fetchedAt>issued||
        !Number.isFinite(Date.parse(forecast.reportDatetime))||Date.parse(forecast.reportDatetime)>forecast.fetchedAt)
       throw new Error('対象日の天気予報を更新してください。');
+    if(issued-forecast.fetchedAt>=FORECAST_TTL_MS)
+      throw new Error('予報の取得から30分以上経過しました。「更新」を押してから保存してください。');
     var trips=mask.map(function(active,i){
       return {trip:i+1,active:active,average:active===true?history.trips[i]:null,
         sampleDays:active===true?history.tripDays[i]:0};
