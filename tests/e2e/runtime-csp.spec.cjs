@@ -173,3 +173,69 @@ test('CSPを監視しながら実画面の天気・年度・廃棄予算・分�
   expect(eventViolations,'CSP violation events during real UI actions:\n'+context).toEqual([]);
   expect(diagnostics.consoleCsp,'Console CSP errors during real UI actions:\n'+context).toEqual([]);
 });
+
+test('保存容量は操作時に保存文字列を参照し、保存内容を変更しない',async({page})=>{
+  await page.setViewportSize({width:1194,height:834});
+  await page.route('**/Index.html*',async route=>{
+    const response=await route.fetch();
+    await route.fulfill({response,body:(await response.text()).replace(/;?\s*upgrade-insecure-requests/g,'')});
+  });
+  await page.goto('/Index.html');
+  await page.locator('#navSettings').click();
+  const button=page.getByRole('button',{name:'保存容量を確認',exact:true});
+  const result=page.locator('#insightStorageUsage');
+  const safety=page.locator('#insightRestoreSafetyBackup');
+  await expect(safety).not.toBeChecked();
+  await page.locator('.insight-restore-safety-switch-track').click();
+  await expect(safety).toBeChecked();
+  await page.reload();
+  await page.locator('#navSettings').click();
+  await expect(safety).not.toBeChecked();
+  await expect(result).toBeEmpty();
+  await page.evaluate(()=>{
+    const proto=Storage.prototype;
+    const set=proto.setItem;
+    const get=proto.getItem;
+    const remove=proto.removeItem;
+    // Use an isolated context with fictional UTF-16 text, never real data.
+    for(const key of Object.keys(localStorage))if(key.startsWith('insight_'))remove.call(localStorage,key);
+    set.call(localStorage,'insight_v11','架😀'.repeat(10000));
+    set.call(localStorage,'insight_fixture','日'.repeat(10000));
+    set.call(localStorage,'unrelated_fixture','X'.repeat(60000));
+    window.__capacityWrites=[];
+    window.__updateCapacityFixture=()=>set.call(localStorage,'insight_fixture','日'.repeat(20000));
+    window.__removePrimaryFixture=()=>remove.call(localStorage,'insight_v11');
+    window.__denyCapacityRead=()=>{
+      proto.getItem=function(key){
+        if(this===localStorage&&key==='insight_fixture')throw new Error('Fictional denied read');
+        return get.call(this,key);
+      };
+    };
+    for(const method of ['setItem','removeItem','clear']){
+      const original=proto[method];
+      proto[method]=function(...args){
+        if(this===localStorage)window.__capacityWrites.push(method);
+        return original.apply(this,args);
+      };
+    }
+  });
+  await button.click();
+  await expect(result.locator('div')).toHaveText([
+    '店舗データ（全店舗）：0.057 MiB','その他のInsight設定：0.019 MiB','合計（概算）：0.076 MiB'
+  ]);
+  await page.evaluate(()=>window.__updateCapacityFixture());
+  await expect(result).toContainText('合計（概算）：0.076 MiB');
+  await page.evaluate(()=>document.documentElement.classList.add('dark'));
+  await button.click();
+  await expect(result).toContainText('合計（概算）：0.095 MiB');
+  const controlBox=await button.boundingBox();
+  const resultBox=await result.boundingBox();
+  expect(resultBox.y-controlBox.y-controlBox.height).toBeGreaterThanOrEqual(7);
+  await page.evaluate(()=>window.__removePrimaryFixture());
+  await button.click();
+  await expect(result).toContainText('店舗データ（全店舗）：未保存');
+  await page.evaluate(()=>window.__denyCapacityRead());
+  await button.click();
+  await expect(result).toHaveText('保存容量を計測できません。');
+  expect(await page.evaluate(()=>window.__capacityWrites)).toEqual([]);
+});

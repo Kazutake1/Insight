@@ -25,9 +25,9 @@ test('Index shellはinline script/styleを持たず外部assetへ分離する',(
   const boot=read('insight_shell_boot_v1.js');
   const loader=read('insight_shell_loader_v1.js');
   const css=read('insight_shell_v1.css');
-  assert.match(index,/insight_shell_boot_v1\.js\?v=20261109-capacity-build-105/);
-  assert.match(index,/insight_shell_loader_v1\.js\?v=20261109-capacity-loader-1/);
-  assert.match(index,/insight_shell_v1\.css\?v=20261109-capacity-build-105/);
+  assert.match(index,/insight_shell_boot_v1\.js\?v=20261109-gate3-usage-build-106/);
+  assert.match(index,/insight_shell_loader_v1\.js\?v=20261109-gate3-usage-loader-1/);
+  assert.match(index,/insight_shell_v1\.css\?v=20261109-gate3-usage-build-106/);
   assert.doesNotMatch(index,/<script(?![^>]*\bsrc=)[^>]*>/i);
   assert.doesNotMatch(index,/<style\b/i);
   assert.doesNotMatch(index,/script-src[^;]*'unsafe-inline'/);
@@ -186,8 +186,8 @@ test('canonical payloadはinline script/styleを持たず外部assetを順序固
 
 test('トップページはキャッシュ抑止とシェル・機能manifestの自己更新を持つ',()=>{
   const index=readShell();
-  assert.match(index,/insight-shell-version" content="20261109-capacity-build-105/);
-  assert.match(index,/var BUILD="20261109-capacity-build-105"/);
+  assert.match(index,/insight-shell-version" content="20261109-gate3-usage-build-106/);
+  assert.match(index,/var BUILD="20261109-gate3-usage-build-106"/);
   assert.match(index,/Shell rule: bump BUILD whenever the loader/);
   assert.match(index,/Cache-Control" content="no-cache, no-store, must-revalidate/);
   assert.match(index,/insight_probe=/);
@@ -568,7 +568,7 @@ test('設定ページはサイドバー下部の管理項目を集約する',()=
   const index=readShell();
   const settings=fs.readFileSync(path.join(root,'insight_settings_v1.js'),'utf8');
   const css=read('insight_payload_core_v1.css');
-  assert.match(index,/insight_settings_v1\.js\?v=20261108-optional-safety-ui-2/);
+  assert.match(index,/insight_settings_v1\.js\?v=20261109-gate3-usage-settings-1/);
   assert.ok(index.indexOf('insight_data_health_v1.js')<index.indexOf('insight_settings_v1.js'));
   assert.match(settings,/nav\.id='navSettings'/);
   assert.match(settings,/page\.id='pageSettings'/);

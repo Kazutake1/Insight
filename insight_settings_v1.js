@@ -18,6 +18,58 @@
 
   function addStyle(){ /* Static rules live in insight_payload_core_v1.css for CSP. */ }
 
+  function measureStorageUsage(storage){
+    var primary=storage.getItem('insight_v11');
+    var settingsUnits=0;
+    var keyCount=storage.length;
+    for(var i=0;i<keyCount;i++){
+      var key=storage.key(i);
+      if(key===null)throw new Error('Storage changed during measurement');
+      if(key==='insight_v11'||!key.startsWith('insight_'))continue;
+      var value=storage.getItem(key);
+      if(value===null)throw new Error('Storage changed during measurement');
+      settingsUnits+=value.length;
+    }
+    return {primaryUnits:primary===null?null:primary.length,settingsUnits:settingsUnits};
+  }
+
+  function addCapacityCheck(actions){
+    var button=doc.createElement('button');
+    button.type='button';
+    button.className='sidebar-btn';
+    button.textContent='保存容量を確認';
+    button.setAttribute('aria-controls','insightStorageUsage');
+    var result=doc.createElement('div');
+    result.id='insightStorageUsage';
+    result.setAttribute('role','status');
+    var note=doc.createElement('small');
+    note.textContent='文字数×2バイトの参考値です。端末の空き容量や保存可能量を示すものではありません。発注予測の比較用記録は集計対象外です。';
+
+    function format(units){
+      return (units*2/1048576).toFixed(3)+' MiB';
+    }
+    button.addEventListener('click',function(){
+      try{
+        var usage=measureStorageUsage(root.localStorage);
+        var primary=usage.primaryUnits;
+        var labels=[
+          '店舗データ（全店舗）：'+(primary===null?'未保存':format(primary)),
+          'その他のInsight設定：'+format(usage.settingsUnits),
+          '合計（概算）：'+format((primary===null?0:primary)+usage.settingsUnits)
+        ];
+        result.replaceChildren();
+        labels.forEach(function(label){
+          var line=doc.createElement('div');
+          line.textContent=label;
+          result.append(line);
+        });
+      }catch(_){
+        result.textContent='保存容量を計測できません。';
+      }
+    });
+    actions.append(button,result,note);
+  }
+
   function build(){
     var sidebarActions=doc.querySelector('.sidebar-btns');
     var main=doc.getElementById('main');
@@ -56,6 +108,7 @@
     // Always start unchecked; never persist this optional choice across visits.
     restoreSafety.querySelector('#insightRestoreSafetyBackup').checked=false;
     page.querySelector('#insightSettingsDataActions').append(backup,restore,restoreSafety,health,csv,restoreFile,csvFile);
+    addCapacityCheck(page.querySelector('#insightSettingsDataActions'));
     var themeWrap=doc.createElement('div');
     themeWrap.className='insight-theme-toggle';
     themeWrap.innerHTML='<svg class="insight-theme-icon insight-theme-sun" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.93 4.93l1.42 1.42M17.65 17.65l1.42 1.42M2 12h2M20 12h2M4.93 19.07l1.42-1.42M17.65 6.35l1.42-1.42"/></svg><label class="insight-theme-switch" aria-label="ライト／ダークモード"><input id="insightThemeToggle" type="checkbox" role="switch"><span class="insight-theme-switch-track"></span></label><svg class="insight-theme-icon insight-theme-moon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/></svg>';
