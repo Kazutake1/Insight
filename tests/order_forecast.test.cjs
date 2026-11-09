@@ -308,14 +308,50 @@ test('比較用記録は対象便の実績0と欠損、予報の取得時点を�
   const issued=Date.parse('2026-11-09T10:00:00+09:00');
   const forecast={days:[{date:'2026-11-10',weatherCode:'100',max:20,min:0,pop:null}],
     reportDatetime:'2026-11-09T05:00:00+09:00',fetchedAt:issued,location:'test',temperatureLocation:'test'};
-  const history={trips:[0,null,99],tripDays:[4,0,6]};
-  const capture=model.buildCapture('s','c','2026-11-10',issued,forecast,history,[true,true,false]);
-  assert.deepEqual(capture.trips,[{trip:1,active:true,average:0,sampleDays:4},{trip:2,active:true,average:null,sampleDays:0}]);
+  const history={trips:[0,null,99],tripDays:[4,0,6],totalDays:2,
+    estimatedDates:['2026-10-27'],unverifiedDates:['2026-11-03']};
+  const decision={trips:[
+    {trip:1,status:'active',source:'observed_day',tentative:false,needsDateReview:false},
+    {trip:2,status:'inactive',source:'inference',tentative:true,needsDateReview:false},
+    {trip:3,status:'unknown',source:'conflict',tentative:false,needsDateReview:true,conflict:true}
+  ]};
+  const capture=model.buildCapture('s','c','2026-11-10',issued,forecast,history,decision);
+  assert.deepEqual(capture.trips.map(t=>[t.trip,t.active,t.source,t.average,t.sampleDays]),[
+    [1,true,'observed_day',0,4],[2,false,'inference',null,0],[3,null,'conflict',null,0]
+  ]);
+  assert.equal(capture.trips[1].tentative,true);
+  assert.equal(capture.trips[2].needsDateReview,true);
+  assert.equal(capture.trips[2].conflict,true);
+  assert.deepEqual(capture.historyQuality,{totalDays:2,estimatedDates:['2026-10-27'],unverifiedDates:['2026-11-03']});
   assert.equal(capture.weather.min,0);
-  const saveAt=(age)=>model.buildCapture('s','c','2026-11-10',issued,{...forecast,fetchedAt:issued-age},history,[true,true,false]);
+  const saveAt=(age)=>model.buildCapture('s','c','2026-11-10',issued,{...forecast,fetchedAt:issued-age},history,decision);
   assert.doesNotThrow(()=>saveAt(30*60*1000-1));
   assert.throws(()=>saveAt(30*60*1000),/30分以上経過/);
   assert.throws(()=>saveAt(30*60*1000+1),/30分以上経過/);
-  assert.throws(()=>model.buildCapture('s','c','2026-11-10',issued,{...forecast,fetchedAt:issued+1},history,[true,true,false]),/天気予報/);
-  assert.throws(()=>model.buildCapture('s','c','2026-11-09',issued,forecast,history,[true,true,false]),/未来/);
+  assert.throws(()=>model.buildCapture('s','c','2026-11-10',issued,{...forecast,fetchedAt:issued+1},history,decision),/天気予報/);
+  assert.throws(()=>model.buildCapture('s','c','2026-11-09',issued,forecast,history,decision),/未来/);
+});
+
+test('記録用DBがブロックされた後に開いても保存しない',async()=>{
+  const request={};
+  let closed=false;
+  const pending=model.saveCapture({open:()=>request},{version:2,sourceDigest:'a'.repeat(64)});
+  request.onblocked();
+  await assert.rejects(pending,/開けません/);
+  request.result={close(){closed=true;},transaction(){assert.fail('遅れて保存してはいけない');}};
+  request.onsuccess();
+  assert.equal(closed,true);
+});
+
+test('記録の保存が容量不足で中断されたときは成功を返さない',async()=>{
+  const request={};
+  const error=new Error('QuotaExceededError');
+  let closed=false;
+  const tx={error,objectStore(){return {get(){return {};}};}};
+  const pending=model.saveCapture({open:()=>request},{version:2,sourceDigest:'a'.repeat(64)});
+  request.result={close(){closed=true;},transaction(){return tx;}};
+  request.onsuccess();
+  tx.onabort();
+  await assert.rejects(pending,error);
+  assert.equal(closed,true);
 });

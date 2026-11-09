@@ -388,8 +388,9 @@ test('比較用記録は初回値を保持し実績データを書き換えな�
   await expect(page.getByText('比較用の記録を保存しました。',{exact:true})).toBeVisible();
   await button.click();
   await expect(page.getByText('この納品日の初回記録が保存済みです。',{exact:true})).toBeVisible();
-  const persisted=await page.evaluate(async()=>{
-    const day=document.getElementById('ofDelivery').value;
+  const day=await page.locator('#ofDelivery').inputValue();
+  await page.reload();
+  const persisted=await page.evaluate(async day=>{
     const record=await new Promise((resolve,reject)=>{
       const open=indexedDB.open('insight-forecast-pilot-v1',1);
       open.onerror=()=>reject(open.error);
@@ -401,10 +402,36 @@ test('比較用記録は初回値を保持し実績データを書き換えな�
       };
     });
     return {record,raw:localStorage.getItem('insight_v11')};
-  });
+  },day);
   expect(persisted.raw).toBe(original);
   expect(persisted.record.delivery).toBe('2026-10-13');
-  expect(persisted.record.trips.map(t=>t.trip)).toEqual([1,3]);
+  expect(persisted.record.trips.map(t=>[t.trip,t.active])).toEqual([[1,true],[2,false],[3,true]]);
+  expect(persisted.record.version).toBe(2);
+  expect(persisted.record.sourceDigest).toMatch(/^[a-f0-9]{64}$/);
+  expect(persisted.record.historyQuality).toEqual({totalDays:expect.any(Number),estimatedDates:expect.any(Array),unverifiedDates:expect.any(Array)});
+  await page.waitForFunction(()=>window.InsightOrderForecast?.saveCapture);
+  const changed=await page.evaluate(record=>InsightOrderForecast.saveCapture(indexedDB,{...record,sourceDigest:'0'.repeat(64)}),persisted.record);
+  expect(changed).toBe('source-changed');
+  const concurrent=await page.evaluate(record=>Promise.all([
+    InsightOrderForecast.saveCapture(indexedDB,{...record,delivery:'2026-10-15'}),
+    InsightOrderForecast.saveCapture(indexedDB,{...record,delivery:'2026-10-15'})
+  ]),persisted.record);
+  expect(concurrent.sort()).toEqual(['duplicate','saved']);
+  const legacy=await page.evaluate(async record=>{
+    await new Promise((resolve,reject)=>{
+      const open=indexedDB.open('insight-forecast-pilot-v1',1);
+      open.onerror=()=>reject(open.error);
+      open.onsuccess=()=>{
+        const db=open.result;
+        const tx=db.transaction('captures','readwrite');
+        tx.oncomplete=()=>{db.close();resolve();};
+        tx.onabort=()=>{db.close();reject(tx.error);};
+        tx.objectStore('captures').add({version:1,delivery:'2026-10-16'},'2026-10-16');
+      };
+    });
+    return InsightOrderForecast.saveCapture(indexedDB,{...record,delivery:'2026-10-16'});
+  },persisted.record);
+  expect(legacy).toBe('legacy');
   expect(persisted.record.weather.source).toBe('JMA');
   const outcome=await page.evaluate(record=>InsightOrderForecast.saveCapture(indexedDB,{...record,storeId:'ofTestStore',delivery:'2026-10-14'}),persisted.record);
   expect(outcome).toBe('scope');

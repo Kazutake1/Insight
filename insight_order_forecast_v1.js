@@ -158,7 +158,7 @@
       return {kind:kind,name:name?name.trim():'名称未登録'};
     });
   }
-  function buildCapture(storeId,categoryId,delivery,issued,forecast,history,mask){
+  function buildCapture(storeId,categoryId,delivery,issued,forecast,history,decision){
     if(!storeId||!categoryId||!isoDate(delivery)||delivery<=today(new Date(issued)))throw new Error('未来の納品日を選択してください。');
     var day=forecast&&forecast.days.find(function(item){return item.date===delivery;});
     if(!day||!day.weatherCode||!Number.isFinite(forecast.fetchedAt)||forecast.fetchedAt>issued||
@@ -166,24 +166,36 @@
       throw new Error('対象日の天気予報を更新してください。');
     if(issued-forecast.fetchedAt>=FORECAST_TTL_MS)
       throw new Error('予報の取得から30分以上経過しました。「更新」を押してから保存してください。');
-    var trips=mask.map(function(active,i){
-      return {trip:i+1,active:active,average:active===true?history.trips[i]:null,
-        sampleDays:active===true?history.tripDays[i]:0};
-    }).filter(function(trip){return trip.active===true;});
-    if(!trips.length)throw new Error('記録できる対象便がありません。');
-    return {version:1,storeId:storeId,categoryId:categoryId,delivery:delivery,issuedAt:new Date(issued).toISOString(),
-      baseline:'same-weekday-six-weeks',trips:trips,weather:{source:'JMA',reportAt:forecast.reportDatetime,
+    var trips=decision.trips.map(function(trip,i){
+      var active=trip.status==='active'?true:trip.status==='inactive'?false:null;
+      return {trip:trip.trip,active:active,source:trip.source,tentative:trip.tentative,
+        needsDateReview:trip.needsDateReview,conflict:trip.conflict===true,
+        average:active===true?history.trips[i]:null,sampleDays:active===true?history.tripDays[i]:0};
+    });
+    if(!trips.some(function(trip){return trip.active===true;}))throw new Error('記録できる対象便がありません。');
+    return {version:2,storeId:storeId,categoryId:categoryId,delivery:delivery,issuedAt:new Date(issued).toISOString(),
+      baseline:'same-weekday-six-weeks',trips:trips,historyQuality:{
+        totalDays:history.totalDays,estimatedDates:history.estimatedDates.slice(),
+        unverifiedDates:history.unverifiedDates.slice()},
+      weather:{source:'JMA',reportAt:forecast.reportDatetime,
         fetchedAt:new Date(forecast.fetchedAt).toISOString(),location:forecast.location,
         temperatureLocation:forecast.temperatureLocation,code:day.weatherCode,max:day.max,min:day.min,pop:day.pop}};
   }
+  function validSourceDigest(value){
+    return typeof value==='string'&&/^[0-9a-f]{64}$/.test(value);
+  }
   function saveCapture(storage,capture){
+    if(capture.version!==2||!validSourceDigest(capture.sourceDigest))
+      return Promise.reject(new Error('記録の保存元を確認できません。'));
     return new Promise(function(resolve,reject){
       var open=storage.open('insight-forecast-pilot-v1',1);
       open.onupgradeneeded=function(){open.result.createObjectStore('captures');};
       open.onerror=function(){reject(open.error);};
-      open.onblocked=function(){reject(new Error('記録用データベースを開けません。'));};
+      var blocked=false;
+      open.onblocked=function(){blocked=true;reject(new Error('記録用データベースを開けません。'));};
       open.onsuccess=function(){
         var db=open.result,tx;
+        if(blocked){db.close();return;}
         try{tx=db.transaction('captures','readwrite');}catch(e){db.close();reject(e);return;}
         var records=tx.objectStore('captures'),scope=records.get('scope'),result='saved';
         tx.oncomplete=function(){db.close();resolve(result);};
@@ -193,7 +205,12 @@
           if(locked&&(locked.storeId!==capture.storeId||locked.categoryId!==capture.categoryId)){result='scope';return;}
           var existing=records.get(capture.delivery);
           existing.onsuccess=function(){
-            if(existing.result){result='duplicate';return;}
+            if(existing.result){
+              var prior=existing.result;
+              result=prior.version!==2||!validSourceDigest(prior.sourceDigest)?'legacy':
+                prior.sourceDigest!==capture.sourceDigest?'source-changed':'duplicate';
+              return;
+            }
             if(!locked)records.add({storeId:capture.storeId,categoryId:capture.categoryId},'scope');
             records.add(capture,capture.delivery);
           };
@@ -217,7 +234,7 @@
     var captureButton=el('button','この納品日の比較用記録を保存'),captureStatus=el('div',undefined,'of-meta');
     captureButton.type='button';captureStatus.setAttribute('role','status');
     captureHeading.append(el('h2','予測検証用の記録'),captureButton);
-    captureSection.append(captureHeading,el('div','初回の店舗・カテゴリーに固定し、納品日ごとの初回値をこのブラウザーに記録します。','of-meta'),captureStatus);
+    captureSection.append(captureHeading,el('div','初回の店舗・カテゴリーに固定し、納品日ごとの初回値をこのブラウザーに記録します。この記録はバックアップ・復元の対象外です。','of-meta'),captureStatus);
     doc.getElementById('ofRecentCards').parentNode.after(captureSection);
     captureButton.onclick=async function(){
       captureButton.disabled=true;captureStatus.textContent='';
@@ -234,8 +251,17 @@
         var data=collect(store.salesCounts,category,delivery,sales,weatherStartDate(),
           {snapshot:snapshot,storeId:state.storeId,resolver:resolver,today:today(new Date(issued))});
         var target=resolver.resolveDate(snapshot,state.storeId,category.id,delivery,{today:today(new Date(issued))});
-        var result=await saveCapture(root.indexedDB,buildCapture(state.storeId,category.id,delivery,issued,forecast,data.salesAverage,target.mask));
+        var capture=buildCapture(state.storeId,category.id,delivery,issued,forecast,data.salesAverage,target);
+        if(!root.crypto||!root.crypto.subtle)throw new Error('保存元を確認できるHTTPS環境で開いてください。');
+        var bytes=new TextEncoder().encode(storage.serialize(snapshot));
+        var digest=await root.crypto.subtle.digest('SHA-256',bytes);
+        capture.sourceDigest=Array.from(new Uint8Array(digest),function(byte){
+          return byte.toString(16).padStart(2,'0');
+        }).join('');
+        var result=await saveCapture(root.indexedDB,capture);
         captureStatus.textContent=result==='scope'?'最初に記録した店舗・カテゴリーを選択してください。':
+          result==='legacy'?'保存元を確認できない旧記録があります。この記録の評価は保留です。':
+          result==='source-changed'?'異なる保存状態の初回記録があります。この記録の評価は保留です。':
           result==='duplicate'?'この納品日の初回記録が保存済みです。':'比較用の記録を保存しました。';
       }catch(e){captureStatus.textContent=e&&e.message||'記録を保存できませんでした。';}
       finally{captureButton.disabled=false;}
