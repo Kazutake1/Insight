@@ -350,10 +350,10 @@ test('トップページは外部shellと機能manifestの最新版確認をno-s
     fetch('/insight_payload_source_v1.html?e2e-shell-check=1',{cache:'no-store'}).then(r=>r.text())
   ]));
   const [source,boot,loader,payload]=sources;
-  expect(source).toContain('name="insight-shell-version" content="20261109-forecast-record-build-99"');
-  expect(source).toContain('insight_shell_boot_v1.js?v=20261109-forecast-record-build-99');
-  expect(source).toContain('insight_shell_loader_v1.js?v=20261109-forecast-record-loader-3');
-  expect(source).toContain('insight_shell_v1.css?v=20261109-forecast-record-build-99');
+  expect(source).toContain('name="insight-shell-version" content="20261112-waste-comparison-build-107"');
+  expect(source).toContain('insight_shell_boot_v1.js?v=20261112-waste-comparison-build-107');
+  expect(source).toContain('insight_shell_loader_v1.js?v=20261112-waste-comparison-loader-1');
+  expect(source).toContain('insight_shell_v1.css?v=20261112-waste-comparison-build-107');
   expect(source).not.toMatch(/<script(?![^>]*\bsrc=)[^>]*>/i);
   expect(source).not.toMatch(/<style\b/i);
   expect(source).not.toMatch(/script-src[^;]*'unsafe-inline'/);
@@ -3862,4 +3862,50 @@ test('発注予測の天気7日間と前年実績7日間は曜日で揃い、納
   nextBase.setUTCDate(nextBase.getUTCDate()-364);
   expect(changed.label).toContain(nextBase.toISOString().slice(0,10));
   expect(errors).toEqual([]);
+});
+
+test('当月の廃棄前年比と増加ランキングは前年も前日までで比較する',async({page})=>{
+  await page.clock.setFixedTime(new Date(2026,10,12,12));
+  await openInsight(page);
+  await page.locator('#nav4').click();
+  const category=await page.evaluate(()=>{
+    const category=HAIKI_CATS[0];
+    for(const year of ['2025','2026']){
+      const rows=Array.from({length:30},(_,index)=>blankRow(index+1));
+      rows[0].haiki[category]=year==='2026'?120:100;
+      rows[10].haiki[category]=year==='2026'?30:0;
+      rows[11].haiki[category]=year==='2026'?0:200;
+      store.data[year]={...store.data[year],'11月':rows};
+    }
+    editYear.haiki='2026';
+    editMonth.haiki='11月';
+    renderTable('haiki');
+    return category;
+  });
+  const yoy=page.locator('#iwcWasteYoy');
+  const note=page.locator('#iwcAnalysisSub');
+  const increase=page.locator('#iwcIncrease');
+  await page.locator('#iwcIncreaseTab').click();
+  await expect(yoy).toHaveText('+50.0%');
+  await expect(note).toHaveText('前年同月11日までと比較');
+  await expect(increase).toContainText(category);
+  await expect(increase).toContainText('+¥50');
+
+  await page.clock.setFixedTime(new Date(2026,10,1,12));
+  await page.evaluate(()=>renderTable('haiki'));
+  await expect(yoy).toHaveText('—');
+  await expect(note).toHaveText('月初のため比較データ未確定');
+  await expect(increase).toHaveText('月初のため比較データ未確定');
+
+  await page.clock.setFixedTime(new Date(2026,10,2,12));
+  await page.evaluate(()=>renderTable('haiki'));
+  await expect(yoy).toHaveText('+20.0%');
+  await expect(note).toHaveText('前年同月1日までと比較');
+  await expect(increase).toContainText('+¥20');
+
+  await page.clock.setFixedTime(new Date(2026,11,1,12));
+  await page.evaluate(()=>renderTable('haiki'));
+  await expect(yoy).toHaveText('-50.0%');
+  await expect(note).toHaveText('前年同月比');
+  await expect(increase).toHaveText('増加カテゴリなし');
 });
