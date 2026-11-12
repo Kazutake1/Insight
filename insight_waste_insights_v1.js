@@ -22,7 +22,7 @@
     var prevRows=store.data&&store.data[previousYear]&&store.data[previousYear][month]||null;
     var throughDay=null;
     if(typeof todayFY==='function'){
-      var t=todayFY();if(String(t.fy)===year&&t.month===month)throughDay=t.day;
+      var t=todayFY();if(String(t.fy)===year&&t.month===month)throughDay=t.day-1;
     }
     function kpi(y){return window.KPIEngine&&window.KPIEngine.getPeriod?window.KPIEngine.getPeriod(y,month,throughDay):null;}
     return {year:year,month:month,values:sums(rows),previousYear:previousYear,
@@ -75,7 +75,8 @@
     var yoy=prevOK&&curOK&&prev>0?(amount-prev)/prev*100:null;
     text('iwcWasteYoy',yoy==null?'—':(yoy>0?'+':'')+yoy.toFixed(1)+'%',yoy>0?'up':yoy<0?'down':'');
     var note=c.throughDay!=null?'前年同月'+c.throughDay+'日までと比較':'前年同月比';
-    if(!prevOK)note='前年の比較データなし';else if(prev===0)note='前年廃棄額0円：前年比算出不可';
+    if(c.throughDay===0)note='月初のため比較データ未確定';
+    else if(!prevOK)note='前年の比較データなし';else if(prev===0)note='前年廃棄額0円：前年比算出不可';
     var subtitle=document.getElementById('iwcAnalysisSub');if(subtitle)subtitle.textContent=note;
     var leaders=cats().map(function(name,i){return {name:name,index:i,value:c.values[i]};})
       .filter(function(item){return item.value>0;}).sort(function(a,b){return b.value-a.value||a.index-b.index;});
@@ -87,7 +88,7 @@
         title:'前年 '+yen(old)+' → 今年 '+yen(cur)+' / 増加額 '+yen(diff)+(old>0?' / 増加率 +'+(diff/old*100).toFixed(1)+'%':' / 前年0円：増加率算出不可'),
         displayAmount:'+'+yen(diff),displayPercent:old>0?'+'+(diff/old*100).toFixed(1)+'%':'前年0円'};
     }).filter(function(item){return item.diff>0;}).sort(function(a,b){return b.diff-a.diff||a.index-b.index;});}
-    ranks('iwcIncrease',rising,function(item){return item.displayAmount;},prevOK?(curOK?'増加カテゴリなし':'当年データなし'):'前年の比較データなし');
+    ranks('iwcIncrease',rising,function(item){return item.displayAmount;},c.throughDay===0?note:prevOK?(curOK?'増加カテゴリなし':'当年データなし'):'前年の比較データなし');
   }
   function syncHeight(){
     var bar=document.getElementById('haikiChartCard'),row=document.getElementById('iwcRow');if(!bar||!row)return;
