@@ -126,7 +126,7 @@ test('valid backup of two stores restores and saves a pre-restore download first
   assert.equal(f.ctx.allStores.stores.a.data['2026']['1月'][0].売上,750);
   assert.equal(f.writeCount,1);
   assert.equal(f.downloads.length,1);
-  assert.match(f.downloads[0],/^Insight_pre_restore_\d{8}_\d{6}\.json$/);
+  assert.match(f.downloads[0],/^Insight_backup_pre_\d{8}_\d{6}\.json$/);
   assert.equal(input.value,'');
   assert.equal(f.alerts.length,0);
 });
