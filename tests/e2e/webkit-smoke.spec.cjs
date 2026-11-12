@@ -1,4 +1,5 @@
 const {test,expect}=require('@playwright/test');
+require('./indexeddb-copy-pilot-check.cjs');
 async function openInsight(page){
   // Production is HTTPS. The local test server is HTTP, so remove only the
   // upgrade-insecure-requests directive to stop WebKit upgrading localhost to HTTPS.

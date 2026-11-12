@@ -1,4 +1,5 @@
 const {test,expect}=require('@playwright/test');
+require('./indexeddb-copy-pilot-check.cjs');
 const fs=require('node:fs');
 
 async function openInsight(page){
