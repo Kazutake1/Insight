@@ -88,7 +88,7 @@ function fixture(options={}){
     migrateOldData(){throw new Error('legacy not expected in test');},
     document,
     URL:{createObjectURL(){return 'blob:fake';},revokeObjectURL(){}},
-    Blob,Date,Number,Set,Map,String,Object,Array,Math,JSON,Promise,
+    Blob,Date:options.Date??Date,Number,Set,Map,String,Object,Array,Math,JSON,Promise,
     setTimeout(){return 1;},
     confirm(){return confirmation;},
     alert(message){alerts.push(String(message));},
@@ -119,14 +119,16 @@ function fixture(options={}){
 }
 
 test('valid backup of two stores restores and saves a pre-restore download first',()=>{
-  const f=fixture();
+  const f=fixture({Date:class extends Date{
+    constructor(...args){super(...(args.length?args:[2026,10,13,0,6,59]));}
+  }});
   const input=f.restore(snapshot(750));
   assert.equal(f.persisted.stores.a.data['2026']['1月'][0].売上,750);
   assert.equal(f.persisted.stores.b.data['2026']['12月'][30].売上,750);
   assert.equal(f.ctx.allStores.stores.a.data['2026']['1月'][0].売上,750);
   assert.equal(f.writeCount,1);
   assert.equal(f.downloads.length,1);
-  assert.match(f.downloads[0],/^Insight_pre_restore_\d{8}_\d{6}\.json$/);
+  assert.equal(f.downloads[0],'Insight_pre_261113_0006.json');
   assert.equal(input.value,'');
   assert.equal(f.alerts.length,0);
 });

@@ -217,7 +217,7 @@ test('通常バックアップは日時・店舗数・対象年度を持つv2形
   assert.match(source,/years:backupYears\(snapshot\)/);
   assert.match(source,/stores:stores/);
   assert.match(source,/data:snapshot/);
-  assert.match(source,/Insight_backup_all_stores_/);
+  assert.match(source,/Insight_/);
 });
 
 test('復元前検査はデータ健全性を確認し重大エラーを保存前に拒否する',()=>{
@@ -241,7 +241,7 @@ test('新旧バックアップ形式を復元対象として維持する',()=>{
 test('復元直前に現在データをv2形式で自動退避してから上書きする',()=>{
   const source=fs.readFileSync(path.join(root,'insight_backup_guard_v1.js'),'utf8');
   assert.match(source,/function createPreRestoreBackup\(\)/);
-  assert.match(source,/Insight_pre_restore_/);
+  assert.match(source,/Insight_pre_/);
   assert.match(source,/backupType="preRestore"/);
   assert.match(source,/preRestoreMemorySnapshot=snapshot/);
   assert.ok(source.indexOf('createPreRestoreBackup()')<source.indexOf('InsightStorage.writeSnapshot(newAll)'));
@@ -264,7 +264,7 @@ test('復元後検査失敗時は復元前メモリデータへ自動ロール�
   assert.match(source,/InsightStorage\.writeSnapshot\(preRestoreMemorySnapshot\)/);
   assert.match(source,/復元前の状態へ自動で戻しました/);
   assert.match(source,/自動復旧にも失敗しました/);
-  assert.match(source,/Insight_pre_restore_\.\.\.json/);
+  assert.match(source,/Insight_pre_\.\.\.json/);
 });
 
 test('設定ページから復元した場合は復元後も設定ページを維持する',()=>{

@@ -86,7 +86,7 @@ function restoreSummary(fileName,info,snapshot,report){
 var preRestoreMemorySnapshot=null;
 function backupStamp(now){
   var pad=function(n){return String(n).padStart(2,"0");};
-  return now.getFullYear()+pad(now.getMonth()+1)+pad(now.getDate())+"_"+pad(now.getHours())+pad(now.getMinutes())+pad(now.getSeconds());
+  return pad(now.getFullYear()%100)+pad(now.getMonth()+1)+pad(now.getDate())+"_"+pad(now.getHours())+pad(now.getMinutes());
 }
 function downloadBackupPayload(payload,filename){
   var blob=new Blob([JSON.stringify(payload,null,2)],{type:"application/json"});
@@ -104,7 +104,7 @@ function createPreRestoreBackup(){
   var now=new Date(),snapshot=window.InsightStorage.migrateSnapshot(allStores);
   var payload={backupInfo:buildBackupInfo(snapshot,now),data:snapshot};
   payload.backupInfo.backupType="preRestore";
-  var filename="Insight_pre_restore_"+backupStamp(now)+".json";
+  var filename="Insight_pre_"+backupStamp(now)+".json";
   downloadBackupPayload(payload,filename);
   preRestoreMemorySnapshot=snapshot;
   return {snapshot:snapshot,filename:filename};
@@ -225,7 +225,7 @@ backupData=function(){
     var snapshot=window.InsightStorage.migrateSnapshot(allStores),now=new Date();
     var payload={backupInfo:buildBackupInfo(snapshot,now),data:snapshot};
     var stamp=backupStamp(now);
-    var filename="Insight_backup_all_stores_"+stamp+".json";
+    var filename="Insight_"+stamp+".json";
     var blob=new Blob([JSON.stringify(payload,null,2)],{type:"application/json"});
     var url=URL.createObjectURL(blob),a=document.createElement("a");
     a.href=url;a.download=filename;document.body.appendChild(a);a.click();a.remove();
@@ -261,7 +261,7 @@ restoreData=function(e){
         preRestoreMemorySnapshot=null;
         alert("復元後の整合性確認に失敗したため、復元前の状態へ自動で戻しました。\n\n"+String(postErr&&postErr.message?postErr.message:postErr)+"\n\n復元直前バックアップも保存されています。");
       }catch(rollbackErr){
-        alert("重大なエラー：復元後の整合性確認に失敗し、自動復旧にも失敗しました。\n\n"+String(postErr&&postErr.message?postErr.message:postErr)+"\n\n自動復旧エラー："+String(rollbackErr&&rollbackErr.message?rollbackErr.message:rollbackErr)+"\n\n保存された Insight_pre_restore_...json を使って手動で復元してください。");
+        alert("重大なエラー：復元後の整合性確認に失敗し、自動復旧にも失敗しました。\n\n"+String(postErr&&postErr.message?postErr.message:postErr)+"\n\n自動復旧エラー："+String(rollbackErr&&rollbackErr.message?rollbackErr.message:rollbackErr)+"\n\n保存された Insight_pre_...json を使って手動で復元してください。");
       }
       e.target.value="";return;
     }
