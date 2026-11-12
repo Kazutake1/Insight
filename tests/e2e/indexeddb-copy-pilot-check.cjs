@@ -19,7 +19,7 @@ test('IndexedDB copy pilot preserves the raw snapshot, refuses conflicts, and re
     const message=promise=>promise.then(()=>null,error=>error.message);
     let reads=0;
     const conflict=await message(pilot.copy({
-      indexedDB,readSource:()=>++reads<4?raw:changed
+      indexedDB,readSource:()=>++reads<5?raw:changed
     }));
     const denied=await message(pilot.copy({
       indexedDB:{open(){throw new DOMException('Pilot open denied','SecurityError');}},

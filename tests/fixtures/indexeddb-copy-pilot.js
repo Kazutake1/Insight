@@ -81,7 +81,7 @@
     const raw=readSource();
     if(typeof raw!=='string')throw new Error('Pilot source is missing');
     const parsed=JSON.parse(raw);
-    if(!parsed||typeof parsed!=='object'||!parsed.stores||Array.isArray(parsed.stores)||
+    if(!parsed||typeof parsed!=='object'||!parsed.stores||typeof parsed.stores!=='object'||Array.isArray(parsed.stores)||
        typeof parsed.current!=='string'||!Object.hasOwn(parsed.stores,parsed.current)){
       throw new Error('Pilot source is not a multi-store snapshot');
     }
