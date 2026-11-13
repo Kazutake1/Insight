@@ -112,7 +112,7 @@ function fixture(options={}){
     migrateOldData(){throw new Error('legacy not expected in test');},
     document,
     URL:{createObjectURL(blob){blobs.push(blob);return 'blob:fake';},revokeObjectURL(){}},
-    Blob,Date,Number,Set,Map,String,Object,Array,Math,JSON,Promise,TextEncoder,TextDecoder,Uint8Array,ArrayBuffer,
+    Blob,Date:class extends Date{constructor(...args){super(...(args.length?args:[2026,10,13,0,6,59]));}},Number,Set,Map,String,Object,Array,Math,JSON,Promise,TextEncoder,TextDecoder,Uint8Array,ArrayBuffer,
     setTimeout(){return 1;},
     confirm(message){confirmationCount++;confirmMessages.push(String(message));if(typeof options.duringConfirm==='function')options.duringConfirm({ctx,readers});return confirmation;},
     alert(message){alerts.push(String(message));},
@@ -163,7 +163,7 @@ test('valid backup of two stores restores and saves a pre-restore download first
   assert.equal(f.ctx.allStores.stores.a.data['2026']['1月'][0].売上,750);
   assert.equal(f.writeCount,1);
   assert.equal(f.downloads.length,1);
-  assert.match(f.downloads[0],/^Insight_pre_restore_\d{8}_\d{6}\.json$/);
+  assert.equal(f.downloads[0],'Insight_pre_261113_0006.json');
   assert.equal(input.value,'');
   assert.equal(f.alerts.length,0);
 });
@@ -392,7 +392,7 @@ test('BR19 FICTIONAL rollback failure holds writes and guides manual reload befo
   assert.equal(f.alerts.length,1);
   const notice=f.alerts[0];
   const steps=[
-    'Insight_pre_restore_...json を保管してください',
+    'Insight_pre_...json を保管してください',
     '追加の編集・保存',
     'この画面での再復元は行わないでください',
     'Insightを手動で再読み込み',
@@ -887,7 +887,7 @@ test('Optional safety OFF: failed rollback retains write hold and never claims a
   assert.equal(f.window.InsightStorage.snapshotWritesHeld(),true);
   assert.match(f.alerts.join(' '),/自動復旧にも失敗/);
   assert.match(f.alerts.join(' '),/安全バックアップは作成していません/);
-  assert.doesNotMatch(f.alerts.join(' '),/Insight_pre_restore_\.\.\.json を保管してください/);
+  assert.doesNotMatch(f.alerts.join(' '),/Insight_pre_\.\.\.json を保管してください/);
 });
 test('Optional safety OFF: postcommit error holds writes without suggesting nonexistent file',async()=>{
   for(const opts of [{postcommitThrow:true},{postcommitThrow:true,readbackUnavailableAfterCommit:true}]){

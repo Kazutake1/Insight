@@ -18,6 +18,8 @@ id_ed25519
 # Browser data backups and debug/database artifacts are private.
 Insight_backup_*.json
 Insight_pre_restore_*.json
+Insight_[0-9]*.json
+Insight_pre_*.json
 *.sqlite
 *.sqlite3
 *.db

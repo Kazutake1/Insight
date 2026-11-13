@@ -359,10 +359,10 @@ test('トップページは外部shellと機能manifestの最新版確認をno-s
     fetch('/insight_payload_source_v1.html?e2e-shell-check=1',{cache:'no-store'}).then(r=>r.text())
   ]));
   const [source,boot,loader,payload]=sources;
-  expect(source).toContain('name="insight-shell-version" content="20261112-gate3-waste-build-108"');
-  expect(source).toContain('insight_shell_boot_v1.js?v=20261112-gate3-waste-build-108');
-  expect(source).toContain('insight_shell_loader_v1.js?v=20261112-gate3-waste-loader-1');
-  expect(source).toContain('insight_shell_v1.css?v=20261112-gate3-waste-build-108');
+  expect(source).toContain('name="insight-shell-version" content="20261113-gate3-backup-name-build-111"');
+  expect(source).toContain('insight_shell_boot_v1.js?v=20261113-gate3-backup-name-build-111');
+  expect(source).toContain('insight_shell_loader_v1.js?v=20261113-gate3-backup-name-loader-1');
+  expect(source).toContain('insight_shell_v1.css?v=20261113-gate3-backup-name-build-111');
   expect(source).not.toMatch(/<script(?![^>]*\bsrc=)[^>]*>/i);
   expect(source).not.toMatch(/<style\b/i);
   expect(source).not.toMatch(/script-src[^;]*'unsafe-inline'/);
@@ -993,6 +993,7 @@ test('バックアップ経過表示はinline色ではなく状態classで切り
 });
 
 test('通常バックアップはメタ情報を含み復元前に内容と検査結果を確認できる',async({page})=>{
+  await page.clock.setFixedTime(new Date(2026,10,13,0,6,59));
   const errors=await openInsight(page);
   const expected=await page.evaluate(()=>({
     storeCount:Object.keys(allStores.stores).length,
@@ -1004,7 +1005,7 @@ test('通常バックアップはメタ情報を含み復元前に内容と検�
   const downloadPromise=page.waitForEvent('download');
   await page.locator('#backupBtn').click();
   const download=await downloadPromise;
-  expect(download.suggestedFilename()).toMatch(/^Insight_backup_all_stores_\d{8}_\d{6}\.json$/);
+  expect(download.suggestedFilename()).toBe('Insight_261113_0006.json');
   const downloadPath=await download.path();
   const backup=await readEncryptedBackup(page,downloadPath);
   expect(backup.backupInfo.format).toBe('InsightBackup');
@@ -1050,7 +1051,7 @@ test('復元確定時は上書き前のデータを自動ダウンロードし�
   const safetyDownload=await safetyDownloadPromise;
   await fileAction;
 
-  expect(safetyDownload.suggestedFilename()).toMatch(/^Insight_pre_restore_\d{8}_\d{6}\.json$/);
+  expect(safetyDownload.suggestedFilename()).toMatch(/^Insight_pre_\d{6}_\d{4}\.json$/);
   const safetyPath=await safetyDownload.path();
   const safety=await readEncryptedBackup(page,safetyPath);
   expect(safety.backupInfo.format).toBe('InsightBackup');
@@ -1085,7 +1086,7 @@ test('復元保存・整合性検証の完了後に画面更新が失敗して�
   const safetyPromise=page.waitForEvent('download');
   await page.locator('#restoreFile').setInputFiles(restorePath);
   const safety=await safetyPromise;
-  expect(safety.suggestedFilename()).toMatch(/^Insight_pre_restore_/);
+  expect(safety.suggestedFilename()).toMatch(/^Insight_pre_/);
   await expect.poll(()=>dialogs.some(d=>d.type==='alert')).toBe(true);
   const warning=dialogs.find(d=>d.type==='alert').message;
   expect(warning).toContain('バックアップの保存と整合性確認は完了しました');
@@ -1126,7 +1127,7 @@ test('復元前の保存競合では容量不足と誤表示せず元データ�
   const safetyPromise=page.waitForEvent('download');
   await page.locator('#restoreFile').setInputFiles(restorePath);
   const safety=await safetyPromise;
-  expect(safety.suggestedFilename()).toMatch(/^Insight_pre_restore_/);
+  expect(safety.suggestedFilename()).toMatch(/^Insight_pre_/);
   await expect.poll(()=>dialogs.some(d=>d.type==='alert')).toBe(true);
   const warning=dialogs.find(d=>d.type==='alert').message;
   expect(warning).toContain('バックアップを復元できませんでした');
@@ -1176,7 +1177,7 @@ test('復元後検査で異常を検出した場合は復元前データへ自�
   const rollbackAlertPromise=page.waitForEvent('dialog');
   await confirmDialog.accept();
   const safetyDownload=await safetyDownloadPromise;
-  expect(safetyDownload.suggestedFilename()).toMatch(/^Insight_pre_restore_\d{8}_\d{6}\.json$/);
+  expect(safetyDownload.suggestedFilename()).toMatch(/^Insight_pre_\d{6}_\d{4}\.json$/);
 
   const rollbackAlert=await rollbackAlertPromise;
   expect(rollbackAlert.type()).toBe('alert');

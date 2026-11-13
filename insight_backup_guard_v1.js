@@ -284,7 +284,7 @@ window.InsightRestoreOperationObserverV0=Object.freeze({getStatus:function(){
 
 function backupStamp(now){
   var pad=function(n){return String(n).padStart(2,"0");};
-  return now.getFullYear()+pad(now.getMonth()+1)+pad(now.getDate())+"_"+pad(now.getHours())+pad(now.getMinutes())+pad(now.getSeconds());
+  return pad(now.getFullYear()%100)+pad(now.getMonth()+1)+pad(now.getDate())+"_"+pad(now.getHours())+pad(now.getMinutes());
 }
 function downloadBackupPayload(payload,filename){
   var blob=new Blob([JSON.stringify(payload,null,2)],{type:"application/json"});
@@ -303,7 +303,7 @@ async function createPreRestoreBackup(operation,state){
   var now=new Date(),snapshot=window.InsightStorage.migrateSnapshot(allStores);
   var payload={backupInfo:buildBackupInfo(snapshot,now),data:snapshot};
   payload.backupInfo.backupType="preRestore";
-  var filename="Insight_pre_restore_"+backupStamp(now)+".json";
+  var filename="Insight_pre_"+backupStamp(now)+".json";
   var password=await backupPassword('復元直前の安全バックアップ用パスワード',true,operation);
   var encrypted;
   try{
@@ -460,7 +460,7 @@ async function encryptedBackupData(){
     var snapshot=window.InsightStorage.migrateSnapshot(allStores),now=new Date();
     var payload={backupInfo:buildBackupInfo(snapshot,now),data:snapshot};
     var stamp=backupStamp(now);
-    var filename="Insight_backup_all_stores_"+stamp+".json";
+    var filename="Insight_"+stamp+".json";
     password=await backupPassword('バックアップ用パスワード',true,operation);
     backupBusy('バックアップを暗号化中',operation);
     var encrypted=await cryptoCodec().encrypt(payload,password);password=null;
@@ -530,7 +530,7 @@ function encryptedRestoreData(e){
         alert("復元後の整合性確認に失敗したため、復元前の状態へ自動で戻しました。\n\n"+String(postErr&&postErr.message?postErr.message:postErr)+"\n\n"+(safetyBackupCreated?"復元直前バックアップのダウンロード処理は開始済みです。保存先を確認してください。":"復元直前の安全バックアップは作成していません。")+"");
       }catch(rollbackErr){
         holdRestoreSnapshotWrites();
-        alert("重大なエラー：復元後の整合性確認に失敗し、自動復旧にも失敗しました。\n\n"+String(postErr&&postErr.message?postErr.message:postErr)+"\n\n自動復旧エラー："+String(rollbackErr&&rollbackErr.message?rollbackErr.message:rollbackErr)+"\n\n"+(safetyBackupCreated?"復元直前バックアップ Insight_pre_restore_...json を保管してください。":"復元直前の安全バックアップは作成していません。復元前の状態に戻せない可能性があります。手元の既存バックアップを確認してください。")+"\n\n追加の編集・保存や、この画面での再復元は行わないでください。\nInsightを手動で再読み込みし、保存内容を確認してください。\n"+(safetyBackupCreated?"その後、必要な場合のみ保管したバックアップから復元してください。":"その後、必要な場合のみ手元の既存バックアップからの復元を検討してください。")+"");
+        alert("重大なエラー：復元後の整合性確認に失敗し、自動復旧にも失敗しました。\n\n"+String(postErr&&postErr.message?postErr.message:postErr)+"\n\n自動復旧エラー："+String(rollbackErr&&rollbackErr.message?rollbackErr.message:rollbackErr)+"\n\n"+(safetyBackupCreated?"復元直前バックアップ Insight_pre_...json を保管してください。":"復元直前の安全バックアップは作成していません。復元前の状態に戻せない可能性があります。手元の既存バックアップを確認してください。")+"\n\n追加の編集・保存や、この画面での再復元は行わないでください。\nInsightを手動で再読み込みし、保存内容を確認してください。\n"+(safetyBackupCreated?"その後、必要な場合のみ保管したバックアップから復元してください。":"その後、必要な場合のみ手元の既存バックアップからの復元を検討してください。")+"");
       }
       e.target.value="";return;
     }
