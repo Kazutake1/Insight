@@ -1892,6 +1892,12 @@ function setSalesWeather(ri,wx){
   if(btnEl){const num=btnEl.querySelector(".hdb-num");if(num)num.innerHTML=`${ri+1}日 ${window.InsightWeatherIconCompat?window.InsightWeatherIconCompat.markup(wx):(WX_ICONS[wx]||"")}`;}
 }
 
+function updateSelectedDailyBar(chart,index,selectedColor,otherColor){
+  const dataset=chart.data.datasets[0];
+  dataset.backgroundColor=dataset.data.map((_,i)=>i===index?selectedColor:otherColor);
+  chart.update("none");
+}
+
 function refreshHaikiBarChart(fy,mi){
   const ctx=document.getElementById("haikiBarChart");
   if(!ctx)return;
@@ -1926,13 +1932,13 @@ function refreshHaikiBarChart(fy,mi){
     },
     options:{
       responsive:true,maintainAspectRatio:false,animation:{duration:200},
-      onClick:(_,els)=>{
+      onClick:(_,els,chart)=>{
         if(els.length>0){
           const d=els[0].index+1;
           window.haikiSelDay=d;
           renderHaikiDayList(fy,mi);
           renderHaikiForm(fy,mi,d);
-          refreshHaikiBarChart(fy,mi);
+          updateSelectedDailyBar(chart,els[0].index,"#b91c1c","rgba(185,28,28,0.25)");
           refreshHaikiWdChart(fy,mi);
         }
       },
@@ -2042,13 +2048,13 @@ function refreshSalesLineChart(fy,mi){
     }]},
     options:{
       responsive:true,maintainAspectRatio:false,animation:{duration:200},
-      onClick:(_,els)=>{
+      onClick:(_,els,chart)=>{
         if(els.length>0){
           const d=els[0].index+1;
           window.salesSelDay=d;
           renderSalesDayList(fy,mi);
           renderSalesForm(fy,mi,d);
-          refreshSalesLineChart(fy,mi);
+          updateSelectedDailyBar(chart,els[0].index,"#166534","rgba(22,101,52,0.25)");
           refreshSalesWdChart(fy,mi);
         }
       },
