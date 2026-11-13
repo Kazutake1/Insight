@@ -92,7 +92,7 @@ window.fixtureStore=InsightIndexedDBRestartGate.create(()=>localStorage.getItem(
   });
   await input.fill('999');
   await page.locator('#salesSaveBtn').click();
-  await expect.poll(()=>page.evaluate(()=>fixtureSaveError)).toBe('Pilot revision conflict');
+  await expect.poll(()=>page.evaluate(()=>window.fixtureSaveError)).toBe('Pilot revision conflict');
   await expect(page.locator('#savedSales')).not.toHaveClass(/is-visible/);
 
   await openSales();
