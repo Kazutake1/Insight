@@ -29,14 +29,17 @@ test('売上・廃棄の日別棒を続けてタップしても選択とツー�
         }
         if(type==='sales')refreshSalesLineChart(fy,mi);
         else refreshHaikiBarChart(fy,mi);
-        window.dailyBarChart=Chart.getChart(id);
-        window.dailyBarChart.update('none');
+        Chart.getChart(id).update('none');
       },entry);
       await canvas.scrollIntoViewIfNeeded();
+      // Let the navigation's queued chart render finish before recording identity.
+      await page.evaluate(()=>new Promise(resolve=>requestAnimationFrame(()=>requestAnimationFrame(resolve))));
       for(const index of [0,1]){
         const position=await canvas.evaluate((element,index)=>{
           const rect=element.getBoundingClientRect();
-          const bar=Chart.getChart(element).getDatasetMeta(0).data[index];
+          const chart=Chart.getChart(element);
+          window.dailyBarChart=chart;
+          const bar=chart.getDatasetMeta(0).data[index];
           return {x:rect.left+bar.x,y:rect.top+(bar.y+bar.base)/2};
         },index);
         await page.touchscreen.tap(position.x,position.y);
