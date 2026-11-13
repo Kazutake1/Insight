@@ -3,38 +3,24 @@ const fs=require('node:fs');
 const path=require('node:path');
 const adapter=fs.readFileSync(path.join(__dirname,'../fixtures/indexeddb-verified-restart.js'),'utf8');
 
-test('isolated Insight boots and saves fictional sales through IndexedDB',async({page})=>{
+test('isolated Insight boots and saves fictional sales through IndexedDB',async({page,context})=>{
   const source=' '+JSON.stringify({current:'a',stores:{
     a:{name:'架空店A',years:['2025','2026'],data:{2025:{'1月':[{d:'1',売上:123,storeMemo:'保持'}]},2026:{}}},
     b:{name:'架空店B',years:['2025','2026'],data:{2025:{'1月':[{d:'1',売上:321}]},2026:{}}}
   }})+'\n';
-  await page.route('**/indexeddb-app-seed',route=>route.fulfill({body:'<!doctype html><title>Fixture seed</title>',contentType:'text/html'}));
-  await page.goto('/indexeddb-app-seed');
-  await page.addScriptTag({content:adapter});
-  await page.evaluate(async raw=>{
+  const seed=await context.newPage();
+  await seed.route('**/indexeddb-app-seed',route=>route.fulfill({body:'<!doctype html><title>Fixture seed</title>',contentType:'text/html'}));
+  await seed.goto('/indexeddb-app-seed');
+  await seed.addScriptTag({content:adapter});
+  await seed.evaluate(async raw=>{
     localStorage.setItem('insight_v11',raw);
     window.InsightStorage={migrateSnapshot:snapshot=>snapshot};
-    const pilot=InsightIndexedDBRestartGate.create(()=>localStorage.getItem('insight_v11'));
+    window.pilot=InsightIndexedDBRestartGate.create(()=>localStorage.getItem('insight_v11'));
     await pilot.activate(await pilot.prepare());
   },source);
   await page.route('**/Index.html*',async route=>{
     const response=await route.fetch();
     await route.fulfill({response,body:(await response.text()).replace(/;?\s*upgrade-insecure-requests/g,'')});
-  });
-  await page.route('**/insight_shell_loader_v1.js*',async route=>{
-    const response=await route.fetch();
-    const body=await response.text();
-    await route.fulfill({response,body:adapter+`
-(async function(){
-  window.fixtureStore=InsightIndexedDBRestartGate.create(()=>localStorage.getItem('insight_v11'));
-  const write=Storage.prototype.setItem;
-  Storage.prototype.setItem=function(key,value){
-    if(this===localStorage&&key==='insight_v11')throw new Error('Legacy write blocked in fixture');
-    return write.call(this,key,value);
-  };
-  try{window.fixtureSnapshot=await fixtureStore.load();}
-  catch(error){document.body.textContent='Fixture startup blocked: '+error.message;return;}
-  `+body+'\\n})();'});
   });
   await page.route('**/insight_payload_core_v1.js*',async route=>{
     const response=await route.fetch();
@@ -42,7 +28,18 @@ test('isolated Insight boots and saves fictional sales through IndexedDB',async(
     const body=original.replace('const current=localStorage.getItem(SK);','const current=window.fixtureSnapshot.raw;')
       .replace('if(msg){msg.classList.add("is-visible");','if(msg&&!window.fixtureSaving){msg.classList.add("is-visible");');
     if(body===original||!body.includes('msg&&!window.fixtureSaving'))throw new Error('Fixture patch no longer matches Insight');
-    await route.fulfill({response,body});
+    const snapshot=await seed.evaluate(()=>pilot.load());
+    const setup=adapter+String.raw`
+window.fixtureStore=InsightIndexedDBRestartGate.create(()=>localStorage.getItem('insight_v11'));
+{
+  const write=Storage.prototype.setItem;
+  Storage.prototype.setItem=function(key,value){
+    if(this===localStorage&&key==='insight_v11')throw new Error('Legacy write blocked in fixture');
+    return write.call(this,key,value);
+  };
+}
+`;
+    await route.fulfill({response,body:setup+'window.fixtureSnapshot='+JSON.stringify(snapshot)+';\n'+body});
   });
   async function openSales(){
     await page.goto('/Index.html');
