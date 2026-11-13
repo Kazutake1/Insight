@@ -48,7 +48,10 @@ test('共通保存処理は失敗時に成功扱いせずInsightPersistErrorを�
   const quota=new Error('quota');
   const {context,alerts,getErrorHandler}=setupPersistGuard({writer:()=>{throw quota;}});
   assert.throws(()=>context.persist(),error=>error&&error.name==='InsightPersistError'&&error.cause===quota);
-  assert.match(alerts[0],/現在の変更は保存されていません/);
+  assert.match(alerts[0],/保存結果を確認できないため/);
+  assert.match(alerts[0],/追加編集・再保存は控えてください/);
+  assert.match(alerts[0],/入力内容を控えてからInsightを手動で再読み込み/);
+  assert.doesNotMatch(alerts[0],/現在の変更は保存されていません/);
   const handler=getErrorHandler();
   assert.equal(typeof handler,'function');
   let prevented=false;
@@ -56,11 +59,38 @@ test('共通保存処理は失敗時に成功扱いせずInsightPersistErrorを�
   assert.equal(prevented,true);
 });
 
+test('FICTIONAL 保存後例外で保存済みを未保存と断定せず手動再確認を案内する',()=>{
+  const fault=new Error('FICTIONAL postcommit failure');
+  let saved=null;
+  const {context,alerts,calls}=setupPersistGuard({writer:value=>{
+    saved=JSON.stringify(value); // FICTIONAL saved bytes exist before the exception.
+    throw fault;
+  }});
+  assert.throws(()=>context.persist(),error=>error&&error.name==='InsightPersistError'&&error.cause===fault);
+  assert.equal(JSON.parse(saved).stores.a.name,'A');
+  assert.equal(calls.some(call=>call[0]==='legacy'),false);
+  assert.equal(alerts.length,1);
+  assert.match(alerts[0],/保存結果を確認できないため/);
+  assert.match(alerts[0],/追加編集・再保存は控えてください/);
+  assert.match(alerts[0],/入力内容を控えてからInsightを手動で再読み込み/);
+  assert.doesNotMatch(alerts[0],/保存されていません|保存できませんでした/);
+});
+
+test('競合・復元停止エラーは具体的な既存メッセージを変えない',()=>{
+  for(const name of ['InsightStorageConflictError','InsightStorageRestoreHoldError']){
+    const cause=new Error('FICTIONAL distinct protection guidance');
+    cause.name=name;
+    const {context,alerts}=setupPersistGuard({writer:()=>{throw cause;}});
+    assert.throws(()=>context.persist(),error=>error&&error.name==='InsightPersistError'&&error.cause===cause);
+    assert.deepEqual(alerts,['FICTIONAL distinct protection guidance']);
+  }
+});
+
 test('共有Storageが利用できない場合も旧persistへ戻らず失敗を明示する',()=>{
   const {context,alerts}=setupPersistGuard();
   context.InsightStorage=null;
   assert.throws(()=>context.persist(),error=>error&&error.name==='InsightPersistError');
-  assert.match(alerts[0],/データを保存できませんでした/);
+  assert.match(alerts[0],/データの保存処理でエラーが発生しました/);
 });
 
 test('セール実績の内容はHTMLではなく文字列として描画する',()=>{
@@ -217,7 +247,55 @@ test('通常バックアップは日時・店舗数・対象年度を持つv2形
   assert.match(source,/years:backupYears\(snapshot\)/);
   assert.match(source,/stores:stores/);
   assert.match(source,/data:snapshot/);
-  assert.match(source,/Insight_backup_all_stores_/);
+  assert.match(source,/Insight_/);
+});
+
+test('暗号化バックアップ入口は旧guardの直接再代入を前後とも拒否する',()=>{
+  const core=fs.readFileSync(path.join(root,'insight_payload_core_v1.js'),'utf8');
+  const oldGuard=fs.readFileSync(path.join(root,'tests','fixtures','cache-main-90e','insight_backup_guard_v1.js'),'utf8');
+  const start=core.indexOf('(function installBackupEntrypoints(root){');
+  const end=core.indexOf('})(window);',start)+11;
+  assert.ok(start>=0&&end>start);
+  const alerts=[];
+  const context={isSecureContext:true,crypto:{subtle:{}},
+    InsightBackupCryptoV1:{encrypt(){},decrypt(){}},
+    InsightBackupPasswordV1:{request(){},confirmSaved(){}},InsightStorage:{},
+    alert:message=>alerts.push(String(message))};
+  context.window=context;vm.createContext(context);vm.runInContext(core.slice(start,end),context);
+  const backupDescriptor=Object.getOwnPropertyDescriptor(context,'backupData');
+  const restoreDescriptor=Object.getOwnPropertyDescriptor(context,'restoreData');
+  assert.equal(backupDescriptor.configurable,false);assert.equal(restoreDescriptor.configurable,false);
+  vm.runInContext('backupData=function(){throw new Error("old plaintext")}; restoreData=function(){throw new Error("old restore")}; backupData();',context);
+  assert.match(alerts.pop(),/初期化が完了していません/);
+  const calls=[];
+  assert.equal(context.InsightBackupEntrypointsV1.register({version:1,
+    backup(){calls.push('encrypted-backup');},restore(){calls.push('guarded-restore');}}),true);
+  context.backupData();context.restoreData({target:{value:'selected'}});
+  assert.deepEqual(calls,['encrypted-backup','guarded-restore']);
+  vm.runInContext('backupData=function(){throw new Error("late old plaintext")}; restoreData=function(){throw new Error("late old restore")};',context);
+  context.backupData();context.restoreData({target:{value:'selected'}});
+  assert.deepEqual(calls,['encrypted-backup','guarded-restore','encrypted-backup','guarded-restore']);
+  assert.equal(context.InsightBackupEntrypointsV1.register({version:1,backup(){},restore(){}}),false);
+
+  const oldFirst={alert:message=>alerts.push(String(message))};oldFirst.window=oldFirst;
+  vm.createContext(oldFirst);vm.runInContext(oldGuard,oldFirst);
+  const plaintextEntry=oldFirst.backupData;
+  Object.assign(oldFirst,{isSecureContext:true,crypto:{subtle:{}},
+    InsightBackupCryptoV1:{encrypt(){},decrypt(){}},InsightBackupPasswordV1:{request(){},confirmSaved(){}},InsightStorage:{}});
+  vm.runInContext(core.slice(start,end),oldFirst);
+  assert.notEqual(oldFirst.backupData,plaintextEntry);
+  assert.equal(Object.getOwnPropertyDescriptor(oldFirst,'backupData').configurable,false);
+  oldFirst.backupData();assert.match(alerts.pop(),/初期化が完了していません/);
+});
+
+test('旧core fallbackはnonconfigurable writable関数をnon-writable fail-closed値へ固定する',()=>{
+  const source=fs.readFileSync(path.join(root,'insight_backup_guard_v1.js'),'utf8');
+  assert.match(source,/Object\.getOwnPropertyDescriptor\(window,name\)/);
+  assert.match(source,/Object\.defineProperty\(window,name,\{value:safe,writable:false\}\)/);
+  assert.match(source,/descriptor\.configurable===false&&window\[name\]===safe/);
+  assert.doesNotMatch(source,/catch\(_\)\{window\.(?:backupData|restoreData)=/);
+  assert.match(source,/event\.stopImmediatePropagation\(\)/);
+  assert.match(source,/document\.body\.replaceChildren\(\)/);
 });
 
 test('復元前検査はデータ健全性を確認し重大エラーを保存前に拒否する',()=>{
@@ -240,11 +318,11 @@ test('新旧バックアップ形式を復元対象として維持する',()=>{
 
 test('復元直前に現在データをv2形式で自動退避してから上書きする',()=>{
   const source=fs.readFileSync(path.join(root,'insight_backup_guard_v1.js'),'utf8');
-  assert.match(source,/function createPreRestoreBackup\(\)/);
-  assert.match(source,/Insight_pre_restore_/);
+  assert.match(source,/async function createPreRestoreBackup\(operation,state\)/);
+  assert.match(source,/Insight_pre_/);
   assert.match(source,/backupType="preRestore"/);
   assert.match(source,/preRestoreMemorySnapshot=snapshot/);
-  assert.ok(source.indexOf('createPreRestoreBackup()')<source.indexOf('InsightStorage.writeSnapshot(newAll)'));
+  assert.ok(source.indexOf('await createPreRestoreBackup(operation,state)')<source.indexOf('InsightStorage.writeSnapshot(newAll)'));
   assert.match(source,/復元直前バックアップを作成できないため、復元を中止しました/);
 });
 
@@ -264,7 +342,7 @@ test('復元後検査失敗時は復元前メモリデータへ自動ロール�
   assert.match(source,/InsightStorage\.writeSnapshot\(preRestoreMemorySnapshot\)/);
   assert.match(source,/復元前の状態へ自動で戻しました/);
   assert.match(source,/自動復旧にも失敗しました/);
-  assert.match(source,/Insight_pre_restore_\.\.\.json/);
+  assert.match(source,/Insight_pre_\.\.\.json/);
 });
 
 test('設定ページから復元した場合は復元後も設定ページを維持する',()=>{
@@ -298,7 +376,7 @@ test('復元の保存前エラーは容量不足と決めつけず元の原因�
 
 test('復元確定後の画面更新エラーは保存成功を伝えて再読込を促す',()=>{
   const source=fs.readFileSync(path.join(root,'insight_backup_guard_v1.js'),'utf8');
-  assert.match(source,/reader\.onload=function\(ev\)\{var restoreCommitted=false;try\{/);
+  assert.ok(source.includes("reader.onload=async function(ev){if(++restoreLoadCount>1||readerPhase!=='pending'||restoreFileReaderActive!==reader){markRestoreObservationFault();return;}readerPhase='processing';var restoreCommitted=false"));
   assert.ok(source.indexOf('verifiedRestore=verifyRestoredSnapshot(newAll)')<source.indexOf('restoreCommitted=true'));
   assert.ok(source.indexOf('restoreCommitted=true')<source.indexOf('allStores=newAll'));
   assert.match(source,/復元したデータは保存されています。Insightを再読み込み/);

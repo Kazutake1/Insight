@@ -21,6 +21,8 @@ const ordered=[
   'insight_quick_date_nav_v1.js',
   'insight_ops_kpifix_v1.js',
   'insight_ai_ops_v1.js',
+  'insight_backup_crypto_v1.js',
+  'insight_backup_password_v1.js',
   'insight_backup_guard_v1.js',
   'insight_data_health_v1.js',
   'insight_prediction_data_health_v1.js',
@@ -92,7 +94,7 @@ test('機能スクリプトの読み込み順はshell loaderのmanifestで明示
 
 test('Indexはshell loaderを外部scriptとして読み込む',()=>{
   const index=read('Index.html');
-  assert.match(index,/insight_shell_loader_v1\.js\?v=20261109-forecast-record-loader-3/);
+  assert.match(index,/insight_shell_loader_v1\.js\?v=20261113-gate3-backup-name-loader-1/);
   assert.doesNotMatch(index,/var orderedFeatureLoads=/);
   assert.match(read('insight_shell_loader_v1.js'),/var orderedFeatureLoads=/);
 });
@@ -173,7 +175,7 @@ test('廃棄分析の既存コンパクト表示スタイルは維持する',()=
 test('非圧縮payload読込はbootstrap文字列パッチと展開処理に依存しない',()=>{
   const index=shellSource();
   assert.doesNotMatch(index,/insight_bootstrap_patches_v1\.js|InsightBootstrapPatches/);
-  assert.match(index,/fetch\('\.\/insight_payload_source_v1\.html\?v=20261021-csp-events-payload-1'/);
+  assert.match(index,/fetch\('\.\/insight_payload_source_v1\.html\?v=20261108-optional-safety-payload-2'/);
   assert.doesNotMatch(index,/Promise\.all\(files\.map|pako\.ungzip|atob\(b64\)/);
   assert.match(index,/orderedFeatureLoads/);
 });

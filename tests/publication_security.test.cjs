@@ -18,7 +18,7 @@ function privatePath(file){
   if(pieces.some(segment=>/^(?:\.env(?:\..*)?|\.aws|\.ssh|\.secrets?)$/i.test(segment)))return true;
   if(/^(?:\.env(?:\..*)?|\.npmrc|\.pypirc|\.netrc|id_rsa|id_ed25519|credentials\.json|service-account(?:-.+)?\.json)$/i.test(last))return true;
   if(/\.(?:pem|key|p12|pfx|sqlite3?|db|bak|dump|log|zip|tar|tgz|7z)$/i.test(last))return true;
-  if(/^Insight_(?:backup|pre_restore)_.+\.json$/i.test(last))return true;
+  if(/^Insight_(?:(?:backup|pre_restore|pre)_.+|[0-9].*)\.json$/i.test(last))return true;
   return false;
 }
 const detectors=[
@@ -34,7 +34,7 @@ function credentialTypes(text){
 
 test('secret and backup files must be excluded by .gitignore',()=>{
   const ignore=fs.readFileSync(path.join(root,'.gitignore'),'utf8');
-  for(const pattern of ['.env','.env.*','*.pem','*.key','*.p12','*.pfx','.npmrc','Insight_backup_*.json','Insight_pre_restore_*.json']){
+  for(const pattern of ['.env','.env.*','*.pem','*.key','*.p12','*.pfx','.npmrc','Insight_backup_*.json','Insight_pre_restore_*.json','Insight_[0-9]*.json','Insight_pre_*.json']){
     assert.ok(ignore.split(/\r?\n/).includes(pattern),'missing ignore rule: '+pattern);
   }
 });
@@ -65,7 +65,7 @@ test('public repository inventory excludes private local files and embedded cred
 });
 
 test('security gate rejects representative forbidden paths and synthetic secrets',()=>{
-  for(const file of ['.env','.env.production','server/.env','id_rsa','private.pem','Insight_backup_20261019.json','config/.npmrc','db.sqlite']){
+  for(const file of ['.env','.env.production','server/.env','id_rsa','private.pem','Insight_backup_20261019.json','Insight_261113_0006.json','Insight_pre_261113_0006.json','config/.npmrc','db.sqlite']){
     assert.equal(privatePath(file),true,file);
   }
   assert.equal(privatePath('insight_storage_v1.js'),false);
