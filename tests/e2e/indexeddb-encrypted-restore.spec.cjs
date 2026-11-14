@@ -27,19 +27,19 @@ test('encrypted IndexedDB restore rolls back only its own committed revision',as
     backupData.stores.a.data[2025]['1月'][0].売上=789;
     const frozenRaw=InsightStorage.serialize(backupData);
     const file=JSON.stringify(await codec.encrypt({data:backupData},password));
-    const safetyFile=JSON.stringify(await codec.encrypt({data:JSON.parse(baseline.raw)},password));
-    const safetyData=(await codec.decrypt(JSON.parse(safetyFile),password)).data;
     const wrongPassword=await codec.decrypt(JSON.parse(file),'fictional-wrong').then(()=>false,()=>true);
     const remained=await gate.load();
     const restoredData=(await codec.decrypt(JSON.parse(file),password)).data;
 
     async function restoreThenVerify(before,verify){
+      const safetyFile=JSON.stringify(await codec.encrypt({data:JSON.parse(before.raw)},password));
       const committed=await gate.save(before.revision,restoredData);
       try{
         await verify(committed);
         return 'verified';
       }catch(_){
         // The revision precondition protects writes that race with recovery.
+        const safetyData=(await codec.decrypt(JSON.parse(safetyFile),password)).data;
         return gate.save(committed.revision,safetyData).then(()=> 'rolled back',error=>error.message);
       }
     }
@@ -49,7 +49,8 @@ test('encrypted IndexedDB restore rolls back only its own committed revision',as
       if(readback.revision!==committed.revision||readback.raw!==frozenRaw)throw new Error('Readback mismatch');
     });
     const first=await gate.load();
-    const rolledBack=await restoreThenVerify(first,async ()=>{throw new Error('Injected verification failure');});
+    const beforeFailure=await gate.save(first.revision,JSON.parse(baseline.raw));
+    const rolledBack=await restoreThenVerify(beforeFailure,async ()=>{throw new Error('Injected verification failure');});
     const recovered=await gate.load();
     const newer=JSON.parse(baseline.raw);
     newer.stores.b.data[2025]['1月'][0].売上=654;
@@ -70,6 +71,6 @@ test('encrypted IndexedDB restore rolls back only its own committed revision',as
   expect(outcome).toEqual({
     encrypted:true,wrongPassword:true,unchangedAfterWrongPassword:true,
     verified:'verified',verifiedRaw:true,rolledBack:'rolled back',recoveredRaw:true,
-    stopped:'Pilot revision conflict',finalRevision:6,finalRaw:true,previousRaw:true,sourceUnchanged:true
+    stopped:'Pilot revision conflict',finalRevision:7,finalRaw:true,previousRaw:true,sourceUnchanged:true
   });
 });
