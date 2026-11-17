@@ -45,7 +45,7 @@ async function enableSafetyBackup(page){
   await expect(page.locator('#insightRestoreSafetyBackup')).toBeChecked();
 }
 
-for(const scenario of ['success','unknown','newer revision']){
+for(const scenario of ['success','unknown','newer revision','observer']){
   test('FICTIONAL IndexedDB restore UI: '+scenario,async({page})=>{
     await page.route('**/insight_backup_guard_v1.js*',async route=>{
       const response=await route.fetch();
@@ -107,6 +107,7 @@ for(const scenario of ['success','unknown','newer revision']){
           if(scenario==='unknown')throw new Error('FICTIONAL commit response lost');
         },
         async read(){
+          if(scenario==='observer')await new Promise(resolve=>{this.releaseRead=resolve;this.reading=true;});
           if(scenario==='newer revision'){
             const newer=JSON.parse(committed.raw);
             newer.stores[id].data[year]['1月'][0].売上=654;
@@ -174,8 +175,28 @@ for(const scenario of ['success','unknown','newer revision']){
     await page.evaluate(()=>gotoNav(2));
     await page.locator('#salesSaveBtn').dispatchEvent('click');
     expect(await page.evaluate(()=>window.__blockedRestoreSave)).toBe(1);
+    if(scenario==='observer'){
+      for(const [nav,button] of [[3,'#kyakuSaveBtn'],[4,'#haikiSaveBtn']]){
+        await page.evaluate(index=>gotoNav(index),nav);
+        await page.locator(button).dispatchEvent('click');
+      }
+      expect(await page.evaluate(()=>window.__blockedRestoreSave)).toBe(3);
+      expect(await page.evaluate(()=>InsightRestoreOperationObserverV0.getStatus().state)).toBe('ACTIVE');
+    }
     await page.evaluate(()=>restoreFixture.release());
-    if(scenario==='success'){
+    if(scenario==='observer'){
+      await expect.poll(()=>page.evaluate(()=>window.restoreFixture.reading)).toBe(true);
+      const readback=await page.evaluate(async ()=>({
+        revision:(await restoreFixture.gate.load()).revision,
+        observer:InsightRestoreOperationObserverV0.getStatus().state,
+        held:localStorage.getItem('insight_test_only_restore_pending')==='1',
+        success:window.__restoreSuccess
+      }));
+      expect(readback).toEqual({revision:1,observer:'ACTIVE',held:true,success:false});
+      await page.evaluate(()=>restoreFixture.releaseRead());
+      await expect.poll(()=>page.evaluate(()=>InsightRestoreOperationObserverV0.getStatus().state)).toBe('IDLE_OBSERVED');
+    }
+    if(scenario==='success'||scenario==='observer'){
       await expect.poll(()=>page.evaluate(()=>__restoreSuccess)).toBe(true);
     }else{
       await expect.poll(()=>page.evaluate(()=>__backupAlerts.join('\n'))).toContain(
@@ -189,12 +210,13 @@ for(const scenario of ['success','unknown','newer revision']){
     });
     const expected={
       success:{revision:1,value:789,live:789,rollbacks:0,success:true},
+      observer:{revision:1,value:789,live:789,rollbacks:0,success:true},
       unknown:{revision:1,value:789,live:123,rollbacks:0,success:false},
       'newer revision':{revision:2,value:654,live:123,rollbacks:1,success:false}
     };
     expect(final).toEqual({...expected[scenario],source:true});
     const marker='insight_test_only_restore_pending';
-    expect(await page.evaluate(key=>localStorage.getItem(key),marker)).toBe(scenario==='success'?null:'1');
+    expect(await page.evaluate(key=>localStorage.getItem(key),marker)).toBe((scenario==='success'||scenario==='observer')?null:'1');
     if(scenario==='unknown'){
       const raw=await page.evaluate(()=>restoreFixture.source);
       await page.reload({waitUntil:'domcontentloaded'});
