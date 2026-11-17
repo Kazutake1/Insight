@@ -11,6 +11,7 @@
 
   var selectedStore=allStores.current;
   var dirty=false;
+  window.InsightQuickDateNavV1=Object.freeze({hasUnsavedInput:function(){return dirty;}});
   var week=['日','月','火','水','木','金','土'];
   function selectedDate(){return dateContext.getSelectedDate();}
   function todaySelected(){return dateContext.isToday();}

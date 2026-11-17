@@ -111,12 +111,13 @@
       if(raw===null)throw new Error('Legacy Insight data is missing');
       parse(raw);
       if(await root.InsightMigrationBackupV1.confirm(raw)!==true)throw new Error('Backup save was not confirmed');
-      if(root.localStorage.getItem(sourceKey)!==raw)throw new Error('Legacy Insight data changed');
+      root.InsightMigrationBackupV1.assertReady(raw);
       const id=root.crypto.randomUUID();
       writeMarker('preparing',id);
       const initial={id,sourceRaw:raw,raw,revision:0,previous:null};
       await transact('readwrite',(existing,records)=>{
         if(existing)throw new Error('An IndexedDB snapshot already exists');
+        root.InsightMigrationBackupV1.assertReady(raw);
         validateRecord(initial,id);
         records.add(initial,recordKey);
       },true);

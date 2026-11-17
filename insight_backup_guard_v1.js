@@ -476,6 +476,16 @@ async function encryptedBackupData(){
     alert("バックアップ処理を完了できませんでした。\n"+String(err&&err.message?err.message:err));
   }finally{backupOperationActive=false;if(window.InsightBackupPasswordV1)window.InsightBackupPasswordV1.close();}
 }
+function assertMigrationReady(raw){
+  var quick=window.InsightQuickDateNavV1,salesCount=window.InsightSalesCount;
+  if(typeof quick?.hasUnsavedInput!=='function'||typeof salesCount?.hasUnsavedInput!=='function')
+    throw new Error('未保存の入力を確認できないため、移行を中止しました。');
+  var state=captureBackupState();
+  if(quick.hasUnsavedInput()||salesCount.hasUnsavedInput()||
+     state.saved!==raw||state.live!==window.InsightStorage.serialize(JSON.parse(raw))){
+    throw new Error('未保存の入力または保存データの変更があるため、移行を中止しました。');
+  }
+}
 // The isolated migration draft is the only caller. Use the exact captured
 // source as input to the existing backup schema migration and confirmation UI.
 async function confirmMigrationBackup(raw){
@@ -484,8 +494,8 @@ async function confirmMigrationBackup(raw){
   var operation={cancelled:false};
   try{
     cryptoCodec();
+    assertMigrationReady(raw);
     var state=captureBackupState();
-    if(state.saved!==raw)throw new Error('移行元データが変更されたため中止しました。');
     var snapshot=window.InsightStorage.migrateSnapshot(JSON.parse(raw)),now=new Date();
     await downloadConfirmedBackup(snapshot,'移行前バックアップ用パスワード','Insight_'+backupStamp(now)+'.json',operation,state,now);
     return true;
@@ -599,5 +609,5 @@ function encryptedRestoreData(e){
 }
 if(entrypoints.register({version:1,backup:encryptedBackupData,restore:encryptedRestoreData})!==true)
   throw new Error("Encrypted backup entry points could not be registered safely");
-window.InsightMigrationBackupV1=Object.freeze({confirm:confirmMigrationBackup});
+window.InsightMigrationBackupV1=Object.freeze({confirm:confirmMigrationBackup,assertReady:assertMigrationReady});
 })();

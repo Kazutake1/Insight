@@ -425,6 +425,7 @@
     model.createHistoricalWeatherRow=createHistoricalWeatherRow;
     model.createAverageCard=createAverageCard;
 
+    model.hasUnsavedInput=function(){return state.dirty;};
     model.getAnalysisContext=function(){
       var data=analysisData(),records=Object.keys(state.draft).sort().map(function(date){
         var r=state.draft[date],mask=activeTrips(selectedCategory());

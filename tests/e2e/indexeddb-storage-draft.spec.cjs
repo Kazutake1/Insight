@@ -9,7 +9,8 @@ test('manual adoption uses the real encrypted backup confirmation and preserves 
   });
   async function open(){
     await page.goto('/Index.html');
-    await page.waitForFunction(()=>window.InsightMigrationBackupV1&&window.InsightBackupPasswordV1);
+    await page.waitForFunction(()=>window.InsightMigrationBackupV1&&window.InsightBackupPasswordV1&&
+      window.InsightQuickDateNavV1&&window.InsightSalesCount?.hasUnsavedInput);
     await page.addScriptTag({url:'/insight_indexeddb_storage_v1.js'});
   }
   await open();
@@ -21,9 +22,21 @@ test('manual adoption uses the real encrypted backup confirmation and preserves 
     source.stores['fictional-b'].name='架空店舗B';
     first.data[first.years.at(-1)]['1月'][0].売上=123;
     const raw=' '+JSON.stringify(source)+'\n';
+    allStores=source;
+    store=source.stores[source.current];
     localStorage.setItem('insight_v11',raw);
     return raw;
   });
+  const divergent=await page.evaluate(async ()=>{
+    const name=store.name;
+    store.name='画面側だけ変更';
+    try{return await InsightIndexedDBStorageV1.migrate().catch(error=>error.message);}
+    finally{store.name=name;}
+  });
+  expect(divergent).toContain('未保存の入力または保存データの変更');
+  await expect(page.locator('#insightBackupOverlay')).toHaveCount(0);
+  expect(await page.evaluate(()=>localStorage.getItem('insight_indexeddb_adoption_v1'))).toBeNull();
+
   const password='fictional-draft-password';
   const confirm=page.getByRole('button',{name:'保存したファイルを確認した',exact:true});
   async function startBackup(){
@@ -44,6 +57,21 @@ test('manual adoption uses the real encrypted backup confirmation and preserves 
   await page.getByRole('button',{name:'未確認のまま閉じる',exact:true}).click();
   expect(await page.evaluate(()=>migrationResult)).toBe('Backup save was not confirmed');
   expect(await page.evaluate(()=>localStorage.getItem('insight_indexeddb_adoption_v1'))).toBeNull();
+
+  await startBackup();
+  const draftInput=await page.evaluate(()=>{
+    const input=document.querySelector('#quickGrid input[type="text"],#quickGrid input[type="number"]');
+    input.value='987';
+    input.dispatchEvent(new Event('input',{bubbles:true}));
+    return input.id;
+  });
+  await confirm.click();
+  expect(await page.evaluate(()=>migrationResult)).toContain('未保存の入力または保存データの変更');
+  expect(await page.evaluate(id=>document.getElementById(id).value,draftInput)).toBe('987');
+  expect(await page.evaluate(()=>localStorage.getItem('insight_v11'))).toBe(raw);
+  expect(await page.evaluate(()=>localStorage.getItem('insight_indexeddb_adoption_v1'))).toBeNull();
+  // Test-only reload after verifying the uncommitted edit was preserved.
+  await open();
 
   const file=await startBackup();
   expect(file.format).toBe('InsightEncryptedBackup');
