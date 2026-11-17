@@ -100,17 +100,14 @@
     return adopted;
   }
 
-  // Called only from a user-driven migration flow. That flow supplies the
-  // existing download and confirmation UI and returns whether they completed.
-  async function migrate({password,downloadAndConfirm}){
+  // Called only from a user-driven migration flow.
+  async function migrate(){
     return exclusive(async ()=>{
       if(marker()!==null)throw new Error('Existing migration requires review');
       const raw=root.localStorage.getItem(sourceKey);
       if(raw===null)throw new Error('Legacy Insight data is missing');
-      const snapshot=parse(raw);
-      const codec=root.InsightBackupCryptoV1;
-      const encrypted=await codec.encrypt(snapshot,password);
-      if(await downloadAndConfirm(encrypted)!==true)throw new Error('Backup save was not confirmed');
+      parse(raw);
+      if(await root.InsightMigrationBackupV1.confirm(raw)!==true)throw new Error('Backup save was not confirmed');
       if(root.localStorage.getItem(sourceKey)!==raw)throw new Error('Legacy Insight data changed');
       const id=root.crypto.randomUUID();
       writeMarker('preparing',id);

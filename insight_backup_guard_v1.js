@@ -449,29 +449,50 @@ function rollbackPreRestoreSnapshot(){
   if(window.InsightStorage.serialize(restored)!==window.InsightStorage.serialize(preRestoreMemorySnapshot))throw new Error("復元前データの再保存結果が一致しません。");
   return restored;
 }
+async function downloadConfirmedBackup(snapshot,title,filename,operation,state,now){
+  var payload={backupInfo:buildBackupInfo(snapshot,now),data:snapshot};
+  var password=await backupPassword(title,true,operation);
+  var encrypted;
+  try{
+    backupBusy('バックアップを暗号化中',operation);
+    encrypted=await cryptoCodec().encrypt(payload,password);
+  }finally{password=null;}
+  ensureBackupContinuing(operation,state);
+  downloadBackupPayload(encrypted,filename);
+  await confirmBackupDownload(filename,'normal',operation,state);
+}
 async function encryptedBackupData(){
   if(backupOperationActive||restoreFileReaderActive){alert('別のバックアップ・復元処理が進行中です。');return;}
   backupOperationActive=true;
-  var operation={cancelled:false},password=null;
+  var operation={cancelled:false};
   try{
     cryptoCodec();
     var state=captureBackupState();
-    if(!window.InsightStorage)throw new Error("保存機能を初期化できませんでした");
     var snapshot=window.InsightStorage.migrateSnapshot(allStores),now=new Date();
-    var payload={backupInfo:buildBackupInfo(snapshot,now),data:snapshot};
-    var stamp=backupStamp(now);
-    var filename="Insight_"+stamp+".json";
-    password=await backupPassword('バックアップ用パスワード',true,operation);
-    backupBusy('バックアップを暗号化中',operation);
-    var encrypted=await cryptoCodec().encrypt(payload,password);password=null;
-    ensureBackupContinuing(operation,state);
-    downloadBackupPayload(encrypted,filename);
-    await confirmBackupDownload(filename,'normal',operation,state);
+    await downloadConfirmedBackup(snapshot,'バックアップ用パスワード','Insight_'+backupStamp(now)+'.json',operation,state,now);
     showToast("📥 保存したファイルの確認を記録しました（ご本人の申告）","#15803d","#f0fdf4");
   }catch(err){
     if(err&&err.name==='InsightBackupCancelled')return;
     alert("バックアップ処理を完了できませんでした。\n"+String(err&&err.message?err.message:err));
-  }finally{password=null;backupOperationActive=false;if(window.InsightBackupPasswordV1)window.InsightBackupPasswordV1.close();}
+  }finally{backupOperationActive=false;if(window.InsightBackupPasswordV1)window.InsightBackupPasswordV1.close();}
+}
+// The isolated migration draft is the only caller. Use the exact captured
+// source as input to the existing backup schema migration and confirmation UI.
+async function confirmMigrationBackup(raw){
+  if(backupOperationActive||restoreFileReaderActive)throw new Error('別のバックアップ・復元処理が進行中です。');
+  backupOperationActive=true;
+  var operation={cancelled:false};
+  try{
+    cryptoCodec();
+    var state=captureBackupState();
+    if(state.saved!==raw)throw new Error('移行元データが変更されたため中止しました。');
+    var snapshot=window.InsightStorage.migrateSnapshot(JSON.parse(raw)),now=new Date();
+    await downloadConfirmedBackup(snapshot,'移行前バックアップ用パスワード','Insight_'+backupStamp(now)+'.json',operation,state,now);
+    return true;
+  }catch(err){
+    if(err&&err.name==='InsightBackupCancelled')return false;
+    throw err;
+  }finally{backupOperationActive=false;if(window.InsightBackupPasswordV1)window.InsightBackupPasswordV1.close();}
 }
 function encryptedRestoreData(e){
   var file=e.target.files[0];if(!file)return;
@@ -578,4 +599,5 @@ function encryptedRestoreData(e){
 }
 if(entrypoints.register({version:1,backup:encryptedBackupData,restore:encryptedRestoreData})!==true)
   throw new Error("Encrypted backup entry points could not be registered safely");
+window.InsightMigrationBackupV1=Object.freeze({confirm:confirmMigrationBackup});
 })();

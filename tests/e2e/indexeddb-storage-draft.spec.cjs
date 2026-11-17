@@ -1,50 +1,77 @@
 const {test,expect}=require('@playwright/test');
-const path=require('node:path');
+const fs=require('node:fs/promises');
+require('./helpers/verified-chart.cjs')(test);
 
-test('manual adoption, encrypted backup confirmation and durable write hold',async({page})=>{
-  const fixture='/indexeddb-storage-draft-fixture';
-  await page.route('**'+fixture,route=>route.fulfill({body:'<!doctype html>',contentType:'text/html'}));
+test('manual adoption uses the real encrypted backup confirmation and preserves the legacy source',async({page})=>{
+  await page.route('**/Index.html*',async route=>{
+    const response=await route.fetch();
+    await route.fulfill({response,body:(await response.text()).replace(/;?\s*upgrade-insecure-requests/g,'')});
+  });
   async function open(){
-    await page.goto(fixture);
-    await page.evaluate(()=>{window.SK='insight_v11';});
-    for(const file of ['insight_storage_v1.js','insight_backup_crypto_v1.js','insight_indexeddb_storage_v1.js']){
-      await page.addScriptTag({path:path.join(__dirname,'../../',file)});
-    }
+    await page.goto('/Index.html');
+    await page.waitForFunction(()=>window.InsightMigrationBackupV1&&window.InsightBackupPasswordV1);
+    await page.addScriptTag({url:'/insight_indexeddb_storage_v1.js'});
   }
   await open();
-  const result=await page.evaluate(async ()=>{
-    const store=InsightIndexedDBStorageV1;
-    const source={current:'a',stores:{a:{sales:123},b:{sales:321}},legacy:{memo:'架空'}};
+  const raw=await page.evaluate(()=>{
+    const source=InsightStorage.migrateSnapshot(allStores);
+    const first=source.stores[source.current];
+    first.name='架空店舗A';
+    source.stores['fictional-b']=JSON.parse(JSON.stringify(first));
+    source.stores['fictional-b'].name='架空店舗B';
+    first.data[first.years.at(-1)]['1月'][0].売上=123;
     const raw=' '+JSON.stringify(source)+'\n';
     localStorage.setItem('insight_v11',raw);
-    const error=promise=>promise.then(()=>null,e=>e.message);
-    const before=await error(store.read());
-    const password='fictional-draft-password';
-    const denied=await error(store.migrate({password,downloadAndConfirm:async()=>false}));
-    const noMarker=localStorage.getItem('insight_indexeddb_adoption_v1')===null;
-    let backupMatches=false;
-    const initial=await store.migrate({password,downloadAndConfirm:async envelope=>{
-      const backup=await InsightBackupCryptoV1.decrypt(envelope,password);
-      backupMatches=JSON.stringify(backup)===JSON.stringify(source);
-      return true;
-    }});
-    const updated=JSON.parse(JSON.stringify(initial.snapshot));
-    updated.stores.a.sales=456;
-    const saved=await store.save(initial.revision,updated);
-    const conflict=await error(store.save(initial.revision,source));
-    return {before,denied,noMarker,backupMatches,initial,saved,conflict,
-      originalMatches:localStorage.getItem('insight_v11')===raw};
+    return raw;
   });
-  expect(result).toMatchObject({
-    before:'IndexedDB writes are on hold',denied:'Backup save was not confirmed',noMarker:true,
-    backupMatches:true,initial:{revision:0},saved:{revision:1,snapshot:{stores:{a:{sales:456},b:{sales:321}}}},
-    conflict:'IndexedDB revision conflict',originalMatches:true
+  const password='fictional-draft-password';
+  const confirm=page.getByRole('button',{name:'保存したファイルを確認した',exact:true});
+  async function startBackup(){
+    await page.evaluate(()=>{
+      window.migrationResult=InsightIndexedDBStorageV1.migrate().catch(error=>error.message);
+    });
+    await page.locator('#insightBackupPassword').fill(password);
+    await page.locator('#insightBackupPasswordConfirm').fill(password);
+    const event=page.waitForEvent('download');
+    await page.locator('#insightBackupOverlay button[type=submit]').click();
+    const download=await event;
+    await expect(confirm).toBeVisible();
+    expect(await page.evaluate(()=>localStorage.getItem('insight_indexeddb_adoption_v1'))).toBeNull();
+    return JSON.parse(await fs.readFile(await download.path(),'utf8'));
+  }
+
+  await startBackup();
+  await page.getByRole('button',{name:'未確認のまま閉じる',exact:true}).click();
+  expect(await page.evaluate(()=>migrationResult)).toBe('Backup save was not confirmed');
+  expect(await page.evaluate(()=>localStorage.getItem('insight_indexeddb_adoption_v1'))).toBeNull();
+
+  const file=await startBackup();
+  expect(file.format).toBe('InsightEncryptedBackup');
+  const backup=await page.evaluate(({file,password})=>InsightBackupCryptoV1.decrypt(file,password),{file,password});
+  const source=JSON.parse(raw);
+  expect(backup.data).toEqual(source);
+  expect(backup.backupInfo).toMatchObject({
+    format:'InsightBackup',formatVersion:2,currentStoreId:source.current,
+    storageKey:'insight_v11',storeCount:2,
+    stores:Object.entries(source.stores).map(([id,store])=>({
+      id,name:store.name,years:store.years.map(String).sort()
+    }))
   });
-  await open();
-  const stopped=await page.evaluate(async ()=>{
+  await confirm.click();
+  expect(await page.evaluate(()=>migrationResult)).toEqual({revision:0,snapshot:source});
+
+  const result=await page.evaluate(async ()=>{
     const store=InsightIndexedDBStorageV1;
-    const error=promise=>promise.then(()=>null,e=>e.message);
-    return [await error(store.read()),await error(store.save(1,{}))];
+    const initial=await store.read();
+    const shop=initial.snapshot.stores[initial.snapshot.current];
+    shop.data[shop.years.at(-1)]['1月'][0].売上=456;
+    const saved=await store.save(initial.revision,initial.snapshot);
+    const conflict=await store.save(initial.revision,initial.snapshot).catch(error=>error.message);
+    return {saved,conflict,raw:localStorage.getItem('insight_v11')};
   });
-  expect(stopped).toEqual(['IndexedDB writes are on hold','IndexedDB writes are on hold']);
+  const shop=source.stores[source.current];
+  shop.data[shop.years.at(-1)]['1月'][0].売上=456;
+  expect(result).toEqual({saved:{revision:1,snapshot:source},conflict:'IndexedDB revision conflict',raw});
+  await open();
+  expect(await page.evaluate(()=>InsightIndexedDBStorageV1.read().catch(error=>error.message))).toBe('IndexedDB writes are on hold');
 });
