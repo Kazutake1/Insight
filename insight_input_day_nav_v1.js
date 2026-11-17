@@ -11,6 +11,7 @@
     {key:'salesCounts',page:'pageSalesCount',label:'販売数',kind:'count'}
   ];
   var selected={},dirty={},applied={},weekday=['日','月','火','水','木','金','土'];
+  var migrationDirty={},migrationChecksReady=false;
   function period(spec){
     if(spec.kind==='count'){
       var count=root.InsightSalesCount;
@@ -161,7 +162,10 @@
     specs.forEach(sync);
     doc.addEventListener('input',function(e){
       var spec=currentSpec(e.target);
-      if(spec&&spec.kind==='legacy'&&!e.target.closest('.insight-shared-day-nav'))dirty[spec.key]=true;
+      if(spec&&spec.kind==='legacy'&&!e.target.closest('.insight-shared-day-nav')){
+        dirty[spec.key]=true;
+        migrationDirty[spec.key]=true;
+      }
     },true);
     doc.addEventListener('click',function(e){
       var target=e.target&&e.target.closest?e.target.closest('button,input'):null;
@@ -170,7 +174,10 @@
       if(!spec)return;
       if(spec.kind==='legacy'){
         if(target.matches('#salesSaveBtn,#kyakuSaveBtn,#haikiSaveBtn'))dirty[spec.key]=false;
-        if(target.matches('.wx-btn'))dirty[spec.key]=true;
+        if(target.matches('.wx-btn')){
+          dirty[spec.key]=true;
+          migrationDirty[spec.key]=true;
+        }
         var list=target.closest('#salesDayList .haiki-day-btn,#haikiDayList .haiki-day-btn');
         if(list){
           var index=Array.prototype.indexOf.call(list.parentNode.children,list);
@@ -187,7 +194,23 @@
     ['nav0','nav1','nav2','nav3','nav4','navSalesCount','storeSel'].forEach(function(id){
       var node=doc.getElementById(id);if(node)node.addEventListener('click',delayed);
     });
-    if(root.InsightHooks)root.InsightHooks.on('input:table:after','shared-input-day-nav',delayed,85);
+    if(root.InsightHooks){
+      root.InsightHooks.on('input:table:after','shared-input-day-nav',delayed,85);
+      root.InsightHooks.on('input:save:before','migration-input-save-baseline',function(ctx){
+        try{ctx.state.migrationSaveRevision=root.InsightStorage?.reportState().revision;}catch(_){}
+      },90);
+      root.InsightHooks.on('input:save:after','migration-input-save-verification',function(ctx){
+        try{
+          var storage=root.InsightStorage,report=storage?.reportState();
+          if(ctx.cancel||!report||report.pending||report.held||report.conflict||
+           !Number.isSafeInteger(ctx.state.migrationSaveRevision)||
+           report.revision<=ctx.state.migrationSaveRevision)return;
+          if(storage.serialize(allStores)===storage.serialize(storage.readSnapshot()))
+            migrationDirty[ctx.args[0]]=false;
+        }catch(_){}
+      },100);
+      migrationChecksReady=true;
+    }
     root.addEventListener('insight:sales-count-period-change',delayed);
     ['kyakuGrid','scCalendar'].forEach(function(id){
       var node=doc.getElementById(id);
@@ -198,7 +221,11 @@
     });
     delayed();
   }
-  root.InsightInputDayNav={VERSION:1,select:function(type,iso){
+  root.InsightInputDayNav={VERSION:1,hasUnsavedInput:function(){
+    var status=root.InsightInputSaveObserverV0?.getStatus();
+    return !migrationChecksReady||!status||status.state==='ACTIVE'||status.state==='HELD'||
+      Object.values(migrationDirty).some(Boolean);
+  },select:function(type,iso){
     var spec=specs.find(function(s){return s.key===type;}),date=context.parseIso(iso);
     return !!(spec&&date&&go(spec,date));
   },getSelectedIso:function(type){var spec=specs.find(function(s){return s.key===type;}),date=spec&&dateFor(spec);return date?context.iso(date):null;}};

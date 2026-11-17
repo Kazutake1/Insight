@@ -477,11 +477,12 @@ async function encryptedBackupData(){
   }finally{backupOperationActive=false;if(window.InsightBackupPasswordV1)window.InsightBackupPasswordV1.close();}
 }
 function assertMigrationReady(raw){
-  var quick=window.InsightQuickDateNavV1,salesCount=window.InsightSalesCount;
-  if(typeof quick?.hasUnsavedInput!=='function'||typeof salesCount?.hasUnsavedInput!=='function')
+  var quick=window.InsightQuickDateNavV1,salesCount=window.InsightSalesCount,dayInput=window.InsightInputDayNav;
+  if(typeof quick?.hasUnsavedInput!=='function'||typeof salesCount?.hasUnsavedInput!=='function'||
+     typeof dayInput?.hasUnsavedInput!=='function')
     throw new Error('未保存の入力を確認できないため、移行を中止しました。');
   var state=captureBackupState();
-  if(quick.hasUnsavedInput()||salesCount.hasUnsavedInput()||
+  if(quick.hasUnsavedInput()||salesCount.hasUnsavedInput()||dayInput.hasUnsavedInput()||
      state.saved!==raw||state.live!==window.InsightStorage.serialize(JSON.parse(raw))){
     throw new Error('未保存の入力または保存データの変更があるため、移行を中止しました。');
   }

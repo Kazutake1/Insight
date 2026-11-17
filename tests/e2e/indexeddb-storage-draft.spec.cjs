@@ -10,7 +10,7 @@ test('manual adoption uses the real encrypted backup confirmation and preserves 
   async function open(){
     await page.goto('/Index.html');
     await page.waitForFunction(()=>window.InsightMigrationBackupV1&&window.InsightBackupPasswordV1&&
-      window.InsightQuickDateNavV1&&window.InsightSalesCount?.hasUnsavedInput);
+      window.InsightQuickDateNavV1&&window.InsightSalesCount?.hasUnsavedInput&&window.InsightInputDayNav?.hasUnsavedInput);
     await page.addScriptTag({url:'/insight_indexeddb_storage_v1.js'});
   }
   await open();
@@ -132,3 +132,44 @@ test('manual adoption uses the real encrypted backup confirmation and preserves 
     markerPreserved:true,rawPreserved:true
   });
 });
+
+for(const inputPage of [
+  {nav:'#nav2',field:'#salesForm input[type=text]',save:'#salesSaveBtn'},
+  {nav:'#nav3',field:'#kyakuGrid input',save:'#kyakuSaveBtn'},
+  {nav:'#nav4',field:'#haikiForm input[type=text]',save:'#haikiSaveBtn'}
+]){
+  test('migration preserves pending daily input on '+inputPage.nav,async({page})=>{
+    await page.route('**/Index.html*',async route=>{
+      const response=await route.fetch();
+      await route.fulfill({response,body:(await response.text()).replace(/;?\s*upgrade-insecure-requests/g,'')});
+    });
+    await page.goto('/Index.html');
+    await page.waitForFunction(()=>window.InsightMigrationBackupV1&&window.InsightQuickDateNavV1&&
+      window.InsightSalesCount?.hasUnsavedInput&&window.InsightInputDayNav?.hasUnsavedInput);
+    await page.addScriptTag({url:'/insight_indexeddb_storage_v1.js'});
+    await page.locator(inputPage.nav).click();
+    const field=page.locator(inputPage.field).first();
+    const raw=await page.evaluate(()=>{
+      const next=InsightStorage.migrateSnapshot(allStores);
+      next.stores['fictional-b']=JSON.parse(JSON.stringify(next.stores[next.current]));
+      allStores=next;
+      store=next.stores[next.current];
+      return InsightStorage.writeSnapshot(next);
+    });
+    await field.fill('987');
+    const attempt=()=>page.evaluate(()=>InsightIndexedDBStorageV1.migrate().catch(error=>error.message));
+    expect(await attempt()).toContain('未保存の入力または保存データの変更');
+    await expect(field).toHaveValue('987');
+    await expect(page.locator('#insightBackupOverlay')).toHaveCount(0);
+    expect(await page.evaluate(()=>localStorage.getItem('insight_v11'))).toBe(raw);
+    expect(await page.evaluate(()=>localStorage.getItem('insight_indexeddb_adoption_v1'))).toBeNull();
+
+    if(inputPage.nav==='#nav2'){
+      await page.evaluate(()=>InsightStorage.holdSnapshotWrites());
+      await page.locator(inputPage.save).click();
+      expect(await page.evaluate(()=>InsightInputDayNav.hasUnsavedInput())).toBe(true);
+      expect(await attempt()).toContain('未保存の入力または保存データの変更');
+      expect(await page.evaluate(()=>localStorage.getItem('insight_v11'))).toBe(raw);
+    }
+  });
+}
