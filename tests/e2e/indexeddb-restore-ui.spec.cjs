@@ -74,8 +74,9 @@ for(const scenario of ['success','unknown','newer revision']){
       target.stores[id].data[year]['1月'][0].売上=789;
       let committed;
       window.restoreFixture={
-        started:false,done:false,source,gate,id,year,rollbacks:0,
+        started:false,source,gate,id,year,rollbacks:0,writes:0,
         async write(snapshot){
+          this.writes++;
           await new Promise(resolve=>{this.release=resolve;this.started=true;});
           committed=await gate.save(before.revision,snapshot);
           if(scenario==='unknown')throw new Error('FICTIONAL commit response lost');
@@ -113,13 +114,37 @@ for(const scenario of ['success','unknown','newer revision']){
     await password(page,SAFETY);
     const download=await downloadPromise;
     expect(download.suggestedFilename()).toMatch(/^Insight_pre_/);
-    expect(JSON.parse(fs.readFileSync(await download.path(),'utf8')).format).toBe('InsightEncryptedBackup');
+    const safetyFile=JSON.parse(fs.readFileSync(await download.path(),'utf8'));
+    expect(safetyFile.format).toBe('InsightEncryptedBackup');
+    const safety=await page.evaluate(async ({safetyFile,SAFETY})=>{
+      const payload=await InsightBackupCryptoV1.decrypt(safetyFile,SAFETY);
+      const before=await restoreFixture.gate.load();
+      return {kind:payload.backupInfo.backupType,
+        matches:InsightStorage.serialize(payload.data)===before.raw};
+    },{safetyFile,SAFETY});
+    expect(safety).toEqual({kind:'preRestore',matches:true});
     expect(await page.evaluate(()=>restoreFixture.started)).toBe(false);
     await confirmSaved(page);
     await expect.poll(()=>page.evaluate(()=>restoreFixture.started)).toBe(true);
     expect(await page.evaluate(async ()=>({
       revision:(await restoreFixture.gate.load()).revision,success:__restoreSuccess
     }))).toEqual({revision:0,success:false});
+    if(scenario==='success'){
+      // Invoke the actual entry points while the first restore is waiting for its commit.
+      await page.evaluate(async file=>{
+        await backupData();
+        const duplicate=new File([JSON.stringify(file)],'FICTIONAL-duplicate.json',{type:'application/json'});
+        restoreData({target:{files:[duplicate],value:'duplicate'}});
+      },file);
+      const pending=await page.evaluate(async ()=>({
+        writes:restoreFixture.writes,revision:(await restoreFixture.gate.load()).revision,
+        success:__restoreSuccess,alerts:__backupAlerts
+      }));
+      expect(pending).toMatchObject({writes:1,revision:0,success:false});
+      expect(pending.alerts).toHaveLength(2);
+      expect(pending.alerts[0]).toContain('進行中');
+      expect(pending.alerts[1]).toContain('進行中');
+    }
     await page.evaluate(()=>restoreFixture.release());
     if(scenario==='success'){
       await expect.poll(()=>page.evaluate(()=>__restoreSuccess)).toBe(true);
