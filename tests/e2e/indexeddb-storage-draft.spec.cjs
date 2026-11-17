@@ -60,6 +60,8 @@ test('manual adoption uses the real encrypted backup confirmation and preserves 
   await confirm.click();
   expect(await page.evaluate(()=>migrationResult)).toEqual({revision:0,snapshot:source});
 
+  expect(await page.evaluate(()=>InsightIndexedDBStorageV1.diagnose())).toEqual({state:'active',revision:0});
+
   const result=await page.evaluate(async ()=>{
     const store=InsightIndexedDBStorageV1;
     const initial=await store.read();
@@ -74,4 +76,31 @@ test('manual adoption uses the real encrypted backup confirmation and preserves 
   expect(result).toEqual({saved:{revision:1,snapshot:source},conflict:'IndexedDB revision conflict',raw});
   await open();
   expect(await page.evaluate(()=>InsightIndexedDBStorageV1.read().catch(error=>error.message))).toBe('IndexedDB writes are on hold');
+  const diagnostic=await page.evaluate(async ()=>{
+    const store=InsightIndexedDBStorageV1;
+    const markerKey='insight_indexeddb_adoption_v1';
+    const before=localStorage.getItem(markerKey);
+    const originalRaw=localStorage.getItem('insight_v11');
+    const writing=await store.diagnose();
+    const unchanged=before===localStorage.getItem(markerKey);
+    localStorage.removeItem(markerKey);
+    const missingMarker=await store.diagnose();
+    localStorage.setItem(markerKey,before);
+    await new Promise((resolve,reject)=>{
+      const deletion=indexedDB.deleteDatabase('insight-store-snapshots-v1');
+      deletion.onsuccess=resolve;
+      deletion.onerror=()=>reject(deletion.error);
+      deletion.onblocked=()=>reject(new Error('Fixture database is still in use'));
+    });
+    const missingDatabase=await store.diagnose();
+    return {writing,unchanged,missingMarker,missingDatabase,
+      markerPreserved:localStorage.getItem(markerKey)===before,
+      rawPreserved:localStorage.getItem('insight_v11')===originalRaw};
+  });
+  expect(diagnostic).toEqual({
+    writing:{state:'hold',reason:'writing',observedRevision:1},unchanged:true,
+    missingMarker:{state:'hold',reason:'marker-missing'},
+    missingDatabase:{state:'hold',reason:'database-missing'},
+    markerPreserved:true,rawPreserved:true
+  });
 });

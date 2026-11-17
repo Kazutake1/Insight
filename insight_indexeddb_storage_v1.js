@@ -34,15 +34,18 @@
     });
   }
 
+  class MissingDatabaseError extends Error {}
+
   function open(create){
     return new Promise((resolve,reject)=>{
       const request=root.indexedDB.open(database,1);
       let blocked=false;
+      let missing=false;
       request.onupgradeneeded=()=>{
         if(create)request.result.createObjectStore(storeName);
-        else request.transaction.abort();
+        else {missing=true;request.transaction.abort();}
       };
-      request.onerror=()=>reject(request.error);
+      request.onerror=()=>reject(missing?new MissingDatabaseError('IndexedDB snapshot database is missing',{cause:request.error}):request.error);
       request.onblocked=()=>{
         blocked=true;
         reject(new Error('IndexedDB open is blocked'));
@@ -153,5 +156,35 @@
     });
   }
 
-  root.InsightIndexedDBStorageV1=Object.freeze({migrate,read,save});
+  // A diagnostic never promotes a record or clears a persistent hold.
+  async function diagnose(){
+    return exclusive(async ()=>{
+      const before=root.localStorage.getItem(markerKey);
+      const source=root.localStorage.getItem(sourceKey);
+      let adopted;
+      try{adopted=JSON.parse(before);}
+      catch(_){return {state:'hold',reason:'invalid-marker'};}
+      if(before!==null&&(!adopted||typeof adopted.id!=='string'||!adopted.id||
+         !['active','preparing','writing'].includes(adopted.state))){
+        return {state:'hold',reason:'invalid-marker'};
+      }
+      let record;
+      try{record=await readRecord();}
+      catch(error){
+        return {state:'hold',reason:error instanceof MissingDatabaseError?'database-missing':'database-unavailable'};
+      }
+      if(before!==root.localStorage.getItem(markerKey)||source!==root.localStorage.getItem(sourceKey)){
+        return {state:'hold',reason:'state-changed'};
+      }
+      if(!adopted)return {state:'hold',reason:'marker-missing'};
+      try{validateRecord(record,adopted.id);}
+      catch(_){return {state:'hold',reason:'record-unverified'};}
+      if(adopted.state!=='active'){
+        return {state:'hold',reason:adopted.state,observedRevision:record.revision};
+      }
+      return {state:'active',revision:record.revision};
+    });
+  }
+
+  root.InsightIndexedDBStorageV1=Object.freeze({migrate,read,save,diagnose});
 })(globalThis);
