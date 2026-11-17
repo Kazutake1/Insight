@@ -61,7 +61,31 @@ for(const scenario of ['success','unknown','newer revision']){
         if(!body.includes(from))throw new Error('Restore boundary changed: '+from);
         body=body.replace(from,to);
       }
-      await route.fulfill({response,body});
+      const completed='restoreOutcome="completed";';
+      if(!body.includes(completed))throw new Error('Restore completion boundary changed');
+      body=body.replace(completed,completed+"localStorage.removeItem('insight_test_only_restore_pending');");
+      const lock=String.raw`
+(function(){
+  const key='insight_test_only_restore_pending';
+  const storage=window.InsightStorage;
+  for(const method of ['persistCurrent','writeSnapshot','transaction']){
+    const original=storage[method];
+    storage[method]=function(...args){
+      if(localStorage.getItem(key)!==null)throw new Error('FICTIONAL restore write hold');
+      return original.apply(this,args);
+    };
+  }
+  document.addEventListener('click',event=>{
+    if(event.target.closest('#salesSaveBtn,#kyakuSaveBtn,#haikiSaveBtn')&&localStorage.getItem(key)!==null){
+      event.preventDefault();
+      event.stopImmediatePropagation();
+      window.__blockedRestoreSave=(window.__blockedRestoreSave||0)+1;
+    }
+  },true);
+  window.__restoreWriteGuardReady=true;
+})();
+`;
+      await route.fulfill({response,body:lock+body});
     });
     await setup(page);
     await page.evaluate(fs.readFileSync(path.join(__dirname,'../fixtures/indexeddb-verified-restart.js'),'utf8'));
@@ -77,6 +101,7 @@ for(const scenario of ['success','unknown','newer revision']){
         started:false,source,gate,id,year,rollbacks:0,writes:0,
         async write(snapshot){
           this.writes++;
+          localStorage.setItem('insight_test_only_restore_pending','1');
           await new Promise(resolve=>{this.release=resolve;this.started=true;});
           committed=await gate.save(before.revision,snapshot);
           if(scenario==='unknown')throw new Error('FICTIONAL commit response lost');
@@ -145,6 +170,10 @@ for(const scenario of ['success','unknown','newer revision']){
       expect(pending.alerts[0]).toContain('進行中');
       expect(pending.alerts[1]).toContain('進行中');
     }
+    // The busy modal intercepts pointer input. Exercise the underlying save guard too.
+    await page.evaluate(()=>gotoNav(2));
+    await page.locator('#salesSaveBtn').dispatchEvent('click');
+    expect(await page.evaluate(()=>window.__blockedRestoreSave)).toBe(1);
     await page.evaluate(()=>restoreFixture.release());
     if(scenario==='success'){
       await expect.poll(()=>page.evaluate(()=>__restoreSuccess)).toBe(true);
@@ -164,5 +193,22 @@ for(const scenario of ['success','unknown','newer revision']){
       'newer revision':{revision:2,value:654,live:123,rollbacks:1,success:false}
     };
     expect(final).toEqual({...expected[scenario],source:true});
+    const marker='insight_test_only_restore_pending';
+    expect(await page.evaluate(key=>localStorage.getItem(key),marker)).toBe(scenario==='success'?null:'1');
+    if(scenario==='unknown'){
+      const raw=await page.evaluate(()=>restoreFixture.source);
+      await page.reload({waitUntil:'domcontentloaded'});
+      await page.waitForFunction(()=>window.__restoreWriteGuardReady&&window.InsightSettings);
+      await page.locator('#nav2').click();
+      await page.locator('#salesSaveBtn').click();
+      expect(await page.evaluate(()=>window.__blockedRestoreSave)).toBe(1);
+      const preserved=await page.evaluate(({marker,raw})=>{
+        let refused=false;
+        try{InsightStorage.persistCurrent(allStores);}
+        catch(error){refused=error.message==='FICTIONAL restore write hold';}
+        return {refused,held:localStorage.getItem(marker)==='1',source:localStorage.getItem('insight_v11')===raw};
+      },{marker,raw});
+      expect(preserved).toEqual({refused:true,held:true,source:true});
+    }
   });
 }
