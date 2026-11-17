@@ -22,7 +22,7 @@
 
   function writeMarker(state,id){
     const raw=JSON.stringify({state,id});
-    root.localStorage.setItem(markerKey,raw);
+    root.InsightStorage.writeMetadata(markerKey,raw);
     if(root.localStorage.getItem(markerKey)!==raw)throw new Error('Adoption state could not be verified');
   }
 

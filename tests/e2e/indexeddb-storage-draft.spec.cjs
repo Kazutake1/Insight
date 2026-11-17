@@ -6,7 +6,8 @@ test('manual adoption, encrypted backup confirmation and durable write hold',asy
   await page.route('**'+fixture,route=>route.fulfill({body:'<!doctype html>',contentType:'text/html'}));
   async function open(){
     await page.goto(fixture);
-    for(const file of ['insight_backup_crypto_v1.js','insight_indexeddb_storage_v1.js']){
+    await page.evaluate(()=>{window.SK='insight_v11';});
+    for(const file of ['insight_storage_v1.js','insight_backup_crypto_v1.js','insight_indexeddb_storage_v1.js']){
       await page.addScriptTag({path:path.join(__dirname,'../../',file)});
     }
   }
