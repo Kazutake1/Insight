@@ -170,8 +170,9 @@ for(const scenario of ['success','unknown','newer revision']){
       expect(pending.alerts[0]).toContain('進行中');
       expect(pending.alerts[1]).toContain('進行中');
     }
-    await page.locator('#nav2').click();
-    await page.locator('#salesSaveBtn').click();
+    // The busy modal intercepts pointer input. Exercise the underlying save guard too.
+    await page.evaluate(()=>gotoNav(2));
+    await page.locator('#salesSaveBtn').dispatchEvent('click');
     expect(await page.evaluate(()=>window.__blockedRestoreSave)).toBe(1);
     await page.evaluate(()=>restoreFixture.release());
     if(scenario==='success'){
