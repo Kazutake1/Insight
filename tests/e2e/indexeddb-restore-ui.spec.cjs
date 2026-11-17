@@ -76,10 +76,17 @@ for(const scenario of ['success','unknown','newer revision','observer']){
     };
   }
   document.addEventListener('click',event=>{
-    if(event.target.closest('#salesSaveBtn,#kyakuSaveBtn,#haikiSaveBtn')&&localStorage.getItem(key)!==null){
+    if(event.target.closest('#salesSaveBtn,#kyakuSaveBtn,#haikiSaveBtn,#scSave')&&localStorage.getItem(key)!==null){
       event.preventDefault();
       event.stopImmediatePropagation();
       window.__blockedRestoreSave=(window.__blockedRestoreSave||0)+1;
+    }
+  },true);
+  document.addEventListener('change',event=>{
+    if(event.target.id==='storeSel'&&localStorage.getItem(key)!==null){
+      event.stopImmediatePropagation();
+      event.target.value=allStores.current;
+      window.__blockedRestoreStore=(window.__blockedRestoreStore||0)+1;
     }
   },true);
   window.__restoreWriteGuardReady=true;
@@ -180,7 +187,19 @@ for(const scenario of ['success','unknown','newer revision','observer']){
         await page.evaluate(index=>gotoNav(index),nav);
         await page.locator(button).dispatchEvent('click');
       }
-      expect(await page.evaluate(()=>window.__blockedRestoreSave)).toBe(3);
+      await page.evaluate(()=>gotoNav('salesCounts'));
+      const salesCount=page.locator('#scCalendar .sc-day:not(.empty) .sc-sales-row input[inputmode="numeric"]:not([readonly])').first();
+      await salesCount.evaluate(input=>{input.value='71';input.dispatchEvent(new Event('input',{bubbles:true}));});
+      await expect(page.locator('#scSave')).toBeEnabled();
+      await page.locator('#scSave').dispatchEvent('click');
+      const current=await page.evaluate(()=>allStores.current);
+      await page.locator('#storeSel').evaluate(select=>{
+        select.value='FICTIONAL-other-store';
+        select.dispatchEvent(new Event('change',{bubbles:true}));
+      });
+      expect(await page.evaluate(()=>({saved:window.__blockedRestoreSave, switched:window.__blockedRestoreStore,
+        current:allStores.current, display:document.getElementById('storeSel').value
+      }))).toEqual({saved:4,switched:1,current,display:current});
       expect(await page.evaluate(()=>InsightRestoreOperationObserverV0.getStatus().state)).toBe('ACTIVE');
     }
     await page.evaluate(()=>restoreFixture.release());
@@ -201,6 +220,7 @@ for(const scenario of ['success','unknown','newer revision','observer']){
     }else{
       await expect.poll(()=>page.evaluate(()=>__backupAlerts.join('\n'))).toContain(
         scenario==='unknown'?'現在の保存状態を確認できませんでした':'Pilot revision conflict');
+      await expect.poll(()=>page.evaluate(()=>InsightRestoreOperationObserverV0.getStatus().state)).toBe('HELD');
     }
     const final=await page.evaluate(async ()=>{
       const f=restoreFixture, state=await f.gate.load();
