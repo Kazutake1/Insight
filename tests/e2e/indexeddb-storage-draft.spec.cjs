@@ -163,8 +163,11 @@ test('manual adoption uses the real encrypted backup confirmation and preserves 
     const missingDatabase=await store.diagnose();
     localStorage.removeItem(markerKey);
     const bothMissing=await store.diagnose({verifyInterrupted:true});
+    const repeatedMigration=await store.migrate().catch(error=>error.message);
+    const markerStillMissing=localStorage.getItem(markerKey)===null;
+    const stillMissing=await store.diagnose();
     localStorage.setItem(markerKey,before);
-    return {writing,unchanged,missingMarker,missingDatabase,bothMissing,
+    return {writing,unchanged,missingMarker,missingDatabase,bothMissing,repeatedMigration,markerStillMissing,stillMissing,
       markerPreserved:localStorage.getItem(markerKey)===before,
       rawPreserved:localStorage.getItem('insight_v11')===originalRaw};
   });
@@ -173,6 +176,9 @@ test('manual adoption uses the real encrypted backup confirmation and preserves 
     missingMarker:{state:'hold',reason:'marker-missing'},
     missingDatabase:{state:'hold',reason:'database-missing'},
     bothMissing:{state:'hold',reason:'database-missing'},
+    repeatedMigration:'Existing migration requires review',
+    markerStillMissing:true,
+    stillMissing:{state:'hold',reason:'database-missing'},
     markerPreserved:true,rawPreserved:true
   });
 });
@@ -295,6 +301,16 @@ test('recovery distinguishes an interrupted migration copy, an aborted save and 
     const writingMarker=localStorage.getItem(markerKey);
     const writing=await inspect();
     const repeated=await inspect();
+    let displayed;
+    const cancelled=await storage.reviewRecovery(summary=>{displayed=summary;return false;});
+    const confirmed=await storage.reviewRecovery(()=>true);
+    const race=await storage.reviewRecovery(()=>{
+      const changed=JSON.parse(writingMarker);
+      changed.reviewChanged=true;
+      writeMetadata(markerKey,JSON.stringify(changed));
+      return true;
+    }).catch(error=>error.message);
+    writeMetadata(markerKey,writingMarker);
     const nativeDigest=crypto.subtle.digest;
     let changedDuringCheck;
     crypto.subtle.digest=function(...args){
@@ -312,7 +328,7 @@ test('recovery distinguishes an interrupted migration copy, an aborted save and 
     const originalBytesHeld=localStorage.getItem(sourceKey)===raw;
     localStorage.setItem(sourceKey,' '+raw); // Model different bytes written by an older tab.
     const sourceChanged=await inspect();
-    return {adoptionError,preparing,preparingHeld,saveError,writing,repeated,changedDuringCheck,invalidMarker,wrongAdoption,blocked,originalBytesHeld,sourceChanged,
+    return {adoptionError,preparing,preparingHeld,saveError,writing,repeated,displayed,cancelled,confirmed,race,changedDuringCheck,invalidMarker,wrongAdoption,blocked,originalBytesHeld,sourceChanged,
       markerPreserved:localStorage.getItem(markerKey)===writingMarker,
       changedSourcePreserved:localStorage.getItem(sourceKey)===' '+raw};
   });
@@ -323,6 +339,12 @@ test('recovery distinguishes an interrupted migration copy, an aborted save and 
     saveError:'QuotaExceededError',
     writing:{state:'hold',reason:'writing',observedRevision:0,recovery:'prior-save-verified'},
     repeated:{state:'hold',reason:'writing',observedRevision:0,recovery:'prior-save-verified'},
+    displayed:{outcome:'prior-save-verified',revision:0,previousRevision:null,stores:[
+      {id:'a',name:'a',years:['2025','2026']},{id:'b',name:'b',years:['2025','2026']}
+    ]},
+    cancelled:{state:'hold',review:'cancelled'},
+    confirmed:{state:'hold',review:'confirmed',revision:0},
+    race:'Recovery data changed',
     changedDuringCheck:{state:'hold',reason:'state-changed'},
     invalidMarker:{state:'hold',reason:'invalid-marker'},
     wrongAdoption:{state:'hold',reason:'record-unverified'},

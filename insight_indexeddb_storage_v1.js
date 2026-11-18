@@ -2,6 +2,7 @@
 (function(root){
   'use strict';
   const database='insight-store-snapshots-v1';
+  const historyDatabase='insight-migration-history-v1';
   const markerKey='insight_indexeddb_adoption_v1';
   const sourceKey='insight_v11';
   const recordKey='current';
@@ -36,9 +37,9 @@
 
   class MissingDatabaseError extends Error {}
 
-  function open(create){
+  function open(create,name){
     return new Promise((resolve,reject)=>{
-      const request=root.indexedDB.open(database,1);
+      const request=root.indexedDB.open(name,1);
       let blocked=false;
       let missing=false;
       request.onupgradeneeded=()=>{
@@ -59,8 +60,8 @@
     });
   }
 
-  async function transact(mode,operation,create=false){
-    const db=await open(create);
+  async function transact(mode,operation,create=false,name=database){
+    const db=await open(create,name);
     try{
       return await new Promise((resolve,reject)=>{
         const tx=db.transaction(storeName,mode);
@@ -79,6 +80,27 @@
   }
 
   function readRecord(){return transact('readonly',record=>record);}
+
+  async function requireFirstMigration(){
+    for(const name of [historyDatabase,database]){
+      try{await transact('readonly',record=>record,false,name);}
+      catch(error){
+        if(error instanceof MissingDatabaseError)continue;
+        throw error;
+      }
+      throw new Error('Existing migration requires review');
+    }
+  }
+
+  async function recordMigrationAttempt(id){
+    await transact('readwrite',(existing,records)=>{
+      if(existing)throw new Error('Existing migration requires review');
+      records.add({id},recordKey);
+    },true,historyDatabase);
+    const saved=await transact('readonly',record=>record,false,historyDatabase);
+    if(saved?.id!==id)throw new Error('Migration history could not be verified');
+  }
+
 
   function validateRecord(record,id){
     if(!record||record.id!==id||typeof record.sourceRaw!=='string'||
@@ -107,12 +129,16 @@
   async function migrate(){
     return exclusive(async ()=>{
       if(marker()!==null)throw new Error('Existing migration requires review');
+      await requireFirstMigration();
       const raw=root.localStorage.getItem(sourceKey);
       if(raw===null)throw new Error('Legacy Insight data is missing');
       parse(raw);
       if(await root.InsightMigrationBackupV1.confirm(raw)!==true)throw new Error('Backup save was not confirmed');
       root.InsightMigrationBackupV1.assertReady(raw);
       const id=root.crypto.randomUUID();
+      await recordMigrationAttempt(id);
+      root.InsightMigrationBackupV1.assertReady(raw);
+      if(marker()!==null)throw new Error('Existing migration requires review');
       writeMarker('preparing',id);
       const initial={id,sourceRaw:raw,raw,revision:0,previous:null};
       await transact('readwrite',(existing,records)=>{
@@ -233,5 +259,40 @@
     });
   }
 
-  root.InsightIndexedDBStorageV1=Object.freeze({migrate,read,save,diagnose});
+  async function recoveryEvidence(){
+    const markerRaw=root.localStorage.getItem(markerKey);
+    const adopted=JSON.parse(markerRaw);
+    if(!['preparing','writing'].includes(adopted?.state))
+      throw new Error('No held migration or save to review');
+    const record=validateRecord(await readRecord(),adopted.id);
+    const outcome=await inspectHeldRecord(adopted,record);
+    if(outcome==='unverified')throw new Error('Recovery could not be verified');
+    const frozenRecord=JSON.stringify(record);
+    if(JSON.stringify(await readRecord())!==frozenRecord||
+       root.localStorage.getItem(markerKey)!==markerRaw||
+       root.localStorage.getItem(sourceKey)!==record.sourceRaw){
+      throw new Error('Recovery data changed');
+    }
+    const snapshot=parse(record.raw);
+    const stores=Object.entries(snapshot.stores).map(([id,store])=>({
+      id,name:store.name??id,years:Array.isArray(store.years)?store.years:[]
+    }));
+    return {markerRaw,frozenRecord,review:{
+      outcome,revision:record.revision,previousRevision:record.previous?.revision??null,stores
+    }};
+  }
+
+  // The draft exercises confirmation and revalidation, without activating writes.
+  async function reviewRecovery(confirm){
+    const before=await exclusive(recoveryEvidence);
+    if(await confirm(before.review)!==true)return {state:'hold',review:'cancelled'};
+    return exclusive(async ()=>{
+      const after=await recoveryEvidence();
+      if(after.markerRaw!==before.markerRaw||after.frozenRecord!==before.frozenRecord)
+        throw new Error('Recovery data changed');
+      return {state:'hold',review:'confirmed',revision:after.review.revision};
+    });
+  }
+
+  root.InsightIndexedDBStorageV1=Object.freeze({migrate,read,save,diagnose,reviewRecovery});
 })(globalThis);
