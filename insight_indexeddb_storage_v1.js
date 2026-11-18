@@ -164,7 +164,9 @@
         validateRecord(initial,id);
         records.add(initial,recordKey);
       },true);
-      verify(await readRecord(),initial);
+      const committed=await readRecord();
+      await requireHistory(id);
+      verify(committed,initial);
       writeMarker('active',id);
       return {revision:0,snapshot:parse(raw)};
     });
@@ -172,8 +174,13 @@
 
   async function read(){
     return exclusive(async ()=>{
+      const markerRaw=root.localStorage.getItem(markerKey);
       const adopted=activeMarker();
-      const current=validateRecord(await readRecord(),adopted.id);
+      const record=await readRecord();
+      await requireHistory(adopted.id);
+      if(root.localStorage.getItem(markerKey)!==markerRaw)
+        throw new Error('IndexedDB adoption state changed');
+      const current=validateRecord(record,adopted.id);
       return {revision:current.revision,snapshot:parse(current.raw)};
     });
   }
@@ -207,7 +214,9 @@
         records.put(candidate,recordKey);
         return candidate;
       });
-      verify(await readRecord(),next);
+      const committed=await readRecord();
+      await requireHistory(adopted.id);
+      verify(committed,next);
       writeMarker('active',adopted.id);
       return {revision:next.revision,snapshot:parse(next.raw)};
     });
@@ -294,7 +303,9 @@
     const outcome=await inspectHeldRecord(adopted,record);
     if(outcome==='unverified')throw new Error('Recovery could not be verified');
     const frozenRecord=JSON.stringify(record);
-    if(JSON.stringify(await readRecord())!==frozenRecord||
+    const reread=await readRecord();
+    await requireHistory(adopted.id);
+    if(JSON.stringify(reread)!==frozenRecord||
        root.localStorage.getItem(markerKey)!==markerRaw||
        root.localStorage.getItem(sourceKey)!==record.sourceRaw){
       throw new Error('Recovery data changed');

@@ -46,7 +46,7 @@ test('manual adoption uses the real encrypted backup confirmation and preserves 
   await expect(page.locator('#insightBackupOverlay')).toHaveCount(0);
   expect(await page.evaluate(()=>localStorage.getItem('insight_indexeddb_adoption_v1'))).toBeNull();
 
-  const password='fictional-draft-password';
+  const password='Fit123';
   const confirm=page.getByRole('button',{name:'保存したファイルを確認した',exact:true});
   async function startBackup(){
     await page.evaluate(()=>{
@@ -403,7 +403,7 @@ test('history-only migration attempt stays held after reload with two-store sour
   });
 });
 
-test('lost or mismatched migration history blocks saves without changing snapshot or marker',async({page})=>{
+test('lost or mismatched migration history blocks reads and saves without changing snapshot or marker',async({page})=>{
   await page.route('**/history-guard-fixture',route=>route.fulfill({
     contentType:'text/html',body:'<!DOCTYPE html><title>Fictional history guard fixture</title>'
   }));
@@ -431,6 +431,7 @@ test('lost or mismatched migration history blocks saves without changing snapsho
     });
     db.close();
     const mismatched=await storage.diagnose();
+    const mismatchRead=await storage.read().catch(error=>error.message);
     const mismatchSave=await storage.save(0,snapshot).catch(error=>error.message);
     await new Promise((resolve,reject)=>{
       const request=indexedDB.deleteDatabase('insight-migration-history-v1');
@@ -439,15 +440,18 @@ test('lost or mismatched migration history blocks saves without changing snapsho
       request.onblocked=()=>reject(new Error('History deletion was blocked in fixture'));
     });
     const missing=await storage.diagnose();
+    const missingRead=await storage.read().catch(error=>error.message);
     const missingSave=await storage.save(0,snapshot).catch(error=>error.message);
-    return {mismatched,mismatchSave,missing,missingSave,
+    return {mismatched,mismatchRead,mismatchSave,missing,missingRead,missingSave,
       markerUnchanged:localStorage.getItem('insight_indexeddb_adoption_v1')===marker,
       rawUnchanged:localStorage.getItem('insight_v11')===raw};
   });
   expect(result).toEqual({
     mismatched:{state:'hold',reason:'history-mismatch'},
+    mismatchRead:'Migration history requires review',
     mismatchSave:'Migration history requires review',
     missing:{state:'hold',reason:'history-missing'},
+    missingRead:'Migration history requires review',
     missingSave:'Migration history requires review',
     markerUnchanged:true,rawUnchanged:true
   });
