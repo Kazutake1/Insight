@@ -76,10 +76,14 @@ test('FICTIONAL insecure contexts fail closed; no JSON fallback',async()=>{
   await assert.rejects(api.decrypt(encrypted,PASSWORD),/HTTPS/);
 });
 
-test('FICTIONAL short passwords and oversized payload are rejected',async()=>{
+test('FICTIONAL six-character password works, short/blank passwords and oversized payload are rejected',async()=>{
   const api=codec();
-  await assert.rejects(api.encrypt(clone(storeSnapshot),'short'),/12文字以上/);
-  await assert.rejects(api.encrypt(clone(storeSnapshot),'            '),/12文字以上/);
+  await assert.rejects(api.encrypt(clone(storeSnapshot),'short'),/6文字以上/);
+  await assert.rejects(api.encrypt(clone(storeSnapshot),'      '),/6文字以上/);
+  await assert.rejects(api.encrypt(clone(storeSnapshot),'            '),/6文字以上/);
+  const file=await api.encrypt(clone(storeSnapshot),'123456');
+  assert.deepEqual(clone(await api.decrypt(file,'123456')),clone(storeSnapshot));
+  await assert.rejects(api.decrypt(file,'12345'),/6文字以上/);
   await assert.rejects(api.encrypt({payload:'A'.repeat(15*1024*1024)},PASSWORD),/大きすぎます/);
 });
 
