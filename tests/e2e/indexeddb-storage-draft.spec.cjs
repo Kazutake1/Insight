@@ -242,3 +242,63 @@ for(const inputPage of [
     }
   });
 }
+
+test('recovery distinguishes an interrupted migration copy, an aborted save and a changed source',async({page})=>{
+  await page.route('**/recovery-fixture',route=>route.fulfill({contentType:'text/html',body:'<!DOCTYPE html><title>Fictional recovery fixture</title>'}));
+  await page.goto('/recovery-fixture');
+  await page.addScriptTag({url:'/insight_indexeddb_storage_v1.js'});
+  const result=await page.evaluate(async ()=>{
+    const storage=InsightIndexedDBStorageV1;
+    const markerKey='insight_indexeddb_adoption_v1',sourceKey='insight_v11';
+    const original={current:'a',stores:{
+      a:{years:['2025','2026'],data:{2025:{sales:123},2026:{sales:456}}},
+      b:{years:['2025','2026'],data:{2025:{sales:321},2026:{sales:654}}}
+    }};
+    const raw=JSON.stringify(original);
+    localStorage.setItem(sourceKey,raw);
+    const writeMetadata=(key,value)=>localStorage.setItem(key,value);
+    window.InsightStorage={writeMetadata(key,value){
+      if(JSON.parse(value).state==='active')throw new Error('Fixture interrupted adoption');
+      writeMetadata(key,value);
+    }};
+    window.InsightMigrationBackupV1={confirm:async()=>true,assertReady(){}};
+    const adoptionError=await storage.migrate().catch(error=>error.message);
+    const preparingMarker=localStorage.getItem(markerKey);
+    const inspect=()=>storage.diagnose({verifyInterrupted:true});
+    const preparing=await inspect();
+    const preparingHeld=localStorage.getItem(markerKey)===preparingMarker;
+
+    // Activate only inside the fixture to construct a separate interrupted-write case.
+    const {id}=JSON.parse(preparingMarker);
+    writeMetadata(markerKey,JSON.stringify({id,state:'active'}));
+    InsightStorage.writeMetadata=writeMetadata;
+    const put=IDBObjectStore.prototype.put;
+    let saveError;
+    try{
+      IDBObjectStore.prototype.put=function(){throw new DOMException('Fixture quota failure','QuotaExceededError');};
+      const candidate=JSON.parse(raw);
+      candidate.stores.a.data['2026'].sales=999;
+      saveError=await storage.save(0,candidate).catch(error=>error.name);
+    }finally{IDBObjectStore.prototype.put=put;}
+    const writingMarker=localStorage.getItem(markerKey);
+    const writing=await inspect();
+    const blocked=await storage.save(0,original).catch(error=>error.message);
+    const originalBytesHeld=localStorage.getItem(sourceKey)===raw;
+    localStorage.setItem(sourceKey,' '+raw); // Model different bytes written by an older tab.
+    const sourceChanged=await inspect();
+    return {adoptionError,preparing,preparingHeld,saveError,writing,blocked,originalBytesHeld,sourceChanged,
+      markerPreserved:localStorage.getItem(markerKey)===writingMarker,
+      changedSourcePreserved:localStorage.getItem(sourceKey)===' '+raw};
+  });
+  expect(result).toEqual({
+    adoptionError:'Fixture interrupted adoption',
+    preparing:{state:'hold',reason:'preparing',observedRevision:0,recovery:'migration-copy-verified'},
+    preparingHeld:true,
+    saveError:'QuotaExceededError',
+    writing:{state:'hold',reason:'writing',observedRevision:0,recovery:'prior-save-verified'},
+    blocked:'IndexedDB writes are on hold',
+    originalBytesHeld:true,
+    sourceChanged:{state:'hold',reason:'record-unverified'},
+    markerPreserved:true,changedSourcePreserved:true
+  });
+});

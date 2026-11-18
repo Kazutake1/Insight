@@ -146,12 +146,17 @@
       const adopted=activeMarker();
       const raw=JSON.stringify(snapshot);
       parse(raw);
+      const baseline=validateRecord(await readRecord(),adopted.id);
+      // Record both versions before opening the write transaction.
+      const [candidateDigest,baselineDigest]=await Promise.all([digest(raw),digest(baseline.raw)]);
+      const operation={id:root.crypto.randomUUID(),expectedRevision,digest:candidateDigest,
+        baselineDigest,baselineWriteId:baseline.writeId??null};
       // Leave a persistent hold if the browser exits or the outcome is unclear.
-      const operation={id:root.crypto.randomUUID(),expectedRevision,digest:await digest(raw)};
       writeMarker('writing',adopted.id,operation);
       const next=await transact('readwrite',(record,records)=>{
-        const current=validateRecord(record,adopted.id);
-        if(current.revision!==expectedRevision||current.revision>=Number.MAX_SAFE_INTEGER)
+        const current=verify(record,baseline);
+        if(current.revision!==expectedRevision||current.revision>=Number.MAX_SAFE_INTEGER||
+           current.writeId!==baseline.writeId)
           throw new Error('IndexedDB revision conflict');
         const candidate={...current,raw,revision:current.revision+1,writeId:operation.id,
           previous:{revision:current.revision,raw:current.raw}};
@@ -173,11 +178,18 @@
     }
     const operation=adopted.operation;
     if(!operation||typeof operation.id!=='string'||!Number.isSafeInteger(operation.expectedRevision)||
-       record.writeId!==operation.id||record.revision!==operation.expectedRevision+1||
+       typeof operation.baselineDigest!=='string')return 'unverified';
+    if(record.revision===operation.expectedRevision&&record.writeId!==operation.id&&
+       (record.writeId??null)===operation.baselineWriteId){
+      return await digest(record.raw)===operation.baselineDigest?'prior-save-verified':'unverified';
+    }
+    if(record.writeId!==operation.id||record.revision!==operation.expectedRevision+1||
        record.previous?.revision!==operation.expectedRevision||
        typeof record.previous.raw!=='string')return 'unverified';
     parse(record.previous.raw);
-    return await digest(record.raw)===operation.digest?'save-verified':'unverified';
+    const [currentDigest,previousDigest]=await Promise.all([digest(record.raw),digest(record.previous.raw)]);
+    return currentDigest===operation.digest&&previousDigest===operation.baselineDigest?
+      'save-verified':'unverified';
   }
 
   // A diagnostic never promotes a record or clears a persistent hold.
@@ -206,8 +218,11 @@
       if(adopted.state!=='active'){
         const diagnostic={state:'hold',reason:adopted.state,observedRevision:record.revision};
         if(verifyInterrupted){
-          try{diagnostic.recovery=await inspectHeldRecord(adopted,record);}
-          catch(_){diagnostic.recovery='unverified';}
+          try{
+            diagnostic.recovery=await inspectHeldRecord(adopted,record);
+            const reread=await readRecord();
+            if(!reread||JSON.stringify(reread)!==JSON.stringify(record))return {state:'hold',reason:'state-changed'};
+          }catch(_){diagnostic.recovery='unverified';}
           if(before!==root.localStorage.getItem(markerKey)||source!==root.localStorage.getItem(sourceKey)){
             return {state:'hold',reason:'state-changed'};
           }
