@@ -76,6 +76,38 @@ test('FICTIONAL real modal: centered light/dark spacing, mismatch, encrypted two
   expect(await page.evaluate(()=>__backupCsp)).toEqual([]);
 });
 
+test('FICTIONAL six-character backup password creates and restores encrypted file, five characters are rejected',async({page})=>{
+  await setup(page);
+  const original=await page.evaluate(()=>JSON.parse(JSON.stringify(allStores)));
+  await page.locator('#backupBtn').click();
+  await expect(page.locator('#insightBackupPassword')).toHaveAttribute('minlength','6');
+  await expect(page.locator('#insightBackupPasswordConfirm')).toHaveAttribute('minlength','6');
+  await expect(page.locator('.insight-backup-panel')).toContainText('6〜1024文字');
+  await page.locator('#insightBackupPassword').fill('12345');
+  await page.locator('#insightBackupPasswordConfirm').fill('12345');
+  expect(await page.locator('#insightBackupPassword').evaluate(input=>input.checkValidity())).toBe(false);
+  await page.locator('#insightBackupOverlay button[type=submit]').click();
+  await expect(page.locator('#insightBackupPassword')).toBeVisible();
+
+  const event=page.waitForEvent('download');
+  await password(page,'123456');
+  const file=await downloaded(await event);
+  expect(file.format).toBe('InsightEncryptedBackup');
+  expect(await page.evaluate(({file})=>InsightBackupCryptoV1.decrypt(file,'123456'),{file})).toEqual({
+    backupInfo:expect.anything(),data:original
+  });
+  await confirmSaved(page);
+  await page.evaluate(()=>{
+    allStores.stores[allStores.current].name='FICTIONAL edited after backup';
+    InsightStorage.persistCurrent(allStores);
+  });
+  await upload(page,file);
+  await expect(page.locator('#insightBackupPassword')).toHaveAttribute('minlength','6');
+  await password(page,'123456',false);
+  await page.waitForFunction(()=>document.getElementById('restoreFile').value==='');
+  expect(await page.evaluate(()=>InsightStorage.readSnapshot())).toEqual(original);
+});
+
 for(const mode of ['unavailable','safety-failure']){
   test('FICTIONAL '+mode+' stops legacy restore before any snapshot write or plaintext download',async({page})=>{
     await setup(page);await enableSafetyBackup(page);const raw=await page.evaluate(()=>localStorage.getItem('insight_v11'));
