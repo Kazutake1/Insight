@@ -21,9 +21,9 @@
     return root.crypto;
   }
   function passwordBytes(password){
-    if(typeof password!=='string'||password.length<12||password.length>1024||
+    if(typeof password!=='string'||password.length<6||password.length>1024||
        !/\S/u.test(password)){
-      throw new Error('パスワードは12文字以上1024文字以下で設定してください。');
+      throw new Error('パスワードは6文字以上1024文字以下で設定してください。');
     }
     return encoder.encode(password);
   }

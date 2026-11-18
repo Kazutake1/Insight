@@ -39,13 +39,13 @@
   function request(options){
     var panel=shell(options.title),form=document.createElement('form');
     var note=document.createElement('p');note.textContent=options.confirm
-      ?'12〜1024文字で設定してください。パスワードを忘れると復号できません。保存・送信はしません。'
+      ?'6〜1024文字で設定してください。パスワードを忘れると復号できません。保存・送信はしません。'
       :'このバックアップの作成時に設定したパスワードを入力してください。';
     panel.appendChild(note);
     var inputs=[];
     ['パスワード'].concat(options.confirm?['確認入力']:[]).forEach(function(text,index){
       var label=document.createElement('label');label.textContent=text;
-      var input=document.createElement('input');input.type='password';input.autocomplete='off';input.required=true;input.minLength=12;input.maxLength=1024;
+      var input=document.createElement('input');input.type='password';input.autocomplete='off';input.required=true;input.minLength=6;input.maxLength=1024;
       input.id=index?'insightBackupPasswordConfirm':'insightBackupPassword';
       label.appendChild(input);form.appendChild(label);inputs.push(input);
     });
@@ -55,7 +55,7 @@
     var submit=document.createElement('button');submit.type='submit';submit.textContent=options.confirm?'暗号化して続行':'復号して続行';actions.appendChild(submit);form.appendChild(actions);panel.appendChild(form);
     form.addEventListener('submit',function(event){
       event.preventDefault();var password=inputs[0].value;
-      if(password.length<12||password.length>1024||! /\S/u.test(password)){error.textContent='12〜1024文字のパスワードを入力してください。';return;}
+      if(password.length<6||password.length>1024||! /\S/u.test(password)){error.textContent='6〜1024文字のパスワードを入力してください。';return;}
       if(inputs[1]&&inputs[1].value!==password){error.textContent='確認入力が一致しません。';return;}
       var resolve=pending;pending=null;inputs.forEach(function(input){input.value='';});
       if(resolve)resolve(password);
