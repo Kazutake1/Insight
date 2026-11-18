@@ -5,7 +5,7 @@ test.use({viewport:{width:1194,height:834}});
 test('FICTIONAL all-period sale history shows twenty rows with scrolling and opens details on demand',async({page})=>{
   await page.route('**/Index.html*',async route=>{
     const response=await route.fetch();
-    await route.fulfill({response,body:(await response.text()).replace(/;?\\s*upgrade-insecure-requests/g,'')});
+    await route.fulfill({response,body:(await response.text()).replace(/;?\s*upgrade-insecure-requests/g,'')});
   });
   await page.goto('/Index.html');
   await page.waitForFunction(()=>window.InsightSaleResults?.getState&&window.InsightEvents&&
@@ -17,9 +17,10 @@ test('FICTIONAL all-period sale history shows twenty rows with scrolling and ope
     if(!allStores.eventManagement)allStores.eventManagement={version:1,presets:[],events:[]};
     allStores.eventManagement.events=[];
     allStores.stores[allStores.current].events=[];
+    const now=new Date();
     for(let i=0;i<27;i++){
-      const date=new Date(2024,i,15);
-      const value=date.getFullYear()+'-'+String(date.getMonth()+1).padStart(2,'0')+'-15';
+      const date=new Date(now.getFullYear(),now.getMonth()-26+i,1);
+      const value=date.getFullYear()+'-'+String(date.getMonth()+1).padStart(2,'0')+'-01';
       allStores.eventManagement.events.push({
         id:'FICTIONAL_sale_'+i,type:'sale',scope:'global',
         startDate:value,endDate:value,
@@ -34,7 +35,7 @@ test('FICTIONAL all-period sale history shows twenty rows with scrolling and ope
   });
   expect(initial).toEqual({period:'12',events:27});
   await expect(page.locator('#pageSaleResults.show')).toBeVisible();
-  await expect(page.locator('#srListBody tr')).toHaveCount(3);
+  await expect(page.locator('#srListBody tr')).toHaveCount(12);
   await expect(page.locator('#srGroups .sr-group-toggle')).toHaveCount(2);
   await expect(page.locator('#srGroups .sr-day-grid')).toHaveCount(0);
 
@@ -83,7 +84,7 @@ test('FICTIONAL all-period sale history shows twenty rows with scrolling and ope
   await expect(first.locator('.sr-occurrence-grids')).toBeHidden();
 
   await page.locator('#srPeriodTabs button[data-period="12"]').click();
-  await expect(page.locator('#srListBody tr')).toHaveCount(3);
+  await expect(page.locator('#srListBody tr')).toHaveCount(12);
   await expect(scroller).not.toHaveAttribute('tabindex');
   expect(await scroller.evaluate(node=>node.style.maxHeight)).toBe('');
   expect(await page.evaluate(()=>localStorage.getItem('insight_v11')===window.__saleResultsOriginalRaw)).toBe(true);
