@@ -331,5 +331,30 @@
     });
   }
 
-  root.InsightIndexedDBStorageV1=Object.freeze({migrate,read,save,diagnose,reviewRecovery});
+  async function historyOnlyEvidence(){
+    const raw=root.localStorage.getItem(sourceKey);
+    const history=await migrationHistory();
+    let record;
+    try{record=await readRecord();}
+    catch(error){if(!(error instanceof MissingDatabaseError))throw error;}
+    if(raw===null||history.kind!=='recorded'||record||
+       root.localStorage.getItem(markerKey)!==null||root.localStorage.getItem(sourceKey)!==raw)
+      throw new Error('History-only recovery could not be verified');
+    parse(raw);
+    return {raw,id:history.id};
+  }
+
+  // The actual backup file is verified without resuming or restoring data.
+  async function reviewHistoryOnlyBackup(file,password,confirm){
+    const before=await exclusive(historyOnlyEvidence);
+    const summary=await root.InsightMigrationBackupV1.verify(file,password,before.raw);
+    if(await confirm(summary)!==true)return {state:'hold',review:'cancelled'};
+    return exclusive(async ()=>{
+      const after=await historyOnlyEvidence();
+      if(after.raw!==before.raw||after.id!==before.id)throw new Error('Recovery data changed');
+      return {state:'hold',review:'confirmed'};
+    });
+  }
+
+  root.InsightIndexedDBStorageV1=Object.freeze({migrate,read,save,diagnose,reviewRecovery,reviewHistoryOnlyBackup});
 })(globalThis);

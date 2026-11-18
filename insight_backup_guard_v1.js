@@ -621,5 +621,16 @@ function encryptedRestoreData(e){
 }
 if(entrypoints.register({version:1,backup:encryptedBackupData,restore:encryptedRestoreData})!==true)
   throw new Error("Encrypted backup entry points could not be registered safely");
-window.InsightMigrationBackupV1=Object.freeze({confirm:confirmMigrationBackup,assertReady:assertMigrationReady});
+async function verifyMigrationBackup(file,password,sourceRaw){
+  var decoded=parseBackupEnvelope(await cryptoCodec().decrypt(file,password));
+  if(decoded.legacy)throw validationError('バックアップの店舗・年度情報を確認できません。');
+  validateBackupInfo(decoded.info,decoded.data);
+  var storage=window.InsightStorage;
+  if(storage.serialize(decoded.data)!==storage.serialize(JSON.parse(sourceRaw)))
+    throw validationError('バックアップと移行元のデータが一致しません。');
+  return {createdAt:decoded.info.createdAt,stores:backupStoreInfo(decoded.data)};
+}
+window.InsightMigrationBackupV1=Object.freeze({
+  confirm:confirmMigrationBackup,assertReady:assertMigrationReady,verify:verifyMigrationBackup
+});
 })();

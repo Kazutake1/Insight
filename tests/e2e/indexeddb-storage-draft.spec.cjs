@@ -144,7 +144,7 @@ test('manual adoption uses the real encrypted backup confirmation and preserves 
   expect(result).toEqual({saved:{revision:2,snapshot:source},conflict:'IndexedDB revision conflict',raw});
   await open();
   expect(await page.evaluate(()=>InsightIndexedDBStorageV1.read().catch(error=>error.message))).toBe('IndexedDB writes are on hold');
-  const diagnostic=await page.evaluate(async ()=>{
+  const diagnostic=await page.evaluate(async ({file,password})=>{
     const store=InsightIndexedDBStorageV1;
     const markerKey='insight_indexeddb_adoption_v1';
     const before=localStorage.getItem(markerKey);
@@ -163,19 +163,41 @@ test('manual adoption uses the real encrypted backup confirmation and preserves 
     const missingDatabase=await store.diagnose();
     localStorage.removeItem(markerKey);
     const bothMissing=await store.diagnose({verifyInterrupted:true});
+    const wrongPassword=await store.reviewHistoryOnlyBackup(file,'Wrong6',()=>true)
+      .then(()=>false,()=>true);
+    localStorage.setItem('insight_v11',originalRaw.replace('"売上":123','"売上":124'));
+    const wrongBackup=await store.reviewHistoryOnlyBackup(file,password,()=>true).catch(error=>error.message);
+    localStorage.setItem('insight_v11',originalRaw);
+    const cancelled=await store.reviewHistoryOnlyBackup(file,password,()=>false);
+    let reviewedStores;
+    const confirmed=await store.reviewHistoryOnlyBackup(file,password,summary=>{
+      reviewedStores=summary.stores.map(shop=>shop.name);
+      return true;
+    });
+    const changed=await store.reviewHistoryOnlyBackup(file,password,()=>{
+      localStorage.setItem('insight_v11',' '+originalRaw);
+      return true;
+    }).catch(error=>error.message);
+    localStorage.setItem('insight_v11',originalRaw);
     const repeatedMigration=await store.migrate().catch(error=>error.message);
     const markerStillMissing=localStorage.getItem(markerKey)===null;
     const stillMissing=await store.diagnose();
     localStorage.setItem(markerKey,before);
-    return {writing,unchanged,missingMarker,missingDatabase,bothMissing,repeatedMigration,markerStillMissing,stillMissing,
+    return {writing,unchanged,missingMarker,missingDatabase,bothMissing,wrongPassword,wrongBackup,cancelled,confirmed,reviewedStores,changed,repeatedMigration,markerStillMissing,stillMissing,
       markerPreserved:localStorage.getItem(markerKey)===before,
       rawPreserved:localStorage.getItem('insight_v11')===originalRaw};
-  });
+  },{file,password});
   expect(diagnostic).toEqual({
     writing:{state:'hold',reason:'writing',observedRevision:2},unchanged:true,
     missingMarker:{state:'hold',reason:'marker-missing'},
     missingDatabase:{state:'hold',reason:'database-missing'},
     bothMissing:{state:'hold',reason:'history-only'},
+    wrongPassword:true,
+    wrongBackup:'バックアップと移行元のデータが一致しません。',
+    cancelled:{state:'hold',review:'cancelled'},
+    confirmed:{state:'hold',review:'confirmed'},
+    reviewedStores:['架空店舗A','架空店舗B'],
+    changed:'Recovery data changed',
     repeatedMigration:'Existing migration requires review',
     markerStillMissing:true,
     stillMissing:{state:'hold',reason:'history-only'},
