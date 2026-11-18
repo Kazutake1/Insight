@@ -129,9 +129,10 @@
     var current=dateFor(spec),p=period(spec);
     if(!p||!current||context.iso(current)===context.iso(date))return false;
     var crossing=Number(p.year)!==date.getFullYear()||Number(p.month)!==date.getMonth()+1;
-    if(crossing&&spec.kind==='legacy'&&dirty[spec.key]&&
-      !root.confirm('未保存の入力があります。\n保存せずに別の日付へ移動しますか？'))return false;
+    var discard=crossing&&spec.kind==='legacy'&&dirty[spec.key];
+    if(discard&&!root.confirm('未保存の入力があります。\n保存せずに別の日付へ移動しますか？'))return false;
     if(crossing){
+      var discardedDraft=discard?drafts[spec.key]:null;
       var oldDay=spec.dayKey?root[spec.dayKey]:null;
       if(spec.dayKey)root[spec.dayKey]=date.getDate();
       var ok=spec.kind==='count'?
@@ -142,6 +143,11 @@
         return false;
       }
       dirty[spec.key]=false;
+      if(discardedDraft&&drafts[spec.key]!==discardedDraft){
+        var updated=period(spec);
+        if(updated&&updated.year===date.getFullYear()&&updated.month===date.getMonth()+1)
+          migrationDirty[spec.key]=false;
+      }
     }
     selected[spec.key]=new Date(date.getFullYear(),date.getMonth(),date.getDate());
     if(root.InsightPagePeriodSync&&typeof root.InsightPagePeriodSync.setTarget==='function')

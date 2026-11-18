@@ -164,12 +164,50 @@ for(const inputPage of [
     expect(await page.evaluate(()=>localStorage.getItem('insight_v11'))).toBe(raw);
     expect(await page.evaluate(()=>localStorage.getItem('insight_indexeddb_adoption_v1'))).toBeNull();
 
+    await page.locator(inputPage.save).click();
+    const saved=await page.evaluate(()=>localStorage.getItem('insight_v11'));
+    expect(saved).not.toBe(raw);
+    expect(await page.evaluate(()=>InsightInputDayNav.hasUnsavedInput())).toBe(false);
+
+    async function checkMigrationCanStart(){
+      await page.evaluate(()=>{
+        window.migrationAfterSave=InsightIndexedDBStorageV1.migrate().catch(error=>error.message);
+      });
+      await expect(page.locator('#insightBackupPassword')).toBeVisible();
+      await page.getByRole('button',{name:'キャンセル',exact:true}).click();
+      expect(await page.evaluate(()=>migrationAfterSave)).toBe('Backup save was not confirmed');
+    }
+    await checkMigrationCanStart();
+
+    if(inputPage.nav==='#nav3'){
+      await field.fill('654');
+      const picker=page.locator('#insightDayNav-kyaku input[type=date]');
+      const target=await picker.evaluate(input=>{
+        const [year,month]=input.value.split('-').map(Number);
+        return year+'-'+(month===1?'02':'01')+'-01';
+      });
+      const chooseDate=()=>picker.evaluate((input,date)=>{
+        input.value=date;
+        input.dispatchEvent(new Event('change',{bubbles:true}));
+      },target);
+      page.once('dialog',dialog=>dialog.dismiss());
+      await chooseDate();
+      await expect(field).toHaveValue('654');
+      expect(await attempt()).toContain('未保存の入力または保存データの変更');
+      page.once('dialog',dialog=>dialog.accept());
+      await chooseDate();
+      expect(await page.evaluate(()=>InsightInputDayNav.hasUnsavedInput())).toBe(false);
+      expect(await page.evaluate(()=>localStorage.getItem('insight_v11'))).toBe(saved);
+      await checkMigrationCanStart();
+    }
+
     if(inputPage.nav==='#nav2'){
+      await field.fill('654');
       await page.evaluate(()=>InsightStorage.holdSnapshotWrites());
       await page.locator(inputPage.save).click();
       expect(await page.evaluate(()=>InsightInputDayNav.hasUnsavedInput())).toBe(true);
       expect(await attempt()).toContain('未保存の入力または保存データの変更');
-      expect(await page.evaluate(()=>localStorage.getItem('insight_v11'))).toBe(raw);
+      expect(await page.evaluate(()=>localStorage.getItem('insight_v11'))).toBe(saved);
     }
   });
 }
