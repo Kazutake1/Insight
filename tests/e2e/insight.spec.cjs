@@ -361,7 +361,7 @@ test('トップページは外部shellと機能manifestの最新版確認をno-s
   const [source,boot,loader,payload]=sources;
   expect(source).toContain('name="insight-shell-version" content="20261113-daily-bar-build-112"');
   expect(source).toContain('insight_shell_boot_v1.js?v=20261113-daily-bar-build-112');
-  expect(source).toContain('insight_shell_loader_v1.js?v=20261113-daily-bar-loader-1');
+  expect(source).toContain('insight_shell_loader_v1.js?v=20261118-sale-scroll20-1');
   expect(source).toContain('insight_shell_v1.css?v=20261113-daily-bar-build-112');
   expect(source).not.toMatch(/<script(?![^>]*\bsrc=)[^>]*>/i);
   expect(source).not.toMatch(/<style\b/i);
@@ -1929,6 +1929,10 @@ test('セール実績は内容別に表示し開催回ごとに行を分けて7�
   await expect(page.locator('.sr-group-stats')).not.toContainText('開催日数');
   const statGridColumns=await page.locator('.sr-group-stats').evaluate(el=>getComputedStyle(el).gridTemplateColumns.split(' ').length);
   expect(statGridColumns).toBe(3);
+  await expect(page.locator('.sr-group .sr-day-grid')).toHaveCount(0);
+  await expect(page.locator('.sr-group-toggle')).toHaveAttribute('aria-expanded','false');
+  await page.locator('.sr-group-toggle').click();
+  await expect(page.locator('.sr-group-toggle')).toHaveAttribute('aria-expanded','true');
   await expect(page.locator('.sr-group .sr-day-grid')).toHaveCount(2);
   await expect(page.locator('.sr-group .sr-day-grid').nth(0).locator('.sc-day')).toHaveCount(8);
   await expect(page.locator('.sr-group .sr-day-grid').nth(1).locator('.sc-day')).toHaveCount(3);
