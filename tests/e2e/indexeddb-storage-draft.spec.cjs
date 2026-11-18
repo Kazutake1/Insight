@@ -175,10 +175,10 @@ test('manual adoption uses the real encrypted backup confirmation and preserves 
     writing:{state:'hold',reason:'writing',observedRevision:2},unchanged:true,
     missingMarker:{state:'hold',reason:'marker-missing'},
     missingDatabase:{state:'hold',reason:'database-missing'},
-    bothMissing:{state:'hold',reason:'database-missing'},
+    bothMissing:{state:'hold',reason:'history-only'},
     repeatedMigration:'Existing migration requires review',
     markerStillMissing:true,
-    stillMissing:{state:'hold',reason:'database-missing'},
+    stillMissing:{state:'hold',reason:'history-only'},
     markerPreserved:true,rawPreserved:true
   });
 });
@@ -352,6 +352,104 @@ test('recovery distinguishes an interrupted migration copy, an aborted save and 
     originalBytesHeld:true,
     sourceChanged:{state:'hold',reason:'record-unverified'},
     markerPreserved:true,changedSourcePreserved:true
+  });
+});
+
+
+test('history-only migration attempt stays held after reload with two-store source untouched',async({page})=>{
+  await page.route('**/history-only-fixture',route=>route.fulfill({
+    contentType:'text/html',body:'<!DOCTYPE html><title>Fictional history-only recovery fixture</title>'
+  }));
+  await page.goto('/history-only-fixture');
+  await page.addScriptTag({url:'/insight_indexeddb_storage_v1.js'});
+  const first=await page.evaluate(async ()=>{
+    const snapshot={current:'a',stores:{
+      a:{name:'架空店舗A',years:['2025','2026'],data:{2025:{sales:123},2026:{sales:456}}},
+      b:{name:'架空店舗B',years:['2025','2026'],data:{2025:{sales:321},2026:{sales:654}}}
+    }};
+    const raw=JSON.stringify(snapshot);
+    localStorage.setItem('insight_v11',raw);
+    window.InsightMigrationBackupV1={confirm:async()=>true,assertReady(){}};
+    window.InsightStorage={writeMetadata(key,value){
+      if(JSON.parse(value).state==='preparing')throw new Error('Fixture interrupted before marker');
+      localStorage.setItem(key,value);
+    }};
+    const storage=InsightIndexedDBStorageV1;
+    const interrupted=await storage.migrate().catch(error=>error.message);
+    const diagnosis=await storage.diagnose({verifyInterrupted:true});
+    const rejected=await storage.migrate().catch(error=>error.message);
+    const review=await storage.reviewRecovery(()=>true).catch(error=>error.message);
+    return {interrupted,diagnosis,rejected,review,rawIntact:localStorage.getItem('insight_v11')===raw,
+      markerMissing:localStorage.getItem('insight_indexeddb_adoption_v1')===null};
+  });
+  expect(first).toEqual({
+    interrupted:'Fixture interrupted before marker',
+    diagnosis:{state:'hold',reason:'history-only'},
+    rejected:'Existing migration requires review',
+    review:'No held migration or save to review',
+    rawIntact:true,markerMissing:true
+  });
+  await page.reload();
+  await page.addScriptTag({url:'/insight_indexeddb_storage_v1.js'});
+  const afterReload=await page.evaluate(async()=>({
+    diagnosis:await InsightIndexedDBStorageV1.diagnose({verifyInterrupted:true}),
+    retry:await InsightIndexedDBStorageV1.migrate().catch(error=>error.message),
+    original:JSON.parse(localStorage.getItem('insight_v11')).stores.b.data['2026'].sales,
+    marker:localStorage.getItem('insight_indexeddb_adoption_v1')
+  }));
+  expect(afterReload).toEqual({
+    diagnosis:{state:'hold',reason:'history-only'},retry:'Existing migration requires review',
+    original:654,marker:null
+  });
+});
+
+test('lost or mismatched migration history blocks saves without changing snapshot or marker',async({page})=>{
+  await page.route('**/history-guard-fixture',route=>route.fulfill({
+    contentType:'text/html',body:'<!DOCTYPE html><title>Fictional history guard fixture</title>'
+  }));
+  await page.goto('/history-guard-fixture');
+  await page.addScriptTag({url:'/insight_indexeddb_storage_v1.js'});
+  const result=await page.evaluate(async()=>{
+    const snapshot={current:'a',stores:{a:{name:'架空店舗A',years:['2026'],data:{2026:{sales:123}}}}};
+    const raw=JSON.stringify(snapshot);
+    localStorage.setItem('insight_v11',raw);
+    window.InsightStorage={writeMetadata(key,value){localStorage.setItem(key,value);}};
+    window.InsightMigrationBackupV1={confirm:async()=>true,assertReady(){}};
+    const storage=InsightIndexedDBStorageV1;
+    await storage.migrate();
+    const marker=localStorage.getItem('insight_indexeddb_adoption_v1');
+    const db=await new Promise((resolve,reject)=>{
+      const request=indexedDB.open('insight-migration-history-v1',1);
+      request.onsuccess=()=>resolve(request.result);
+      request.onerror=()=>reject(request.error);
+    });
+    await new Promise((resolve,reject)=>{
+      const tx=db.transaction('snapshots','readwrite');
+      tx.objectStore('snapshots').put({id:'other-fixture-id'},'current');
+      tx.oncomplete=resolve;
+      tx.onerror=()=>reject(tx.error);
+    });
+    db.close();
+    const mismatched=await storage.diagnose();
+    const mismatchSave=await storage.save(0,snapshot).catch(error=>error.message);
+    await new Promise((resolve,reject)=>{
+      const request=indexedDB.deleteDatabase('insight-migration-history-v1');
+      request.onsuccess=resolve;
+      request.onerror=()=>reject(request.error);
+      request.onblocked=()=>reject(new Error('History deletion was blocked in fixture'));
+    });
+    const missing=await storage.diagnose();
+    const missingSave=await storage.save(0,snapshot).catch(error=>error.message);
+    return {mismatched,mismatchSave,missing,missingSave,
+      markerUnchanged:localStorage.getItem('insight_indexeddb_adoption_v1')===marker,
+      rawUnchanged:localStorage.getItem('insight_v11')===raw};
+  });
+  expect(result).toEqual({
+    mismatched:{state:'hold',reason:'history-mismatch'},
+    mismatchSave:'Migration history requires review',
+    missing:{state:'hold',reason:'history-missing'},
+    missingSave:'Migration history requires review',
+    markerUnchanged:true,rawUnchanged:true
   });
 });
 
