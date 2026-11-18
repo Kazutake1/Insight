@@ -102,6 +102,23 @@
   }
 
 
+  // Read-only evidence. A missing or corrupt history must never authorize writes.
+  async function migrationHistory(){
+    try{
+      const record=await transact('readonly',value=>value,false,historyDatabase);
+      return record&&typeof record.id==='string'&&record.id?
+        {kind:'recorded',id:record.id}:{kind:'unverified'};
+    }catch(error){
+      return {kind:error instanceof MissingDatabaseError?'missing':'unavailable'};
+    }
+  }
+
+  async function requireHistory(id){
+    const history=await migrationHistory();
+    if(history.kind!=='recorded'||history.id!==id)
+      throw new Error('Migration history requires review');
+  }
+
   function validateRecord(record,id){
     if(!record||record.id!==id||typeof record.sourceRaw!=='string'||
        record.sourceRaw!==root.localStorage.getItem(sourceKey)||
@@ -170,6 +187,7 @@
   async function save(expectedRevision,snapshot){
     return exclusive(async ()=>{
       const adopted=activeMarker();
+      await requireHistory(adopted.id);
       const raw=JSON.stringify(snapshot);
       parse(raw);
       const baseline=validateRecord(await readRecord(),adopted.id);
@@ -230,17 +248,24 @@
          !['active','preparing','writing'].includes(adopted.state))){
         return {state:'hold',reason:'invalid-marker'};
       }
+      const history=await migrationHistory();
       let record;
       try{record=await readRecord();}
       catch(error){
+        if(!adopted&&history.kind==='recorded'&&error instanceof MissingDatabaseError)
+          return {state:'hold',reason:'history-only'};
         return {state:'hold',reason:error instanceof MissingDatabaseError?'database-missing':'database-unavailable'};
       }
       if(before!==root.localStorage.getItem(markerKey)||source!==root.localStorage.getItem(sourceKey)){
         return {state:'hold',reason:'state-changed'};
       }
-      if(!adopted)return {state:'hold',reason:'marker-missing'};
+      if(!adopted)return {state:'hold',reason:history.kind==='recorded'&&!record?'history-only':'marker-missing'};
       try{validateRecord(record,adopted.id);}
       catch(_){return {state:'hold',reason:'record-unverified'};}
+      if(history.kind!=='recorded'||history.id!==adopted.id){
+        return {state:'hold',reason:history.kind==='recorded'?'history-mismatch':
+          history.kind==='missing'?'history-missing':'history-unverified'};
+      }
       if(adopted.state!=='active'){
         const diagnostic={state:'hold',reason:adopted.state,observedRevision:record.revision};
         if(verifyInterrupted){
@@ -264,6 +289,7 @@
     const adopted=JSON.parse(markerRaw);
     if(!['preparing','writing'].includes(adopted?.state))
       throw new Error('No held migration or save to review');
+    await requireHistory(adopted.id);
     const record=validateRecord(await readRecord(),adopted.id);
     const outcome=await inspectHeldRecord(adopted,record);
     if(outcome==='unverified')throw new Error('Recovery could not be verified');
