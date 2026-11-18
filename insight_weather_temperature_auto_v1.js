@@ -198,7 +198,7 @@
       weatherText:wx&&wx.text||'',max:temp&&temp.max,min:temp&&temp.min,tempSource:temp&&temp.source,source:'legacy'};
   }
 
-  var latestFetchRequest=0;
+  var latestFetchRequest=0,activeFetches=0;
   function manualRevision(){
     var compact=root.InsightWeatherCompact;
     return compact&&typeof compact.manualSelectionRevision==='function'?compact.manualSelectionRevision():0;
@@ -212,6 +212,7 @@
     function manualOverride(){return manualRevision()!==revision;}
     var btn=document.getElementById('autoWxBtn');if(btn)btn.disabled=true;
     label('取得中…');
+    activeFetches++;
     try{
       var result;
       if(isFutureDate(date)){
@@ -270,7 +271,10 @@
       title(validLocation(loc)?'設定した天気地点のデータ取得に失敗しました。地点設定を確認するか、手動で入力してください。':
         '気象庁データへの接続または対象日のデータ取得に失敗しました。手動で入力してください。');
       compactIdleLabel();
-    }finally{if(sameTarget()&&btn)btn.disabled=isFutureDate(targetDate());}
+    }finally{
+      activeFetches--;
+      if(sameTarget()&&btn)btn.disabled=isFutureDate(targetDate());
+    }
   };
 
   function applyFutureWeatherState(){
@@ -308,6 +312,7 @@
   applyFutureWeatherState();
 
   root.InsightWeatherTemperatureAuto={
+    hasPendingFetch:function(){return activeFetches>0;},
     weatherFromForecast:weatherFromForecast,
     temperatureFromForecast:temperatureFromForecast,
     wmoToWx:wmoToWx,

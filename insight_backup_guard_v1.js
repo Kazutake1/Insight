@@ -477,6 +477,18 @@ async function encryptedBackupData(){
   }finally{backupOperationActive=false;if(window.InsightBackupPasswordV1)window.InsightBackupPasswordV1.close();}
 }
 function assertMigrationReady(raw){
+  if(backupOperationActive||restoreFileReaderActive)
+    throw new Error('別のバックアップ・復元処理が進行中です。');
+  var weather=window.InsightWeatherTemperatureAuto,location=window.InsightWeatherLocation;
+  var bulk=window.InsightWeatherBulk?.getWeatherBulkOperationStatus();
+  if(typeof window.hasPendingCSVImport!=='function'||typeof weather?.hasPendingFetch!=='function'||
+     typeof location?.hasPendingSearch!=='function'||!bulk)
+    throw new Error('処理中の操作を確認できないため、移行を中止しました。');
+  if(window.hasPendingCSVImport()||weather.hasPendingFetch()||location.hasPendingSearch()||
+     bulk.state==='ACTIVE'||bulk.state==='HELD'||window.InsightStorage.snapshotWritesHeld()||
+     document.querySelector('dialog[open],#modalBg.show,#budgetModalBg.show,#ayInput,#storeMenu.is-open')){
+    throw new Error('編集中または処理中の操作があるため、移行を中止しました。');
+  }
   var quick=window.InsightQuickDateNavV1,salesCount=window.InsightSalesCount,dayInput=window.InsightInputDayNav;
   if(typeof quick?.hasUnsavedInput!=='function'||typeof salesCount?.hasUnsavedInput!=='function'||
      typeof dayInput?.hasUnsavedInput!=='function')
@@ -490,12 +502,11 @@ function assertMigrationReady(raw){
 // The isolated migration draft is the only caller. Use the exact captured
 // source as input to the existing backup schema migration and confirmation UI.
 async function confirmMigrationBackup(raw){
-  if(backupOperationActive||restoreFileReaderActive)throw new Error('別のバックアップ・復元処理が進行中です。');
+  assertMigrationReady(raw);
   backupOperationActive=true;
   var operation={cancelled:false};
   try{
     cryptoCodec();
-    assertMigrationReady(raw);
     var state=captureBackupState();
     var snapshot=window.InsightStorage.migrateSnapshot(JSON.parse(raw)),now=new Date();
     await downloadConfirmedBackup(snapshot,'移行前バックアップ用パスワード','Insight_'+backupStamp(now)+'.json',operation,state,now);

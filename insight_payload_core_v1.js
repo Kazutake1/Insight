@@ -2545,10 +2545,14 @@ window.addEventListener('storage',function(event){
     value:Object.freeze({version:1,register:register,status:function(){return registered?"ready":"pending";}})});
 })(window);
 
+const activeCSVReaders=new Set();
+function hasPendingCSVImport(){return activeCSVReaders.size>0;}
 function importCSV(e){
   const file=e.target.files[0];
   if(!file){return;}
   const reader=new FileReader();
+  activeCSVReaders.add(reader);
+  reader.onloadend=()=>activeCSVReaders.delete(reader);
   reader.onload=ev=>{
     try{
       const lines=ev.target.result.split('\n').map(l=>l.trim()).filter(l=>l);
@@ -2663,7 +2667,8 @@ function importCSV(e){
     }
     e.target.value='';
   };
-  reader.readAsText(file,'UTF-8');
+  try{reader.readAsText(file,'UTF-8');}
+  catch(error){activeCSVReaders.delete(reader);throw error;}
 }
 
 /* ══ ① 入力漏れの可視化 ══ */

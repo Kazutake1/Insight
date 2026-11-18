@@ -1,6 +1,16 @@
 const {test,expect}=require('@playwright/test');
 const fs=require('node:fs/promises');
 require('./helpers/verified-chart.cjs')(test);
+test.beforeEach(async({page})=>{
+  await page.route(/https:\/\/(www\.jma\.go\.jp|[^/]*api\.open-meteo\.com)\//,route=>route.abort());
+});
+async function waitForMigrationChecks(page){
+  await page.waitForFunction(()=>window.InsightMigrationBackupV1&&window.InsightBackupPasswordV1&&
+    window.InsightQuickDateNavV1&&window.InsightSalesCount?.hasUnsavedInput&&window.InsightInputDayNav?.hasUnsavedInput&&
+    window.InsightWeatherLocation?.hasPendingSearch&&window.InsightWeatherBulk?.getWeatherBulkOperationStatus&&
+    window.InsightWeatherTemperatureAuto?.hasPendingFetch()===false);
+}
+
 
 test('manual adoption uses the real encrypted backup confirmation and preserves the legacy source',async({page})=>{
   await page.route('**/Index.html*',async route=>{
@@ -9,8 +19,7 @@ test('manual adoption uses the real encrypted backup confirmation and preserves 
   });
   async function open(){
     await page.goto('/Index.html');
-    await page.waitForFunction(()=>window.InsightMigrationBackupV1&&window.InsightBackupPasswordV1&&
-      window.InsightQuickDateNavV1&&window.InsightSalesCount?.hasUnsavedInput&&window.InsightInputDayNav?.hasUnsavedInput);
+    await waitForMigrationChecks(page);
     await page.addScriptTag({url:'/insight_indexeddb_storage_v1.js'});
   }
   await open();
@@ -152,7 +161,10 @@ test('manual adoption uses the real encrypted backup confirmation and preserves 
       deletion.onblocked=()=>reject(new Error('Fixture database is still in use'));
     });
     const missingDatabase=await store.diagnose();
-    return {writing,unchanged,missingMarker,missingDatabase,
+    localStorage.removeItem(markerKey);
+    const bothMissing=await store.diagnose({verifyInterrupted:true});
+    localStorage.setItem(markerKey,before);
+    return {writing,unchanged,missingMarker,missingDatabase,bothMissing,
       markerPreserved:localStorage.getItem(markerKey)===before,
       rawPreserved:localStorage.getItem('insight_v11')===originalRaw};
   });
@@ -160,6 +172,7 @@ test('manual adoption uses the real encrypted backup confirmation and preserves 
     writing:{state:'hold',reason:'writing',observedRevision:2},unchanged:true,
     missingMarker:{state:'hold',reason:'marker-missing'},
     missingDatabase:{state:'hold',reason:'database-missing'},
+    bothMissing:{state:'hold',reason:'database-missing'},
     markerPreserved:true,rawPreserved:true
   });
 });
@@ -175,8 +188,7 @@ for(const inputPage of [
       await route.fulfill({response,body:(await response.text()).replace(/;?\s*upgrade-insecure-requests/g,'')});
     });
     await page.goto('/Index.html');
-    await page.waitForFunction(()=>window.InsightMigrationBackupV1&&window.InsightQuickDateNavV1&&
-      window.InsightSalesCount?.hasUnsavedInput&&window.InsightInputDayNav?.hasUnsavedInput);
+    await waitForMigrationChecks(page);
     await page.addScriptTag({url:'/insight_indexeddb_storage_v1.js'});
     await page.locator(inputPage.nav).click();
     const field=page.locator(inputPage.field).first();
@@ -237,7 +249,7 @@ for(const inputPage of [
       await page.evaluate(()=>InsightStorage.holdSnapshotWrites());
       await page.locator(inputPage.save).click();
       expect(await page.evaluate(()=>InsightInputDayNav.hasUnsavedInput())).toBe(true);
-      expect(await attempt()).toContain('未保存の入力または保存データの変更');
+      expect(await attempt()).toContain('編集中または処理中の操作');
       expect(await page.evaluate(()=>localStorage.getItem('insight_v11'))).toBe(saved);
     }
   });
@@ -282,11 +294,25 @@ test('recovery distinguishes an interrupted migration copy, an aborted save and 
     }finally{IDBObjectStore.prototype.put=put;}
     const writingMarker=localStorage.getItem(markerKey);
     const writing=await inspect();
+    const repeated=await inspect();
+    const nativeDigest=crypto.subtle.digest;
+    let changedDuringCheck;
+    crypto.subtle.digest=function(...args){
+      writeMetadata(markerKey,JSON.stringify({...JSON.parse(writingMarker),id:'different-adoption'}));
+      return nativeDigest.apply(this,args);
+    };
+    try{changedDuringCheck=await inspect();}
+    finally{crypto.subtle.digest=nativeDigest;}
+    writeMetadata(markerKey,'{invalid');
+    const invalidMarker=await inspect();
+    writeMetadata(markerKey,JSON.stringify({...JSON.parse(writingMarker),id:'different-adoption'}));
+    const wrongAdoption=await inspect();
+    writeMetadata(markerKey,writingMarker);
     const blocked=await storage.save(0,original).catch(error=>error.message);
     const originalBytesHeld=localStorage.getItem(sourceKey)===raw;
     localStorage.setItem(sourceKey,' '+raw); // Model different bytes written by an older tab.
     const sourceChanged=await inspect();
-    return {adoptionError,preparing,preparingHeld,saveError,writing,blocked,originalBytesHeld,sourceChanged,
+    return {adoptionError,preparing,preparingHeld,saveError,writing,repeated,changedDuringCheck,invalidMarker,wrongAdoption,blocked,originalBytesHeld,sourceChanged,
       markerPreserved:localStorage.getItem(markerKey)===writingMarker,
       changedSourcePreserved:localStorage.getItem(sourceKey)===' '+raw};
   });
@@ -296,9 +322,61 @@ test('recovery distinguishes an interrupted migration copy, an aborted save and 
     preparingHeld:true,
     saveError:'QuotaExceededError',
     writing:{state:'hold',reason:'writing',observedRevision:0,recovery:'prior-save-verified'},
+    repeated:{state:'hold',reason:'writing',observedRevision:0,recovery:'prior-save-verified'},
+    changedDuringCheck:{state:'hold',reason:'state-changed'},
+    invalidMarker:{state:'hold',reason:'invalid-marker'},
+    wrongAdoption:{state:'hold',reason:'record-unverified'},
     blocked:'IndexedDB writes are on hold',
     originalBytesHeld:true,
     sourceChanged:{state:'hold',reason:'record-unverified'},
     markerPreserved:true,changedSourcePreserved:true
+  });
+});
+
+test('migration pauses while a dialog, CSV import or weather fetch is pending',async({page})=>{
+  await page.route('**/Index.html*',async route=>{
+    const response=await route.fetch();
+    await route.fulfill({response,body:(await response.text()).replace(/;?\s*upgrade-insecure-requests/g,'')});
+  });
+  await page.goto('/Index.html');
+  await waitForMigrationChecks(page);
+  await page.addScriptTag({url:'/insight_indexeddb_storage_v1.js'});
+  const result=await page.evaluate(async ()=>{
+    const attempt=()=>InsightIndexedDBStorageV1.migrate().catch(error=>error.message);
+    const raw=InsightStorage.writeSnapshot(allStores);
+    const editor=document.createElement('dialog');
+    document.body.append(editor);
+    editor.showModal();
+    const dialog=await attempt();
+    editor.close();
+    editor.remove();
+
+    const readAsText=FileReader.prototype.readAsText;
+    let reader;
+    FileReader.prototype.readAsText=function(){reader=this;};
+    try{importCSV({target:{files:[new File(['日付,売上\n2026-01-01,123'],'fictional.csv')]}});}
+    finally{FileReader.prototype.readAsText=readAsText;}
+    const csv=await attempt();
+    reader.dispatchEvent(new Event('loadend'));
+
+    const nativeFetch=window.fetch;
+    let finishFetch;
+    const pending=new Promise((_,reject)=>{finishFetch=()=>reject(new Error('Fixture stops weather fetch'));});
+    window.fetch=()=>pending;
+    let weather;
+    try{
+      const weatherOperation=fetchWeather();
+      weather=await attempt();
+      finishFetch();
+      await weatherOperation;
+    }finally{window.fetch=nativeFetch;}
+    return {dialog,csv,weather,pendingCSV:hasPendingCSVImport(),
+      pendingWeather:InsightWeatherTemperatureAuto.hasPendingFetch(),
+      rawPreserved:localStorage.getItem('insight_v11')===raw,
+      marker:localStorage.getItem('insight_indexeddb_adoption_v1')};
+  });
+  const message='編集中または処理中の操作があるため、移行を中止しました。';
+  expect(result).toEqual({
+    dialog:message,csv:message,weather:message,pendingCSV:false,pendingWeather:false,rawPreserved:true,marker:null
   });
 });

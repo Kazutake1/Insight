@@ -174,6 +174,7 @@
     if(!Number.isFinite(n)||n<1||n>max){alert('候補番号を正しく入力してください。');return null;}
     return results[n-1];
   }
+  var activeLocationSearches=0;
   async function configureLocation(){
     var current=store&&store.weatherLocation;
     var initial=current&&(current.name||current.query)?String(current.name||current.query):'';
@@ -193,6 +194,7 @@
       return;
     }
 
+    activeLocationSearches++;
     try{
       var results=await searchLocations(query);
       if(!results.length){alert('「'+query+'」に一致する市区町村が見つかりませんでした。');return;}
@@ -219,7 +221,7 @@
       });
     }catch(e){
       alert((e&&e.message)||'地点設定に失敗しました。');
-    }
+    }finally{activeLocationSearches--;}
   }
 
   function injectMenuItem(){
@@ -253,6 +255,7 @@
 
   root.InsightWeatherLocation={
     configure:configureLocation,
+    hasPendingSearch:function(){return activeLocationSearches>0;},
     getLocationSaveOperationStatus:getLocationSaveOperationStatus,
     getLocationClearOperationStatus:getLocationClearOperationStatus,
     search:searchLocations,
