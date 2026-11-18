@@ -223,7 +223,7 @@
   }
   root.InsightInputDayNav={VERSION:1,hasUnsavedInput:function(){
     var status=root.InsightInputSaveObserverV0?.getStatus();
-    return !migrationChecksReady||!status||status.state==='ACTIVE'||status.state==='HELD'||
+    return !migrationChecksReady||status?.state!=='IDLE_OBSERVED'||
       Object.values(migrationDirty).some(Boolean);
   },select:function(type,iso){
     var spec=specs.find(function(s){return s.key===type;}),date=context.parseIso(iso);
