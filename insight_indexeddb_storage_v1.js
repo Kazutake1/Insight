@@ -20,8 +20,8 @@
     return raw===null?null:JSON.parse(raw);
   }
 
-  function writeMarker(state,id){
-    const raw=JSON.stringify({state,id});
+  function writeMarker(state,id,operation){
+    const raw=JSON.stringify({state,id,operation});
     root.InsightStorage.writeMetadata(markerKey,raw);
     if(root.localStorage.getItem(markerKey)!==raw)throw new Error('Adoption state could not be verified');
   }
@@ -135,18 +135,25 @@
     });
   }
 
+  async function digest(raw){
+    const bytes=new TextEncoder().encode(raw);
+    const hash=await root.crypto.subtle.digest('SHA-256',bytes);
+    return Array.from(new Uint8Array(hash),byte=>byte.toString(16).padStart(2,'0')).join('');
+  }
+
   async function save(expectedRevision,snapshot){
     return exclusive(async ()=>{
       const adopted=activeMarker();
       const raw=JSON.stringify(snapshot);
       parse(raw);
       // Leave a persistent hold if the browser exits or the outcome is unclear.
-      writeMarker('writing',adopted.id);
+      const operation={id:root.crypto.randomUUID(),expectedRevision,digest:await digest(raw)};
+      writeMarker('writing',adopted.id,operation);
       const next=await transact('readwrite',(record,records)=>{
         const current=validateRecord(record,adopted.id);
         if(current.revision!==expectedRevision||current.revision>=Number.MAX_SAFE_INTEGER)
           throw new Error('IndexedDB revision conflict');
-        const candidate={...current,raw,revision:current.revision+1,
+        const candidate={...current,raw,revision:current.revision+1,writeId:operation.id,
           previous:{revision:current.revision,raw:current.raw}};
         records.put(candidate,recordKey);
         return candidate;
@@ -157,8 +164,24 @@
     });
   }
 
+  // Check whether an interrupted operation produced a complete snapshot.
+  // Older markers without an operation ID carry no evidence of a save.
+  async function inspectHeldRecord(adopted,record){
+    if(adopted.state==='preparing'){
+      return record.revision===0&&record.raw===record.sourceRaw&&record.previous===null?
+        'migration-copy-verified':'unverified';
+    }
+    const operation=adopted.operation;
+    if(!operation||typeof operation.id!=='string'||!Number.isSafeInteger(operation.expectedRevision)||
+       record.writeId!==operation.id||record.revision!==operation.expectedRevision+1||
+       record.previous?.revision!==operation.expectedRevision||
+       typeof record.previous.raw!=='string')return 'unverified';
+    parse(record.previous.raw);
+    return await digest(record.raw)===operation.digest?'save-verified':'unverified';
+  }
+
   // A diagnostic never promotes a record or clears a persistent hold.
-  async function diagnose(){
+  async function diagnose({verifyInterrupted=false}={}){
     return exclusive(async ()=>{
       const before=root.localStorage.getItem(markerKey);
       const source=root.localStorage.getItem(sourceKey);
@@ -181,7 +204,15 @@
       try{validateRecord(record,adopted.id);}
       catch(_){return {state:'hold',reason:'record-unverified'};}
       if(adopted.state!=='active'){
-        return {state:'hold',reason:adopted.state,observedRevision:record.revision};
+        const diagnostic={state:'hold',reason:adopted.state,observedRevision:record.revision};
+        if(verifyInterrupted){
+          try{diagnostic.recovery=await inspectHeldRecord(adopted,record);}
+          catch(_){diagnostic.recovery='unverified';}
+          if(before!==root.localStorage.getItem(markerKey)||source!==root.localStorage.getItem(sourceKey)){
+            return {state:'hold',reason:'state-changed'};
+          }
+        }
+        return diagnostic;
       }
       return {state:'active',revision:record.revision};
     });

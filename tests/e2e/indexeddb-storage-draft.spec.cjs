@@ -89,6 +89,37 @@ test('manual adoption uses the real encrypted backup confirmation and preserves 
   expect(await page.evaluate(()=>migrationResult)).toEqual({revision:0,snapshot:source});
 
   expect(await page.evaluate(()=>InsightIndexedDBStorageV1.diagnose())).toEqual({state:'active',revision:0});
+  const recovered=await page.evaluate(async ()=>{
+    const storage=InsightIndexedDBStorageV1,markerKey='insight_indexeddb_adoption_v1';
+    const initial=await storage.read(),writeMetadata=InsightStorage.writeMetadata;
+    const originalRaw=localStorage.getItem('insight_v11');
+    const originalMarker=localStorage.getItem(markerKey);
+    let interrupted;
+    InsightStorage.writeMetadata=(key,value)=>{
+      if(key===markerKey&&JSON.parse(value).state==='active')throw new Error('Fixture lost save acknowledgement');
+      return writeMetadata(key,value);
+    };
+    try{
+      initial.snapshot.stores[initial.snapshot.current].name='架空店舗A（更新）';
+      interrupted=await storage.save(initial.revision,initial.snapshot).catch(error=>error.message);
+    }finally{InsightStorage.writeMetadata=writeMetadata;}
+    const held=localStorage.getItem(markerKey);
+    const verified=await storage.diagnose({verifyInterrupted:true});
+    const stillHeld=held===localStorage.getItem(markerKey);
+    const changed=JSON.parse(held);
+    changed.operation.digest='0'.repeat(64);
+    writeMetadata(markerKey,JSON.stringify(changed));
+    const mismatched=await storage.diagnose({verifyInterrupted:true});
+    writeMetadata(markerKey,originalMarker); // Fixture only, to continue the existing conflict test.
+    return {interrupted,verified,mismatched,stillHeld,sourceUntouched:originalRaw===localStorage.getItem('insight_v11')};
+  });
+  expect(recovered).toEqual({
+    interrupted:'Fixture lost save acknowledgement',
+    verified:{state:'hold',reason:'writing',observedRevision:1,recovery:'save-verified'},
+    mismatched:{state:'hold',reason:'writing',observedRevision:1,recovery:'unverified'},
+    stillHeld:true,sourceUntouched:true
+  });
+  source.stores[source.current].name='架空店舗A（更新）';
 
   const result=await page.evaluate(async ()=>{
     const store=InsightIndexedDBStorageV1;
@@ -101,7 +132,7 @@ test('manual adoption uses the real encrypted backup confirmation and preserves 
   });
   const shop=source.stores[source.current];
   shop.data[shop.years.at(-1)]['1月'][0].売上=456;
-  expect(result).toEqual({saved:{revision:1,snapshot:source},conflict:'IndexedDB revision conflict',raw});
+  expect(result).toEqual({saved:{revision:2,snapshot:source},conflict:'IndexedDB revision conflict',raw});
   await open();
   expect(await page.evaluate(()=>InsightIndexedDBStorageV1.read().catch(error=>error.message))).toBe('IndexedDB writes are on hold');
   const diagnostic=await page.evaluate(async ()=>{
@@ -126,7 +157,7 @@ test('manual adoption uses the real encrypted backup confirmation and preserves 
       rawPreserved:localStorage.getItem('insight_v11')===originalRaw};
   });
   expect(diagnostic).toEqual({
-    writing:{state:'hold',reason:'writing',observedRevision:1},unchanged:true,
+    writing:{state:'hold',reason:'writing',observedRevision:2},unchanged:true,
     missingMarker:{state:'hold',reason:'marker-missing'},
     missingDatabase:{state:'hold',reason:'database-missing'},
     markerPreserved:true,rawPreserved:true
@@ -134,9 +165,9 @@ test('manual adoption uses the real encrypted backup confirmation and preserves 
 });
 
 for(const inputPage of [
-  {nav:'#nav2',field:'#salesForm input[type=text]',save:'#salesSaveBtn'},
-  {nav:'#nav3',field:'#kyakuGrid input',save:'#kyakuSaveBtn'},
-  {nav:'#nav4',field:'#haikiForm input[type=text]',save:'#haikiSaveBtn'}
+  {nav:'#nav2',type:'sales',field:'#salesForm input[type=text]',save:'#salesSaveBtn'},
+  {nav:'#nav3',type:'kyaku',field:'#kyakuGrid input',save:'#kyakuSaveBtn'},
+  {nav:'#nav4',type:'haiki',field:'#haikiForm input[type=text]',save:'#haikiSaveBtn'}
 ]){
   test('migration preserves pending daily input on '+inputPage.nav,async({page})=>{
     await page.route('**/Index.html*',async route=>{
@@ -179,9 +210,9 @@ for(const inputPage of [
     }
     await checkMigrationCanStart();
 
-    if(inputPage.nav==='#nav3'){
+    {
       await field.fill('654');
-      const picker=page.locator('#insightDayNav-kyaku input[type=date]');
+      const picker=page.locator('#insightDayNav-'+inputPage.type+' input[type=date]');
       const target=await picker.evaluate(input=>{
         const [year,month]=input.value.split('-').map(Number);
         return year+'-'+(month===1?'02':'01')+'-01';
