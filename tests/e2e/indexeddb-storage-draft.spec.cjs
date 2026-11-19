@@ -205,6 +205,64 @@ test('manual adoption uses the real encrypted backup confirmation and preserves 
   });
 });
 
+test('missing storage keeps migration stopped and only previews a selected encrypted backup',async({page})=>{
+  await page.goto('/Index.html');
+  await waitForMigrationChecks(page);
+  await page.addScriptTag({url:'/insight_indexeddb_storage_v1.js'});
+  const result=await page.evaluate(async ()=>{
+    const api=InsightIndexedDBStorageV1,sourceKey='insight_v11';
+    const markerKey='insight_indexeddb_adoption_v1';
+    const snapshot=InsightStorage.migrateSnapshot(allStores);
+    snapshot.stores[snapshot.current].name='架空店舗';
+    const store=snapshot.stores[snapshot.current];
+    const years=store.years.map(String).sort();
+    const createdAt='2026-11-19T00:00:00.000Z',password='Fit123';
+    const envelope=await InsightBackupCryptoV1.encrypt({
+      backupInfo:{
+        format:'InsightBackup',formatVersion:2,createdAt,storageKey:sourceKey,
+        schemaVersion:snapshot.schemaVersion,storeCount:1,currentStoreId:snapshot.current,years,
+        stores:[{id:snapshot.current,name:store.name,years}]
+      },
+      data:snapshot
+    },password);
+    const file=new File([JSON.stringify(envelope)],'Insight_261119_0900.json');
+    localStorage.removeItem(sourceKey);
+
+    const initial=await api.diagnose();
+    const migration=await api.migrate().catch(error=>error.message);
+    const invalidFile=await api.reviewMissingStorageBackup(new File(['{'],'invalid.json'),password,()=>true)
+      .catch(error=>error.message);
+    const badPassword=await api.reviewMissingStorageBackup(file,'Wrong6',()=>true)
+      .catch(error=>error.message);
+    const cancelled=await api.reviewMissingStorageBackup(file,password,()=>false);
+    let summary;
+    const confirmed=await api.reviewMissingStorageBackup(file,password,info=>{summary=info;return true;});
+    const withoutWrites=localStorage.getItem(sourceKey)===null&&localStorage.getItem(markerKey)===null;
+    const after=await api.diagnose();
+    const appeared=await api.reviewMissingStorageBackup(file,password,()=>{
+      localStorage.setItem(sourceKey,JSON.stringify(snapshot));
+      return true;
+    }).catch(error=>error.message);
+    return {initial,migration,invalidFile,badPassword,cancelled,confirmed,summary,withoutWrites,after,appeared,
+      preservedNewSource:localStorage.getItem(sourceKey)===JSON.stringify(snapshot)};
+  });
+  expect(result).toEqual({
+    initial:{state:'hold',reason:'storage-history-unknown'},
+    migration:'Legacy Insight data is missing',
+    invalidFile:'バックアップファイルを読み込めませんでした。',
+    badPassword:'復号できませんでした。パスワードまたはバックアップファイルを確認してください。',
+    cancelled:{state:'hold',review:'cancelled'},
+    confirmed:{state:'hold',review:'confirmed'},
+    summary:{createdAt:'2026-11-19T00:00:00.000Z',stores:[{
+      id:expect.any(String),name:'架空店舗',years:expect.arrayContaining([expect.stringMatching(/^\d{4}$/)])
+    }]},
+    withoutWrites:true,
+    after:{state:'hold',reason:'storage-history-unknown'},
+    appeared:'Missing storage recovery state could not be verified',
+    preservedNewSource:true
+  });
+});
+
 for(const inputPage of [
   {nav:'#nav2',type:'sales',field:'#salesForm input[type=text]',save:'#salesSaveBtn'},
   {nav:'#nav3',type:'kyaku',field:'#kyakuGrid input',save:'#kyakuSaveBtn'},

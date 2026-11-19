@@ -258,15 +258,20 @@
         return {state:'hold',reason:'invalid-marker'};
       }
       const history=await migrationHistory();
-      let record;
+      let record, databaseMissing=false;
       try{record=await readRecord();}
       catch(error){
-        if(!adopted&&history.kind==='recorded'&&error instanceof MissingDatabaseError)
-          return {state:'hold',reason:'history-only'};
-        return {state:'hold',reason:error instanceof MissingDatabaseError?'database-missing':'database-unavailable'};
+        if(!(error instanceof MissingDatabaseError))return {state:'hold',reason:'database-unavailable'};
+        databaseMissing=true;
       }
       if(before!==root.localStorage.getItem(markerKey)||source!==root.localStorage.getItem(sourceKey)){
         return {state:'hold',reason:'state-changed'};
+      }
+      if(databaseMissing){
+        if(!adopted&&history.kind==='recorded')return {state:'hold',reason:'history-only'};
+        if(!adopted&&source===null&&history.kind==='missing')
+          return {state:'hold',reason:'storage-history-unknown'};
+        return {state:'hold',reason:'database-missing'};
       }
       if(!adopted)return {state:'hold',reason:history.kind==='recorded'&&!record?'history-only':'marker-missing'};
       try{validateRecord(record,adopted.id);}
@@ -356,5 +361,21 @@
     });
   }
 
-  root.InsightIndexedDBStorageV1=Object.freeze({migrate,read,save,diagnose,reviewRecovery,reviewHistoryOnlyBackup});
+  async function assertMissingStorage(){
+    if((await diagnose()).reason!=='storage-history-unknown')
+      throw new Error('Missing storage recovery state could not be verified');
+  }
+
+  async function reviewMissingStorageBackup(file,password,confirm){
+    await assertMissingStorage();
+    const summary=await root.InsightMigrationBackupV1.inspectMissingStorage(file,password);
+    await assertMissingStorage();
+    if(await confirm(summary)!==true)return {state:'hold',review:'cancelled'};
+    await assertMissingStorage();
+    return {state:'hold',review:'confirmed'};
+  }
+
+  root.InsightIndexedDBStorageV1=Object.freeze({
+    migrate,read,save,diagnose,reviewRecovery,reviewHistoryOnlyBackup,reviewMissingStorageBackup
+  });
 })(globalThis);
