@@ -4,6 +4,12 @@ require('./helpers/verified-chart.cjs')(test);
 test.beforeEach(async({page})=>{
   await page.route(/https:\/\/(www\.jma\.go\.jp|[^/]*api\.open-meteo\.com)\//,route=>route.abort());
 });
+async function routeMigrationPage(page){
+  await page.route('**/Index.html*',async route=>{
+    const response=await route.fetch();
+    await route.fulfill({response,body:(await response.text()).replace(/;?\s*upgrade-insecure-requests/g,'')});
+  });
+}
 async function waitForMigrationChecks(page){
   await page.waitForFunction(()=>window.InsightMigrationBackupV1&&window.InsightBackupPasswordV1&&
     window.InsightQuickDateNavV1&&window.InsightSalesCount?.hasUnsavedInput&&window.InsightInputDayNav?.hasUnsavedInput&&
@@ -13,10 +19,7 @@ async function waitForMigrationChecks(page){
 
 
 test('manual adoption uses the real encrypted backup confirmation and preserves the legacy source',async({page})=>{
-  await page.route('**/Index.html*',async route=>{
-    const response=await route.fetch();
-    await route.fulfill({response,body:(await response.text()).replace(/;?\s*upgrade-insecure-requests/g,'')});
-  });
+  await routeMigrationPage(page);
   async function open(){
     await page.goto('/Index.html');
     await waitForMigrationChecks(page);
@@ -206,6 +209,7 @@ test('manual adoption uses the real encrypted backup confirmation and preserves 
 });
 
 test('missing storage keeps migration stopped and only previews a selected encrypted backup',async({page})=>{
+  await routeMigrationPage(page);
   await page.goto('/Index.html');
   await waitForMigrationChecks(page);
   await page.addScriptTag({url:'/insight_indexeddb_storage_v1.js'});
@@ -269,10 +273,7 @@ for(const inputPage of [
   {nav:'#nav4',type:'haiki',field:'#haikiForm input[type=text]',save:'#haikiSaveBtn'}
 ]){
   test('migration preserves pending daily input on '+inputPage.nav,async({page})=>{
-    await page.route('**/Index.html*',async route=>{
-      const response=await route.fetch();
-      await route.fulfill({response,body:(await response.text()).replace(/;?\s*upgrade-insecure-requests/g,'')});
-    });
+    await routeMigrationPage(page);
     await page.goto('/Index.html');
     await waitForMigrationChecks(page);
     await page.addScriptTag({url:'/insight_indexeddb_storage_v1.js'});
@@ -538,10 +539,7 @@ test('lost or mismatched migration history blocks reads and saves without changi
 });
 
 test('migration pauses while a dialog, CSV import or weather fetch is pending',async({page})=>{
-  await page.route('**/Index.html*',async route=>{
-    const response=await route.fetch();
-    await route.fulfill({response,body:(await response.text()).replace(/;?\s*upgrade-insecure-requests/g,'')});
-  });
+  await routeMigrationPage(page);
   await page.goto('/Index.html');
   await waitForMigrationChecks(page);
   await page.addScriptTag({url:'/insight_indexeddb_storage_v1.js'});
