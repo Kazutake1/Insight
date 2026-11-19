@@ -101,6 +101,8 @@ test('manual adoption uses the real encrypted backup confirmation and preserves 
   expect(await page.evaluate(()=>migrationResult)).toEqual({revision:0,snapshot:source});
 
   expect(await page.evaluate(()=>InsightIndexedDBStorageV1.diagnose())).toEqual({state:'active',revision:0});
+  expect(await page.evaluate(()=>InsightIndexedDBStorageV1.diagnoseStartup()))
+    .toEqual({state:'hold',reason:'indexeddb-adopted'});
   const recovered=await page.evaluate(async ()=>{
     const storage=InsightIndexedDBStorageV1,markerKey='insight_indexeddb_adoption_v1';
     const initial=await storage.read(),writeMetadata=InsightStorage.writeMetadata;
@@ -314,6 +316,67 @@ test('missing storage keeps migration stopped and only previews a selected encry
     marker:localStorage.getItem('insight_indexeddb_adoption_v1'),
     diagnostic:await InsightIndexedDBStorageV1.diagnose()
   }))).toEqual({source:null,marker:null,diagnostic:{state:'hold',reason:'storage-history-unknown'}});
+});
+
+test('startup diagnosis preserves legacy data and refuses uncertain or adopted storage',async({page,context})=>{
+  await page.route('**/startup-diagnosis-fixture',route=>route.fulfill({
+    contentType:'text/html',body:'<!doctype html><title>Fictional startup diagnosis fixture</title>'
+  }));
+  await page.goto('/startup-diagnosis-fixture');
+  await page.addScriptTag({url:'/insight_indexeddb_storage_v1.js'});
+  const initial=await page.evaluate(async ()=>{
+    const api=InsightIndexedDBStorageV1;
+    const empty=await api.diagnoseStartup();
+    const existing=[];
+    for(const key of ['insight_v11','insight_v9','insight_v8']){
+      localStorage.setItem(key,'fictional legacy data');
+      existing.push([await api.diagnoseStartup(),localStorage.getItem(key)]);
+      localStorage.removeItem(key);
+    }
+    return {empty,existing,keys:localStorage.length};
+  });
+  expect(initial).toEqual({
+    empty:{state:'hold',reason:'storage-history-unknown'},
+    existing:Array.from({length:3},()=>[{state:'legacy'},'fictional legacy data']),
+    keys:0
+  });
+
+  const other=await context.newPage();
+  try{
+    await other.route('**/startup-diagnosis-fixture',route=>route.fulfill({
+      contentType:'text/html',body:'<!doctype html><title>Fictional other tab</title>'
+    }));
+    await other.goto('/startup-diagnosis-fixture');
+    await other.evaluate(()=>{
+      localStorage.setItem('insight_v11','fictional data from another tab');
+      localStorage.setItem('insight_indexeddb_adoption_v1','{"state":"active","id":"fixture"}');
+    });
+    const blocked=await page.evaluate(async ()=>({
+      diagnostic:await InsightIndexedDBStorageV1.diagnoseStartup(),
+      raw:localStorage.getItem('insight_v11'),
+      marker:localStorage.getItem('insight_indexeddb_adoption_v1')
+    }));
+    expect(blocked).toEqual({
+      diagnostic:{state:'hold',reason:'database-missing'},
+      raw:'fictional data from another tab',
+      marker:'{"state":"active","id":"fixture"}'
+    });
+  }finally{
+    await other.close();
+  }
+
+  const unavailable=await page.evaluate(async ()=>{
+    let release;
+    let entered;
+    const locked=new Promise(resolve=>{entered=resolve;});
+    const holding=navigator.locks.request('insight-store-snapshots-v1',async lock=>{
+      await new Promise(resolve=>{release=resolve;entered();});
+    });
+    await locked;
+    try{return await InsightIndexedDBStorageV1.diagnoseStartup();}
+    finally{release();await holding;}
+  });
+  expect(unavailable).toEqual({state:'hold',reason:'startup-check-unavailable'});
 });
 
 for(const inputPage of [

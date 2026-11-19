@@ -250,7 +250,7 @@
   }
 
   // A diagnostic never promotes a record or clears a persistent hold.
-  async function diagnose({verifyInterrupted=false}={}){
+  async function inspectStorage(verifyInterrupted,beforeStartup){
     return exclusive(async ()=>{
       const before=root.localStorage.getItem(markerKey);
       const source=root.localStorage.getItem(sourceKey);
@@ -275,8 +275,9 @@
       }
       if(databaseMissing){
         if(!adopted&&history.kind==='recorded')return {state:'hold',reason:'history-only'};
-        if(!adopted&&source===null&&history.kind==='missing'){
-          return {state:'hold',reason:olderSource?'older-source-present':'storage-history-unknown'};
+        if(!adopted&&history.kind==='missing'){
+          if(beforeStartup&&(source!==null||olderSource))return {state:'legacy'};
+          if(source===null)return {state:'hold',reason:olderSource?'older-source-present':'storage-history-unknown'};
         }
         return {state:'hold',reason:'database-missing'};
       }
@@ -303,6 +304,20 @@
       }
       return {state:'active',revision:record.revision};
     });
+  }
+
+  function diagnose({verifyInterrupted=false}={}){
+    return inspectStorage(verifyInterrupted,false);
+  }
+
+  async function diagnoseStartup(){
+    try{
+      const result=await inspectStorage(false,true);
+      // The legacy shell must not start while IndexedDB is the adopted source.
+      return result.state==='active'?{state:'hold',reason:'indexeddb-adopted'}:result;
+    }catch(_){
+      return {state:'hold',reason:'startup-check-unavailable'};
+    }
   }
 
   async function recoveryEvidence(){
@@ -383,6 +398,6 @@
   }
 
   root.InsightIndexedDBStorageV1=Object.freeze({
-    migrate,read,save,diagnose,reviewRecovery,reviewHistoryOnlyBackup,reviewMissingStorageBackup
+    migrate,read,save,diagnose,diagnoseStartup,reviewRecovery,reviewHistoryOnlyBackup,reviewMissingStorageBackup
   });
 })(globalThis);
