@@ -213,6 +213,7 @@ test('missing storage keeps migration stopped and only previews a selected encry
   await page.goto('/Index.html');
   await waitForMigrationChecks(page);
   await page.addScriptTag({url:'/insight_indexeddb_storage_v1.js'});
+  await page.addScriptTag({url:'/insight_indexeddb_recovery_preview_v1.js'});
   const result=await page.evaluate(async ()=>{
     const api=InsightIndexedDBStorageV1,sourceKey='insight_v11';
     const markerKey='insight_indexeddb_adoption_v1';
@@ -233,6 +234,20 @@ test('missing storage keeps migration stopped and only previews a selected encry
     localStorage.removeItem(sourceKey);
 
     const initial=await api.diagnose();
+    const olderSources=[];
+    for(const key of ['insight_v9','insight_v8']){
+      localStorage.setItem(key,'{"years":["2025"],"data":{}}');
+      const diagnostic=await api.diagnose();
+      const blocked=await api.reviewMissingStorageBackup(file,password,()=>true).catch(error=>error.message);
+      olderSources.push({diagnostic,blocked,preserved:localStorage.getItem(key)==='{"years":["2025"],"data":{}}'});
+      localStorage.removeItem(key);
+    }
+    const legacyAppeared=await api.reviewMissingStorageBackup(file,password,()=>{
+      localStorage.setItem('insight_v8','{"years":["2025"],"data":{}}');
+      return true;
+    }).catch(error=>error.message);
+    const legacyPreserved=localStorage.getItem('insight_v8')==='{"years":["2025"],"data":{}}';
+    localStorage.removeItem('insight_v8');
     const migration=await api.migrate().catch(error=>error.message);
     const invalidFile=await api.reviewMissingStorageBackup(new File(['{'],'invalid.json'),password,()=>true)
       .catch(error=>error.message);
@@ -247,11 +262,25 @@ test('missing storage keeps migration stopped and only previews a selected encry
       localStorage.setItem(sourceKey,JSON.stringify(snapshot));
       return true;
     }).catch(error=>error.message);
-    return {initial,migration,invalidFile,badPassword,cancelled,confirmed,summary,withoutWrites,after,appeared,
-      preservedNewSource:localStorage.getItem(sourceKey)===JSON.stringify(snapshot)};
+    const preservedNewSource=localStorage.getItem(sourceKey)===JSON.stringify(snapshot);
+    localStorage.removeItem(sourceKey);
+    const screen=document.createElement('div');
+    screen.id='fictionalRecoveryScreen';
+    document.body.append(screen);
+    InsightIndexedDBRecoveryPreviewV1.mount(screen);
+    return {initial,migration,invalidFile,badPassword,cancelled,confirmed,summary,withoutWrites,after,
+      appeared,preservedNewSource,olderSources,legacyAppeared,legacyPreserved,envelope:JSON.stringify(envelope)};
   });
-  expect(result).toEqual({
+  const {envelope,...diagnostic}=result;
+  expect(diagnostic).toEqual({
     initial:{state:'hold',reason:'storage-history-unknown'},
+    olderSources:Array.from({length:2},()=>({
+      diagnostic:{state:'hold',reason:'older-source-present'},
+      blocked:'Missing storage recovery state could not be verified',
+      preserved:true
+    })),
+    legacyAppeared:'Missing storage recovery state could not be verified',
+    legacyPreserved:true,
     migration:'Legacy Insight data is missing',
     invalidFile:'バックアップファイルを読み込めませんでした。',
     badPassword:'復号できませんでした。パスワードまたはバックアップファイルを確認してください。',
@@ -265,6 +294,26 @@ test('missing storage keeps migration stopped and only previews a selected encry
     appeared:'Missing storage recovery state could not be verified',
     preservedNewSource:true
   });
+  const screen=page.locator('#fictionalRecoveryScreen');
+  const file=screen.getByLabel('暗号化バックアップ',{exact:true});
+  const password=screen.getByLabel('バックアップのパスワード');
+  for(const [button,message] of [
+    ['取り消す','確認を取り消しました。保存は停止したままです。'],
+    ['確認済みにする','バックアップを確認しました。保存は停止したままです。']
+  ]){
+    await file.setInputFiles({name:'Insight_261119_0900.json',mimeType:'application/json',buffer:Buffer.from(envelope)});
+    await password.fill('Fit123');
+    await screen.getByRole('button',{name:'内容を表示'}).click();
+    await expect(screen.getByText(/架空店舗/)).toBeVisible();
+    await expect(password).toHaveValue('');
+    await screen.getByRole('button',{name:button}).click();
+    await expect(screen.getByRole('status')).toHaveText(message);
+  }
+  expect(await page.evaluate(async ()=>({
+    source:localStorage.getItem('insight_v11'),
+    marker:localStorage.getItem('insight_indexeddb_adoption_v1'),
+    diagnostic:await InsightIndexedDBStorageV1.diagnose()
+  }))).toEqual({source:null,marker:null,diagnostic:{state:'hold',reason:'storage-history-unknown'}});
 });
 
 for(const inputPage of [

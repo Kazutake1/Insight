@@ -245,11 +245,16 @@
       'save-verified':'unverified';
   }
 
+  function hasOlderSource(){
+    return ['insight_v9','insight_v8'].some(key=>root.localStorage.getItem(key)!==null);
+  }
+
   // A diagnostic never promotes a record or clears a persistent hold.
   async function diagnose({verifyInterrupted=false}={}){
     return exclusive(async ()=>{
       const before=root.localStorage.getItem(markerKey);
       const source=root.localStorage.getItem(sourceKey);
+      const olderSource=source===null&&hasOlderSource();
       let adopted;
       try{adopted=JSON.parse(before);}
       catch(_){return {state:'hold',reason:'invalid-marker'};}
@@ -264,13 +269,15 @@
         if(!(error instanceof MissingDatabaseError))return {state:'hold',reason:'database-unavailable'};
         databaseMissing=true;
       }
-      if(before!==root.localStorage.getItem(markerKey)||source!==root.localStorage.getItem(sourceKey)){
+      if(before!==root.localStorage.getItem(markerKey)||source!==root.localStorage.getItem(sourceKey)||
+         (source===null&&olderSource!==hasOlderSource())){
         return {state:'hold',reason:'state-changed'};
       }
       if(databaseMissing){
         if(!adopted&&history.kind==='recorded')return {state:'hold',reason:'history-only'};
-        if(!adopted&&source===null&&history.kind==='missing')
-          return {state:'hold',reason:'storage-history-unknown'};
+        if(!adopted&&source===null&&history.kind==='missing'){
+          return {state:'hold',reason:olderSource?'older-source-present':'storage-history-unknown'};
+        }
         return {state:'hold',reason:'database-missing'};
       }
       if(!adopted)return {state:'hold',reason:history.kind==='recorded'&&!record?'history-only':'marker-missing'};
