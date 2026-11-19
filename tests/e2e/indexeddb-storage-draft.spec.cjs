@@ -379,6 +379,75 @@ test('startup diagnosis preserves legacy data and refuses uncertain or adopted s
   expect(unavailable).toEqual({state:'hold',reason:'startup-check-unavailable'});
 });
 
+test('a tab with the current storage guard stops legacy writes once it observes migration',async({context,page})=>{
+  await context.route('**/guarded-storage-fixture',route=>route.fulfill({
+    contentType:'text/html',body:'<!doctype html><title>Fictional guarded storage fixture</title>'
+  }));
+  await page.goto('/guarded-storage-fixture');
+  await page.evaluate(()=>{window.SK='insight_v11';});
+  await page.addScriptTag({url:'/insight_storage_v1.js'});
+  const original=await page.evaluate(()=>InsightStorage.writeSnapshot({fictional:123}));
+  expect(JSON.parse(original)).toEqual({fictional:123,schemaVersion:1});
+
+  const other=await context.newPage();
+  try{
+    await other.goto('/guarded-storage-fixture');
+    await page.evaluate(()=>{
+      window.markerCleared=new Promise(resolve=>{
+        window.addEventListener('storage',function observed(event){
+          if(event.key==='insight_indexeddb_adoption_v1'&&event.newValue===null){
+            window.removeEventListener('storage',observed);
+            resolve();
+          }
+        });
+      });
+    });
+    await other.evaluate(()=>{
+      const key='insight_indexeddb_adoption_v1';
+      localStorage.setItem(key,'{"state":"preparing","id":"fictional"}');
+      localStorage.removeItem(key);
+    });
+    const result=await page.evaluate(async ()=>{
+      await window.markerCleared;
+      const store=InsightStorage;
+      const target={fictional:999};
+      const failures=[];
+      let mutated=false;
+      for(const attempt of [
+        ()=>store.writeSnapshot(target),
+        ()=>store.persistCurrent(target),
+        ()=>store.transaction(target,()=>{mutated=true;})
+      ]){
+        try{attempt();}
+        catch(error){failures.push(error.name);}
+      }
+      return {failures,mutated,target,raw:localStorage.getItem('insight_v11')};
+    });
+    expect(result).toEqual({
+      failures:Array(3).fill('InsightStorageConflictError'),
+      mutated:false,
+      target:{fictional:999},
+      raw:original
+    });
+  }finally{
+    await other.close();
+  }
+
+  // Reload a separate fixture with a malformed marker already present.
+  await page.evaluate(()=>localStorage.setItem('insight_indexeddb_adoption_v1','{invalid'));
+  await page.reload();
+  await page.evaluate(()=>{window.SK='insight_v11';});
+  await page.addScriptTag({url:'/insight_storage_v1.js'});
+  const atStartup=await page.evaluate(()=>{
+    try{InsightStorage.writeSnapshot({fictional:456});}
+    catch(error){
+      return {code:error.name,raw:localStorage.getItem('insight_v11'),
+        marker:localStorage.getItem('insight_indexeddb_adoption_v1')};
+    }
+  });
+  expect(atStartup).toEqual({code:'InsightStorageConflictError',raw:original,marker:'{invalid'});
+});
+
 for(const inputPage of [
   {nav:'#nav2',type:'sales',field:'#salesForm input[type=text]',save:'#salesSaveBtn'},
   {nav:'#nav3',type:'kyaku',field:'#kyakuGrid input',save:'#kyakuSaveBtn'},
