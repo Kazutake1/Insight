@@ -142,6 +142,16 @@
     return adopted;
   }
 
+  function checkActiveSource(record,adopted,markerRaw){
+    if(root.localStorage.getItem(markerKey)!==markerRaw)
+      throw new Error('IndexedDB adoption state changed');
+    if(record?.id===adopted.id&&typeof record.sourceRaw==='string'&&
+       root.localStorage.getItem(sourceKey)!==record.sourceRaw){
+      writeMarker('source-conflict',adopted.id);
+      throw new Error('Legacy Insight storage changed; IndexedDB writes are on hold');
+    }
+  }
+
   // Called only from a user-driven migration flow.
   async function migrate(){
     return exclusive(async ()=>{
@@ -178,8 +188,7 @@
       const adopted=activeMarker();
       const record=await readRecord();
       await requireHistory(adopted.id);
-      if(root.localStorage.getItem(markerKey)!==markerRaw)
-        throw new Error('IndexedDB adoption state changed');
+      checkActiveSource(record,adopted,markerRaw);
       const current=validateRecord(record,adopted.id);
       return {revision:current.revision,snapshot:parse(current.raw)};
     });
@@ -193,15 +202,20 @@
 
   async function save(expectedRevision,snapshot){
     return exclusive(async ()=>{
+      const markerRaw=root.localStorage.getItem(markerKey);
       const adopted=activeMarker();
       await requireHistory(adopted.id);
       const raw=JSON.stringify(snapshot);
       parse(raw);
-      const baseline=validateRecord(await readRecord(),adopted.id);
+      const record=await readRecord();
+      checkActiveSource(record,adopted,markerRaw);
+      const baseline=validateRecord(record,adopted.id);
       // Record both versions before opening the write transaction.
       const [candidateDigest,baselineDigest]=await Promise.all([digest(raw),digest(baseline.raw)]);
       const operation={id:root.crypto.randomUUID(),expectedRevision,digest:candidateDigest,
         baselineDigest,baselineWriteId:baseline.writeId??null};
+      // The legacy source can change while hashing the two snapshots.
+      checkActiveSource(baseline,adopted,markerRaw);
       // Leave a persistent hold if the browser exits or the outcome is unclear.
       writeMarker('writing',adopted.id,operation);
       const next=await transact('readwrite',(record,records)=>{
@@ -259,7 +273,7 @@
       try{adopted=JSON.parse(before);}
       catch(_){return {state:'hold',reason:'invalid-marker'};}
       if(before!==null&&(!adopted||typeof adopted.id!=='string'||!adopted.id||
-         !['active','preparing','writing'].includes(adopted.state))){
+         !['active','preparing','writing','source-conflict'].includes(adopted.state))){
         return {state:'hold',reason:'invalid-marker'};
       }
       const history=await migrationHistory();
@@ -282,6 +296,7 @@
         return {state:'hold',reason:'database-missing'};
       }
       if(!adopted)return {state:'hold',reason:history.kind==='recorded'&&!record?'history-only':'marker-missing'};
+      if(adopted.state==='source-conflict')return {state:'hold',reason:'source-conflict'};
       try{validateRecord(record,adopted.id);}
       catch(_){return {state:'hold',reason:'record-unverified'};}
       if(history.kind!=='recorded'||history.id!==adopted.id){

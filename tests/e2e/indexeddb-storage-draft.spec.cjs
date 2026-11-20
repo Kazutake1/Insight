@@ -448,6 +448,73 @@ test('a tab with the current storage guard stops legacy writes once it observes 
   expect(atStartup).toEqual({code:'InsightStorageConflictError',raw:original,marker:'{invalid'});
 });
 
+for(const operation of ['read','save']){
+  test('an unguarded legacy tab change leaves a persistent hold on '+operation,async({context,page})=>{
+    await context.route('**/legacy-conflict-fixture',route=>route.fulfill({
+      contentType:'text/html',body:'<!doctype html><title>Fictional legacy conflict fixture</title>'
+    }));
+    await page.goto('/legacy-conflict-fixture');
+    await page.addScriptTag({url:'/insight_indexeddb_storage_v1.js'});
+    const original=await page.evaluate(async ()=>{
+      const source={current:'fictional',stores:{fictional:{value:1}}};
+      const raw=JSON.stringify(source);
+      localStorage.setItem('insight_v11',raw);
+      window.InsightStorage={writeMetadata(key,value){localStorage.setItem(key,value);}};
+      window.InsightMigrationBackupV1={confirm:async()=>true,assertReady(){}};
+      await InsightIndexedDBStorageV1.migrate();
+      await InsightIndexedDBStorageV1.save(0,{...source,stores:{fictional:{value:2}}});
+      return raw;
+    });
+
+    const other=await context.newPage();
+    try{
+      await other.goto('/legacy-conflict-fixture');
+      const conflicting=await other.evaluate(()=>{
+        const raw=JSON.stringify({current:'fictional',stores:{fictional:{value:3}}});
+        localStorage.setItem('insight_v11',raw);
+        return raw;
+      });
+      const observed=await page.evaluate(async operation=>{
+        const api=InsightIndexedDBStorageV1;
+        const rejected=await (operation==='read'?api.read():
+          api.save(1,{current:'fictional',stores:{fictional:{value:4}}})).catch(error=>error.message);
+        const record=await new Promise((resolve,reject)=>{
+          const request=indexedDB.open('insight-store-snapshots-v1');
+          request.onerror=()=>reject(request.error);
+          request.onsuccess=()=>{
+            const db=request.result;
+            const tx=db.transaction('snapshots','readonly');
+            const get=tx.objectStore('snapshots').get('current');
+            tx.oncomplete=()=>{db.close();resolve(get.result);};
+            tx.onabort=()=>{db.close();reject(tx.error);};
+          };
+        });
+        return {rejected,diagnostic:await api.diagnose(),raw:localStorage.getItem('insight_v11'),
+          initial:record.sourceRaw,prior:JSON.parse(record.previous.raw).stores.fictional.value,
+          current:JSON.parse(record.raw).stores.fictional.value,revision:record.revision};
+      },operation);
+      expect(observed).toEqual({
+        rejected:'Legacy Insight storage changed; IndexedDB writes are on hold',
+        diagnostic:{state:'hold',reason:'source-conflict'},raw:conflicting,initial:original,
+        prior:1,current:2,revision:1
+      });
+
+      // Simulate the legacy tab returning the original bytes. A reload must still hold.
+      await other.evaluate(raw=>localStorage.setItem('insight_v11',raw),original);
+      await page.reload();
+      await page.addScriptTag({url:'/insight_indexeddb_storage_v1.js'});
+      expect(await page.evaluate(async ()=>({
+        diagnostic:await InsightIndexedDBStorageV1.diagnoseStartup(),
+        read:await InsightIndexedDBStorageV1.read().catch(error=>error.message)
+      }))).toEqual({
+        diagnostic:{state:'hold',reason:'source-conflict'},read:'IndexedDB writes are on hold'
+      });
+    }finally{
+      await other.close();
+    }
+  });
+}
+
 for(const inputPage of [
   {nav:'#nav2',type:'sales',field:'#salesForm input[type=text]',save:'#salesSaveBtn'},
   {nav:'#nav3',type:'kyaku',field:'#kyakuGrid input',save:'#kyakuSaveBtn'},
