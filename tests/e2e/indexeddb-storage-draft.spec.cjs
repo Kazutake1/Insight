@@ -2,6 +2,11 @@ const {test,expect}=require('@playwright/test');
 const fs=require('node:fs/promises');
 require('./helpers/verified-chart.cjs')(test);
 test.beforeEach(async({page})=>{
+  await page.addInitScript(({build,features})=>{
+    if(!location.pathname.endsWith('-fixture'))return;
+    window.__INSIGHT_SHELL_VERSION__=build;
+    window.__INSIGHT_FEATURE_SIGNATURE__=features;
+  },{build:'20261113-daily-bar-build-112',features:'8b6a11f7'});
   await page.route(/https:\/\/(www\.jma\.go\.jp|[^/]*api\.open-meteo\.com)\//,route=>route.abort());
 });
 async function routeMigrationPage(page){
@@ -42,7 +47,7 @@ test('manual adoption uses the real encrypted backup confirmation and preserves 
   const divergent=await page.evaluate(async ()=>{
     const name=store.name;
     store.name='画面側だけ変更';
-    try{return await InsightIndexedDBStorageV1.migrate().catch(error=>error.message);}
+    try{return await InsightIndexedDBStorageV1.migrate({legacyClientsClosed:true}).catch(error=>error.message);}
     finally{store.name=name;}
   });
   expect(divergent).toContain('未保存の入力または保存データの変更');
@@ -53,7 +58,7 @@ test('manual adoption uses the real encrypted backup confirmation and preserves 
   const confirm=page.getByRole('button',{name:'保存したファイルを確認した',exact:true});
   async function startBackup(){
     await page.evaluate(()=>{
-      window.migrationResult=InsightIndexedDBStorageV1.migrate().catch(error=>error.message);
+      window.migrationResult=InsightIndexedDBStorageV1.migrate({legacyClientsClosed:true}).catch(error=>error.message);
     });
     await page.locator('#insightBackupPassword').fill(password);
     await page.locator('#insightBackupPasswordConfirm').fill(password);
@@ -184,7 +189,7 @@ test('manual adoption uses the real encrypted backup confirmation and preserves 
       return true;
     }).catch(error=>error.message);
     localStorage.setItem('insight_v11',originalRaw);
-    const repeatedMigration=await store.migrate().catch(error=>error.message);
+    const repeatedMigration=await store.migrate({legacyClientsClosed:true}).catch(error=>error.message);
     const markerStillMissing=localStorage.getItem(markerKey)===null;
     const stillMissing=await store.diagnose();
     localStorage.setItem(markerKey,before);
@@ -250,7 +255,7 @@ test('missing storage keeps migration stopped and only previews a selected encry
     }).catch(error=>error.message);
     const legacyPreserved=localStorage.getItem('insight_v8')==='{"years":["2025"],"data":{}}';
     localStorage.removeItem('insight_v8');
-    const migration=await api.migrate().catch(error=>error.message);
+    const migration=await api.migrate({legacyClientsClosed:true}).catch(error=>error.message);
     const invalidFile=await api.reviewMissingStorageBackup(new File(['{'],'invalid.json'),password,()=>true)
       .catch(error=>error.message);
     const badPassword=await api.reviewMissingStorageBackup(file,'Wrong6',()=>true)
@@ -461,7 +466,7 @@ for(const operation of ['read','save']){
       localStorage.setItem('insight_v11',raw);
       window.InsightStorage={writeMetadata(key,value){localStorage.setItem(key,value);}};
       window.InsightMigrationBackupV1={confirm:async()=>true,assertReady(){}};
-      await InsightIndexedDBStorageV1.migrate();
+      await InsightIndexedDBStorageV1.migrate({legacyClientsClosed:true});
       await InsightIndexedDBStorageV1.save(0,{...source,stores:{fictional:{value:2}}});
       return raw;
     });
@@ -569,6 +574,68 @@ test('migration startup gate requires a confirmed restart and a fresh build with
   expect(await page.evaluate(()=>localStorage.length)).toBe(0);
 });
 
+test('migration enforces the pinned environment before and after backup confirmation',async({page})=>{
+  const fixture='/forced-migration-gate-fixture',build='20261113-daily-bar-build-112';
+  await page.route('**'+fixture,route=>route.fulfill({
+    contentType:'text/html',body:'<!doctype html><title>Fictional forced migration fixture</title>'
+  }));
+  let serverBuild=build;
+  await page.route('**/Index.html?insight_migration_probe=*',route=>route.fulfill({
+    contentType:'text/html',body:'<!doctype html><meta name="insight-shell-version" content="'+serverBuild+'">'
+  }));
+  await page.goto(fixture);
+  await page.addScriptTag({url:'/insight_indexeddb_storage_v1.js'});
+  await page.evaluate(()=>{
+    window.confirmations=0;
+    window.InsightStorage={writeMetadata(key,value){localStorage.setItem(key,value);}};
+    window.InsightMigrationBackupV1={
+      confirm:async()=>{
+        window.confirmations++;
+        return await new Promise(resolve=>{window.finishBackup=resolve;});
+      },
+      assertReady(raw){
+        if(localStorage.getItem('insight_v11')!==raw)throw new Error('Fictional source changed');
+      }
+    };
+    localStorage.setItem('insight_v11','{"current":"fictional","stores":{"fictional":{"value":1}}}');
+  });
+  const attempt=(options)=>page.evaluate(options=>
+    InsightIndexedDBStorageV1.migrate(options).catch(error=>error.message),options);
+  expect(await attempt({})).toContain('legacy-client-confirmation-required');
+
+  // Values provided by the caller cannot bypass the pin.
+  await page.evaluate(()=>{window.__INSIGHT_SHELL_VERSION__='fictional-other-build';});
+  serverBuild='fictional-other-build';
+  expect(await attempt({legacyClientsClosed:true,expectedBuild:serverBuild})).toContain('build-mismatch');
+  await page.evaluate(build=>{window.__INSIGHT_SHELL_VERSION__=build;},build);
+  serverBuild=build;
+  expect(await page.evaluate(()=>window.confirmations)).toBe(0);
+
+  for(const scenario of ['server-changed','source-changed','ready']){
+    await page.evaluate(()=>{
+      window.finishBackup=null;
+      window.attemptResult=InsightIndexedDBStorageV1.migrate({legacyClientsClosed:true})
+        .catch(error=>error.message);
+    });
+    await page.waitForFunction(()=>typeof window.finishBackup==='function');
+    if(scenario==='server-changed')serverBuild='fictional-new-build';
+    if(scenario==='source-changed')await page.evaluate(()=>{
+      localStorage.setItem('insight_v11','{"current":"fictional","stores":{"fictional":{"value":2}}}');
+    });
+    await page.evaluate(()=>window.finishBackup(true));
+    const actual=await page.evaluate(()=>window.attemptResult);
+    if(scenario==='ready'){
+      expect(actual).toEqual({revision:0,snapshot:{current:'fictional',stores:{fictional:{value:2}}}});
+    }else{
+      expect(actual).toContain(scenario==='server-changed'?'build-mismatch':'Fictional source changed');
+      expect(await page.evaluate(()=>localStorage.getItem('insight_indexeddb_adoption_v1'))).toBeNull();
+    }
+    serverBuild=build;
+  }
+  expect(await page.evaluate(()=>localStorage.getItem('insight_v11')))
+    .toBe('{"current":"fictional","stores":{"fictional":{"value":2}}}');
+});
+
 for(const inputPage of [
   {nav:'#nav2',type:'sales',field:'#salesForm input[type=text]',save:'#salesSaveBtn'},
   {nav:'#nav3',type:'kyaku',field:'#kyakuGrid input',save:'#kyakuSaveBtn'},
@@ -589,7 +656,7 @@ for(const inputPage of [
       return InsightStorage.writeSnapshot(next);
     });
     await field.fill('987');
-    const attempt=()=>page.evaluate(()=>InsightIndexedDBStorageV1.migrate().catch(error=>error.message));
+    const attempt=()=>page.evaluate(()=>InsightIndexedDBStorageV1.migrate({legacyClientsClosed:true}).catch(error=>error.message));
     expect(await attempt()).toContain('未保存の入力または保存データの変更');
     await expect(field).toHaveValue('987');
     await expect(page.locator('#insightBackupOverlay')).toHaveCount(0);
@@ -603,7 +670,7 @@ for(const inputPage of [
 
     async function checkMigrationCanStart(){
       await page.evaluate(()=>{
-        window.migrationAfterSave=InsightIndexedDBStorageV1.migrate().catch(error=>error.message);
+        window.migrationAfterSave=InsightIndexedDBStorageV1.migrate({legacyClientsClosed:true}).catch(error=>error.message);
       });
       await expect(page.locator('#insightBackupPassword')).toBeVisible();
       await page.getByRole('button',{name:'キャンセル',exact:true}).click();
@@ -663,7 +730,7 @@ test('recovery distinguishes an interrupted migration copy, an aborted save and 
       writeMetadata(key,value);
     }};
     window.InsightMigrationBackupV1={confirm:async()=>true,assertReady(){}};
-    const adoptionError=await storage.migrate().catch(error=>error.message);
+    const adoptionError=await storage.migrate({legacyClientsClosed:true}).catch(error=>error.message);
     const preparingMarker=localStorage.getItem(markerKey);
     const inspect=()=>storage.diagnose({verifyInterrupted:true});
     const preparing=await inspect();
@@ -758,9 +825,9 @@ test('history-only migration attempt stays held after reload with two-store sour
       localStorage.setItem(key,value);
     }};
     const storage=InsightIndexedDBStorageV1;
-    const interrupted=await storage.migrate().catch(error=>error.message);
+    const interrupted=await storage.migrate({legacyClientsClosed:true}).catch(error=>error.message);
     const diagnosis=await storage.diagnose({verifyInterrupted:true});
-    const rejected=await storage.migrate().catch(error=>error.message);
+    const rejected=await storage.migrate({legacyClientsClosed:true}).catch(error=>error.message);
     const review=await storage.reviewRecovery(()=>true).catch(error=>error.message);
     return {interrupted,diagnosis,rejected,review,rawIntact:localStorage.getItem('insight_v11')===raw,
       markerMissing:localStorage.getItem('insight_indexeddb_adoption_v1')===null};
@@ -776,7 +843,7 @@ test('history-only migration attempt stays held after reload with two-store sour
   await page.addScriptTag({url:'/insight_indexeddb_storage_v1.js'});
   const afterReload=await page.evaluate(async()=>({
     diagnosis:await InsightIndexedDBStorageV1.diagnose({verifyInterrupted:true}),
-    retry:await InsightIndexedDBStorageV1.migrate().catch(error=>error.message),
+    retry:await InsightIndexedDBStorageV1.migrate({legacyClientsClosed:true}).catch(error=>error.message),
     original:JSON.parse(localStorage.getItem('insight_v11')).stores.b.data['2026'].sales,
     marker:localStorage.getItem('insight_indexeddb_adoption_v1')
   }));
@@ -799,7 +866,7 @@ test('lost or mismatched migration history blocks reads and saves without changi
     window.InsightStorage={writeMetadata(key,value){localStorage.setItem(key,value);}};
     window.InsightMigrationBackupV1={confirm:async()=>true,assertReady(){}};
     const storage=InsightIndexedDBStorageV1;
-    await storage.migrate();
+    await storage.migrate({legacyClientsClosed:true});
     const marker=localStorage.getItem('insight_indexeddb_adoption_v1');
     const db=await new Promise((resolve,reject)=>{
       const request=indexedDB.open('insight-migration-history-v1',1);
@@ -846,7 +913,7 @@ test('migration pauses while a dialog, CSV import or weather fetch is pending',a
   await waitForMigrationChecks(page);
   await page.addScriptTag({url:'/insight_indexeddb_storage_v1.js'});
   const result=await page.evaluate(async ()=>{
-    const attempt=()=>InsightIndexedDBStorageV1.migrate().catch(error=>error.message);
+    const attempt=()=>InsightIndexedDBStorageV1.migrate({legacyClientsClosed:true}).catch(error=>error.message);
     const raw=InsightStorage.writeSnapshot(allStores);
     const editor=document.createElement('dialog');
     document.body.append(editor);

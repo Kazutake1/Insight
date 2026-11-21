@@ -7,6 +7,9 @@
   const sourceKey='insight_v11';
   const recordKey='current';
   const storeName='snapshots';
+  // Pin the version exercised by the Draft migration. It must be updated with the release that enables it.
+  const migrationBuild='20261113-daily-bar-build-112';
+  const migrationFeatures='8b6a11f7';
 
   function parse(raw){
     const snapshot=JSON.parse(raw);
@@ -186,16 +189,30 @@
     }
   }
 
+  async function requireMigrationEnvironment(legacyClientsClosed){
+    const result=await checkMigrationEnvironment({
+      expectedBuild:migrationBuild,expectedFeatures:migrationFeatures,legacyClientsClosed
+    });
+    if(result.state!=='ready')throw new Error('Migration environment requires review: '+result.reason);
+  }
+
   // Called only from a user-driven migration flow.
-  async function migrate(){
+  async function migrate({legacyClientsClosed}={}){
+    if(legacyClientsClosed!==true)
+      throw new Error('Migration environment requires review: legacy-client-confirmation-required');
     return exclusive(async ()=>{
       if(marker()!==null)throw new Error('Existing migration requires review');
       await requireFirstMigration();
       const raw=root.localStorage.getItem(sourceKey);
       if(raw===null)throw new Error('Legacy Insight data is missing');
       parse(raw);
-      if(await root.InsightMigrationBackupV1.confirm(raw)!==true)throw new Error('Backup save was not confirmed');
+      await requireMigrationEnvironment(legacyClientsClosed);
       root.InsightMigrationBackupV1.assertReady(raw);
+      if(await root.InsightMigrationBackupV1.confirm(raw)!==true)throw new Error('Backup save was not confirmed');
+      await requireMigrationEnvironment(legacyClientsClosed);
+      await requireFirstMigration();
+      root.InsightMigrationBackupV1.assertReady(raw);
+      if(marker()!==null)throw new Error('Existing migration requires review');
       const id=root.crypto.randomUUID();
       await recordMigrationAttempt(id);
       root.InsightMigrationBackupV1.assertReady(raw);
