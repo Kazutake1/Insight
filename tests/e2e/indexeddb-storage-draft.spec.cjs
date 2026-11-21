@@ -951,3 +951,91 @@ test('migration pauses while a dialog, CSV import or weather fetch is pending',a
     dialog:message,csv:message,weather:message,pendingCSV:false,pendingWeather:false,rawPreserved:true,marker:null
   });
 });
+
+test('isolated startup and migration button gate the real shell and encrypted backup',async({page})=>{
+  await page.route('**/isolated-migration-start.js',route=>route.fulfill({
+    contentType:'application/javascript',
+    body:`const container=document.getElementById('loading');
+      InsightIndexedDBMigrationPreviewV1.start(container,()=>{
+        const loader=document.createElement('script');
+        loader.src=container.dataset.loader;
+        document.body.append(loader);
+      });`
+  }));
+  await page.route('**/Index.html*',async route=>{
+    const response=await route.fetch();
+    let body=(await response.text()).replace(/;?\s*upgrade-insecure-requests/g,'');
+    if(new URL(route.request().url()).searchParams.has('isolated-migration-fixture')){
+      const loader=body.match(/<script src="([^"]*insight_shell_loader_v1[^"]*)"><\/script>/);
+      if(!loader)throw new Error('The isolated startup fixture could not find the shell loader');
+      body=body.replace('id="loading"','id="loading" data-loader="'+loader[1]+'"')
+        .replace(loader[0],[
+          'insight_indexeddb_storage_v1.js',
+          'insight_indexeddb_migration_preview_v1.js',
+          'isolated-migration-start.js'
+        ].map(path=>'<script src="./'+path+'"></script>').join(''));
+    }
+    await route.fulfill({response,body});
+  });
+
+  const fixture='/Index.html?isolated-migration-fixture=1';
+  await page.goto(fixture);
+  await expect(page.getByRole('status')).toHaveText('保存状態を確認できないため、起動と保存を停止しています。');
+  await expect(page.locator('#quickGrid')).toHaveCount(0);
+  expect(await page.evaluate(()=>localStorage.getItem('insight_v11'))).toBeNull();
+
+  // Create the fictional source with the normal storage format before entering the fixture.
+  await page.goto('/Index.html');
+  await waitForMigrationChecks(page);
+  const raw=await page.evaluate(()=>{
+    store.name='架空店舗';
+    return InsightStorage.writeSnapshot(allStores);
+  });
+  await page.goto(fixture);
+  await waitForMigrationChecks(page);
+  await page.evaluate(()=>{
+    const container=document.createElement('aside');
+    document.body.prepend(container);
+    InsightIndexedDBMigrationPreviewV1.mount(container);
+  });
+  await expect(page.locator('#quickGrid')).toBeAttached();
+  const checkbox=page.getByRole('checkbox',{name:'Insightの他のタブとホーム画面から開いたアプリを閉じました'});
+  const button=page.getByRole('button',{name:'バックアップを作成して移行'});
+  const marker=()=>page.evaluate(()=>localStorage.getItem('insight_indexeddb_adoption_v1'));
+  await expect(button).toBeDisabled();
+  expect(await marker()).toBeNull();
+
+  const password='Fit123';
+  async function start(){
+    await checkbox.check();
+    await button.click();
+    await expect(button).toBeDisabled();
+    await page.locator('#insightBackupPassword').fill(password);
+    await page.locator('#insightBackupPasswordConfirm').fill(password);
+    const download=page.waitForEvent('download');
+    await page.locator('#insightBackupOverlay button[type=submit]').click();
+    return download;
+  }
+  await start();
+  await page.getByRole('button',{name:'未確認のまま閉じる',exact:true}).click();
+  await expect(page.getByText('バックアップの確認を取り消しました。')).toBeVisible();
+  await expect(checkbox).not.toBeChecked();
+  expect(await marker()).toBeNull();
+
+  const download=await start();
+  const file=JSON.parse(await fs.readFile(await download.path(),'utf8'));
+  expect(file.format).toBe('InsightEncryptedBackup');
+  expect(await marker()).toBeNull();
+  await page.getByRole('button',{name:'保存したファイルを確認した',exact:true}).click();
+  await expect(page.getByRole('status')).toHaveText('IndexedDBにコピーを確認しました。保存を停止しています。');
+  await expect(page.locator('#quickGrid')).toHaveCount(0);
+  await expect(button).toHaveCount(0);
+  expect(JSON.parse(await marker()).state).toBe('active');
+  expect(await page.evaluate(()=>localStorage.getItem('insight_v11'))).toBe(raw);
+  expect(await page.evaluate(()=>InsightIndexedDBStorageV1.read())).toEqual({
+    revision:0,snapshot:JSON.parse(raw)
+  });
+  await page.reload();
+  await expect(page.getByRole('status')).toHaveText('IndexedDBにコピーを確認しました。保存を停止しています。');
+  await expect(page.locator('#quickGrid')).toHaveCount(0);
+});
