@@ -152,6 +152,40 @@
     }
   }
 
+  async function checkMigrationEnvironment({expectedBuild,expectedFeatures,legacyClientsClosed}={}){
+    const hold=reason=>({state:'hold',reason});
+    if(legacyClientsClosed!==true)return hold('legacy-client-confirmation-required');
+    const matchesLoadedVersion=()=>root.__INSIGHT_SHELL_VERSION__===expectedBuild&&
+      root.__INSIGHT_FEATURE_SIGNATURE__===expectedFeatures;
+    if(!expectedBuild||!expectedFeatures||!matchesLoadedVersion())return hold('build-mismatch');
+    if(root.navigator.onLine!==true)return hold('offline');
+
+    try{
+      const workers=root.navigator.serviceWorker;
+      if(typeof workers?.getRegistration!=='function')return hold('worker-state-unavailable');
+      const hasWorker=async ()=>{
+        const registration=await workers.getRegistration(root.location.href);
+        return Boolean(workers.controller||registration);
+      };
+      if(await hasWorker())return hold('service-worker-present');
+
+      const probe=new URL('Index.html',root.location.href);
+      probe.searchParams.set('insight_migration_probe',root.crypto.randomUUID());
+      const response=await root.fetch(probe,{cache:'no-store',redirect:'error'});
+      if(!response.ok)return hold('build-check-unavailable');
+      const html=await response.text();
+      const document=new DOMParser().parseFromString(html,'text/html');
+      const serverBuild=document.querySelector('meta[name="insight-shell-version"]')?.content;
+      if(!serverBuild)return hold('build-check-unavailable');
+      if(await hasWorker())return hold('service-worker-present');
+      if(serverBuild!==expectedBuild||!matchesLoadedVersion())return hold('build-mismatch');
+      if(root.navigator.onLine!==true)return hold('offline');
+      return {state:'ready'};
+    }catch(_){
+      return hold('build-check-unavailable');
+    }
+  }
+
   // Called only from a user-driven migration flow.
   async function migrate(){
     return exclusive(async ()=>{
@@ -413,6 +447,6 @@
   }
 
   root.InsightIndexedDBStorageV1=Object.freeze({
-    migrate,read,save,diagnose,diagnoseStartup,reviewRecovery,reviewHistoryOnlyBackup,reviewMissingStorageBackup
+    migrate,read,save,diagnose,diagnoseStartup,checkMigrationEnvironment,reviewRecovery,reviewHistoryOnlyBackup,reviewMissingStorageBackup
   });
 })(globalThis);

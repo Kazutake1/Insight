@@ -515,6 +515,60 @@ for(const operation of ['read','save']){
   });
 }
 
+test('migration startup gate requires a confirmed restart and a fresh build without a service worker',async({page})=>{
+  const fixture='/migration-gate-fixture';
+  await page.route('**'+fixture,route=>route.fulfill({
+    contentType:'text/html',body:'<!doctype html><title>Fictional migration gate fixture</title>'
+  }));
+  let serverBuild='fictional-current',unreachable=false,workerAppears=false;
+  await page.route('**/Index.html?insight_migration_probe=*',async route=>{
+    if(unreachable)return route.abort();
+    if(workerAppears)await page.evaluate(()=>{window.workerState='registered';});
+    return route.fulfill({contentType:'text/html',body:
+      '<!doctype html><meta name="insight-shell-version" content="'+serverBuild+'">'});
+  });
+  await page.addInitScript(()=>{
+    window.__INSIGHT_SHELL_VERSION__='fictional-current';
+    window.__INSIGHT_FEATURE_SIGNATURE__='fictional-features';
+    window.workerState='none';
+    Object.defineProperty(navigator,'serviceWorker',{configurable:true,value:{
+      get controller(){return window.workerState==='controlling'?{}:null;},
+      async getRegistration(){return window.workerState==='registered'?{}:undefined;}
+    }});
+  });
+  await page.goto(fixture);
+  await page.addScriptTag({url:'/insight_indexeddb_storage_v1.js'});
+  const check=(legacyClientsClosed=true)=>page.evaluate(closed=>
+    InsightIndexedDBStorageV1.checkMigrationEnvironment({
+      expectedBuild:'fictional-current',expectedFeatures:'fictional-features',legacyClientsClosed:closed
+    }),legacyClientsClosed);
+  expect(await check(false)).toEqual({state:'hold',reason:'legacy-client-confirmation-required'});
+  expect(await check()).toEqual({state:'ready'});
+  await page.evaluate(()=>{window.__INSIGHT_FEATURE_SIGNATURE__='fictional-stale-features';});
+  expect(await check()).toEqual({state:'hold',reason:'build-mismatch'});
+
+  serverBuild='fictional-newer';
+  await page.reload();
+  await page.addScriptTag({url:'/insight_indexeddb_storage_v1.js'});
+  expect(await check()).toEqual({state:'hold',reason:'build-mismatch'});
+  serverBuild='fictional-current';
+
+  unreachable=true;
+  expect(await check()).toEqual({state:'hold',reason:'build-check-unavailable'});
+  unreachable=false;
+  await page.evaluate(()=>Object.defineProperty(navigator,'onLine',{configurable:true,value:false}));
+  expect(await check()).toEqual({state:'hold',reason:'offline'});
+  await page.evaluate(()=>{delete navigator.onLine;});
+
+  await page.evaluate(()=>{window.workerState='controlling';});
+  expect(await check()).toEqual({state:'hold',reason:'service-worker-present'});
+  await page.evaluate(()=>{window.workerState='none';});
+  workerAppears=true;
+  expect(await check()).toEqual({state:'hold',reason:'service-worker-present'});
+
+  expect(await page.evaluate(()=>localStorage.length)).toBe(0);
+});
+
 for(const inputPage of [
   {nav:'#nav2',type:'sales',field:'#salesForm input[type=text]',save:'#salesSaveBtn'},
   {nav:'#nav3',type:'kyaku',field:'#kyakuGrid input',save:'#kyakuSaveBtn'},
