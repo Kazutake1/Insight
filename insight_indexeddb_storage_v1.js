@@ -206,6 +206,7 @@
       const raw=root.localStorage.getItem(sourceKey);
       if(raw===null)throw new Error('Legacy Insight data is missing');
       parse(raw);
+      root.InsightMigrationBackupV1.assertReady(raw);
       await requireMigrationEnvironment(legacyClientsClosed);
       root.InsightMigrationBackupV1.assertReady(raw);
       if(await root.InsightMigrationBackupV1.confirm(raw)!==true)throw new Error('Backup save was not confirmed');
