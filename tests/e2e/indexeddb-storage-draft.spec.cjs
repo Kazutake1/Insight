@@ -574,6 +574,63 @@ test('migration startup gate requires a confirmed restart and a fresh build with
   expect(await page.evaluate(()=>localStorage.length)).toBe(0);
 });
 
+test('a real legacy service worker appearing during backup stops migration and can reopen offline',async({page,context})=>{
+  const fixture='/tests/e2e/fixtures/legacy-pwa-fixture';
+  const fixtureRoute='**'+fixture;
+  await page.route(fixtureRoute,route=>route.fulfill({
+    contentType:'text/html',body:'<!doctype html><title>Fictional online migration page</title>'
+  }));
+  await page.route('**/tests/e2e/fixtures/Index.html?insight_migration_probe=*',route=>route.fulfill({
+    contentType:'text/html',body:'<!doctype html><meta name="insight-shell-version" content="20261113-daily-bar-build-112">'
+  }));
+  await page.goto(fixture);
+  await page.addScriptTag({url:'/insight_indexeddb_storage_v1.js'});
+  const raw=await page.evaluate(()=>{
+    const source=JSON.stringify({current:'fictional',stores:{fictional:{value:1}}});
+    localStorage.setItem('insight_v11',source);
+    window.InsightStorage={writeMetadata(key,value){localStorage.setItem(key,value);}};
+    window.InsightMigrationBackupV1={
+      assertReady(){},
+      confirm(){return new Promise(resolve=>{window.finishFictionalBackup=resolve;});}
+    };
+    window.migrationOutcome=InsightIndexedDBStorageV1.migrate({legacyClientsClosed:true}).then(
+      ()=>null,error=>error.message
+    );
+    return source;
+  });
+  await page.waitForFunction(()=>typeof window.finishFictionalBackup==='function');
+  const scope=await page.evaluate(async ()=>{
+    const registration=await navigator.serviceWorker.register('./legacy-pwa-worker.js');
+    return registration.scope;
+  });
+  expect(new URL(scope).pathname).toBe('/tests/e2e/fixtures/');
+  await page.waitForFunction(()=>Boolean(navigator.serviceWorker.controller));
+  expect(await page.evaluate(async ()=>{
+    window.finishFictionalBackup(true);
+    return {
+      result:await window.migrationOutcome,
+      source:localStorage.getItem('insight_v11'),
+      marker:localStorage.getItem('insight_indexeddb_adoption_v1'),
+      startup:await InsightIndexedDBStorageV1.diagnoseStartup()
+    };
+  })).toEqual({
+    result:'Migration environment requires review: service-worker-present',
+    source:raw,marker:null,startup:{state:'legacy'}
+  });
+
+  // The offline navigation has no network route to supply this document.
+  await page.unroute(fixtureRoute);
+  await context.setOffline(true);
+  try{
+    await page.reload();
+    await expect(page).toHaveTitle('Fictional cached legacy PWA');
+    expect(await page.evaluate(()=>localStorage.getItem('insight_v11'))).toBe(raw);
+    expect(await page.evaluate(()=>localStorage.getItem('insight_indexeddb_adoption_v1'))).toBeNull();
+  }finally{
+    await context.setOffline(false);
+  }
+});
+
 test('migration enforces the pinned environment before and after backup confirmation',async({page})=>{
   const fixture='/forced-migration-gate-fixture',build='20261113-daily-bar-build-112';
   await page.route('**'+fixture,route=>route.fulfill({
