@@ -6,7 +6,7 @@ test.beforeEach(async({page})=>{
     if(!location.pathname.endsWith('-fixture'))return;
     window.__INSIGHT_SHELL_VERSION__=build;
     window.__INSIGHT_FEATURE_SIGNATURE__=features;
-  },{build:'20261113-daily-bar-build-112',features:'8b6a11f7'});
+  },{build:'20261121-sale-scroll20-build-113',features:'f2dd343f'});
   await page.route(/https:\/\/(www\.jma\.go\.jp|[^/]*api\.open-meteo\.com)\//,route=>route.abort());
 });
 async function routeMigrationPage(page){
@@ -581,7 +581,7 @@ async function openLegacyPwaFixture(page){
     contentType:'text/html',body:'<!doctype html><title>Fictional online migration page</title>'
   }));
   await page.route('**/tests/e2e/fixtures/Index.html?insight_migration_probe=*',route=>route.fulfill({
-    contentType:'text/html',body:'<!doctype html><meta name="insight-shell-version" content="20261113-daily-bar-build-112">'
+    contentType:'text/html',body:'<!doctype html><meta name="insight-shell-version" content="20261121-sale-scroll20-build-113">'
   }));
   await page.goto(legacyPwaFixture);
   await page.addScriptTag({url:'/insight_indexeddb_storage_v1.js'});
@@ -714,7 +714,7 @@ test('a cached legacy PWA writing after adoption preserves both copies and stops
 });
 
 test('migration enforces the pinned environment before and after backup confirmation',async({page})=>{
-  const fixture='/forced-migration-gate-fixture',build='20261113-daily-bar-build-112';
+  const fixture='/forced-migration-gate-fixture',build='20261121-sale-scroll20-build-113';
   await page.route('**'+fixture,route=>route.fulfill({
     contentType:'text/html',body:'<!doctype html><title>Fictional forced migration fixture</title>'
   }));

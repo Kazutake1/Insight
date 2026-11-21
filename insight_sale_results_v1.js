@@ -223,7 +223,7 @@
     function renderGroups(data){
       var area=doc.getElementById('srGroups');area.replaceChildren();
       if(!data.groups.length){area.append(el('div','選択した条件のセール実績はありません。','sr-empty'));return;}
-      data.groups.forEach(function(group){
+      data.groups.forEach(function(group,index){
         var section=el('section',undefined,'sr-group'),head=el('div',undefined,'sr-group-head'),title=el('h2',group.summary),statsRow=el('div',undefined,'sr-group-stats');
         [
           ['平均納品',fmt(group.averageDelivery,1)],
@@ -237,23 +237,47 @@
           if(notes.length>1)text=group.occurrences.filter(function(item){return item.note===note;}).map(periodLabel).join('、')+'\n'+note;
           heading.append(el('div',text,'sr-sale-note'));
         });
-        head.append(heading,statsRow);
         var rows=el('div',undefined,'sr-occurrence-grids'),category=selectedCategory();
-        group.occurrences.forEach(function(occurrence){
-          var grid=el('div',undefined,'sr-day-grid');
-          var resolver=root.InsightTripHistoryResolver,cache=new Map();
-          occurrence.days.forEach(function(day){
-            var decision=resolver.resolveDate(allStores,allStores.current,category.id,day.date,{monthCache:cache});
-            grid.append(root.InsightSalesCount.createReadOnlyDayCard(day.date,day.record,category,
-              root.InsightSalesCount.wasteRecordAt(allStores,allStores.current,day.date,category.id),decision.mask));
-          });
-          rows.append(grid);
-        });
+        rows.id='srGroupDetails'+index;rows.hidden=true;
+        var toggle=el('button','詳細を表示','sr-group-toggle');toggle.type='button';
+        toggle.setAttribute('aria-controls',rows.id);
+        toggle.setAttribute('aria-expanded','false');
+        toggle.onclick=function(){
+          var opening=rows.hidden;
+          if(opening&&!rows.dataset.ready){
+            // Build day cards only when the user opens this sale; no history is discarded.
+            group.occurrences.forEach(function(occurrence){
+              var grid=el('div',undefined,'sr-day-grid');
+              var resolver=root.InsightTripHistoryResolver,cache=new Map();
+              occurrence.days.forEach(function(day){
+                var decision=resolver.resolveDate(allStores,allStores.current,category.id,day.date,{monthCache:cache});
+                grid.append(root.InsightSalesCount.createReadOnlyDayCard(day.date,day.record,category,
+                  root.InsightSalesCount.wasteRecordAt(allStores,allStores.current,day.date,category.id),decision.mask));
+              });
+              rows.append(grid);
+            });
+            rows.dataset.ready='true';
+          }
+          rows.hidden=!opening;
+          toggle.setAttribute('aria-expanded',String(opening));
+          toggle.textContent=opening?'詳細を閉じる':'詳細を表示';
+        };
+        heading.append(toggle);
+        head.append(heading,statsRow);
         section.append(head,rows);area.append(section);
       });
     }
     function renderList(data){
-      var body=doc.getElementById('srListBody');body.replaceChildren();
+      var body=doc.getElementById('srListBody'),scroller=doc.querySelector('#pageSaleResults .sr-table-scroll');
+      var count=doc.getElementById('srListCount');
+      body.replaceChildren();
+      scroller.style.maxHeight='';
+      scroller.classList.remove('sr-all-period-scroll');
+      scroller.removeAttribute('tabindex');
+      scroller.removeAttribute('role');
+      scroller.removeAttribute('aria-label');
+      scroller.scrollTop=0;
+      count.hidden=true;
       if(!data.occurrences.length){var tr=el('tr'),td=el('td','選択した条件のセール実績はありません。');td.colSpan=8;tr.append(td);body.append(tr);return;}
       data.occurrences.forEach(function(occurrence){
         var tr=el('tr');
@@ -270,6 +294,22 @@
         values.forEach(function(value,index){var td=el('td',String(value));if(index===6&&occurrence.normalRatio!==null)td.className=occurrence.normalRatio>=0?'sr-positive':'sr-negative';tr.append(td);});
         body.append(tr);
       });
+      // All-period mode shows the height of twenty complete rows; older rows stay
+      // in the same scrollable list. No pagination or deletion of historical data.
+      if(state.period==='all'&&data.occurrences.length>20){
+        var table=body.closest('table'),lastVisible=body.rows[19];
+        var height=Math.floor(lastVisible.getBoundingClientRect().bottom-
+          table.getBoundingClientRect().top);
+        if(height>0){
+          scroller.style.maxHeight=height+'px';
+          scroller.classList.add('sr-all-period-scroll');
+          scroller.tabIndex=0;
+          scroller.setAttribute('role','region');
+          scroller.setAttribute('aria-label','セール実績一覧、全'+data.occurrences.length+'件。21件目以降は縦スクロール');
+          count.textContent='全'+data.occurrences.length+'件（21件目以降は一覧内をスクロール）';
+          count.hidden=false;
+        }
+      }
     }
     function render(){
       renderFilters();
@@ -290,7 +330,7 @@
         '<button type="button" data-period="3">直近3か月</button><button type="button" data-period="6">6か月</button><button type="button" data-period="12">12か月</button><button type="button" data-period="all">全期間</button></div></div>'+
         '<label class="sr-category-label">カテゴリー <select id="srCategory"></select></label></div>'+
         '<div id="srGroups"></div>'+
-        '<section class="sr-list-section"><h2>セール実績一覧</h2><div class="sr-table-scroll"><table class="sr-list-table"><thead><tr><th>開催期間</th><th>セール内容</th><th>日数</th><th>平均納品数</th><th>平均販売数</th><th>消化率</th><th>通常日比</th><th>比較対象</th></tr></thead><tbody id="srListBody"></tbody></table></div></section>';
+        '<section class="sr-list-section"><h2>セール実績一覧</h2><p id="srListCount" class="sr-list-count" hidden></p><div class="sr-table-scroll"><table class="sr-list-table"><thead><tr><th>開催期間</th><th>セール内容</th><th>日数</th><th>平均納品数</th><th>平均販売数</th><th>消化率</th><th>通常日比</th><th>比較対象</th></tr></thead><tbody id="srListBody"></tbody></table></div></section>';
       doc.getElementById('main').append(page);
       doc.querySelectorAll('#srPeriodTabs button').forEach(function(button){button.onclick=function(){state.period=button.dataset.period;render();};});
       doc.getElementById('srCategory').onchange=function(event){state.categoryId=event.target.value;render();};
