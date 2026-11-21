@@ -574,7 +574,7 @@ test('migration startup gate requires a confirmed restart and a fresh build with
   expect(await page.evaluate(()=>localStorage.length)).toBe(0);
 });
 
-test('a real legacy service worker appearing during backup stops migration and can reopen offline',async({page,context})=>{
+test('a real legacy service worker stops migration during backup and serves a cached reopen',async({page,context,browserName})=>{
   const fixture='/tests/e2e/fixtures/legacy-pwa-fixture';
   const fixtureRoute='**'+fixture;
   await page.route(fixtureRoute,route=>route.fulfill({
@@ -618,16 +618,21 @@ test('a real legacy service worker appearing during backup stops migration and c
     source:raw,marker:null,startup:{state:'legacy'}
   });
 
-  // The offline navigation has no network route to supply this document.
+  // The origin has no file at this URL once the online fixture route is removed.
   await page.unroute(fixtureRoute);
-  await context.setOffline(true);
+  // The WebKit CI browser reports an internal navigation error with offline emulation.
+  // Still require a cached reopen there, with the origin reachable but no page to serve.
+  const emulateOffline=browserName==='chromium';
+  const reopened=await context.newPage();
   try{
-    await page.reload();
-    await expect(page).toHaveTitle('Fictional cached legacy PWA');
-    expect(await page.evaluate(()=>localStorage.getItem('insight_v11'))).toBe(raw);
-    expect(await page.evaluate(()=>localStorage.getItem('insight_indexeddb_adoption_v1'))).toBeNull();
+    if(emulateOffline)await context.setOffline(true);
+    await reopened.goto(fixture);
+    await expect(reopened).toHaveTitle('Fictional cached legacy PWA');
+    expect(await reopened.evaluate(()=>localStorage.getItem('insight_v11'))).toBe(raw);
+    expect(await reopened.evaluate(()=>localStorage.getItem('insight_indexeddb_adoption_v1'))).toBeNull();
   }finally{
-    await context.setOffline(false);
+    await reopened.close();
+    if(emulateOffline)await context.setOffline(false);
   }
 });
 
