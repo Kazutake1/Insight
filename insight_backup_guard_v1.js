@@ -449,29 +449,72 @@ function rollbackPreRestoreSnapshot(){
   if(window.InsightStorage.serialize(restored)!==window.InsightStorage.serialize(preRestoreMemorySnapshot))throw new Error("復元前データの再保存結果が一致しません。");
   return restored;
 }
+async function downloadConfirmedBackup(snapshot,title,filename,operation,state,now){
+  var payload={backupInfo:buildBackupInfo(snapshot,now),data:snapshot};
+  var password=await backupPassword(title,true,operation);
+  var encrypted;
+  try{
+    backupBusy('バックアップを暗号化中',operation);
+    encrypted=await cryptoCodec().encrypt(payload,password);
+  }finally{password=null;}
+  ensureBackupContinuing(operation,state);
+  downloadBackupPayload(encrypted,filename);
+  await confirmBackupDownload(filename,'normal',operation,state);
+}
 async function encryptedBackupData(){
   if(backupOperationActive||restoreFileReaderActive){alert('別のバックアップ・復元処理が進行中です。');return;}
   backupOperationActive=true;
-  var operation={cancelled:false},password=null;
+  var operation={cancelled:false};
   try{
     cryptoCodec();
     var state=captureBackupState();
-    if(!window.InsightStorage)throw new Error("保存機能を初期化できませんでした");
     var snapshot=window.InsightStorage.migrateSnapshot(allStores),now=new Date();
-    var payload={backupInfo:buildBackupInfo(snapshot,now),data:snapshot};
-    var stamp=backupStamp(now);
-    var filename="Insight_"+stamp+".json";
-    password=await backupPassword('バックアップ用パスワード',true,operation);
-    backupBusy('バックアップを暗号化中',operation);
-    var encrypted=await cryptoCodec().encrypt(payload,password);password=null;
-    ensureBackupContinuing(operation,state);
-    downloadBackupPayload(encrypted,filename);
-    await confirmBackupDownload(filename,'normal',operation,state);
+    await downloadConfirmedBackup(snapshot,'バックアップ用パスワード','Insight_'+backupStamp(now)+'.json',operation,state,now);
     showToast("📥 保存したファイルの確認を記録しました（ご本人の申告）","#15803d","#f0fdf4");
   }catch(err){
     if(err&&err.name==='InsightBackupCancelled')return;
     alert("バックアップ処理を完了できませんでした。\n"+String(err&&err.message?err.message:err));
-  }finally{password=null;backupOperationActive=false;if(window.InsightBackupPasswordV1)window.InsightBackupPasswordV1.close();}
+  }finally{backupOperationActive=false;if(window.InsightBackupPasswordV1)window.InsightBackupPasswordV1.close();}
+}
+function assertMigrationReady(raw){
+  if(backupOperationActive||restoreFileReaderActive)
+    throw new Error('別のバックアップ・復元処理が進行中です。');
+  var weather=window.InsightWeatherTemperatureAuto,location=window.InsightWeatherLocation;
+  var bulk=window.InsightWeatherBulk?.getWeatherBulkOperationStatus();
+  if(typeof window.hasPendingCSVImport!=='function'||typeof weather?.hasPendingFetch!=='function'||
+     typeof location?.hasPendingSearch!=='function'||!bulk)
+    throw new Error('処理中の操作を確認できないため、移行を中止しました。');
+  if(window.hasPendingCSVImport()||weather.hasPendingFetch()||location.hasPendingSearch()||
+     bulk.state==='ACTIVE'||bulk.state==='HELD'||window.InsightStorage.snapshotWritesHeld()||
+     document.querySelector('dialog[open],#modalBg.show,#budgetModalBg.show,#ayInput,#storeMenu.is-open')){
+    throw new Error('編集中または処理中の操作があるため、移行を中止しました。');
+  }
+  var quick=window.InsightQuickDateNavV1,salesCount=window.InsightSalesCount,dayInput=window.InsightInputDayNav;
+  if(typeof quick?.hasUnsavedInput!=='function'||typeof salesCount?.hasUnsavedInput!=='function'||
+     typeof dayInput?.hasUnsavedInput!=='function')
+    throw new Error('未保存の入力を確認できないため、移行を中止しました。');
+  var state=captureBackupState();
+  if(quick.hasUnsavedInput()||salesCount.hasUnsavedInput()||dayInput.hasUnsavedInput()||
+     state.saved!==raw||state.live!==window.InsightStorage.serialize(JSON.parse(raw))){
+    throw new Error('未保存の入力または保存データの変更があるため、移行を中止しました。');
+  }
+}
+// The isolated migration draft is the only caller. Use the exact captured
+// source as input to the existing backup schema migration and confirmation UI.
+async function confirmMigrationBackup(raw){
+  assertMigrationReady(raw);
+  backupOperationActive=true;
+  var operation={cancelled:false};
+  try{
+    cryptoCodec();
+    var state=captureBackupState();
+    var snapshot=window.InsightStorage.migrateSnapshot(JSON.parse(raw)),now=new Date();
+    await downloadConfirmedBackup(snapshot,'移行前バックアップ用パスワード','Insight_'+backupStamp(now)+'.json',operation,state,now);
+    return true;
+  }catch(err){
+    if(err&&err.name==='InsightBackupCancelled')return false;
+    throw err;
+  }finally{backupOperationActive=false;if(window.InsightBackupPasswordV1)window.InsightBackupPasswordV1.close();}
 }
 function encryptedRestoreData(e){
   var file=e.target.files[0];if(!file)return;
@@ -578,4 +621,32 @@ function encryptedRestoreData(e){
 }
 if(entrypoints.register({version:1,backup:encryptedBackupData,restore:encryptedRestoreData})!==true)
   throw new Error("Encrypted backup entry points could not be registered safely");
+async function decodeMigrationBackup(file,password){
+  var decoded=parseBackupEnvelope(await cryptoCodec().decrypt(file,password));
+  if(decoded.legacy)throw validationError('バックアップの店舗・年度情報を確認できません。');
+  validateBackupInfo(decoded.info,decoded.data);
+  return decoded;
+}
+async function verifyMigrationBackup(file,password,sourceRaw){
+  var decoded=await decodeMigrationBackup(file,password);
+  var storage=window.InsightStorage;
+  if(storage.serialize(decoded.data)!==storage.serialize(JSON.parse(sourceRaw)))
+    throw validationError('バックアップと移行元のデータが一致しません。');
+  return {createdAt:decoded.info.createdAt,stores:backupStoreInfo(decoded.data)};
+}
+async function inspectMissingStorageBackup(file,password){
+  if(!(file instanceof Blob)||file.size>ENCRYPTED_FILE_LIMIT)
+    throw validationError('21MiB以下の暗号化バックアップを選んでください。');
+  var encrypted;
+  try{encrypted=JSON.parse(await file.text());}
+  catch(_){throw validationError('バックアップファイルを読み込めませんでした。');}
+  var decoded=await decodeMigrationBackup(encrypted,password);
+  var snapshot=normalizeBackup(decoded.data);
+  runRestorePreflight(snapshot);
+  return {createdAt:decoded.info.createdAt,stores:backupStoreInfo(snapshot)};
+}
+window.InsightMigrationBackupV1=Object.freeze({
+  confirm:confirmMigrationBackup,assertReady:assertMigrationReady,verify:verifyMigrationBackup,
+  inspectMissingStorage:inspectMissingStorageBackup
+});
 })();
