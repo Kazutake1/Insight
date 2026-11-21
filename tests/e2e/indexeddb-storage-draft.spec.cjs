@@ -574,17 +574,48 @@ test('migration startup gate requires a confirmed restart and a fresh build with
   expect(await page.evaluate(()=>localStorage.length)).toBe(0);
 });
 
-test('a real legacy service worker stops migration during backup and serves a cached reopen',async({page,context,browserName})=>{
-  const fixture='/tests/e2e/fixtures/legacy-pwa-fixture';
-  const fixtureRoute='**'+fixture;
+const legacyPwaFixture='/tests/e2e/fixtures/legacy-pwa-fixture';
+async function openLegacyPwaFixture(page){
+  const fixtureRoute='**'+legacyPwaFixture;
   await page.route(fixtureRoute,route=>route.fulfill({
     contentType:'text/html',body:'<!doctype html><title>Fictional online migration page</title>'
   }));
   await page.route('**/tests/e2e/fixtures/Index.html?insight_migration_probe=*',route=>route.fulfill({
     contentType:'text/html',body:'<!doctype html><meta name="insight-shell-version" content="20261113-daily-bar-build-112">'
   }));
-  await page.goto(fixture);
+  await page.goto(legacyPwaFixture);
   await page.addScriptTag({url:'/insight_indexeddb_storage_v1.js'});
+  return fixtureRoute;
+}
+
+async function registerLegacyPwaWorker(page){
+  const scope=await page.evaluate(async ()=>{
+    const registration=await navigator.serviceWorker.register('./legacy-pwa-worker.js');
+    return registration.scope;
+  });
+  expect(new URL(scope).pathname).toBe('/tests/e2e/fixtures/');
+  await page.waitForFunction(()=>Boolean(navigator.serviceWorker.controller));
+}
+
+async function withCachedLegacyPwa(page,context,browserName,fixtureRoute,visit){
+  // The origin has no file at this URL once the online fixture route is removed.
+  await page.unroute(fixtureRoute);
+  // WebKit CI reports an internal navigation error with offline emulation.
+  const emulateOffline=browserName==='chromium';
+  const reopened=await context.newPage();
+  try{
+    if(emulateOffline)await context.setOffline(true);
+    await reopened.goto(legacyPwaFixture);
+    await expect(reopened).toHaveTitle('Fictional cached legacy PWA');
+    await visit(reopened);
+  }finally{
+    await reopened.close();
+    if(emulateOffline)await context.setOffline(false);
+  }
+}
+
+test('a real legacy service worker stops migration during backup and serves a cached reopen',async({page,context,browserName})=>{
+  const fixtureRoute=await openLegacyPwaFixture(page);
   const raw=await page.evaluate(()=>{
     const source=JSON.stringify({current:'fictional',stores:{fictional:{value:1}}});
     localStorage.setItem('insight_v11',source);
@@ -599,12 +630,7 @@ test('a real legacy service worker stops migration during backup and serves a ca
     return source;
   });
   await page.waitForFunction(()=>typeof window.finishFictionalBackup==='function');
-  const scope=await page.evaluate(async ()=>{
-    const registration=await navigator.serviceWorker.register('./legacy-pwa-worker.js');
-    return registration.scope;
-  });
-  expect(new URL(scope).pathname).toBe('/tests/e2e/fixtures/');
-  await page.waitForFunction(()=>Boolean(navigator.serviceWorker.controller));
+  await registerLegacyPwaWorker(page);
   expect(await page.evaluate(async ()=>{
     window.finishFictionalBackup(true);
     return {
@@ -618,22 +644,73 @@ test('a real legacy service worker stops migration during backup and serves a ca
     source:raw,marker:null,startup:{state:'legacy'}
   });
 
-  // The origin has no file at this URL once the online fixture route is removed.
-  await page.unroute(fixtureRoute);
-  // The WebKit CI browser reports an internal navigation error with offline emulation.
-  // Still require a cached reopen there, with the origin reachable but no page to serve.
-  const emulateOffline=browserName==='chromium';
-  const reopened=await context.newPage();
-  try{
-    if(emulateOffline)await context.setOffline(true);
-    await reopened.goto(fixture);
-    await expect(reopened).toHaveTitle('Fictional cached legacy PWA');
+  await withCachedLegacyPwa(page,context,browserName,fixtureRoute,async reopened=>{
     expect(await reopened.evaluate(()=>localStorage.getItem('insight_v11'))).toBe(raw);
     expect(await reopened.evaluate(()=>localStorage.getItem('insight_indexeddb_adoption_v1'))).toBeNull();
-  }finally{
-    await reopened.close();
-    if(emulateOffline)await context.setOffline(false);
-  }
+  });
+});
+
+test('a cached legacy PWA writing after adoption preserves both copies and stops recovery',async({page,context,browserName})=>{
+  const fixtureRoute=await openLegacyPwaFixture(page);
+  const original=await page.evaluate(async ()=>{
+    const source={current:'fictional',stores:{fictional:{value:1}}};
+    const raw=JSON.stringify(source);
+    localStorage.setItem('insight_v11',raw);
+    window.InsightStorage={writeMetadata(key,value){localStorage.setItem(key,value);}};
+    window.InsightMigrationBackupV1={confirm:async()=>true,assertReady(){}};
+    await InsightIndexedDBStorageV1.migrate({legacyClientsClosed:true});
+    await InsightIndexedDBStorageV1.save(0,{...source,stores:{fictional:{value:2}}});
+    return raw;
+  });
+  await registerLegacyPwaWorker(page);
+  let legacyEdit;
+  await withCachedLegacyPwa(page,context,browserName,fixtureRoute,async reopened=>{
+    expect(await reopened.evaluate(()=>localStorage.getItem('insight_v11'))).toBe(original);
+    legacyEdit=await reopened.evaluate(()=>{
+      const raw=JSON.stringify({current:'fictional',stores:{fictional:{value:3}}});
+      // Old code can still write directly to the legacy key.
+      localStorage.setItem('insight_v11',raw);
+      return raw;
+    });
+  });
+
+  const result=await page.evaluate(async ()=>{
+    const api=InsightIndexedDBStorageV1;
+    const startupBeforeRead=await api.diagnoseStartup();
+    const read=await api.read().catch(error=>error.message);
+    let confirmationOffered=false;
+    const recovery=await api.reviewRecovery(()=>{
+      confirmationOffered=true;
+      return true;
+    }).catch(error=>error.message);
+    const save=await api.save(1,{current:'fictional',stores:{fictional:{value:4}}}).catch(error=>error.message);
+    const record=await new Promise((resolve,reject)=>{
+      const request=indexedDB.open('insight-store-snapshots-v1');
+      request.onerror=()=>reject(request.error);
+      request.onsuccess=()=>{
+        const db=request.result;
+        const tx=db.transaction('snapshots','readonly');
+        const get=tx.objectStore('snapshots').get('current');
+        tx.oncomplete=()=>{db.close();resolve(get.result);};
+        tx.onabort=()=>{db.close();reject(tx.error);};
+      };
+    });
+    return {startupBeforeRead,read,recovery,confirmationOffered,save,
+      startupAfterConflict:await api.diagnoseStartup(),
+      legacyRaw:localStorage.getItem('insight_v11'),
+      sourceRaw:record.sourceRaw,currentRaw:record.raw,previousRaw:record.previous.raw,
+      revision:record.revision
+    };
+  });
+  expect(result).toEqual({
+    startupBeforeRead:{state:'hold',reason:'indexeddb-adopted'},
+    read:'Legacy Insight storage changed; IndexedDB writes are on hold',
+    recovery:'No held migration or save to review',confirmationOffered:false,
+    save:'IndexedDB writes are on hold',startupAfterConflict:{state:'hold',reason:'source-conflict'},
+    legacyRaw:legacyEdit,sourceRaw:original,
+    currentRaw:JSON.stringify({current:'fictional',stores:{fictional:{value:2}}}),
+    previousRaw:original,revision:1
+  });
 });
 
 test('migration enforces the pinned environment before and after backup confirmation',async({page})=>{
