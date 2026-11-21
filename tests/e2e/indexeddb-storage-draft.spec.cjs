@@ -703,7 +703,7 @@ test('a cached legacy PWA writing after adoption preserves both copies and stops
     };
   });
   expect(result).toEqual({
-    startupBeforeRead:{state:'hold',reason:'indexeddb-adopted'},
+    startupBeforeRead:{state:'hold',reason:'record-unverified'},
     read:'Legacy Insight storage changed; IndexedDB writes are on hold',
     recovery:'No held migration or save to review',confirmationOffered:false,
     save:'IndexedDB writes are on hold',startupAfterConflict:{state:'hold',reason:'source-conflict'},
