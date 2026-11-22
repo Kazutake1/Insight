@@ -1293,19 +1293,23 @@ test('isolated adopted startup saves a single sales day after readback and stops
   await expect(save).toHaveCount(0);
 });
 
-async function openMonthlySalesPreview(page){
+async function openMonthlySalesPreview(page,{followInputScreens=false}={}){
   await routeMigrationPage(page);
   await page.goto('/Index.html');
   await waitForMigrationChecks(page);
   // Initialize the existing dashboard before capturing the fixture's committed baseline.
   await page.locator('#nav1').click();
   await expect(page.locator('#pageDash')).toHaveClass(/show/);
+  if(followInputScreens){
+    await page.locator('#nav3').click();
+    await page.locator('#nav4').click();
+  }
   await page.locator('#nav2').click();
   await page.waitForFunction(()=>window.InsightInputDayNav?.getSelectedIso('sales')&&
     document.getElementById('sf_売上'));
   await page.addScriptTag({url:'/insight_indexeddb_storage_v1.js'});
   await page.addScriptTag({url:'/insight_indexeddb_sales_input_preview_v1.js'});
-  return page.evaluate(async ()=>{
+  return page.evaluate(async followInputScreens=>{
     const year=editYear.sales,month=editMonth.sales,day=window.salesSelDay;
     const active=allStores.current;
     const row=store.data[year][month][day-1];
@@ -1321,9 +1325,9 @@ async function openMonthlySalesPreview(page){
     const raw=InsightStorage.writeSnapshot(allStores);
     window.InsightMigrationBackupV1={assertReady(){},confirm:async()=>true};
     await InsightIndexedDBStorageV1.migrate({legacyClientsClosed:true});
-    window.fixtureSalesPreview=await InsightIndexedDBSalesInputPreviewV1.connect();
+    window.fixtureSalesPreview=await InsightIndexedDBSalesInputPreviewV1.connect('sales',{followInputScreens});
     return {year,month,day,active,raw,weather:WX_KEYS.find(key=>key!==(row.weather||''))};
-  });
+  },followInputScreens);
 }
 
 for(const failure of ['stale revision','quota failure','draft changed during save']){
@@ -1705,3 +1709,105 @@ for(const config of [
     expect(await page.evaluate(()=>localStorage.getItem('insight_v11'))).toBe(seed.raw);
   });
 }
+
+test('sales, customer and waste screens share one committed revision when switched in the same tab',async({page,context})=>{
+  const seed=await openMonthlySalesPreview(page,{followInputScreens:true});
+  const getRevision=()=>page.evaluate(()=>InsightIndexedDBStorageV1.read().then(value=>value.revision));
+  const sales=page.locator('#sf_売上');
+  const kyaku=page.locator('.kyaku-input[data-ri="'+(seed.day-1)+'"]');
+  await sales.click();
+  await sales.fill('456');
+  await page.locator('#salesSaveBtn').click();
+  await expect(page.locator('#savedSales')).toHaveClass(/is-visible/);
+  expect(await getRevision()).toBe(1);
+
+  await page.locator('#nav3').click();
+  await expect(kyaku).toBeVisible();
+  await kyaku.click();
+  await kyaku.fill('123');
+  await page.evaluate(()=>{
+    window.fixtureLeaveWarnings=0;
+    window.confirm=()=>{fixtureLeaveWarnings++;return false;};
+  });
+  await page.locator('#nav4').click();
+  await expect(page.locator('#pageKyaku')).toHaveClass(/show/);
+  await expect(kyaku).toHaveValue('123');
+  expect(await page.evaluate(()=>fixtureLeaveWarnings)).toBe(1);
+  await page.locator('#kyakuSaveBtn').click();
+  await expect(page.locator('#savedKyaku')).toHaveClass(/is-visible/);
+  expect(await getRevision()).toBe(2);
+
+  await page.locator('#nav4').click();
+  const categories=await page.evaluate(()=>HAIKI_CATS);
+  const category=categories[0];
+  const waste=page.locator('#haikiForm [data-hc="'+category+'"]');
+  const date=seed.year+'-'+String(Number.parseInt(seed.month)).padStart(2,'0')+'-'+String(seed.day).padStart(2,'0');
+  await page.evaluate(date=>InsightInputDayNav.select('haiki',date),date);
+  await expect.poll(()=>page.evaluate(()=>window.haikiSelDay)).toBe(seed.day);
+  await waste.click();
+  await waste.fill('123');
+  await page.evaluate(()=>{
+    const digest=crypto.subtle.digest,resume=[];
+    window.multiScreenDigests=resume;
+    crypto.subtle.digest=async function(...args){
+      await new Promise(resolve=>resume.push(resolve));
+      return digest.apply(this,args);
+    };
+    window.resumeMultiScreenSave=()=>{
+      crypto.subtle.digest=digest;
+      resume.forEach(resolve=>resolve());
+    };
+  });
+  await page.locator('#haikiSaveBtn').click();
+  await page.waitForFunction(()=>multiScreenDigests.length===2);
+  expect(await page.evaluate(()=>gotoNav(3))).toBe(false);
+  await page.evaluate(()=>saveInput('kyaku'));
+  expect(await page.evaluate(()=>InsightInputSaveObserverV0.getStatus()))
+    .toMatchObject({state:'ACTIVE',activeCount:1});
+  await expect(page.locator('#savedHaiki')).not.toHaveClass(/is-visible/);
+  await page.evaluate(()=>resumeMultiScreenSave());
+  await expect(page.locator('#savedHaiki')).toHaveClass(/is-visible/);
+  const expected=JSON.parse(seed.raw);
+  const row=expected.stores[seed.active].data[seed.year][seed.month][seed.day-1];
+  row.売上=456;
+  row.客数=123;
+  row.haiki={...row.haiki,[category]:123};
+  row.廃棄金額=categories.reduce((sum,key)=>sum+Number(row.haiki[key]??0),0);
+  expect(await page.evaluate(()=>InsightIndexedDBStorageV1.read())).toEqual({revision:3,snapshot:expected});
+  expect(await page.evaluate(()=>localStorage.getItem('insight_v11'))).toBe(seed.raw);
+
+  await page.locator('#nav2').click();
+  await expect(sales).toHaveValue('456');
+  expect(await page.evaluate(()=>fixtureLeaveWarnings)).toBe(1);
+  await page.locator('#salesSaveBtn').click();
+  await expect(page.locator('#salesSaveBtn + [role=status]')).toHaveText('保存する変更はありません。');
+  expect(await getRevision()).toBe(3);
+  for(const button of ['#salesSaveBtn','#kyakuSaveBtn','#haikiSaveBtn'])
+    await expect(page.locator(button+' + [role=status]')).toHaveCount(1);
+
+  const other=await context.newPage();
+  try{
+    await other.route('**/monthly-concurrent-fixture',route=>route.fulfill({
+      contentType:'text/html',body:'<!doctype html><title>Fictional concurrent save</title>'
+    }));
+    await other.goto('/monthly-concurrent-fixture');
+    await other.evaluate(()=>{window.SK='insight_v11';});
+    await other.addScriptTag({url:'/insight_storage_v1.js'});
+    await other.addScriptTag({url:'/insight_indexeddb_storage_v1.js'});
+    await other.evaluate(async ()=>{
+      const api=InsightIndexedDBStorageV1,current=await api.read();
+      current.snapshot.stores['fictional-second-shop'].name='別タブで確定';
+      await api.save(current.revision,current.snapshot);
+    });
+    await sales.click();
+    await sales.fill('789');
+    await page.locator('#salesSaveBtn').click();
+    await expect(page.locator('#salesSaveBtn + [role=status]'))
+      .toHaveText('保存結果を確認できないため、追加の保存を停止しました。');
+    await expect(sales).toHaveValue('789');
+    expect(await page.evaluate(()=>gotoNav(3))).toBe(false);
+    expect(await page.evaluate(()=>InsightIndexedDBStorageV1.diagnose({verifyInterrupted:true})))
+      .toMatchObject({state:'hold',observedRevision:4});
+    expect(await page.evaluate(()=>localStorage.getItem('insight_v11'))).toBe(seed.raw);
+  }finally{await other.close();}
+});

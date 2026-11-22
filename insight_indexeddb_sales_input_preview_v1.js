@@ -1,4 +1,4 @@
-/* Draft-only IndexedDB connection to one monthly input screen. */
+/* Draft-only IndexedDB session for monthly input screens. */
 (function(root){
   'use strict';
 
@@ -12,18 +12,25 @@
     nav0:0,nav1:1,nav2:2,nav3:3,nav4:4,navSalesCount:'salesCounts',navSaleResults:'saleResults'
   };
 
-  async function connect(type='sales'){
+  async function connect(type='sales',{followInputScreens=false}={}){
     if(connectedStatus)throw new Error('Month input preview already connected');
-    const screen=screens[type];
+    let screen=screens[type];
     if(!screen||currentNav!==screen.route)throw new Error('Open the corresponding input screen first');
     const doc=root.document;
-    const button=doc.getElementById(screen.button);
-    const notice=doc.getElementById(screen.notice);
-    if(!button||!notice)throw new Error('The input controls are unavailable');
+    function controlsFor(screen){
+      const button=doc.getElementById(screen.button);
+      const notice=doc.getElementById(screen.notice);
+      if(!button||!notice)throw new Error('The input controls are unavailable');
+      const status=doc.createElement('p');
+      status.setAttribute('role','status');
+      button.parentNode.insertBefore(status,button.nextSibling);
+      return {button,notice,status};
+    }
 
     const api=root.InsightIndexedDBStorageV1;
     let committed=await api.read();
-    const target={storeId:allStores.current,year:editYear[type],month:editMonth[type]};
+    const sessionStore=allStores.current;
+    let target=displayedPeriod();
     function matchesPeriod(){
       return currentNav===screen.route&&allStores.current===target.storeId&&
         editYear[type]===target.year&&editMonth[type]===target.month;
@@ -95,9 +102,24 @@
     if(!matchesScreen())throw new Error('The displayed month is not the committed snapshot');
     changes();
 
-    const status=doc.createElement('p');
-    status.setAttribute('role','status');
-    button.parentNode.insertBefore(status,button.nextSibling);
+    let {button,notice,status}=controlsFor(screen);
+    const attachments=new Map([[type,{target,button,notice,status}]]);
+
+    function followCurrentScreen(){
+      if(!followInputScreens||currentNav===screen.route)return;
+      const next=Object.keys(screens).find(key=>screens[key].route===currentNav);
+      if(!next)return;
+      clearTimeout(timer);
+      notice.classList.remove('is-visible');
+      type=next;
+      screen=screens[type];
+      if(!attachments.has(type)){
+        const period=displayedPeriod();
+        attachments.set(type,{target:{...period,storeId:sessionStore},...controlsFor(screen)});
+      }
+      ({target,button,notice,status}=attachments.get(type));
+      connectedType=type;
+    }
     let held=false,busy=false,timer;
     const getStatus=()=>{
       let dirty=true;
@@ -154,7 +176,8 @@
         updateMissingBadge();
         status.textContent='';
         notice.classList.add('is-visible');
-        timer=root.setTimeout(()=>notice.classList.remove('is-visible'),3000);
+        const savedNotice=notice;
+        timer=root.setTimeout(()=>savedNotice.classList.remove('is-visible'),3000);
         return 'completed';
       }catch(_){
         stop('保存結果を確認できないため、追加の保存を停止しました。');
@@ -168,7 +191,8 @@
 
     // Cancel the synchronous core and its after-save writers in the isolated sales screen.
     root.InsightHooks.on('input:save:before','indexeddb-sales-input-preview',ctx=>{
-      if(ctx.args[0]!==type)return;
+      if(!Object.hasOwn(screens,ctx.args[0]))return;
+      if(ctx.args[0]!==type)return followInputScreens?false:undefined;
       if(!held&&!busy)ctx.runIndexedDBPreview=save;
       return false;
     },-1000);
@@ -197,7 +221,12 @@
 
     const gotoNav=root.gotoNav;
     root.gotoNav=function(destination){
-      if(currentNav!==screen.route)return gotoNav.apply(this,arguments);
+      if(followInputScreens&&(busy||held))return false;
+      if(currentNav!==screen.route){
+        const result=gotoNav.apply(this,arguments);
+        followCurrentScreen();
+        return result;
+      }
       const approvedClick=approved;
       approved=null;
       const allowed=approvedClick&&approvedClick.route===destination&&approvedClick.event.eventPhase!==0;
@@ -210,6 +239,7 @@
          after.year!==priorPeriod.year||after.month!==priorPeriod.month)){
         drafts[type]=JSON.parse(JSON.stringify(rows(committed.snapshot,priorPeriod.storeId,priorPeriod)??[]));
       }
+      followCurrentScreen();
       return result;
     };
     allowConnectedNavigation=allowNavigation;
