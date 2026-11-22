@@ -61,6 +61,9 @@
         hasUnsavedInput:busy||held||root.InsightQuickDateNavV1.hasUnsavedInput()
       };
     }
+    function matchesDate(iso){
+      return dateContext.getSelectedIso()===iso&&doc.getElementById('iqdDateInput')?.value===iso;
+    }
     function supports(date){
       const info=dateContext.info(date);
       const shop=committed.snapshot.stores[storeId];
@@ -91,7 +94,7 @@
         Object.assign(row,inputs.values,{storeMemo:inputs.memo});
         updateSharedWeather(candidate,fy,month,day,inputs.values.weather);
         root.InsightTemperature.applyQuickTemperatures(candidate,shop,fy,month,day,row,inputs.temperatures);
-        const unchanged=()=>matchesBaseline()&&dateContext.getSelectedIso()===iso&&
+        const unchanged=()=>matchesBaseline()&&matchesDate(iso)&&
           JSON.stringify(readInputs())===JSON.stringify(inputs);
         if(!unchanged())throw new Error('Quick input changed before save');
         const result=await api.save(baseline.revision,candidate);
@@ -124,7 +127,7 @@
         allowDateChange(target.date);
         return false;
       }
-      if(!matchesBaseline()){
+      if(!matchesBaseline()||!matchesDate(target.iso)){
         ctx.runIndexedDBPreview=()=>{stop();return 'unknown';};
         return false;
       }

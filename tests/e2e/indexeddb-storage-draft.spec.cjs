@@ -2223,7 +2223,7 @@ for(const sameMunicipality of [true,false]){
   });
 }
 
-for(const failure of ['stale revision','quota error','readback aborted','changed input']){
+for(const failure of ['stale revision','quota error','readback aborted','changed input','date mismatch before saving']){
   test('isolated Quick input retains the draft and stops on '+failure,async({page,context})=>{
     const seed=await openQuickInputPreview(page);
     const other=await openStoreSwitchPeer(context);
@@ -2238,6 +2238,11 @@ for(const failure of ['stale revision','quota error','readback aborted','changed
         },seed.peer);
       }
       await page.evaluate(failure=>{
+        if(failure==='date mismatch before saving'){
+          const date=InsightDateContext.getSelectedDate();
+          date.setDate(date.getDate()+1);
+          InsightDateContext.setSelectedDate(date);
+        }
         if(failure==='quota error'){
           const put=IDBObjectStore.prototype.put;
           IDBObjectStore.prototype.put=function(){
@@ -2295,7 +2300,7 @@ for(const failure of ['stale revision','quota error','readback aborted','changed
       expect(await page.evaluate(()=>quickPreview.getStatus())).toEqual({state:'HELD',hasUnsavedInput:true});
       expect(await page.evaluate(()=>InsightQuickSaveObserverV0.getStatus())).toMatchObject({state:'HELD',activeCount:0});
       expect(await page.evaluate(()=>gotoNav(1))).toBe(false);
-      expect(await page.evaluate(()=>store.data[InsightDateContext.getSelectedInfo().fy]['6月'][11].売上)).toBe(47);
+      expect(await page.evaluate(year=>store.data[year]['6月'][11].売上,seed.year)).toBe(47);
 
       const record=await readStoreSwitchRecord(other);
       if(failure==='stale revision'){
@@ -2303,7 +2308,7 @@ for(const failure of ['stale revision','quota error','readback aborted','changed
         otherExpected.stores[seed.peer].name='別タブで確定した名称';
         expect(record.revision).toBe(1);
         expect(JSON.parse(record.raw)).toEqual(otherExpected);
-      }else if(failure==='quota error'){
+      }else if(failure==='quota error'||failure==='date mismatch before saving'){
         expect(record.revision).toBe(0);
         expect(JSON.parse(record.raw)).toEqual(JSON.parse(seed.raw));
       }else{
