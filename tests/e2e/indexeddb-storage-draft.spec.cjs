@@ -1297,6 +1297,9 @@ async function openMonthlySalesPreview(page){
   await routeMigrationPage(page);
   await page.goto('/Index.html');
   await waitForMigrationChecks(page);
+  // Initialize the existing dashboard before capturing the fixture's committed baseline.
+  await page.locator('#nav1').click();
+  await expect(page.locator('#pageDash')).toHaveClass(/show/);
   await page.locator('#nav2').click();
   await page.waitForFunction(()=>window.InsightInputDayNav?.getSelectedIso('sales')&&
     document.getElementById('sf_売上'));
@@ -1514,7 +1517,14 @@ for(const navigation of ['sidebar','programmatic','period']){
     await page.evaluate(date=>{InsightInputDayNav.select('sales',date);},iso);
     await expect(sales).toHaveValue('42');
     expect(await page.evaluate(()=>navigationWarnings.length)).toBe(2);
-    expect(await page.evaluate(()=>InsightInputDayNav.hasUnsavedInput())).toBe(false);
+    const reopened=await page.evaluate(async ()=>{
+      const committed=(await InsightIndexedDBStorageV1.read()).snapshot;
+      const live=JSON.parse(InsightStorage.serialize(allStores));
+      const changedKeys=[...new Set([...Object.keys(live),...Object.keys(committed)])].filter(key=>
+        JSON.stringify(live[key])!==JSON.stringify(committed[key]));
+      return {dirty:InsightInputDayNav.hasUnsavedInput(),changedKeys};
+    });
+    expect(reopened).toEqual({dirty:false,changedKeys:[]});
     expect(await page.evaluate(()=>InsightIndexedDBStorageV1.read().then(value=>value.revision))).toBe(0);
     expect(await page.evaluate(()=>localStorage.getItem('insight_v11'))).toBe(seed.raw);
     await page.locator('#salesSaveBtn').click();
