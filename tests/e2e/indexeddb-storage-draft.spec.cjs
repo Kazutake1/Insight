@@ -773,6 +773,28 @@ for(const mode of ['readback failure','lost acknowledgement','tab close']){
   });
 }
 
+test('combined sales count rejects a period change during large-value approval',async({page,context})=>{
+  const seed=await openQuickInputPreview(page,{followMonthlyInputs:true,seedCounts:true});
+  await page.locator('#navSalesCount').click();
+  await countField(page,seed,'1便 納品数').fill('1000');
+  await page.evaluate(year=>{
+    window.confirm=message=>{
+      if(message.startsWith('4桁以上'))InsightSalesCount.setPeriod(year,5);
+      return true;
+    };
+  },seed.year);
+  await page.locator('#scSave').click();
+  await expect(page.locator('#scDirty')).toHaveText('保存結果を確認できないため、追加の保存を停止しました。');
+  expect(await page.evaluate(()=>combinedPreview.getStatus())).toEqual({state:'HELD',hasUnsavedInput:true});
+  const other=await openStoreSwitchPeer(context);
+  try{
+    const record=await readStoreSwitchRecord(other);
+    expect(record.revision).toBe(0);
+    expect(JSON.parse(record.raw)).toEqual(JSON.parse(seed.raw));
+    expect(await other.evaluate(()=>localStorage.getItem('insight_v11'))).toBe(seed.raw);
+  }finally{await other.close();}
+});
+
 test('combined category changes preserve count drafts and require approval before switching',async({page})=>{
   const seed=await openQuickInputPreview(page,{followMonthlyInputs:true,seedCounts:true});
   const expected=JSON.parse(seed.raw),categories=expected.salesCountManagement.categories;

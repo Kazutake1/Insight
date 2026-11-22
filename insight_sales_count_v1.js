@@ -251,12 +251,12 @@
     function draftFingerprint(){
       return JSON.stringify([state.draft,state.wasteDraft,state.wasteTouched]);
     }
-    function savePreview(markOutcome){
-      var storeId=allStores.current,prefix=monthPrefix(),categoryId=state.categoryId;
-      var captured=draftFingerprint(),values=JSON.parse(captured);
+    function savePreview(markOutcome,target){
+      var storeId=target.storeId,prefix=target.prefix,categoryId=target.categoryId;
+      var captured=target.draft,values=JSON.parse(captured);
       var button=doc.getElementById('scSave'),label=doc.getElementById('scDirty');
       var commit=preview.prepareSave({
-        storeId:storeId,year:state.year,
+        storeId:storeId,year:target.year,
         unchanged:function(){
           return monthPrefix()===prefix&&state.categoryId===categoryId&&state.dirty&&
             draftFingerprint()===captured&&!doc.querySelector('#pageSalesCount input:invalid');
@@ -278,9 +278,12 @@
       return observeForecastOperation('sales_count_save',function(markOutcome){
       if(!ensureRegisteredYear(state.year)){if(preview)markOutcome('cancelled_before_mutation');return;}
       var invalid=doc.querySelector('#pageSalesCount input:invalid');if(invalid){invalid.reportValidity();invalid.focus();if(preview)markOutcome('cancelled_before_mutation');return;}
+      var target=preview?{
+        storeId:allStores.current,year:state.year,prefix:monthPrefix(),categoryId:state.categoryId,draft:draftFingerprint()
+      }:null;
       var mask=activeTrips(selectedCategory()),large=[];Object.keys(state.draft).forEach(function(date){state.draft[date].trips.forEach(function(t,i){if(mask[i]===false)return;['delivery','sales'].forEach(function(k){if(t[k]>=1000)large.push(date+' '+(i+1)+'便 '+(k==='delivery'?'納品':'販売')+' '+t[k]);});});});
       Object.keys(state.wasteTouched).forEach(function(date){var rec=state.wasteDraft[date];if(!rec)return;rec.trips.forEach(function(v,i){if(v!==null&&v>=1000)large.push(date+' '+(i+1)+'便 廃棄 '+v);});});if(large.length&&!confirm('4桁以上の入力があります。内容を確認して保存しますか？\n\n'+large.slice(0,8).join('\n')+(large.length>8?'\nほか '+(large.length-8)+'件':''))){if(preview)markOutcome('cancelled_before_mutation');return;}
-      if(preview)return savePreview(markOutcome);
+      if(preview)return savePreview(markOutcome,target);
       try{
         var next=copy(allStores);ensure(next);
         applyCountDraft(next,allStores.current,monthPrefix(),state.categoryId,state.draft,state.wasteDraft,state.wasteTouched);
