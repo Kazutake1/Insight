@@ -1341,7 +1341,9 @@ test('the existing sales save button uses IndexedDB for the selected day in isol
     window.restoreFixtureDigest=()=>{crypto.subtle.digest=digest;};
   });
   await sales.fill('456');
+  await count.click();
   await count.fill('8.25');
+  await expect(count).toHaveValue('8.25');
   await save.click();
   await page.waitForFunction(()=>window.resumeFixtureSave?.length===2);
   await expect(save).toBeDisabled();
@@ -1364,7 +1366,9 @@ test('the existing sales save button uses IndexedDB for the selected day in isol
     current.snapshot.stores['fictional-second-shop'].name='別の画面で変更済み';
     await api.save(current.revision,current.snapshot);
   });
+  await sales.click();
   await sales.fill('789');
+  await expect(sales).toHaveValue('789');
   await save.click();
   await expect(status).toHaveText('保存結果を確認できないため、追加の保存を停止しました。');
   await expect(sales).toHaveValue('789');
