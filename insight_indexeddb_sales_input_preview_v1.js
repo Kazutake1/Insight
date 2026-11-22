@@ -120,17 +120,6 @@
       }
     }
 
-    // The regular weather click writes synchronously. Stage it with the month's inputs here.
-    const originalWeather=root.setSalesWeather;
-    root.setSalesWeather=function(index,weather){
-      if(currentNav!==2)return originalWeather.apply(this,arguments);
-      if(held||busy||!matchesPeriod()||index!==root.salesSelDay-1||!WX_KEYS.includes(weather))return;
-      drafts.sales[index].weather=weather;
-      doc.querySelectorAll('#salesForm [data-sales-weather]').forEach(node=>{
-        node.classList.toggle('active',node.dataset.salesWeather===weather);
-      });
-      renderSalesDayList(target.year,MONTHS.indexOf(target.month));
-    };
     // Cancel the synchronous core and its after-save writers in the isolated sales screen.
     root.InsightHooks.on('input:save:before','indexeddb-sales-input-preview',ctx=>{
       if(ctx.args[0]!=='sales')return;

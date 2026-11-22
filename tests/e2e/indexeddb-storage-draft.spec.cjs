@@ -1350,7 +1350,8 @@ for(const failure of ['stale revision','quota failure']){
     await sales.click();
     await sales.fill('222');
     await page.locator('#salesDayList button').nth(seed.day-1).click();
-    await page.locator('#salesForm [data-sales-weather="'+seed.weather+'"]').click();
+    // The existing sales page displays weather as a reference; stage the linked input in the fixture.
+    await page.evaluate(({day,weather})=>{drafts.sales[day-1].weather=weather;},seed);
     expect(await page.evaluate(()=>fixtureSalesPreview.getStatus()))
       .toEqual({state:'IDLE_OBSERVED',hasUnsavedInput:true});
     expect(await page.evaluate(()=>localStorage.getItem('insight_v11'))).toBe(seed.raw);
