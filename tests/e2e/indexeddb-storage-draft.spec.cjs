@@ -1293,7 +1293,7 @@ test('isolated adopted startup saves a single sales day after readback and stops
   await expect(save).toHaveCount(0);
 });
 
-test('the existing sales save button uses IndexedDB for the selected day in isolation',async({page})=>{
+test('the existing sales save button saves monthly sales and shared weather together in isolation',async({page})=>{
   await routeMigrationPage(page);
   await page.goto('/Index.html');
   await waitForMigrationChecks(page);
@@ -1318,8 +1318,8 @@ test('the existing sales save button uses IndexedDB for the selected day in isol
     const raw=InsightStorage.writeSnapshot(allStores);
     window.InsightMigrationBackupV1={assertReady(){},confirm:async()=>true};
     await InsightIndexedDBStorageV1.migrate({legacyClientsClosed:true});
-    await InsightIndexedDBSalesInputPreviewV1.connect();
-    return {year,month,day,active,raw};
+    window.fixtureSalesPreview=await InsightIndexedDBSalesInputPreviewV1.connect();
+    return {year,month,day,active,raw,weather:WX_KEYS.find(key=>key!==(row.weather||''))};
   });
   const expected=JSON.parse(seed.raw);
   const getRow=snapshot=>snapshot.stores[seed.active].data[seed.year][seed.month][seed.day-1];
@@ -1344,9 +1344,21 @@ test('the existing sales save button uses IndexedDB for the selected day in isol
   await count.click();
   await count.fill('8.25');
   await expect(count).toHaveValue('8.25');
+  const siblingDay=seed.day===1?2:1;
+  await page.locator('#salesDayList button').nth(siblingDay-1).click();
+  await sales.click();
+  await sales.fill('222');
+  await page.locator('#salesDayList button').nth(seed.day-1).click();
+  await page.locator('#salesForm [data-sales-weather="'+seed.weather+'"]').click();
+  expect(await page.evaluate(()=>fixtureSalesPreview.getStatus()))
+    .toEqual({state:'IDLE_OBSERVED',hasUnsavedInput:true});
+  expect(await page.evaluate(()=>localStorage.getItem('insight_v11'))).toBe(seed.raw);
+  expect(await page.evaluate(()=>InsightIndexedDBStorageV1.read().then(value=>value.revision))).toBe(0);
   await save.click();
   await page.waitForFunction(()=>window.resumeFixtureSave?.length===2);
   await expect(save).toBeDisabled();
+  expect(await page.evaluate(()=>fixtureSalesPreview.getStatus()))
+    .toEqual({state:'ACTIVE',hasUnsavedInput:true});
   await expect(status).toHaveText('保存を確認しています。');
   await expect(notice).not.toHaveClass(/is-visible/);
   expect(await page.evaluate(()=>store.data[editYear.sales][editMonth.sales][window.salesSelDay-1].売上)).toBe(42);
@@ -1355,7 +1367,12 @@ test('the existing sales save button uses IndexedDB for the selected day in isol
     window.resumeFixtureSave.forEach(resolve=>resolve());
   });
   await expect(notice).toHaveClass(/is-visible/);
-  Object.assign(getRow(expected),{売上:456,買上点数:8.25});
+  Object.assign(getRow(expected),{売上:456,買上点数:8.25,weather:seed.weather});
+  expected.stores[seed.active].data[seed.year][seed.month][siblingDay-1].売上=222;
+  expected.stores['fictional-second-shop'].data[seed.year][seed.month][seed.day-1].weather=seed.weather;
+  expected.sharedWeather={...expected.sharedWeather,[seed.year+'-'+seed.month+'-'+seed.day]:seed.weather};
+  expect(await page.evaluate(()=>fixtureSalesPreview.getStatus()))
+    .toEqual({state:'IDLE_OBSERVED',hasUnsavedInput:false});
   expect(await page.evaluate(()=>InsightIndexedDBStorageV1.read())).toEqual({revision:1,snapshot:expected});
   expect(await page.evaluate(()=>localStorage.getItem('insight_v11'))).toBe(seed.raw);
 
@@ -1372,6 +1389,8 @@ test('the existing sales save button uses IndexedDB for the selected day in isol
   await save.click();
   await expect(status).toHaveText('保存結果を確認できないため、追加の保存を停止しました。');
   await expect(sales).toHaveValue('789');
+  expect(await page.evaluate(()=>fixtureSalesPreview.getStatus()))
+    .toEqual({state:'HELD',hasUnsavedInput:true});
   await expect(save).toBeDisabled();
   await expect(notice).not.toHaveClass(/is-visible/);
   expect(await page.evaluate(()=>InsightIndexedDBStorageV1.diagnose({verifyInterrupted:true})))
