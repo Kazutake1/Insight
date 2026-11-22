@@ -2,7 +2,10 @@
 (function(root){
   'use strict';
 
-  let connectedStatus=null;
+  let connectedStatus=null,allowConnectedNavigation=null;
+  const sidebarRoutes={
+    nav0:0,nav1:1,nav2:2,nav3:3,nav4:4,navSalesCount:'salesCounts',navSaleResults:'saleResults'
+  };
 
   async function connect(){
     if(connectedStatus)throw new Error('Sales preview already connected');
@@ -70,7 +73,7 @@
     let held=false,busy=false,timer;
     const getStatus=()=>{
       let dirty=true;
-      try{dirty=!matchesScreen()||changes().length>0;}catch(_){}
+      try{dirty=matchesPeriod()&&(!matchesScreen()||changes().length>0);}catch(_){}
       return {state:held?'HELD':busy?'ACTIVE':'IDLE_OBSERVED',hasUnsavedInput:dirty};
     };
     function stop(message){
@@ -83,6 +86,10 @@
       if(held||busy)return 'cancelled_before_mutation';
       clearTimeout(timer);
       notice.classList.remove('is-visible');
+      if(!matchesPeriod()){
+        status.textContent='この期間は試験用の売上保存の対象外です。';
+        return 'cancelled_before_mutation';
+      }
       if(!matchesScreen()){
         stop('表示中の店舗・日付または保存済みデータが変わったため、保存を停止しました。');
         return 'unknown';
@@ -135,24 +142,50 @@
       if(!held&&!busy)ctx.runIndexedDBPreview=save;
       return false;
     },-1000);
-    // Check sidebar clicks before document capture updates the shared date target.
-    root.addEventListener('click',event=>{
-      if(currentNav!==2||!event.target.closest?.('#nav0,#nav1,#nav2,#nav3,#nav4,#navSalesCount,#navSaleResults'))return;
+    function allowNavigation(question){
       const current=getStatus();
-      if(current.state==='IDLE_OBSERVED'&&
-         (!matchesPeriod()||!current.hasUnsavedInput||
-          root.confirm('未保存の入力があります。\n保存せずに画面を移動しますか？')))return;
+      return current.state==='IDLE_OBSERVED'&&
+        (!current.hasUnsavedInput||root.confirm('未保存の入力があります。\n'+question));
+    }
+
+    // Approve a sidebar dispatch once, before document capture can start date synchronization.
+    const sidebarSelector=Object.keys(sidebarRoutes).map(id=>'#'+id).join(',');
+    let approved=null;
+    const screenQuestion='保存せずに画面を移動しますか？';
+    root.addEventListener('click',event=>{
+      if(currentNav!==2)return;
+      const item=event.target.closest?.(sidebarSelector);
+      if(!item)return;
+      approved=null;
+      if(allowNavigation(screenQuestion)){
+        approved={event,route:sidebarRoutes[item.id]};
+        return;
+      }
       event.preventDefault();
       event.stopImmediatePropagation();
     },true);
+
     const gotoNav=root.gotoNav;
-    root.gotoNav=function(){
-      if(currentNav===2&&getStatus().state!=='IDLE_OBSERVED')return false;
-      return gotoNav.apply(this,arguments);
+    root.gotoNav=function(destination){
+      if(currentNav!==2)return gotoNav.apply(this,arguments);
+      const approvedClick=approved;
+      approved=null;
+      const allowed=approvedClick&&approvedClick.route===destination&&approvedClick.event.eventPhase!==0;
+      if(!allowed&&!allowNavigation(screenQuestion))return false;
+      const priorDraft=matchesPeriod()?drafts.sales:null;
+      const result=gotoNav.apply(this,arguments);
+      if(priorDraft&&drafts.sales===priorDraft&&!matchesPeriod())
+        drafts.sales=JSON.parse(JSON.stringify(rows(committed.snapshot,target.storeId)));
+      return result;
     };
+    allowConnectedNavigation=allowNavigation;
     connectedStatus=getStatus;
     return Object.freeze({getStatus});
   }
 
-  root.InsightIndexedDBSalesInputPreviewV1=Object.freeze({connect,getConnectedStatus:()=>connectedStatus?.()??null});
+  root.InsightIndexedDBSalesInputPreviewV1=Object.freeze({
+    connect,
+    getConnectedStatus:()=>connectedStatus?.()??null,
+    allowNavigation:question=>allowConnectedNavigation?.(question)??true
+  });
 })(globalThis);

@@ -142,6 +142,12 @@
   function apply(config,year,month){
     year=validYear(year);month=monthNumber(month);
     if(!year||!month)return false;
+    var preview=root.InsightIndexedDBSalesInputPreviewV1;
+    if(preview&&config.type==='sales'&&currentNav===2){
+      var current=period(config);
+      if((!current||year!==current.year||month!==current.month)&&
+         !preview.allowNavigation('保存せずに別の日付へ移動しますか？'))return false;
+    }
     if(!ensureRegisteredYear(year,config.label))return false;
     try{
       if(root.InsightPagePeriodSync&&typeof root.InsightPagePeriodSync.setTarget==='function'&&typeof root.InsightPagePeriodSync.syncCurrentPage==='function'){

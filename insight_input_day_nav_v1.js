@@ -132,7 +132,7 @@
     var preview=spec.key==='sales'?root.InsightIndexedDBSalesInputPreviewV1?.getConnectedStatus():null;
     if(preview&&preview.state!=='IDLE_OBSERVED')return false;
     var discard=crossing&&spec.kind==='legacy'&&(preview?preview.hasUnsavedInput:dirty[spec.key]);
-    if(discard&&!root.confirm('未保存の入力があります。\n保存せずに別の日付へ移動しますか？'))return false;
+    if(discard&&!preview&&!root.confirm('未保存の入力があります。\n保存せずに別の日付へ移動しますか？'))return false;
     if(crossing){
       var discardedDraft=discard?drafts[spec.key]:null;
       var oldDay=spec.dayKey?root[spec.dayKey]:null;

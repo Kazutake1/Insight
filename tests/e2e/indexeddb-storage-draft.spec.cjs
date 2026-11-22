@@ -1293,35 +1293,39 @@ test('isolated adopted startup saves a single sales day after readback and stops
   await expect(save).toHaveCount(0);
 });
 
+async function openMonthlySalesPreview(page){
+  await routeMigrationPage(page);
+  await page.goto('/Index.html');
+  await waitForMigrationChecks(page);
+  await page.locator('#nav2').click();
+  await page.waitForFunction(()=>window.InsightInputDayNav?.getSelectedIso('sales')&&
+    document.getElementById('sf_売上'));
+  await page.addScriptTag({url:'/insight_indexeddb_storage_v1.js'});
+  await page.addScriptTag({url:'/insight_indexeddb_sales_input_preview_v1.js'});
+  return page.evaluate(async ()=>{
+    const year=editYear.sales,month=editMonth.sales,day=window.salesSelDay;
+    const active=allStores.current;
+    const row=store.data[year][month][day-1];
+    row.売上=42;
+    row.買上点数=7;
+    row.客数=77;
+    row.storeMemo='FICTIONAL memo';
+    row.tempMaxC=30;
+    allStores.stores['fictional-second-shop']=JSON.parse(JSON.stringify(store));
+    allStores.stores['fictional-second-shop'].name='架空の別店舗';
+    drafts.sales[day-1]=JSON.parse(JSON.stringify(row));
+    renderSalesForm(year,MONTHS.indexOf(month),day);
+    const raw=InsightStorage.writeSnapshot(allStores);
+    window.InsightMigrationBackupV1={assertReady(){},confirm:async()=>true};
+    await InsightIndexedDBStorageV1.migrate({legacyClientsClosed:true});
+    window.fixtureSalesPreview=await InsightIndexedDBSalesInputPreviewV1.connect();
+    return {year,month,day,active,raw,weather:WX_KEYS.find(key=>key!==(row.weather||''))};
+  });
+}
+
 for(const failure of ['stale revision','quota failure','draft changed during save']){
   test('monthly sales and weather use one revision, with '+failure+' stopping the next save',async({page})=>{
-    await routeMigrationPage(page);
-    await page.goto('/Index.html');
-    await waitForMigrationChecks(page);
-    await page.locator('#nav2').click();
-    await page.waitForFunction(()=>window.InsightInputDayNav?.getSelectedIso('sales')&&
-      document.getElementById('sf_売上'));
-    await page.addScriptTag({url:'/insight_indexeddb_storage_v1.js'});
-    await page.addScriptTag({url:'/insight_indexeddb_sales_input_preview_v1.js'});
-    const seed=await page.evaluate(async ()=>{
-      const year=editYear.sales,month=editMonth.sales,day=window.salesSelDay;
-      const active=allStores.current;
-      const row=store.data[year][month][day-1];
-      row.売上=42;
-      row.買上点数=7;
-      row.客数=77;
-      row.storeMemo='FICTIONAL memo';
-      row.tempMaxC=30;
-      allStores.stores['fictional-second-shop']=JSON.parse(JSON.stringify(store));
-      allStores.stores['fictional-second-shop'].name='架空の別店舗';
-      drafts.sales[day-1]=JSON.parse(JSON.stringify(row));
-      renderSalesForm(year,MONTHS.indexOf(month),day);
-      const raw=InsightStorage.writeSnapshot(allStores);
-      window.InsightMigrationBackupV1={assertReady(){},confirm:async()=>true};
-      await InsightIndexedDBStorageV1.migrate({legacyClientsClosed:true});
-      window.fixtureSalesPreview=await InsightIndexedDBSalesInputPreviewV1.connect();
-      return {year,month,day,active,raw,weather:WX_KEYS.find(key=>key!==(row.weather||''))};
-    });
+    const seed=await openMonthlySalesPreview(page);
     const expected=JSON.parse(seed.raw);
     const getRow=snapshot=>snapshot.stores[seed.active].data[seed.year][seed.month][seed.day-1];
     const save=page.locator('#salesSaveBtn');
@@ -1469,5 +1473,51 @@ for(const failure of ['stale revision','quota failure','draft changed during sav
           :{state:'hold',observedRevision:1,recovery:'prior-save-verified'});
     }
     expect(await page.evaluate(()=>localStorage.getItem('insight_v11'))).toBe(seed.raw);
+  });
+}
+
+for(const navigation of ['sidebar','programmatic','period']){
+  test('unsaved sales navigation warns once and discards only on approval via '+navigation,async({page})=>{
+    const seed=await openMonthlySalesPreview(page);
+    const sales=page.locator('#sf_売上');
+    const status=page.locator('#salesSaveBtn + [role=status]');
+    const iso=seed.year+'-'+String(Number.parseInt(seed.month)).padStart(2,'0')+'-'+String(seed.day).padStart(2,'0');
+    await page.evaluate(()=>{
+      window.navigationWarnings=[];
+      window.approveNavigation=false;
+      window.confirm=message=>{window.navigationWarnings.push(message);return window.approveNavigation;};
+    });
+    await sales.click();
+    await sales.fill('456');
+    async function navigate(){
+      if(navigation==='sidebar')await page.locator('#nav1').click();
+      else if(navigation==='programmatic')await page.evaluate(()=>gotoNav(1));
+      else await page.evaluate(()=>{
+        const next=new Date(Number(editYear.sales),MONTHS.indexOf(editMonth.sales)+1,1);
+        InsightInputPeriodControls.apply({type:'sales',label:'売上'},next.getFullYear(),next.getMonth()+1);
+      });
+    }
+    await navigate();
+    await expect(page.locator('#pageSales')).toHaveClass(/show/);
+    await expect(sales).toHaveValue('456');
+    expect(await page.evaluate(()=>navigationWarnings.length)).toBe(1);
+    await page.evaluate(()=>{window.approveNavigation=true;});
+    await navigate();
+    if(navigation==='period'){
+      await expect.poll(()=>page.evaluate(()=>editMonth.sales)).not.toBe(seed.month);
+      await page.locator('#salesSaveBtn').click();
+      await expect(status).toHaveText('この期間は試験用の売上保存の対象外です。');
+    }else{
+      await expect(page.locator('#pageDash')).toHaveClass(/show/);
+      await page.locator('#nav2').click();
+    }
+    await page.evaluate(date=>{InsightInputDayNav.select('sales',date);},iso);
+    await expect(sales).toHaveValue('42');
+    expect(await page.evaluate(()=>navigationWarnings.length)).toBe(2);
+    expect(await page.evaluate(()=>InsightInputDayNav.hasUnsavedInput())).toBe(false);
+    expect(await page.evaluate(()=>InsightIndexedDBStorageV1.read().then(value=>value.revision))).toBe(0);
+    expect(await page.evaluate(()=>localStorage.getItem('insight_v11'))).toBe(seed.raw);
+    await page.locator('#salesSaveBtn').click();
+    await expect(status).toHaveText('保存する変更はありません。');
   });
 }
