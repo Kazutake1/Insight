@@ -23,6 +23,71 @@ async function waitForMigrationChecks(page){
 }
 
 
+
+async function quickInputBlocksUnload(page){
+  return page.evaluate(()=>!window.dispatchEvent(new Event('beforeunload',{cancelable:true})));
+}
+
+const quickDraftChanges={
+  'weather only':[['#qWeatherCompactTrigger .qwc-label','雨']],
+  'maximum temperature only':[['#qi_tempMaxC','25']],
+  'minimum temperature only':[['#qi_tempMinC','7']],
+  'memo only':[['#qi_storeMemo','変更した架空メモ']],
+  'sales only':[['#qi_売上','456']],
+  'customer count only':[['#qi_客数','222']],
+  'items per customer only':[['#qi_買上点数','3.75']],
+  'waste only':[['waste','123']],
+  'multiple fields':[['#qWeatherCompactTrigger .qwc-label','雨'],['#qi_tempMinC','7'],['#qi_storeMemo','変更した架空メモ']]
+};
+
+for(const [name,fields] of Object.entries(quickDraftChanges)){
+  test('isolated Quick draft guards date changes and unload with '+name,async({page})=>{
+    const seed=await openQuickInputPreview(page);
+    const selectedDate=page.locator('#iqdDateInput');
+    await expect(selectedDate).toHaveValue(seed.iso);
+    expect(await quickInputBlocksUnload(page)).toBe(false);
+    await page.evaluate(()=>{
+      window.quickDateDecisions=[];
+      window.allowQuickDateChange=false;
+      window.confirm=message=>{quickDateDecisions.push(message);return allowQuickDateChange;};
+    });
+    for(const [field,value] of fields){
+      if(field.startsWith('#qWeatherCompactTrigger')){
+        await page.locator('#qWeatherCompactTrigger').click();
+        await page.locator('#qWeatherCompactMenu [data-wx="'+value+'"]').click();
+      }else{
+        const selector=field==='waste'?'[id="qi_h_'+seed.category+'"]':field;
+        await page.locator(selector).fill(value);
+      }
+    }
+    expect.soft(await quickInputBlocksUnload(page)).toBe(true);
+    await page.locator('#iqdPrev').click();
+    expect(await page.evaluate(()=>quickDateDecisions)).toEqual([
+      '未保存の入力があります。\n保存せずに別の日付へ移動しますか？'
+    ]);
+    await expect(selectedDate).toHaveValue(seed.iso);
+    for(const [field,value] of fields){
+      const selector=field==='waste'?'[id="qi_h_'+seed.category+'"]':field;
+      const input=page.locator(selector);
+      if(field.startsWith('#qWeatherCompactTrigger'))await expect(input).toHaveText(value);
+      else await expect(input).toHaveValue(value);
+    }
+
+    await page.evaluate(()=>{allowQuickDateChange=true;});
+    await page.locator('#iqdPrev').click();
+    await expect(selectedDate).toHaveValue(seed.year+'-06-11');
+    expect(await quickInputBlocksUnload(page)).toBe(false);
+    expect(await page.evaluate(()=>quickDateDecisions.length)).toBe(2);
+    await selectedDate.fill(seed.iso);
+    await expect(selectedDate).toHaveValue(seed.iso);
+    expect(await page.evaluate(()=>quickDateDecisions.length)).toBe(2);
+    expect(await quickInputBlocksUnload(page)).toBe(false);
+    expect(await page.evaluate(()=>InsightIndexedDBStorageV1.read()))
+      .toEqual({revision:0,snapshot:JSON.parse(seed.raw)});
+    expect(await page.evaluate(()=>localStorage.getItem('insight_v11'))).toBe(seed.raw);
+  });
+}
+
 test('manual adoption uses the real encrypted backup confirmation and preserves the legacy source',async({page})=>{
   await routeMigrationPage(page);
   async function open(){
