@@ -574,7 +574,7 @@ function switchStore(id){
   });
 }
 
-function renderStoreSelection(id,beforeRender){
+function renderStoreSelection(id,beforeRender,skipPage=false){
   allStores.current=id;
   store=allStores.stores[id];
   baseYear=store.years[store.years.length-1];
@@ -584,9 +584,11 @@ function renderStoreSelection(id,beforeRender){
   editMonth={sales:t.month,kyaku:t.month,haiki:t.month};
   if(beforeRender)beforeRender();
   renderStoreSel();
-  if(currentNav===0)initQuickPage();
-  else if(currentNav===1)refreshDash();
-  else initInputPage(["","","sales","kyaku","haiki"][currentNav]);
+  if(!skipPage){
+    if(currentNav===0)initQuickPage();
+    else if(currentNav===1)refreshDash();
+    else initInputPage(["","","sales","kyaku","haiki"][currentNav]);
+  }
   updateMissingBadge();
   document.getElementById("storeMenu").classList.remove("is-open");
 }
@@ -599,6 +601,7 @@ function showStoreMenu(previewAction){
   // 店舗名変更
   const rename=document.createElement("button");
   rename.className="store-menu-item";
+  if(typeof previewAction==="function")rename.dataset.indexeddbStoreAction="";
   rename.innerHTML=`<span>✏️</span> 店舗名を変更`;
   rename.onclick=()=>{
     if(typeof previewAction==="function")return previewAction("rename");
@@ -614,6 +617,7 @@ function showStoreMenu(previewAction){
   // 新しい店舗を追加
   const add=document.createElement("button");
   add.className="store-menu-item";
+  if(typeof previewAction==="function")add.dataset.indexeddbStoreAction="";
   add.innerHTML=`<span>＋</span> 新しい店舗を追加`;
   add.onclick=()=>{
     if(typeof previewAction==="function")return previewAction("add");
@@ -636,6 +640,7 @@ function showStoreMenu(previewAction){
     // この店舗を削除
     const del=document.createElement("button");
     del.className="store-menu-item danger";
+    if(typeof previewAction==="function")del.dataset.indexeddbStoreAction="";
     del.innerHTML=`<span>🗑</span> この店舗を削除`;
     del.onclick=()=>{
       if(typeof previewAction==="function")return previewAction("delete");

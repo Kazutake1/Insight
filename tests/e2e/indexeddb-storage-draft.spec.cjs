@@ -1312,10 +1312,12 @@ test('management preview saves a store rename, add and delete as separate revisi
   expected.current=id;
   expected.stores[id]={name:'架空の追加店舗',years:[added.year],data:{[added.year]:added.data}};
   expect(await committedInput(page)).toEqual({revision:2,snapshot:expected});
+  expect(await page.evaluate(()=>allStores)).toEqual(expected);
 
   await open();
   page.once('dialog',dialog=>dialog.dismiss());
   await menu.getByRole('button',{name:/この店舗を削除/}).click();
+  await expect.poll(()=>page.evaluate(()=>combinedPreview.getStatus().state)).toBe('IDLE_OBSERVED');
   await expect(menu).not.toHaveClass(/is-open/);
   expect(await committedInput(page)).toEqual({revision:2,snapshot:expected});
   await open();

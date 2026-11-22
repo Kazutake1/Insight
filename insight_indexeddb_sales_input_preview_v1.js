@@ -339,6 +339,8 @@
     const isInputRoute=route=>route===0||route==='salesCounts'||Object.values(screens).some(screen=>screen.route===route);
     const yearDialog=()=>management&&doc.querySelector('#insightYearDeleteOverlay:not([hidden])');
     const yearControl='#addYearBtn,#ayInput,#ayAddBtn,#insightDeleteYearButton';
+    const storeControl='#storeSel,#storeMenuBtn';
+    const storeActionControl='#storeMenu [data-indexeddb-store-action]';
     root.addEventListener('click',event=>{
       const item=event.target.closest?.(sidebarSelector);
       if(quick){
@@ -357,7 +359,7 @@
         const yearOverlay=yearDialog();
         if(management&&(yearOverlay||currentNav==='settings')){
           if(!blocked()&&(yearOverlay?yearOverlay.contains(event.target):
-            event.target.closest?.(yearControl+',#storeSel,#storeMenuBtn,#storeMenu')))return;
+            event.target.closest?.(yearControl+','+storeControl+','+storeActionControl)))return;
           event.preventDefault();
           event.stopImmediatePropagation();
           return;
@@ -366,8 +368,8 @@
                         root.InsightSalesCount.getCategoryDialog()?.contains(event.target)))return;
         const inside=event.target.closest?.('.page.show');
         const excluded=event.target.closest?.('.clear-btn:not(#quickClearBtn,#salesClearBtn,#kyakuClearBtn,#haikiClearBtn),#autoWxBtn');
-        if(!blocked()&&((inside&&!excluded)||event.target.closest?.('#storeSel,#storeMenuBtn')||
-          (management&&event.target.closest?.('#storeMenu'))))return;
+        if(!blocked()&&((inside&&!excluded)||event.target.closest?.(storeControl)||
+          (management&&event.target.closest?.(storeActionControl))))return;
         event.preventDefault();
         event.stopImmediatePropagation();
         return;
@@ -507,8 +509,10 @@
       const showStoreMenu=root.showStoreMenu;
       root.showStoreMenu=function(){
         if(management&&canOpenStoreMenu()){
-          const scope=managementScope();
-          return showStoreMenu(action=>storeAction(action,scope));
+          const id=state.storeId;
+          const result=showStoreMenu(action=>storeAction(action,id));
+          doc.getElementById('weatherLocationMenuItem')?.remove();
+          return result;
         }
         storeStatus.textContent='店舗の追加・変更・削除は試験対象外です。';
         return false;
@@ -566,11 +570,11 @@
         }
       }
 
-      async function storeAction(action,scope){
-        if(!canOpenStoreMenu())return false;
+      async function storeAction(action,id){
+        if(!canOpenStoreMenu()||id!==state.storeId)return false;
         const menu=doc.getElementById('storeMenu');
         if(!menu.classList.contains('is-open'))return false;
-        const id=state.storeId;
+        const scope=managementScope();
         const period=root.InsightPagePeriodSync?.getTarget();
         const dirty=getStatus().hasUnsavedInput;
         const result=await runManagement(scope,candidate=>{
@@ -605,10 +609,7 @@
           if(changed==='rename'){
             renderStoreSel();
           }else{
-            const route=currentNav;
-            if(route==='settings')currentNav=1;
-            try{renderStoreSelection(state.storeId);}
-            finally{currentNav=route;}
+            renderStoreSelection(state.storeId,undefined,currentNav==='settings');
             root.InsightPagePeriodSync?.reconcileCurrentStore(period);
             for(const attachment of attachments.values())attachment.target=null;
             if(currentNav===screen.route){
