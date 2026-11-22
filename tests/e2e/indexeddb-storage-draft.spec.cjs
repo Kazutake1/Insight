@@ -888,6 +888,159 @@ for(const mode of ['conflict','quota','readback failure']){
   });
 }
 
+
+test('combined category creation, reordering and visibility preserve all store records',async({page})=>{
+  const seed=await openQuickInputPreview(page,{followMonthlyInputs:true,seedCounts:true});
+  const expected=JSON.parse(seed.raw),categories=expected.salesCountManagement.categories;
+  await page.locator('#navSalesCount').click();
+  const dialog=page.locator('dialog.sc-dialog'),button=dialog.getByRole('button',{name:'保存する'});
+  await page.locator('#scManage').click();
+  await dialog.getByRole('button',{name:categories[1].name+'を上へ移動',exact:true}).click();
+  await dialog.getByRole('button',{name:'＋ カテゴリーを追加',exact:true}).click();
+  await dialog.getByLabel('カテゴリー名',{exact:true}).last().fill('架空の新規カテゴリー');
+  await button.click();
+  await expect(dialog).toHaveCount(0);
+  const first=await committedInput(page);
+  const added=first.snapshot.salesCountManagement.categories.find(c=>c.name==='架空の新規カテゴリー');
+  expect(added).toEqual({id:expect.stringMatching(/^cat_/),name:'架空の新規カテゴリー',hidden:false,aliases:[],activeTrips:[true,true,true]});
+  [categories[0],categories[1]]=[categories[1],categories[0]];
+  categories.push(added);
+  expect(first).toEqual({revision:1,snapshot:expected});
+
+  await page.locator('#scManage').click();
+  await dialog.getByRole('button',{name:'非表示にする',exact:true}).first().click();
+  await button.click();
+  await expect(dialog).toHaveCount(0);
+  categories[0].hidden=true;
+  expect(await committedInput(page)).toEqual({revision:2,snapshot:expected});
+  await page.locator('#scManage').click();
+  await dialog.getByRole('button',{name:'再表示する',exact:true}).first().click();
+  await button.click();
+  await expect(dialog).toHaveCount(0);
+  categories[0].hidden=false;
+  expect(await committedInput(page)).toEqual({revision:3,snapshot:expected});
+  expect(await page.evaluate(()=>localStorage.getItem('insight_v11'))).toBe(seed.raw);
+});
+
+test('combined category validation rejects historical aliases, duplicate IDs and exclusive masks',async({page})=>{
+  const seed=await openQuickInputPreview(page,{followMonthlyInputs:true,seedCounts:true});
+  const expected=JSON.parse(seed.raw),categories=expected.salesCountManagement.categories;
+  await page.locator('#navSalesCount').click();
+  const dialog=page.locator('dialog.sc-dialog'),save=dialog.getByRole('button',{name:'保存する'});
+  await page.locator('#scManage').click();
+  const names=dialog.getByLabel('カテゴリー名',{exact:true});
+  const original=categories[0].name;
+  await names.first().fill('架空新名称');
+  await save.click();
+  await expect(dialog).toHaveCount(0);
+  categories[0].name='架空新名称';categories[0].aliases.push(original);
+  await page.locator('#scManage').click();
+  await names.nth(1).fill(original);
+  await save.click();
+  await expect(dialog.getByRole('status')).toHaveText('現在名または過去名と重複するカテゴリー名は使用できません');
+  await names.nth(1).fill(categories[1].name);
+  const firstRow=dialog.locator('.sc-category-row').first();
+  for(const box of await firstRow.getByRole('checkbox').all())await box.uncheck();
+  await save.click();
+  await expect(dialog.getByRole('status')).toContainText('対象便を1つ以上選択してください');
+  await firstRow.getByRole('checkbox').first().check();
+  const hide=dialog.getByRole('button',{name:'非表示にする',exact:true});
+  while(await hide.count())await hide.first().click();
+  await save.click();
+  await expect(dialog.getByRole('status')).toHaveText('表示するカテゴリーを1件以上残してください');
+  await dialog.getByRole('button',{name:'再表示する',exact:true}).first().click();
+  await page.evaluate(()=>{
+    const now=Date.now,random=Math.random;
+    Date.now=()=>1730000000000;Math.random=()=>0.25;
+    document.querySelector('dialog.sc-dialog [data-add]').click();
+    document.querySelector('dialog.sc-dialog [data-add]').click();
+    Date.now=now;Math.random=random;
+  });
+  await dialog.locator('.sc-category-group.is-visible').getByLabel('カテゴリー名').nth(1).fill('架空A');
+  await dialog.locator('.sc-category-group.is-visible').getByLabel('カテゴリー名').nth(2).fill('架空B');
+  await save.click();
+  await expect(dialog.getByRole('status')).toHaveText('販売数カテゴリーが不正です');
+  await dialog.getByRole('button',{name:'閉じる'}).click();
+  await expect(dialog).toHaveCount(0);
+  expect(await committedInput(page)).toEqual({revision:1,snapshot:expected});
+  expect(await page.evaluate(()=>localStorage.getItem('insight_v11'))).toBe(seed.raw);
+});
+
+for(const failure of ['lost acknowledgement','tab close']){
+  test('combined category save preserves the full revision after '+failure,async({page,context})=>{
+    const seed=await openQuickInputPreview(page,{followMonthlyInputs:true,seedCounts:true});
+    await page.locator('#navSalesCount').click();
+    await page.locator('#scManage').click();
+    const dialog=page.locator('dialog.sc-dialog');
+    const name=dialog.getByLabel('カテゴリー名',{exact:true}).first();
+    await name.fill('架空新名称');
+    const observer=await openStoreSwitchPeer(context);
+    try{
+      const closed=failure==='tab close';
+      await interruptCountReadback(page,failure);
+      await dialog.getByRole('button',{name:'保存する'}).click();
+      if(closed)await page.waitForFunction(()=>window.countReadbackPaused===true);
+      else await expect(dialog.getByRole('status')).toHaveText('保存結果を確認できないため、追加の保存を停止しました。');
+      await expect(name).toHaveValue('架空新名称');
+      expect(await page.evaluate(async peer=>({nav:gotoNav(0),store:await switchStore(peer)}),seed.peer))
+        .toEqual({nav:false,store:false});
+      if(closed)await page.close();
+      await expect.poll(()=>observer.evaluate(async closed=>{
+        try{return await InsightIndexedDBStorageV1.diagnose({verifyInterrupted:true});}
+        catch(error){
+          if(closed&&error.message==='Another Insight operation is in progress')return null;
+          throw error;
+        }
+      },closed),{timeout:10000}).toMatchObject({state:'hold',observedRevision:1,recovery:'save-verified'});
+      const expected=JSON.parse(seed.raw),category=expected.salesCountManagement.categories[0];
+      category.aliases.push(category.name);category.name='架空新名称';
+      const record=await readStoreSwitchRecord(observer);
+      expect(JSON.parse(record.raw)).toEqual(expected);
+      expect(JSON.parse(record.previous.raw)).toEqual(JSON.parse(seed.raw));
+      expect(await observer.evaluate(()=>localStorage.getItem('insight_v11'))).toBe(seed.raw);
+    }finally{await observer.close();}
+  });
+}
+
+for(const outcome of ['success','quota']){
+  test('combined customer month clear keeps other columns and dates on '+outcome,async({page,context})=>{
+    const seed=await openQuickInputPreview(page,{followMonthlyInputs:true,seedCounts:true});
+    await page.locator('#nav3').click();
+    const input=page.locator('.kyaku-input[data-ri="'+(seed.day-1)+'"]');
+    await expect(input).toHaveValue('62');
+    await fillCombinedInput(input,'123');
+    const button=page.locator('#kyakuClearBtn');
+    await page.evaluate(()=>{window.confirm=()=>false;});
+    await button.click();
+    await expect(input).toHaveValue('123');
+    const expected=JSON.parse(seed.raw);
+    expect(await committedInput(page)).toEqual({revision:0,snapshot:expected});
+    await page.evaluate(()=>{window.confirm=()=>true;});
+    if(outcome==='quota')await page.evaluate(()=>{
+      const put=IDBObjectStore.prototype.put;
+      IDBObjectStore.prototype.put=function(){
+        IDBObjectStore.prototype.put=put;
+        throw new DOMException('Fictional quota error','QuotaExceededError');
+      };
+    });
+    await button.click();
+    const status=page.locator('#kyakuSaveBtn + [role=status]');
+    if(outcome==='success'){
+      await expect(status).toHaveText('客数をクリアしました。');
+      expected.stores[seed.active].data[seed.year][seed.month].forEach(row=>{if(row)row.客数=0;});
+      expect(await committedInput(page)).toEqual({revision:1,snapshot:expected});
+    }else{
+      await expect(status).toHaveText('客数クリアの結果を確認できないため、追加の保存を停止しました。');
+      await expect(input).toHaveValue('123');
+      expect(await page.evaluate(()=>combinedPreview.getStatus())).toEqual({state:'HELD',hasUnsavedInput:true});
+      const observer=await openStoreSwitchPeer(context);
+      try{expect(JSON.parse((await readStoreSwitchRecord(observer)).raw)).toEqual(expected);}
+      finally{await observer.close();}
+    }
+    expect(await page.evaluate(()=>localStorage.getItem('insight_v11'))).toBe(seed.raw);
+  });
+}
+
 test('manual adoption uses the real encrypted backup confirmation and preserves the legacy source',async({page})=>{
   await routeMigrationPage(page);
   async function open(){
