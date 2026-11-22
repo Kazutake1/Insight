@@ -1,54 +1,79 @@
-/* Draft-only connection to the existing sales input screen. */
+/* Draft-only IndexedDB connection to one monthly input screen. */
 (function(root){
   'use strict';
 
-  let connectedStatus=null,allowConnectedNavigation=null;
+  let connectedType=null,connectedStatus=null,allowConnectedNavigation=null;
+  const screens={
+    sales:{route:2,button:'salesSaveBtn',notice:'savedSales',label:'売上'},
+    kyaku:{route:3,button:'kyakuSaveBtn',notice:'savedKyaku',label:'客数'},
+    haiki:{route:4,button:'haikiSaveBtn',notice:'savedHaiki',label:'廃棄'}
+  };
   const sidebarRoutes={
     nav0:0,nav1:1,nav2:2,nav3:3,nav4:4,navSalesCount:'salesCounts',navSaleResults:'saleResults'
   };
 
-  async function connect(){
-    if(connectedStatus)throw new Error('Sales preview already connected');
+  async function connect(type='sales'){
+    if(connectedStatus)throw new Error('Month input preview already connected');
+    const screen=screens[type];
+    if(!screen||currentNav!==screen.route)throw new Error('Open the corresponding input screen first');
     const doc=root.document;
-    const button=doc.getElementById('salesSaveBtn');
-    const notice=doc.getElementById('savedSales');
-    if(!button||!notice||currentNav!==2)throw new Error('Open the sales input screen first');
+    const button=doc.getElementById(screen.button);
+    const notice=doc.getElementById(screen.notice);
+    if(!button||!notice)throw new Error('The input controls are unavailable');
 
     const api=root.InsightIndexedDBStorageV1;
     let committed=await api.read();
-    const target={storeId:allStores.current,year:editYear.sales,month:editMonth.sales};
+    const target={storeId:allStores.current,year:editYear[type],month:editMonth[type]};
     function matchesPeriod(){
-      return currentNav===2&&allStores.current===target.storeId&&
-        editYear.sales===target.year&&editMonth.sales===target.month;
+      return currentNav===screen.route&&allStores.current===target.storeId&&
+        editYear[type]===target.year&&editMonth[type]===target.month;
     }
     function matchesScreen(){
       return matchesPeriod()&&
         root.InsightStorage.serialize(allStores)===root.InsightStorage.serialize(committed.snapshot);
     }
     function displayedPeriod(){
-      return {storeId:allStores.current,year:editYear.sales,month:editMonth.sales};
+      return {storeId:allStores.current,year:editYear[type],month:editMonth[type]};
     }
     function rows(snapshot,storeId,period=target){
       return snapshot.stores[storeId]?.data?.[period.year]?.[period.month];
     }
+    function collectNumber(fields,key,draft,before,integer=true){
+      const value=Number(draft?.[key]??0);
+      if(value<0||!Number.isFinite(value)||(integer&&!Number.isSafeInteger(value)))
+        throw new Error('Month input value is invalid');
+      if(value!==Number(before?.[key]??0))fields[key]=value;
+    }
     function changes(period=target){
       const saved=rows(committed.snapshot,period.storeId,period);
-      if(!Array.isArray(saved)||saved.length!==drafts.sales.length)
-        throw new Error('Sales month is incomplete');
+      if(!Array.isArray(saved)||saved.length!==drafts[type].length)
+        throw new Error('Input month is incomplete');
       const edited=[];
-      drafts.sales.forEach((draft,index)=>{
+      drafts[type].forEach((draft,index)=>{
         const before=saved[index];
         const day=index+1;
-        const sales=Number(draft.売上),items=Number(draft.買上点数),weather=draft.weather||'';
-        if(Number(draft.d)!==day||Number(before?.d)!==day||
-           !Number.isSafeInteger(sales)||sales<0||!Number.isFinite(items)||items<0)
-          throw new Error('Sales input is invalid');
+        if(Number(draft.d)!==day||Number(before?.d)!==day)
+          throw new Error('Month input day is invalid');
         const fields={};
-        if(sales!==Number(before.売上||0))fields.売上=sales;
-        if(items!==Number(before.買上点数||0))fields.買上点数=items;
-        if(weather!==(before.weather||'')){
-          if(!WX_KEYS.includes(weather))throw new Error('Sales weather is invalid');
-          fields.weather=weather;
+        if(type==='sales'){
+          collectNumber(fields,'売上',draft,before);
+          collectNumber(fields,'買上点数',draft,before,false);
+          const weather=draft.weather||'';
+          if(weather!==(before.weather||'')){
+            if(!WX_KEYS.includes(weather))throw new Error('Sales weather is invalid');
+            fields.weather=weather;
+          }
+        }else if(type==='kyaku'){
+          collectNumber(fields,'客数',draft,before);
+        }else{
+          const categories={};
+          for(const category of HAIKI_CATS)
+            collectNumber(categories,category,draft.haiki,before.haiki);
+          if(Object.keys(categories).length){
+            fields.haiki={...before.haiki,...categories};
+            fields.廃棄金額=HAIKI_CATS.reduce((total,category)=>total+Number(fields.haiki[category]??0),0);
+            if(!Number.isSafeInteger(fields.廃棄金額))throw new Error('Waste total is invalid');
+          }
         }
         if(Object.keys(fields).length)edited.push({day,fields});
       });
@@ -77,7 +102,7 @@
     const getStatus=()=>{
       let dirty=true;
       try{
-        dirty=currentNav===2&&((matchesPeriod()&&!matchesScreen())||changes(displayedPeriod()).length>0);
+        dirty=currentNav===screen.route&&((matchesPeriod()&&!matchesScreen())||changes(displayedPeriod()).length>0);
       }catch(_){}
       return {state:held?'HELD':busy?'ACTIVE':'IDLE_OBSERVED',hasUnsavedInput:dirty};
     };
@@ -92,7 +117,7 @@
       clearTimeout(timer);
       notice.classList.remove('is-visible');
       if(!matchesPeriod()){
-        status.textContent='この期間は試験用の売上保存の対象外です。';
+        status.textContent='この期間は試験用の'+screen.label+'保存の対象外です。';
         return 'cancelled_before_mutation';
       }
       if(!matchesScreen()){
@@ -103,7 +128,7 @@
       let edited;
       try{edited=changes();}
       catch(_){
-        status.textContent='売上・買上点数・天気の入力を確認してください。';
+        status.textContent=screen.label+'の入力を確認してください。';
         return 'cancelled_before_mutation';
       }
       if(!edited.length){
@@ -143,7 +168,7 @@
 
     // Cancel the synchronous core and its after-save writers in the isolated sales screen.
     root.InsightHooks.on('input:save:before','indexeddb-sales-input-preview',ctx=>{
-      if(ctx.args[0]!=='sales')return;
+      if(ctx.args[0]!==type)return;
       if(!held&&!busy)ctx.runIndexedDBPreview=save;
       return false;
     },-1000);
@@ -158,7 +183,7 @@
     let approved=null;
     const screenQuestion='保存せずに画面を移動しますか？';
     root.addEventListener('click',event=>{
-      if(currentNav!==2)return;
+      if(currentNav!==screen.route)return;
       const item=event.target.closest?.(sidebarSelector);
       if(!item)return;
       approved=null;
@@ -172,29 +197,30 @@
 
     const gotoNav=root.gotoNav;
     root.gotoNav=function(destination){
-      if(currentNav!==2)return gotoNav.apply(this,arguments);
+      if(currentNav!==screen.route)return gotoNav.apply(this,arguments);
       const approvedClick=approved;
       approved=null;
       const allowed=approvedClick&&approvedClick.route===destination&&approvedClick.event.eventPhase!==0;
       if(!allowed&&!allowNavigation(screenQuestion))return false;
       const priorPeriod=displayedPeriod();
-      const priorDraft=drafts.sales;
+      const priorDraft=drafts[type];
       const result=gotoNav.apply(this,arguments);
       const after=displayedPeriod();
-      if(drafts.sales===priorDraft&&(currentNav!==2||after.storeId!==priorPeriod.storeId||
+      if(drafts[type]===priorDraft&&(currentNav!==screen.route||after.storeId!==priorPeriod.storeId||
          after.year!==priorPeriod.year||after.month!==priorPeriod.month)){
-        drafts.sales=JSON.parse(JSON.stringify(rows(committed.snapshot,priorPeriod.storeId,priorPeriod)??[]));
+        drafts[type]=JSON.parse(JSON.stringify(rows(committed.snapshot,priorPeriod.storeId,priorPeriod)??[]));
       }
       return result;
     };
     allowConnectedNavigation=allowNavigation;
+    connectedType=type;
     connectedStatus=getStatus;
     return Object.freeze({getStatus});
   }
 
   root.InsightIndexedDBSalesInputPreviewV1=Object.freeze({
     connect,
-    getConnectedStatus:()=>connectedStatus?.()??null,
-    allowNavigation:question=>allowConnectedNavigation?.(question)??true
+    getConnectedStatus:(type=connectedType)=>type===connectedType?connectedStatus?.()??null:null,
+    allowNavigation:(type,question)=>type===connectedType?allowConnectedNavigation(question):true
   });
 })(globalThis);

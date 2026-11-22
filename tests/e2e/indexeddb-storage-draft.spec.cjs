@@ -1594,3 +1594,114 @@ for(const navigation of ['sidebar','programmatic','period']){
     expect(await page.evaluate(()=>localStorage.getItem('insight_v11'))).toBe(seed.raw);
   });
 }
+
+for(const config of [
+  {type:'kyaku',route:3,button:'#kyakuSaveBtn',notice:'#savedKyaku',field:'.kyaku-input[data-ri]',failure:'revision'},
+  {type:'haiki',route:4,button:'#haikiSaveBtn',notice:'#savedHaiki',field:'#haikiForm input[data-hc]',failure:'quota'}
+]){
+  test('isolated '+config.type+' monthly save protects other data and stops on '+config.failure,async({page})=>{
+    await routeMigrationPage(page);
+    await page.goto('/Index.html');
+    await waitForMigrationChecks(page);
+    await page.locator('#nav1').click();
+    await page.locator('#nav'+config.route).click();
+    await expect(page.locator(config.button)).toBeVisible();
+    await page.waitForFunction(type=>window.InsightInputDayNav?.getSelectedIso(type),config.type);
+    await page.addScriptTag({url:'/insight_indexeddb_storage_v1.js'});
+    await page.addScriptTag({url:'/insight_indexeddb_sales_input_preview_v1.js'});
+    const seed=await page.evaluate(async type=>{
+      const year=editYear[type],month=editMonth[type];
+      const prior=String(Number(year)-1);
+      store.data[prior]??=JSON.parse(JSON.stringify(store.data[year]));
+      if(!store.years.includes(prior))store.years.unshift(prior);
+      const current=allStores.current,day=type==='haiki'?window.haikiSelDay:1;
+      const category=HAIKI_CATS[0],otherCategory=HAIKI_CATS[1];
+      const row=store.data[year][month][day-1];
+      Object.assign(row,{売上:42,客数:10,買上点数:7,weather:'晴',storeMemo:'保持するメモ',tempMaxC:30});
+      row.haiki={...row.haiki,[category]:20,[otherCategory]:30,customCarry:9};
+      row.廃棄金額=50;
+      const peer=JSON.parse(JSON.stringify(store));
+      peer.name='架空の別店舗';
+      allStores.stores['fictional-other-store']=peer;
+      drafts[type][day-1]=JSON.parse(JSON.stringify(row));
+      if(type==='haiki')renderHaikiForm(year,MONTHS.indexOf(month),day);
+      else renderKyakuGrid(year,MONTHS.indexOf(month));
+      const raw=InsightStorage.writeSnapshot(allStores);
+      window.InsightMigrationBackupV1={assertReady(){},confirm:async()=>true};
+      await InsightIndexedDBStorageV1.migrate({legacyClientsClosed:true});
+      await InsightIndexedDBSalesInputPreviewV1.connect(type);
+      return {raw,current,year,month,day,category};
+    },config.type);
+    const save=page.locator(config.button),notice=page.locator(config.notice);
+    const status=page.locator(config.button+' + [role=status]');
+    const field=config.type==='haiki'
+      ? page.locator(config.field+'[data-hc="'+seed.category+'"]')
+      : page.locator(config.field+'[data-ri="'+(seed.day-1)+'"]');
+    await field.click();
+    await field.fill('123');
+    await expect(field).toHaveValue('123');
+    await page.evaluate(()=>{
+      window.confirm=()=>{window.fixtureRejectedLeave=true;return false;};
+    });
+    await page.locator('#nav1').click();
+    expect(await page.evaluate(()=>fixtureRejectedLeave)).toBe(true);
+    await expect(field).toHaveValue('123');
+    expect(await page.evaluate(()=>InsightInputDayNav.hasUnsavedInput())).toBe(true);
+
+    await page.evaluate(()=>{
+      const digest=crypto.subtle.digest,resume=[];
+      window.fixtureDigests=resume;
+      crypto.subtle.digest=async function(...args){
+        await new Promise(resolve=>resume.push(resolve));
+        return digest.apply(this,args);
+      };
+      window.resumeFixtureCommit=()=>{
+        crypto.subtle.digest=digest;
+        resume.forEach(resolve=>resolve());
+      };
+    });
+    await save.click();
+    await page.waitForFunction(()=>fixtureDigests.length===2);
+    await expect(status).toHaveText('保存を確認しています。');
+    await expect(notice).not.toHaveClass(/is-visible/);
+    expect(await page.evaluate(()=>InsightInputSaveObserverV0.getStatus()))
+      .toMatchObject({state:'ACTIVE',activeCount:1});
+    await page.evaluate(()=>resumeFixtureCommit());
+    await expect(notice).toHaveClass(/is-visible/);
+    expect(await page.evaluate(()=>InsightInputDayNav.hasUnsavedInput())).toBe(false);
+    const snapshot=JSON.parse(seed.raw),row=snapshot.stores[seed.current].data[seed.year][seed.month][seed.day-1];
+    if(config.type==='kyaku')row.客数=123;
+    else{
+      row.haiki[seed.category]=123;
+      row.廃棄金額=153;
+    }
+    expect(await page.evaluate(()=>InsightIndexedDBStorageV1.read())).toEqual({revision:1,snapshot});
+
+    await page.evaluate(async failure=>{
+      if(failure==='revision'){
+        const api=InsightIndexedDBStorageV1,current=await api.read();
+        current.snapshot.stores['fictional-other-store'].name='別操作で更新';
+        await api.save(current.revision,current.snapshot);
+        return;
+      }
+      const put=IDBObjectStore.prototype.put;
+      IDBObjectStore.prototype.put=function(){
+        IDBObjectStore.prototype.put=put;
+        throw new DOMException('Fictional quota error','QuotaExceededError');
+      };
+    },config.failure);
+    await field.click();
+    await field.fill('333');
+    await save.click();
+    await expect(status).toHaveText('保存結果を確認できないため、追加の保存を停止しました。');
+    await expect(field).toHaveValue('333');
+    await expect(save).toBeDisabled();
+    await expect(notice).not.toHaveClass(/is-visible/);
+    expect(await page.evaluate(()=>InsightInputSaveObserverV0.getStatus()))
+      .toMatchObject({state:'HELD',activeCount:0});
+    expect(await page.evaluate(()=>InsightInputDayNav.hasUnsavedInput())).toBe(true);
+    expect(await page.evaluate(()=>InsightIndexedDBStorageV1.diagnose({verifyInterrupted:true}))).toMatchObject(
+      config.failure==='quota'?{state:'hold',observedRevision:1,recovery:'prior-save-verified'}:{state:'hold',observedRevision:2});
+    expect(await page.evaluate(()=>localStorage.getItem('insight_v11'))).toBe(seed.raw);
+  });
+}

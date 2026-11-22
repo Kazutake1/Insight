@@ -199,7 +199,8 @@
         var context={name:functionName,thisArg:self,args:args,state:{},cancel:false,result:undefined};
         if(beforeEvent)emit(beforeEvent,context);
         if(context.cancel){
-          if(functionName==='saveInput'&&context.args[0]==='sales'&&typeof context.runIndexedDBPreview==='function')
+          if(functionName==='saveInput'&&['sales','kyaku','haiki'].indexOf(context.args[0])>=0&&
+             typeof context.runIndexedDBPreview==='function')
             return observeInputSave(context.runIndexedDBPreview,context,true);
           if(afterEvent&&context.afterOnCancel)emit(afterEvent,context);
           return context.result;
