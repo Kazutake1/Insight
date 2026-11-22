@@ -20,6 +20,9 @@
       ?!followInputScreens||currentNav!==0||!root.InsightIndexedDBQuickInputPreviewV1
       :currentNav!==screen.route))throw new Error('Open the corresponding input screen first');
     const doc=root.document;
+    const yearSection=manageStoresAndYears&&doc.getElementById('insightSettingsYearSection');
+    if(manageStoresAndYears&&(!followQuickInput||!yearSection))
+      throw new Error('The management controls are unavailable');
     function controlsFor(screen){
       const button=doc.getElementById(screen.button);
       const notice=doc.getElementById(screen.notice);
@@ -613,16 +616,19 @@
               attachments.get(type).target=target;
             }
           }
-          menu.classList.remove('is-open');
         },storeStatus,()=>menu.classList.contains('is-open'));
-        if(result&&action!=='rename'&&currentNav===0)quick.onEnter();
+        if(!state.held)menu.classList.remove('is-open');
+        if(result&&action!=='rename'&&currentNav===0){
+          root.renderQuickNav();
+          quick.onEnter();
+        }
         return result;
       }
 
       if(management){
         const yearStatus=doc.createElement('p');
         yearStatus.setAttribute('role','status');
-        doc.getElementById('insightSettingsYearSection').append(yearStatus);
+        yearSection.append(yearStatus);
         const deleteStatus=doc.createElement('p');
         deleteStatus.setAttribute('role','status');
         let deletionScope;
@@ -658,10 +664,16 @@
               showToast('✓ '+year+'年度を追加しました','#15803d','#f0fdf4');
             });
             if(!result)return false;
-            finish();
-            if(currentNav===screen.route&&String(editYear[type])===year){
-              target={...displayedPeriod(),storeId:state.storeId};
-              attachments.get(type).target=target;
+            try{
+              if(finish()===false)throw new Error('The new period could not be displayed');
+              if(currentNav===screen.route&&String(editYear[type])===year){
+                target={...displayedPeriod(),storeId:state.storeId};
+                attachments.get(type).target=target;
+              }
+            }catch(_){
+              state.held=true;
+              storeStatus.textContent='追加した年度を表示できないため、追加の保存を停止しました。';
+              return false;
             }
             return true;
           }

@@ -1316,7 +1316,9 @@ test('management preview saves a store rename, add and delete as separate revisi
   await open();
   page.once('dialog',dialog=>dialog.dismiss());
   await menu.getByRole('button',{name:/この店舗を削除/}).click();
+  await expect(menu).not.toHaveClass(/is-open/);
   expect(await committedInput(page)).toEqual({revision:2,snapshot:expected});
+  await open();
   page.once('dialog',dialog=>dialog.accept());
   await menu.getByRole('button',{name:/この店舗を削除/}).click();
   await expect(page.locator('#storeSel')).toHaveValue(seed.active);
@@ -3555,6 +3557,7 @@ async function openQuickInputPreview(page,{sameMunicipality=true,followMonthlyIn
   await page.addScriptTag({url:'/insight_indexeddb_quick_input_preview_v1.js'});
   if(followMonthlyInputs){
     await page.waitForFunction(()=>typeof InsightHourlyCustomers?.connectIndexedDBPreview==='function');
+    if(manageStoresAndYears)await page.waitForSelector('#insightSettingsYearSection',{state:'attached'});
     await page.addScriptTag({url:'/insight_indexeddb_sales_input_preview_v1.js'});
   }
   return page.evaluate(async ({sameMunicipality,followMonthlyInputs,seedCounts,seedHours,seedDailyClear,seedYearBoundary,seedManagement,manageStoresAndYears})=>{
