@@ -269,39 +269,51 @@
       }
       return false;
     },-1000);
-    async function clearCustomerMonth(){
-      if(blocked()||type!=='kyaku'||!matchesPeriod())return false;
+    async function clearInput(clearType,dayKey){
+      if(blocked()||type!==clearType||!matchesPeriod())return false;
+      const label=screen.label;
       if(!matchesScreen()){
-        stop('保存済みデータとの一致を確認できないため、客数クリアを停止しました。');
+        stop('保存済みデータとの一致を確認できないため、'+label+'クリアを停止しました。');
         return false;
       }
-      const scope={...target},liveDraft=JSON.stringify(drafts.kyaku);
+      const day=dayKey?root[dayKey]:null;
+      if(dayKey&&(!Number.isInteger(day)||day<1))return false;
+      const scope={...target},draftBefore=JSON.stringify(drafts[clearType]);
+      const baseline=state.committed;
       const candidate=JSON.parse(JSON.stringify(state.committed.snapshot));
       const month=rows(candidate,scope.storeId,scope);
-      if(!month?.some(row=>row&&Number(row.客数??0)!==0))return false;
-      const unchanged=()=>type==='kyaku'&&target.storeId===scope.storeId&&target.year===scope.year&&
-        target.month===scope.month&&matchesScreen()&&JSON.stringify(drafts.kyaku)===liveDraft;
-      const message=store.name+' の '+scope.month+'（'+scope.year+'年）の客数データだけを全て削除します。\n売上・買上点数・廃棄・店舗メモ・天気・気温は残ります。\n\nこの操作は元に戻せません。よろしいですか？';
-      if(!root.confirm(message))return false;
+      const row=dayKey?month?.[day-1]:null;
+      if(dayKey?Number(row?.d)!==day:!month?.some(row=>row&&Number(row.客数??0)!==0))return false;
+      const unchanged=()=>state.committed===baseline&&type===clearType&&
+        target.storeId===scope.storeId&&target.year===scope.year&&target.month===scope.month&&
+        (!dayKey||root[dayKey]===day)&&matchesScreen()&&JSON.stringify(drafts[clearType])===draftBefore;
+      const message=dayKey
+        ?store.name+' の '+scope.month+day+'日 の'+(clearType==='sales'?'売上・買上点数':label)+'データだけを削除します。\n他の入力データは残ります。\n\nこの操作は元に戻せません。よろしいですか？'
+        :store.name+' の '+scope.month+'（'+scope.year+'年）の客数データだけを全て削除します。\n売上・買上点数・廃棄・店舗メモ・天気・気温は残ります。\n\nこの操作は元に戻せません。よろしいですか？';
       const wasInert=doc.body.inert;
       state.busy=true;
       doc.body.inert=true;
       button.disabled=true;
-      status.textContent='客数クリアを確認しています。';
       try{
-        if(!unchanged())throw new Error('Customer month changed during confirmation');
-        month.forEach(row=>{if(row)row.客数=0;});
-        const result=await api.save(state.committed.revision,candidate);
-        if(!unchanged())throw new Error('Customer month changed during save');
+        if(!root.confirm(message))return false;
+        if(!unchanged())throw new Error('Clear target changed during confirmation');
+        clearTimeout(timer);
+        notice.classList.remove('is-visible');
+        status.textContent=label+'クリアを確認しています。';
+        if(clearType==='sales')Object.assign(row,{売上:0,買上点数:0});
+        else if(clearType==='haiki')Object.assign(row,{廃棄金額:0,haiki:blankHaiki()});
+        else month.forEach(row=>{if(row)row.客数=0;});
+        const result=await api.save(baseline.revision,candidate);
+        if(!unchanged())throw new Error('Clear target changed during save');
         allStores=JSON.parse(JSON.stringify(result.snapshot));
         store=allStores.stores[state.storeId];
         state.committed=result;
-        initInputPage('kyaku');
+        initInputPage(clearType);
         updateMissingBadge();
-        status.textContent='客数をクリアしました。';
+        status.textContent=label+'をクリアしました。';
         return true;
       }catch(_){
-        stop('客数クリアの結果を確認できないため、追加の保存を停止しました。');
+        stop(label+'クリアの結果を確認できないため、追加の保存を停止しました。');
         return false;
       }finally{
         state.busy=false;
@@ -333,7 +345,7 @@
         if(!blocked()&&(hourly?.dialog()?.contains(event.target)||
                         root.InsightSalesCount.getCategoryDialog()?.contains(event.target)))return;
         const inside=event.target.closest?.('.page.show');
-        const excluded=event.target.closest?.('.clear-btn:not(#kyakuClearBtn),#autoWxBtn');
+        const excluded=event.target.closest?.('.clear-btn:not(#quickClearBtn,#salesClearBtn,#kyakuClearBtn,#haikiClearBtn),#autoWxBtn');
         if(!blocked()&&((inside&&!excluded)||event.target.closest?.('#storeSel,#storeMenuBtn')))return;
         event.preventDefault();
         event.stopImmediatePropagation();
@@ -489,8 +501,12 @@
         status.textContent='試験中は登録済みの年度だけを表示できます。';
         return false;
       };
-      root.clearDayData=()=>false;
-      root.clearKyakuMonth=clearCustomerMonth;
+      root.clearDayData=type=>{
+        if(type==='sales')return clearInput(type,'salesSelDay');
+        if(type==='haiki')return clearInput(type,'haikiSelDay');
+        return false;
+      };
+      root.clearKyakuMonth=()=>clearInput('kyaku');
       root.addEventListener('beforeunload',event=>{
         if(!getStatus().hasUnsavedInput)return;
         event.preventDefault();

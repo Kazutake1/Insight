@@ -166,14 +166,65 @@
       return false;
     },-1000);
 
-    // Other write entrances are outside this one-screen preview.
+    async function clearTodayData(){
+      if(state.busy||state.held||state.pending||state.hourly?.dialog()?.open||currentNav!==0)return false;
+      const {date,fy,month,day,iso}=dateContext.getSelectedInfo();
+      if(!supports(date))return false;
+      if(!matchesBaseline()||!matchesDate(iso)){
+        stop();
+        return false;
+      }
+      const draftSignature=()=>JSON.stringify([quickWeather,...Array.from(
+        page.querySelectorAll('input,textarea,select'),
+        field=>[field.id,field.value,field.dataset.insightItemsRaw]
+      )]);
+      const baseline=state.committed,draftBefore=draftSignature();
+      const unchanged=()=>baseline===state.committed&&matchesBaseline()&&matchesDate(iso)&&
+        draftSignature()===draftBefore;
+      const message=store.name+' の '+fy+'年'+month+day+'日の入力データを削除します。\n売上・客数・買上点数・廃棄・店舗メモをクリアし、天気・店舗イベント（共通セールを含む）は保持します。\n\nこの操作は元に戻せません。よろしいですか？';
+      const wasInert=doc.body.inert;
+      state.busy=true;
+      button.disabled=true;
+      doc.body.inert=true;
+      try{
+        if(!root.confirm(message))return false;
+        if(!unchanged())throw new Error('Quick clear target changed during confirmation');
+        finishFeedback();
+        status.textContent='入力データのクリアを確認しています。';
+        const candidate=JSON.parse(JSON.stringify(baseline.snapshot));
+        const row=candidate.stores[state.storeId].data[fy][month][day-1];
+        Object.assign(row,{売上:0,客数:0,買上点数:0,廃棄金額:0,haiki:blankHaiki()});
+        delete row.storeMemo;
+        const result=await api.save(baseline.revision,candidate);
+        if(!unchanged())throw new Error('Quick clear target changed during save');
+        allStores=JSON.parse(JSON.stringify(result.snapshot));
+        store=allStores.stores[state.storeId];
+        state.committed=result;
+        root.renderQuickNav();
+        root.renderQuickPage();
+        rememberDraft(iso,readInputs());
+        root.InsightHooks.emit('quick:preview:committed',{});
+        updateMissingBadge();
+        status.textContent='入力データをクリアしました。';
+        return true;
+      }catch(_){
+        stop();
+        return false;
+      }finally{
+        state.busy=false;
+        button.disabled=state.held;
+        doc.body.inert=wasInert;
+      }
+    }
+
+    // Weather fetching remains outside this one-screen preview.
     function blockUnsupported(){
-      if(!state.busy&&!state.held&&!state.pending)status.textContent='この試験では今日の入力の保存と日付移動を行えます。';
+      if(!state.busy&&!state.held&&!state.pending)status.textContent='この試験では今日の入力の保存・クリアと日付移動を行えます。';
       return false;
     }
     if(!sharedState){
       root.addEventListener('click',event=>{
-        if(!state.busy&&!state.held&&page.contains(event.target)&&!event.target.closest('#quickClearBtn,#autoWxBtn'))return;
+        if(!state.busy&&!state.held&&page.contains(event.target)&&!event.target.closest('#autoWxBtn'))return;
         event.preventDefault();
         event.stopImmediatePropagation();
         blockUnsupported();
@@ -191,7 +242,8 @@
       });
       root.gotoNav=root.switchStore=root.showStoreMenu=blockUnsupported;
     }
-    root.clearTodayData=root.fetchWeather=blockUnsupported;
+    root.clearTodayData=clearTodayData;
+    root.fetchWeather=blockUnsupported;
     function onEnter(){
       baselineDraft=null;
       finishFeedback();

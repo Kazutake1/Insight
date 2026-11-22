@@ -1002,7 +1002,7 @@ for(const failure of ['lost acknowledgement','tab close']){
   });
 }
 
-for(const outcome of ['success','quota']){
+for(const outcome of ['success','quota','conflict','readback failure','lost acknowledgement','tab close','changed confirmation']){
   test('combined customer month clear keeps other columns and dates on '+outcome,async({page,context})=>{
     const seed=await openQuickInputPreview(page,{followMonthlyInputs:true,seedCounts:true});
     await page.locator('#nav3').click();
@@ -1015,30 +1015,141 @@ for(const outcome of ['success','quota']){
     await expect(input).toHaveValue('123');
     const expected=JSON.parse(seed.raw);
     expect(await committedInput(page)).toEqual({revision:0,snapshot:expected});
-    await page.evaluate(()=>{window.confirm=()=>true;});
-    if(outcome==='quota')await page.evaluate(()=>{
-      const put=IDBObjectStore.prototype.put;
-      IDBObjectStore.prototype.put=function(){
-        IDBObjectStore.prototype.put=put;
-        throw new DOMException('Fictional quota error','QuotaExceededError');
-      };
-    });
-    await button.click();
-    const status=page.locator('#kyakuSaveBtn + [role=status]');
-    if(outcome==='success'){
-      await expect(status).toHaveText('客数をクリアしました。');
-      expected.stores[seed.active].data[seed.year][seed.month].forEach(row=>{if(row)row.客数=0;});
-      expect(await committedInput(page)).toEqual({revision:1,snapshot:expected});
-    }else{
-      await expect(status).toHaveText('客数クリアの結果を確認できないため、追加の保存を停止しました。');
-      await expect(input).toHaveValue('123');
-      expect(await page.evaluate(()=>combinedPreview.getStatus())).toEqual({state:'HELD',hasUnsavedInput:true});
-      const observer=await openStoreSwitchPeer(context);
-      try{expect(JSON.parse((await readStoreSwitchRecord(observer)).raw)).toEqual(expected);}
-      finally{await observer.close();}
-    }
-    expect(await page.evaluate(()=>localStorage.getItem('insight_v11'))).toBe(seed.raw);
+    await page.evaluate(outcome=>{window.confirm=()=>{
+      if(outcome==='changed confirmation')drafts.kyaku[0].客数=1234;
+      return true;
+    };},outcome);
+    const observer=await openStoreSwitchPeer(context);
+    try{
+      if(outcome==='conflict'){
+        await observer.evaluate(async peer=>{
+          const api=InsightIndexedDBStorageV1,record=await api.read();
+          record.snapshot.stores[peer].name='月次クリアより前に確定';
+          await api.save(record.revision,record.snapshot);
+        },seed.peer);
+        expected.stores[seed.peer].name='月次クリアより前に確定';
+      }
+      const interrupted=['readback failure','lost acknowledgement','tab close'].includes(outcome);
+      if(interrupted)await interruptCountReadback(page,outcome);
+      if(outcome==='quota')await page.evaluate(()=>{
+        const put=IDBObjectStore.prototype.put;
+        IDBObjectStore.prototype.put=function(){
+          IDBObjectStore.prototype.put=put;
+          throw new DOMException('Fictional quota error','QuotaExceededError');
+        };
+      });
+      await button.click();
+      const status=page.locator('#kyakuSaveBtn + [role=status]');
+      const applyClear=()=>expected.stores[seed.active].data[seed.year][seed.month].forEach(row=>{if(row)row.客数=0;});
+      if(outcome==='success'){
+        await expect(status).toHaveText('客数をクリアしました。');
+        applyClear();
+        await page.evaluate(()=>{window.confirm=()=>{throw new Error('Zero month unexpectedly requested confirmation');};});
+        await button.click();
+        expect(await page.evaluate(()=>combinedPreview.getStatus())).toEqual({state:'IDLE_OBSERVED',hasUnsavedInput:false});
+        expect(await committedInput(page)).toEqual({revision:1,snapshot:expected});
+      }else{
+        const closed=outcome==='tab close';
+        if(closed)await page.waitForFunction(()=>window.countReadbackPaused===true);
+        else await expect(status).toHaveText('客数クリアの結果を確認できないため、追加の保存を停止しました。');
+        await expect(input).toHaveValue('123');
+        expect(await page.evaluate(()=>combinedPreview.getStatus())).toEqual({state:closed?'ACTIVE':'HELD',hasUnsavedInput:true});
+        expect(await page.evaluate(()=>gotoNav(0))).toBe(false);
+        if(closed)await page.close();
+        if(interrupted){
+          await expect.poll(()=>observer.evaluate(async closed=>{
+            try{return await InsightIndexedDBStorageV1.diagnose({verifyInterrupted:true});}
+            catch(error){
+              if(closed&&error.message==='Another Insight operation is in progress')return null;
+              throw error;
+            }
+          },closed)).toMatchObject({state:'hold',observedRevision:1,recovery:'save-verified'});
+          applyClear();
+        }
+        const record=await readStoreSwitchRecord(observer);
+        expect(record.revision).toBe(interrupted||outcome==='conflict'?1:0);
+        expect(JSON.parse(record.raw)).toEqual(expected);
+        if(record.revision===1)expect(JSON.parse(record.previous.raw)).toEqual(JSON.parse(seed.raw));
+      }
+      expect(await observer.evaluate(()=>localStorage.getItem('insight_v11'))).toBe(seed.raw);
+    }finally{await observer.close();}
   });
+}
+
+const dailyClearScreens=[
+  {name:'quick',button:'quickClearBtn',save:'quickSaveBtn',input:'#qi_売上',failure:'readback failure'},
+  {name:'sales',nav:'nav2',button:'salesClearBtn',save:'salesSaveBtn',input:'#sf_売上',failure:'conflict'},
+  {name:'haiki',nav:'nav4',button:'haikiClearBtn',save:'haikiSaveBtn',failure:'quota'}
+];
+for(const screen of dailyClearScreens){
+  for(const outcome of ['success',screen.failure]){
+    test('combined daily clear preserves fields outside '+screen.name+' on '+outcome,async({page,context})=>{
+      const seed=await openQuickInputPreview(page,{followMonthlyInputs:true,seedCounts:true,seedHours:true,seedDailyClear:true});
+      if(screen.nav){
+        await page.locator('#'+screen.nav).click();
+        await page.evaluate(({type,iso})=>InsightInputDayNav.select(type,iso),{type:screen.name,iso:seed.iso});
+      }
+      const input=page.locator(screen.input??'#haikiForm [data-hc="'+seed.category+'"]');
+      await fillCombinedInput(input,'123');
+      const button=page.locator('#'+screen.button);
+      await page.evaluate(()=>{window.confirm=()=>false;});
+      await button.click();
+      await expect(input).toHaveValue('123');
+      const expected=JSON.parse(seed.raw);
+      expect(await committedInput(page)).toEqual({revision:0,snapshot:expected});
+      await page.evaluate(()=>{window.confirm=()=>true;});
+      const observer=await openStoreSwitchPeer(context);
+      try{
+        if(outcome==='conflict'){
+          await observer.evaluate(async id=>{
+            const api=InsightIndexedDBStorageV1,record=await api.read();
+            record.snapshot.stores[id].name='日次クリアより前に確定';
+            await api.save(record.revision,record.snapshot);
+          },seed.peer);
+          expected.stores[seed.peer].name='日次クリアより前に確定';
+        }
+        if(outcome==='quota')await page.evaluate(()=>{
+          const put=IDBObjectStore.prototype.put;
+          IDBObjectStore.prototype.put=function(){
+            IDBObjectStore.prototype.put=put;
+            throw new DOMException('Fictional quota error','QuotaExceededError');
+          };
+        });
+        if(outcome==='readback failure')await interruptCountReadback(page,outcome);
+        await button.click();
+        const status=page.locator('#'+screen.save+' + [role=status]');
+        if(outcome==='success'){
+          await expect(status).toHaveText(/クリアしました/);
+          await expect(input).toHaveValue('');
+          expect(await page.evaluate(()=>combinedPreview.getStatus())).toEqual({state:'IDLE_OBSERVED',hasUnsavedInput:false});
+        }else{
+          await expect(status).toHaveText(/追加の保存を停止しました/);
+          await expect(input).toHaveValue('123');
+          expect(await page.evaluate(()=>combinedPreview.getStatus())).toEqual({state:'HELD',hasUnsavedInput:true});
+          expect(await page.evaluate(async()=>[
+            await clearTodayData(),await clearDayData('sales'),await clearDayData('haiki'),await clearKyakuMonth()
+          ])).toEqual([false,false,false,false]);
+        }
+        if(outcome==='success'||outcome==='readback failure'){
+          const row=expected.stores[seed.active].data[seed.year][seed.month][seed.day-1];
+          if(screen.name!=='haiki')Object.assign(row,{売上:0,買上点数:0});
+          if(screen.name!=='sales'){
+            row.廃棄金額=0;
+            for(const category of Object.keys(row.haiki))row.haiki[category]=0;
+          }
+          if(screen.name==='quick'){
+            row.客数=0;
+            delete row.storeMemo;
+          }
+        }
+        const record=await readStoreSwitchRecord(observer);
+        expect(record.revision).toBe(outcome==='quota'?0:1);
+        expect(JSON.parse(record.raw)).toEqual(expected);
+        if(record.revision===1)expect(JSON.parse(record.previous.raw)).toEqual(JSON.parse(seed.raw));
+        expect(await observer.evaluate(()=>localStorage.getItem('insight_v11'))).toBe(seed.raw);
+      }finally{await observer.close();}
+    });
+  }
 }
 
 test('manual adoption uses the real encrypted backup confirmation and preserves the legacy source',async({page})=>{
@@ -3104,7 +3215,7 @@ for(const failure of ['readback abort','acknowledgement lost','tab closed during
   });
 }
 
-async function openQuickInputPreview(page,{sameMunicipality=true,followMonthlyInputs=false,seedCounts=false,seedHours=false}={}){
+async function openQuickInputPreview(page,{sameMunicipality=true,followMonthlyInputs=false,seedCounts=false,seedHours=false,seedDailyClear=false}={}){
   await routeMigrationPage(page);
   await page.goto('/Index.html');
   await waitForMigrationChecks(page);
@@ -3114,7 +3225,7 @@ async function openQuickInputPreview(page,{sameMunicipality=true,followMonthlyIn
     await page.waitForFunction(()=>typeof InsightHourlyCustomers?.connectIndexedDBPreview==='function');
     await page.addScriptTag({url:'/insight_indexeddb_sales_input_preview_v1.js'});
   }
-  return page.evaluate(async ({sameMunicipality,followMonthlyInputs,seedCounts,seedHours})=>{
+  return page.evaluate(async ({sameMunicipality,followMonthlyInputs,seedCounts,seedHours,seedDailyClear})=>{
     const year=String(Number(todayFY().fy)-1),month='6月',day=12;
     const iso=year+'-06-12',active=allStores.current,peer='fictional-quick-peer';
     store.data[year]=blankYearData(year);
@@ -3149,6 +3260,14 @@ async function openQuickInputPreview(page,{sameMunicipality=true,followMonthlyIn
       }
       second.salesCounts[iso]={[countCategory.id]:count};
     }
+    if(seedDailyClear){
+      const values={廃棄金額:14,haiki:{...blankHaiki(),[HAIKI_CATS[0]]:14}};
+      Object.assign(row,values);
+      Object.assign(store.data[year][month][day-2],values);
+      Object.assign(second.data[year][month][day-1],values);
+      Object.assign(store.data[todayFY().fy][month][day-1],values);
+      store.hourlyCustomers[iso]=Array(24).fill(12);
+    }
     renderStoreSel();
     InsightDateContext.setSelectedDate(InsightDateContext.parseIso(iso));
     renderQuickNav();
@@ -3162,7 +3281,7 @@ async function openQuickInputPreview(page,{sameMunicipality=true,followMonthlyIn
       });
     }else window.quickPreview=await InsightIndexedDBQuickInputPreviewV1.connect();
     return {year,month,day,iso,active,peer,raw,category:HAIKI_CATS[0],countCategory:countCategory.id,otherCategory:otherCategory.id};
-  },{sameMunicipality,followMonthlyInputs,seedCounts,seedHours});
+  },{sameMunicipality,followMonthlyInputs,seedCounts,seedHours,seedDailyClear});
 }
 
 async function editQuickInput(page,category){
