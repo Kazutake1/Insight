@@ -2570,6 +2570,133 @@ window.addEventListener('storage',function(event){
 
 const activeCSVReaders=new Set();
 function hasPendingCSVImport(){return activeCSVReaders.size>0;}
+function parseInsightCSV(text,strict=false){
+  const lines=text.split('\n').map(l=>l.trim()).filter(l=>l);
+  if(lines.length<2)throw new Error('データがありません');
+
+  // ヘッダー行を確認
+  const header=lines[0].split(',').map(h=>h.trim());
+  const dateIdx=header.findIndex(h=>h.includes('日付')||h.toLowerCase()==='date');
+  const salesIdx=header.findIndex(h=>h.includes('売上')&&!h.includes('廃棄'));
+  const kyakuIdx=header.findIndex(h=>h.includes('客数'));
+  const tensuIdx=header.findIndex(h=>h.includes('買上')||h.includes('点数'));
+  const haikiTotalIdx=header.findIndex(h=>h.includes('廃棄金額')||h.includes('廃棄合計'));
+  // 廃棄カテゴリ列のインデックス（サブカテゴリのエイリアスも対応）
+  const haikiCatIdx={};
+  const haikiAliases={
+    'FF':['FF','FFおでん','FFフライヤー','FFフライヤーその他'],
+    'その他デイリー':['その他デイリー','牛乳','乳飲料','牛乳・乳飲料','生活デイリー'],
+  };
+  HAIKI_CATS.forEach(c=>{
+    const aliases=haikiAliases[c]||[c];
+    const idx=header.findIndex(h=>aliases.some(a=>h===a||h.includes(a)));
+    if(idx>=0)haikiCatIdx[c]=idx;
+  });
+  // サブカテゴリが複数列ある場合（FFおでん列とFFフライヤー列が別々など）
+  const haikiSubCols={};
+  header.forEach((h,i)=>{
+    if(h.includes('FFおでん')||h.includes('FFフライヤー'))
+      (haikiSubCols['FF']=haikiSubCols['FF']||[]).push(i);
+    if(h.includes('牛乳')||h.includes('乳飲料')||h.includes('生活デイリー'))
+      (haikiSubCols['その他デイリー']=haikiSubCols['その他デイリー']||[]).push(i);
+  });
+  if(dateIdx<0)throw new Error('「日付」列が見つかりません');
+  if(strict&&[salesIdx,kyakuIdx,tensuIdx,haikiTotalIdx,...Object.values(haikiCatIdx)].every(i=>i<0))
+    throw new Error('取り込み対象の列が見つかりません');
+
+  function valueAt(cols,index,decimal=false){
+    if(index<0)return null;
+    const value=String(cols[index]??'').replace(/,/g,'');
+    if(!strict)return (decimal?parseFloat(value):parseInt(value))||0;
+    if(!value)return 0;
+    const shape=decimal?/^[+-]?(?:\d+(?:\.\d*)?|\.\d+)$/:/^[+-]?\d+$/;
+    const numeric=Number(value);
+    if(!shape.test(value)||!(decimal?Number.isFinite(numeric):Number.isSafeInteger(numeric)))
+      throw new Error('取り込めない数値があります');
+    return numeric;
+  }
+
+  // データ行を解析
+  const rows=[];
+  let skipped=0;
+  for(let i=1;i<lines.length;i++){
+    const cols=lines[i].split(',').map(c=>c.trim());
+    if(strict&&(cols.length!==header.length||lines[i].includes('"')))
+      throw new Error('列数が見出しと一致しないか、対応していない引用符があります');
+    const dateStr=cols[dateIdx]||'';
+    const m=dateStr.match(/(\d{4})[-\/](\d{1,2})[-\/](\d{1,2})/);
+    if(!m){skipped++;continue;}
+    const year=m[1],month=parseInt(m[2]),day=parseInt(m[3]);
+    const mName=MONTHS[month-1];
+    if(!mName||(strict&&(!/^\d{4}[-\/]\d{1,2}[-\/]\d{1,2}$/.test(dateStr)||
+      Number(year)<1000||day<1||day>new Date(Number(year),month,0).getDate()))){skipped++;continue;}
+    // 廃棄カテゴリ（サブカテゴリは合算）
+    const haiki={};
+    HAIKI_CATS.forEach(c=>{
+      let val=0;
+      if(haikiSubCols[c]&&haikiSubCols[c].length>1){
+        // 複数のサブカテゴリ列を合算
+        haikiSubCols[c].forEach(i=>{val+=valueAt(cols,i);});
+      }else if(haikiCatIdx[c]!==undefined){
+        val=valueAt(cols,haikiCatIdx[c]);
+      }
+      if(strict&&!Number.isSafeInteger(val))throw new Error('廃棄の内訳が範囲を超えています');
+      if(val>0)haiki[c]=val;
+    });
+    const row={
+      year,mName,day,
+      sales:valueAt(cols,salesIdx),
+      kyaku:valueAt(cols,kyakuIdx),
+      tensu:valueAt(cols,tensuIdx,true),
+      haikiTotal:valueAt(cols,haikiTotalIdx),
+      haiki:Object.keys(haiki).length>0?haiki:null,
+    };
+    if(strict&&!row.haiki&&![row.sales,row.kyaku,row.tensu,row.haikiTotal].some(value=>value>0)){
+      skipped++;
+      continue;
+    }
+    rows.push(row);
+  }
+  if(rows.length===0)throw new Error('有効なデータ行がありません');
+  const years=[...new Set(rows.map(r=>r.year))].sort();
+  return {rows,skipped,years,hasHaiki:rows.some(r=>r.haiki||r.haikiTotal>0)};
+}
+
+function applyInsightCSV(target,{rows,years},prepareYear){
+  // 年度が存在しない場合は作成
+  years.forEach(y=>{
+    if(prepareYear){
+      prepareYear(y);
+    }else if(!target.years.includes(y)){
+      target.years.push(y);target.years.sort();
+      target.data[y]=blankYearData(y);
+    }
+  });
+
+  // データを書き込む
+  let imported=0;
+  rows.forEach(({year,mName,day,sales,kyaku,tensu,haikiTotal,haiki})=>{
+    if(!target.data[year])target.data[year]=blankYearData(year);
+    if(!target.data[year][mName])return;
+    const ri=day-1;
+    if(ri<0||ri>=target.data[year][mName].length)return;
+    const row=target.data[year][mName][ri];
+    if(sales!==null&&sales>0)row.売上=sales;
+    if(kyaku!==null&&kyaku>0)row.客数=kyaku;
+    if(tensu!==null&&tensu>0)row.買上点数=tensu;
+    if(haikiTotal!==null&&haikiTotal>0)row.廃棄金額=haikiTotal;
+    if(haiki){
+      if(!row.haiki)row.haiki=blankHaiki();
+      HAIKI_CATS.forEach(c=>{if(haiki[c]>0)row.haiki[c]=haiki[c];});
+      // 廃棄合計を自動計算
+      row.廃棄金額=HAIKI_CATS.reduce((s,c)=>s+(row.haiki[c]||0),0);
+      if(prepareYear&&!Number.isSafeInteger(row.廃棄金額))throw new Error('廃棄金額が範囲を超えています');
+    }
+    imported++;
+  });
+  return imported;
+}
+
 function importCSV(e){
   const file=e.target.files[0];
   if(!file){return;}
@@ -2578,107 +2705,13 @@ function importCSV(e){
   reader.onloadend=()=>activeCSVReaders.delete(reader);
   reader.onload=ev=>{
     try{
-      const lines=ev.target.result.split('\n').map(l=>l.trim()).filter(l=>l);
-      if(lines.length<2)throw new Error('データがありません');
-
-      // ヘッダー行を確認
-      const header=lines[0].split(',').map(h=>h.trim());
-      const dateIdx=header.findIndex(h=>h.includes('日付')||h.toLowerCase()==='date');
-      const salesIdx=header.findIndex(h=>h.includes('売上')&&!h.includes('廃棄'));
-      const kyakuIdx=header.findIndex(h=>h.includes('客数'));
-      const tensuIdx=header.findIndex(h=>h.includes('買上')||h.includes('点数'));
-      const haikiTotalIdx=header.findIndex(h=>h.includes('廃棄金額')||h.includes('廃棄合計'));
-      // 廃棄カテゴリ列のインデックス（サブカテゴリのエイリアスも対応）
-      const haikiCatIdx={};
-      const haikiAliases={
-        'FF':['FF','FFおでん','FFフライヤー','FFフライヤーその他'],
-        'その他デイリー':['その他デイリー','牛乳','乳飲料','牛乳・乳飲料','生活デイリー'],
-      };
-      HAIKI_CATS.forEach(c=>{
-        const aliases=haikiAliases[c]||[c];
-        const idx=header.findIndex(h=>aliases.some(a=>h===a||h.includes(a)));
-        if(idx>=0)haikiCatIdx[c]=idx;
-      });
-      // サブカテゴリが複数列ある場合（FFおでん列とFFフライヤー列が別々など）
-      const haikiSubCols={};
-      header.forEach((h,i)=>{
-        if(h.includes('FFおでん')||h.includes('FFフライヤー'))
-          (haikiSubCols['FF']=haikiSubCols['FF']||[]).push(i);
-        if(h.includes('牛乳')||h.includes('乳飲料')||h.includes('生活デイリー'))
-          (haikiSubCols['その他デイリー']=haikiSubCols['その他デイリー']||[]).push(i);
-      });
-      if(dateIdx<0)throw new Error('「日付」列が見つかりません');
-
-      // データ行を解析
-      const rows=[];
-      let skipped=0;
-      for(let i=1;i<lines.length;i++){
-        const cols=lines[i].split(',').map(c=>c.trim());
-        const dateStr=cols[dateIdx]||'';
-        const m=dateStr.match(/(\d{4})[-\/](\d{1,2})[-\/](\d{1,2})/);
-        if(!m){skipped++;continue;}
-        const year=m[1],month=parseInt(m[2]),day=parseInt(m[3]);
-        const mName=MONTHS[month-1];
-        if(!mName){skipped++;continue;}
-        // 廃棄カテゴリ（サブカテゴリは合算）
-        const haiki={};
-        HAIKI_CATS.forEach(c=>{
-          let val=0;
-          if(haikiSubCols[c]&&haikiSubCols[c].length>1){
-            // 複数のサブカテゴリ列を合算
-            haikiSubCols[c].forEach(i=>{val+=parseInt(String(cols[i]||'0').replace(/,/g,''))||0;});
-          }else if(haikiCatIdx[c]!==undefined){
-            val=parseInt(String(cols[haikiCatIdx[c]]||'0').replace(/,/g,''))||0;
-          }
-          if(val>0)haiki[c]=val;
-        });
-        rows.push({
-          year,mName,day,
-          sales:salesIdx>=0?parseInt(String(cols[salesIdx]).replace(/,/g,''))||0:null,
-          kyaku:kyakuIdx>=0?parseInt(String(cols[kyakuIdx]).replace(/,/g,''))||0:null,
-          tensu:tensuIdx>=0?parseFloat(String(cols[tensuIdx]).replace(/,/g,''))||0:null,
-          haikiTotal:haikiTotalIdx>=0?parseInt(String(cols[haikiTotalIdx]).replace(/,/g,''))||0:null,
-          haiki:Object.keys(haiki).length>0?haiki:null,
-        });
-      }
-      if(rows.length===0)throw new Error('有効なデータ行がありません');
-
-      // 確認ダイアログ
-      const years=[...new Set(rows.map(r=>r.year))].sort();
-      const hasHaiki=rows.some(r=>r.haiki||r.haikiTotal>0);
+      const parsed=parseInsightCSV(ev.target.result);
+      const {rows,years,hasHaiki,skipped}=parsed;
       if(!confirm(`${file.name}\n\n${rows.length}件のデータを取り込みます。\n対象年度: ${years.join(', ')}\n含むデータ: 売上・客数・買上点数${hasHaiki?'・廃棄':''}\n\n既存データは上書きされます。よろしいですか？`)){
         e.target.value='';return;
       }
 
-      // 年度が存在しない場合は作成
-      years.forEach(y=>{
-        if(!store.years.includes(y)){
-          store.years.push(y);store.years.sort();
-          store.data[y]=blankYearData(y);
-        }
-      });
-
-      // データを書き込む
-      let imported=0;
-      rows.forEach(({year,mName,day,sales,kyaku,tensu,haikiTotal,haiki})=>{
-        if(!store.data[year])store.data[year]=blankYearData(year);
-        if(!store.data[year][mName])return;
-        const ri=day-1;
-        if(ri<0||ri>=store.data[year][mName].length)return;
-        const row=store.data[year][mName][ri];
-        if(sales!==null&&sales>0)row.売上=sales;
-        if(kyaku!==null&&kyaku>0)row.客数=kyaku;
-        if(tensu!==null&&tensu>0)row.買上点数=tensu;
-        if(haikiTotal!==null&&haikiTotal>0)row.廃棄金額=haikiTotal;
-        if(haiki){
-          if(!row.haiki)row.haiki=blankHaiki();
-          HAIKI_CATS.forEach(c=>{if(haiki[c]>0)row.haiki[c]=haiki[c];});
-          // 廃棄合計を自動計算
-          row.廃棄金額=HAIKI_CATS.reduce((s,c)=>s+(row.haiki[c]||0),0);
-        }
-        imported++;
-      });
-
+      const imported=applyInsightCSV(store,parsed);
       persist();
       baseYear=store.years[store.years.length-1];
       editYear={sales:baseYear,kyaku:baseYear,haiki:baseYear};

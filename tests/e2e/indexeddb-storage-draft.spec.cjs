@@ -1483,6 +1483,115 @@ for(const [operation,failure] of [
   });
 }
 
+function csvFixture(text){
+  return {name:'fictional-insight.csv',mimeType:'text/csv',buffer:Buffer.from(text)};
+}
+
+test('CSV preview confirms the store, years and duplicates before a single commit',async({page})=>{
+  const seed=await openQuickInputPreview(page,{followMonthlyInputs:true,manageStoresAndYears:true,seedCSV:true});
+  await page.locator('#navSettings').click();
+  const oldYear=String(Number(seed.year)-2);
+  const file=csvFixture('日付,売上,客数,買上点数,FFおでん,FFフライヤー\n'+
+    seed.iso+',170,22,3.25,100,200\n'+seed.iso+',180,0,,,\n'+
+    oldYear+'-01-02,90,0,,,\n'+oldYear+'-02-30,999,0,,,');
+  await page.evaluate(()=>{window.csvPrompts=[];window.allowCsv=false;window.confirm=message=>{
+    csvPrompts.push(message);
+    return allowCsv;
+  };});
+  const status=page.locator('#insightCSVImportStatus');
+  const input=page.locator('#csvImportFile');
+  const [chooser]=await Promise.all([page.waitForEvent('filechooser'),page.locator('#csvImportBtn').click()]);
+  await chooser.setFiles(file);
+  await expect(status).toHaveText('CSV取り込みをキャンセルしました。');
+  const expected=JSON.parse(seed.raw);
+  expect(await committedInput(page)).toEqual({revision:0,snapshot:expected});
+  expect(await page.evaluate(()=>csvPrompts[0])).toContain('取込先: '+expected.stores[seed.active].name);
+  expect(await page.evaluate(()=>csvPrompts[0])).toContain('対象年度: '+oldYear+', '+seed.year);
+  expect(await page.evaluate(()=>csvPrompts[0])).toContain('同じ日付の行: 1件');
+  expect(await page.evaluate(()=>csvPrompts[0])).toContain('対象外の行: 1件');
+  await page.evaluate(()=>{window.allowCsv=true;});
+  await input.setInputFiles(file);
+  await expect(status).toHaveText('保存しました。');
+  const shop=expected.stores[seed.active];
+  const row=shop.data[seed.year][seed.month][seed.day-1];
+  Object.assign(row,{売上:180,客数:22,買上点数:3.25,廃棄金額:300});
+  row.haiki.FF=300;
+  shop.years=[...shop.years,oldYear].sort();
+  const oldRow=shop.data[oldYear]['1月'][0];
+  shop.data[oldYear]=await page.evaluate(year=>blankYearData(year),oldYear);
+  shop.data[oldYear]['1月'][0]=oldRow;
+  shop.data[oldYear]['1月'][1].売上=90;
+  expect(await committedInput(page)).toEqual({revision:1,snapshot:expected});
+  await input.setInputFiles(file);
+  await expect(status).toHaveText('取り込む変更がありません。');
+  expect(await committedInput(page)).toEqual({revision:1,snapshot:expected});
+  await expect(input).toHaveValue('');
+  expect(await page.evaluate(()=>localStorage.getItem('insight_v11'))).toBe(seed.raw);
+});
+
+test('CSV preview rejects malformed numbers without changing the stored revision',async({page})=>{
+  const seed=await openQuickInputPreview(page,{followMonthlyInputs:true,manageStoresAndYears:true});
+  await page.locator('#navSettings').click();
+  await page.locator('#csvImportFile').setInputFiles(csvFixture('日付,売上\n'+seed.iso+',123abc'));
+  await expect(page.locator('#insightCSVImportStatus')).toHaveText(/取り込めない数値/);
+  expect(await committedInput(page)).toEqual({revision:0,snapshot:JSON.parse(seed.raw)});
+  expect(await page.evaluate(()=>combinedPreview.getStatus().state)).toBe('IDLE_OBSERVED');
+});
+
+for(const fault of ['changed store while reading','conflict','quota','readback failure']){
+  test('CSV preview protects the original snapshot on '+fault,async({page,context})=>{
+    const seed=await openQuickInputPreview(page,{followMonthlyInputs:true,manageStoresAndYears:true});
+    await page.locator('#navSettings').click();
+    const observer=await openStoreSwitchPeer(context);
+    const expected=JSON.parse(seed.raw);
+    try{
+      await page.evaluate(fault=>{
+        window.csvConfirmations=0;
+        window.confirm=()=>{csvConfirmations++;return true;};
+        if(fault==='changed store while reading'){
+          const text=File.prototype.text;
+          File.prototype.text=function(){
+            return new Promise(resolve=>{window.resumeCsvRead=()=>resolve(text.call(this));});
+          };
+        }else if(fault==='quota'){
+          const put=IDBObjectStore.prototype.put;
+          IDBObjectStore.prototype.put=function(){
+            IDBObjectStore.prototype.put=put;
+            throw new DOMException('Fictional CSV quota error','QuotaExceededError');
+          };
+        }
+      },fault);
+      if(fault==='conflict'){
+        await observer.evaluate(async id=>{
+          const api=InsightIndexedDBStorageV1,record=await api.read();
+          record.snapshot.stores[id].name='別タブで保存';
+          await api.save(record.revision,record.snapshot);
+        },seed.peer);
+        expected.stores[seed.peer].name='別タブで保存';
+      }
+      if(fault==='readback failure')await interruptCountReadback(page,fault);
+      await page.locator('#csvImportFile').setInputFiles(csvFixture('日付,売上\n'+seed.iso+',180'));
+      if(fault==='changed store while reading'){
+        await page.waitForFunction(()=>typeof window.resumeCsvRead==='function');
+        expect(await page.evaluate(async()=>({
+          state:combinedPreview.getStatus().state,nav:gotoNav(0),switched:await switchStore('nonexistent')
+        }))).toEqual({state:'ACTIVE',nav:false,switched:false});
+        await page.evaluate(id=>{allStores.current=id;resumeCsvRead();},seed.peer);
+      }
+      await expect(page.locator('#insightCSVImportStatus')).toContainText('追加の保存を停止しました');
+      expect(await page.evaluate(()=>combinedPreview.getStatus().state)).toBe('HELD');
+      if(fault==='changed store while reading')expect(await page.evaluate(()=>csvConfirmations)).toBe(0);
+      if(fault==='readback failure')expected.stores[seed.active].data[seed.year][seed.month][seed.day-1].売上=180;
+      const record=await readStoreSwitchRecord(observer);
+      const wrote=fault==='conflict'||fault==='readback failure';
+      expect(record.revision).toBe(wrote?1:0);
+      expect(JSON.parse(record.raw)).toEqual(expected);
+      if(wrote)expect(record.previous.raw).toBe(seed.raw);
+      expect(await observer.evaluate(()=>localStorage.getItem('insight_v11'))).toBe(seed.raw);
+    }finally{await observer.close();}
+  });
+}
+
 test('manual adoption uses the real encrypted backup confirmation and preserves the legacy source',async({page})=>{
   await routeMigrationPage(page);
   async function open(){
@@ -3547,7 +3656,7 @@ for(const failure of ['readback abort','acknowledgement lost','tab closed during
 }
 
 async function openQuickInputPreview(page,{sameMunicipality=true,followMonthlyInputs=false,seedCounts=false,
-  seedHours=false,seedDailyClear=false,seedYearBoundary=false,seedManagement=false,manageStoresAndYears=false}={}){
+  seedHours=false,seedDailyClear=false,seedYearBoundary=false,seedManagement=false,manageStoresAndYears=false,seedCSV=false}={}){
   await routeMigrationPage(page);
   await page.goto('/Index.html');
   await waitForMigrationChecks(page);
@@ -3558,7 +3667,7 @@ async function openQuickInputPreview(page,{sameMunicipality=true,followMonthlyIn
     if(manageStoresAndYears)await page.waitForSelector('#insightSettingsYearSection',{state:'attached'});
     await page.addScriptTag({url:'/insight_indexeddb_sales_input_preview_v1.js'});
   }
-  return page.evaluate(async ({sameMunicipality,followMonthlyInputs,seedCounts,seedHours,seedDailyClear,seedYearBoundary,seedManagement,manageStoresAndYears})=>{
+  return page.evaluate(async ({sameMunicipality,followMonthlyInputs,seedCounts,seedHours,seedDailyClear,seedYearBoundary,seedManagement,manageStoresAndYears,seedCSV})=>{
     const year=String(Number(todayFY().fy)-1),month='6月',day=12;
     const iso=year+'-06-12',active=allStores.current,peer='fictional-quick-peer';
     store.data[year]=blankYearData(year);
@@ -3614,6 +3723,9 @@ async function openQuickInputPreview(page,{sameMunicipality=true,followMonthlyIn
       store.events=[{id:'fictional-management-event',type:'nearby',scope:'store',startDate:iso,endDate:iso,
         snapshot:{version:1,title:'架空の催事',location:'架空の会場'}}];
     }
+    if(seedCSV){
+      store.data[String(Number(year)-2)]={'1月':[{...blankRow(1),売上:55,storeMemo:'架空の既存実績'}]};
+    }
     renderStoreSel();
     InsightDateContext.setSelectedDate(InsightDateContext.parseIso(iso));
     renderQuickNav();
@@ -3627,7 +3739,7 @@ async function openQuickInputPreview(page,{sameMunicipality=true,followMonthlyIn
       });
     }else window.quickPreview=await InsightIndexedDBQuickInputPreviewV1.connect();
     return {year,month,day,iso,active,peer,raw,category:HAIKI_CATS[0],countCategory:countCategory.id,otherCategory:otherCategory.id};
-  },{sameMunicipality,followMonthlyInputs,seedCounts,seedHours,seedDailyClear,seedYearBoundary,seedManagement,manageStoresAndYears});
+  },{sameMunicipality,followMonthlyInputs,seedCounts,seedHours,seedDailyClear,seedYearBoundary,seedManagement,manageStoresAndYears,seedCSV});
 }
 
 async function editQuickInput(page,category){

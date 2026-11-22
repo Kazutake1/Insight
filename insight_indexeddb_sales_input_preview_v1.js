@@ -359,7 +359,7 @@
         const yearOverlay=yearDialog();
         if(management&&(yearOverlay||currentNav==='settings')){
           if(!blocked()&&(yearOverlay?yearOverlay.contains(event.target):
-            event.target.closest?.(yearControl+','+storeControl+','+storeActionControl)))return;
+            event.target.closest?.(yearControl+','+storeControl+','+storeActionControl+',#csvImportBtn,#csvImportFile')))return;
           event.preventDefault();
           event.stopImmediatePropagation();
           return;
@@ -547,7 +547,7 @@
         try{
           if(!unchanged())throw new Error('Management target changed before confirmation');
           const candidate=structuredClone(baseline.snapshot);
-          const action=create(candidate);
+          const action=await create(candidate,unchanged);
           if(!action)return false;
           if(!unchanged())throw new Error('Management target changed during confirmation');
           message.textContent='保存を確認しています。';
@@ -629,6 +629,67 @@
       }
 
       if(management){
+        const csvField=doc.getElementById('csvImportFile');
+        const csvStatus=doc.createElement('p');
+        csvStatus.id='insightCSVImportStatus';
+        csvStatus.setAttribute('role','status');
+        csvField.after(csvStatus);
+        root.importCSV=async event=>{
+          const file=csvField.files?.[0];
+          if(event.target!==csvField||!file||blocked()||currentNav!=='settings'||yearDialog())return false;
+          csvStatus.textContent='CSVを読み込んでいます。';
+          try{
+            return await runManagement(managementScope(),async(candidate,unchanged)=>{
+              let parsed,imported;
+              const shop=candidate.stores[candidate.current];
+              try{
+                parsed=parseInsightCSV(await file.text(),true);
+                imported=applyInsightCSV(shop,parsed,year=>{
+                  if(!root.InsightYearManager.isRegistered(shop,year)){
+                    const existing=shop.data?.[year];
+                    const template=blankYearData(year);
+                    if(existing&&(!Object.keys(template).every(month=>{
+                      if(!Object.hasOwn(existing,month))return true;
+                      const rows=existing[month];
+                      return Array.isArray(rows)&&rows.length<=template[month].length&&
+                        rows.every((row,index)=>row===null||Number(row?.d)===index+1);
+                    })))throw new Error(year+'年度の既存データを安全に補完できません');
+                    root.InsightYearManager.promote(candidate,candidate.current,year,blankYearData);
+                  }
+                  if(parsed.rows.some(row=>row.year===year&&Number(shop.data?.[year]?.[row.mName]?.[row.day-1]?.d)!==row.day))
+                    throw new Error(year+'年度の既存データで対象の日付を確認できません');
+                });
+              }catch(error){
+                if(!unchanged())throw error;
+                csvStatus.textContent='CSVを取り込めませんでした。'+error.message;
+                return false;
+              }
+              if(!unchanged())throw new Error('CSV target changed while reading');
+              if(root.InsightStorage.serialize(candidate)===root.InsightStorage.serialize(state.committed.snapshot)){
+                csvStatus.textContent='取り込む変更がありません。';
+                return false;
+              }
+              const dates=new Set(parsed.rows.map(row=>[row.year,row.mName,row.day].join('-')));
+              const duplicates=parsed.rows.length-dates.size;
+              const notes=(parsed.skipped?'\n対象外の行: '+parsed.skipped+'件':'')+
+                (duplicates?'\n同じ日付の行: '+duplicates+'件（同じ項目は後の行を優先）':'');
+              if(!root.confirm(file.name+'\n\n取込先: '+shop.name+'\n対象年度: '+parsed.years.join(', ')+
+                '\n取込対象: '+imported+'行'+notes+'\n\n対象日付の既存データは上書きされます。よろしいですか？')){
+                csvStatus.textContent='CSV取り込みをキャンセルしました。';
+                return false;
+              }
+              return true;
+            },()=>{
+              baseYear=store.years[store.years.length-1];
+              editYear={sales:baseYear,kyaku:baseYear,haiki:baseYear};
+              for(const attachment of attachments.values())attachment.target=null;
+              renderYearPills();
+              updateMissingBadge();
+            },csvStatus,()=>csvField.files?.[0]===file);
+          }finally{
+            if(csvField.files?.[0]===file)csvField.value='';
+          }
+        };
         const yearStatus=doc.createElement('p');
         yearStatus.setAttribute('role','status');
         yearSection.append(yearStatus);
