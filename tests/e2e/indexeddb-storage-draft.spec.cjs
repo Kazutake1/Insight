@@ -1077,12 +1077,15 @@ for(const outcome of ['success','quota','conflict','readback failure','lost ackn
 }
 
 const dailyClearScreens=[
-  {name:'quick',button:'quickClearBtn',save:'quickSaveBtn',input:'#qi_売上',failure:'readback failure'},
-  {name:'sales',nav:'nav2',button:'salesClearBtn',save:'salesSaveBtn',input:'#sf_売上',failure:'conflict'},
-  {name:'haiki',nav:'nav4',button:'haikiClearBtn',save:'haikiSaveBtn',failure:'quota'}
+  {name:'quick',button:'quickClearBtn',save:'quickSaveBtn',input:'#qi_売上',
+    outcomes:['success','readback failure','conflict','quota','lost acknowledgement','date changed in confirmation','draft changed in confirmation']},
+  {name:'sales',nav:'nav2',button:'salesClearBtn',save:'salesSaveBtn',input:'#sf_売上',
+    outcomes:['success','conflict','readback failure','period changed in confirmation']},
+  {name:'haiki',nav:'nav4',button:'haikiClearBtn',save:'haikiSaveBtn',
+    outcomes:['success','quota','tab close','store changed after write']}
 ];
 for(const screen of dailyClearScreens){
-  for(const outcome of ['success',screen.failure]){
+  for(const outcome of screen.outcomes){
     test('combined daily clear preserves fields outside '+screen.name+' on '+outcome,async({page,context})=>{
       const seed=await openQuickInputPreview(page,{followMonthlyInputs:true,seedCounts:true,seedHours:true,seedDailyClear:true});
       if(screen.nav){
@@ -1097,7 +1100,19 @@ for(const screen of dailyClearScreens){
       await expect(input).toHaveValue('123');
       const expected=JSON.parse(seed.raw);
       expect(await committedInput(page)).toEqual({revision:0,snapshot:expected});
-      await page.evaluate(()=>{window.confirm=()=>true;});
+      const interrupted=['readback failure','lost acknowledgement','tab close'].includes(outcome);
+      const changedAfterWrite=outcome==='store changed after write';
+      const changedDuringConfirmation=outcome.endsWith('in confirmation');
+      await page.evaluate(outcome=>{window.confirm=()=>{
+        if(outcome==='date changed in confirmation'){
+          document.getElementById('iqdDateInput').value='2020-06-11';
+        }else if(outcome==='draft changed in confirmation'){
+          document.getElementById('qi_売上').value='124';
+        }else if(outcome==='period changed in confirmation'){
+          editMonth.sales='5月';
+        }
+        return true;
+      };},outcome);
       const observer=await openStoreSwitchPeer(context);
       try{
         if(outcome==='conflict'){
@@ -1115,22 +1130,47 @@ for(const screen of dailyClearScreens){
             throw new DOMException('Fictional quota error','QuotaExceededError');
           };
         });
-        if(outcome==='readback failure')await interruptCountReadback(page,outcome);
+        if(interrupted)await interruptCountReadback(page,outcome);
+        if(changedAfterWrite)await page.evaluate(peer=>{
+          const write=InsightStorage.writeMetadata;
+          InsightStorage.writeMetadata=(key,value)=>{
+            const result=write(key,value);
+            if(key==='insight_indexeddb_adoption_v1'&&JSON.parse(value).state==='active'){
+              allStores.current=peer;
+            }
+            return result;
+          };
+        },seed.peer);
         await button.click();
         const status=page.locator('#'+screen.save+' + [role=status]');
         if(outcome==='success'){
           await expect(status).toHaveText(/クリアしました/);
           await expect(input).toHaveValue('');
           expect(await page.evaluate(()=>combinedPreview.getStatus())).toEqual({state:'IDLE_OBSERVED',hasUnsavedInput:false});
+          const nextScreen=screen.nav?'nav0':'nav2';
+          await page.locator('#'+nextScreen).click();
+          await page.locator('#'+(screen.nav??'nav0')).click();
+          if(screen.nav)await page.evaluate(({type,iso})=>InsightInputDayNav.select(type,iso),{type:screen.name,iso:seed.iso});
+          await expect(input).toHaveValue('');
         }else{
-          await expect(status).toHaveText(/追加の保存を停止しました/);
-          await expect(input).toHaveValue('123');
-          expect(await page.evaluate(()=>combinedPreview.getStatus())).toEqual({state:'HELD',hasUnsavedInput:true});
+          const closed=outcome==='tab close';
+          if(closed)await page.waitForFunction(()=>window.countReadbackPaused===true);
+          else await expect(status).toHaveText(/追加の保存を停止しました/);
+          await expect(input).toHaveValue(outcome==='draft changed in confirmation'?'124':'123');
+          expect(await page.evaluate(()=>combinedPreview.getStatus())).toEqual({state:closed?'ACTIVE':'HELD',hasUnsavedInput:true});
           expect(await page.evaluate(async()=>[
             await clearTodayData(),await clearDayData('sales'),await clearDayData('haiki'),await clearKyakuMonth()
           ])).toEqual([false,false,false,false]);
+          if(closed)await page.close();
+          if(interrupted)await expect.poll(()=>observer.evaluate(async closed=>{
+            try{return await InsightIndexedDBStorageV1.diagnose({verifyInterrupted:true});}
+            catch(error){
+              if(closed&&error.message==='Another Insight operation is in progress')return null;
+              throw error;
+            }
+          },closed)).toMatchObject({state:'hold',observedRevision:1,recovery:'save-verified'});
         }
-        if(outcome==='success'||outcome==='readback failure'){
+        if(outcome==='success'||interrupted||changedAfterWrite){
           const row=expected.stores[seed.active].data[seed.year][seed.month][seed.day-1];
           if(screen.name!=='haiki')Object.assign(row,{売上:0,買上点数:0});
           if(screen.name!=='sales'){
@@ -1143,9 +1183,104 @@ for(const screen of dailyClearScreens){
           }
         }
         const record=await readStoreSwitchRecord(observer);
-        expect(record.revision).toBe(outcome==='quota'?0:1);
+        expect(record.revision).toBe(outcome==='quota'||changedDuringConfirmation?0:1);
         expect(JSON.parse(record.raw)).toEqual(expected);
         if(record.revision===1)expect(JSON.parse(record.previous.raw)).toEqual(JSON.parse(seed.raw));
+        expect(await observer.evaluate(()=>localStorage.getItem('insight_v11'))).toBe(seed.raw);
+      }finally{await observer.close();}
+    });
+  }
+}
+
+test('isolated quick clear respects the year boundary and repeating a clear keeps the same data',async({page})=>{
+  const seed=await openQuickInputPreview(page,{seedYearBoundary:true});
+  const boundary=seed.year+'-01-01';
+  const previous=(Number(seed.year)-1)+'-12-31';
+  await page.evaluate(()=>{window.confirm=()=>true;});
+  const date=page.locator('#iqdDateInput');
+  await date.fill(boundary);
+  await page.locator('#iqdPrev').click();
+  await expect(date).toHaveValue(previous);
+  await expect(page.locator('#qi_売上')).toHaveValue('71');
+  await page.locator('#iqdNext').click();
+  await expect(date).toHaveValue(boundary);
+  await expect(page.locator('#qi_売上')).toHaveValue('81');
+  await page.evaluate(()=>{
+    const date=document.getElementById('iqdDateInput');
+    date.value='2025-02-30';
+    date.dispatchEvent(new Event('change',{bubbles:true}));
+  });
+  await expect(date).toHaveValue(boundary);
+  const expected=JSON.parse(seed.raw);
+  expect(await committedInput(page)).toEqual({revision:0,snapshot:expected});
+  expected.stores[seed.active].data[seed.year]['1月'][0].売上=0;
+  for(const revision of [1,2]){
+    expect(await page.evaluate(()=>clearTodayData())).toBe(true);
+    await expect(date).toHaveValue(boundary);
+    await expect(page.locator('#qi_売上')).toHaveValue('');
+    expect(await committedInput(page)).toEqual({revision,snapshot:expected});
+  }
+  expect(await page.evaluate(()=>localStorage.getItem('insight_v11'))).toBe(seed.raw);
+});
+
+for(const operation of ['store','year']){
+  for(const failure of ['quota','lost acknowledgement']){
+    test('isolated management deletion preserves the prior snapshot for '+operation+' on '+failure,async({page,context})=>{
+      const seed=await openQuickInputPreview(page,{seedCounts:true,seedHours:true,seedManagement:true});
+      const observer=await openStoreSwitchPeer(context);
+      try{
+        if(failure==='lost acknowledgement')await interruptCountReadback(page,failure);
+        const result=await page.evaluate(async ({operation,failure,active,peer,year})=>{
+          const api=InsightIndexedDBStorageV1,baseline=await api.read();
+          const candidate=structuredClone(baseline.snapshot);
+          if(operation==='year'){
+            InsightYearManager.removeYear(candidate,active,year);
+          }else{
+            delete candidate.stores[active];
+            candidate.current=peer;
+            applySharedWeatherToStore(candidate.stores[peer],candidate);
+          }
+          if(failure==='quota'){
+            const put=IDBObjectStore.prototype.put;
+            IDBObjectStore.prototype.put=function(){
+              IDBObjectStore.prototype.put=put;
+              throw new DOMException('Fictional quota error','QuotaExceededError');
+            };
+          }
+          try{
+            await api.save(baseline.revision,candidate);
+            return {failure:null};
+          }catch(error){
+            return {failure:error.message,live:InsightStorage.serialize(allStores)};
+          }
+        },{operation,failure,active:seed.active,peer:seed.peer,year:seed.year});
+        expect(result.failure).toContain(failure==='quota'?'Fictional quota error':'Fictional lost acknowledgement');
+        expect(JSON.parse(result.live)).toEqual(JSON.parse(seed.raw));
+        const record=await readStoreSwitchRecord(observer);
+        const prior=JSON.parse(seed.raw);
+        const saved=failure==='lost acknowledgement';
+        const expected=JSON.parse(seed.raw);
+        if(saved&&operation==='store'){
+          delete expected.stores[seed.active];
+          expected.current=seed.peer;
+          expected.stores[seed.peer].data[seed.year][seed.month][seed.day].weather='雨';
+        }else if(saved){
+          const shop=expected.stores[seed.active];
+          shop.years=shop.years.filter(year=>year!==seed.year);
+          delete shop.data[seed.year];
+          delete shop.monthlyOps[seed.year];
+          for(const key of ['salesCounts','wasteCounts','hourlyCustomers']){
+            for(const date of Object.keys(shop[key])){
+              if(date.startsWith(seed.year+'-'))delete shop[key][date];
+            }
+          }
+        }
+        expect(record.revision).toBe(saved?1:0);
+        expect(JSON.parse(record.raw)).toEqual(expected);
+        if(saved)expect(JSON.parse(record.previous.raw)).toEqual(prior);
+        else expect(record.previous).toBeNull();
+        expect(await observer.evaluate(()=>InsightIndexedDBStorageV1.diagnose({verifyInterrupted:true})))
+          .toMatchObject({state:'hold',observedRevision:saved?1:0,recovery:saved?'save-verified':'prior-save-verified'});
         expect(await observer.evaluate(()=>localStorage.getItem('insight_v11'))).toBe(seed.raw);
       }finally{await observer.close();}
     });
@@ -3215,7 +3350,8 @@ for(const failure of ['readback abort','acknowledgement lost','tab closed during
   });
 }
 
-async function openQuickInputPreview(page,{sameMunicipality=true,followMonthlyInputs=false,seedCounts=false,seedHours=false,seedDailyClear=false}={}){
+async function openQuickInputPreview(page,{sameMunicipality=true,followMonthlyInputs=false,seedCounts=false,
+  seedHours=false,seedDailyClear=false,seedYearBoundary=false,seedManagement=false}={}){
   await routeMigrationPage(page);
   await page.goto('/Index.html');
   await waitForMigrationChecks(page);
@@ -3225,7 +3361,7 @@ async function openQuickInputPreview(page,{sameMunicipality=true,followMonthlyIn
     await page.waitForFunction(()=>typeof InsightHourlyCustomers?.connectIndexedDBPreview==='function');
     await page.addScriptTag({url:'/insight_indexeddb_sales_input_preview_v1.js'});
   }
-  return page.evaluate(async ({sameMunicipality,followMonthlyInputs,seedCounts,seedHours,seedDailyClear})=>{
+  return page.evaluate(async ({sameMunicipality,followMonthlyInputs,seedCounts,seedHours,seedDailyClear,seedYearBoundary,seedManagement})=>{
     const year=String(Number(todayFY().fy)-1),month='6月',day=12;
     const iso=year+'-06-12',active=allStores.current,peer='fictional-quick-peer';
     store.data[year]=blankYearData(year);
@@ -3268,6 +3404,19 @@ async function openQuickInputPreview(page,{sameMunicipality=true,followMonthlyIn
       Object.assign(store.data[todayFY().fy][month][day-1],values);
       store.hourlyCustomers[iso]=Array(24).fill(12);
     }
+    if(seedYearBoundary){
+      const previous=String(Number(year)-1);
+      store.data[previous]=blankYearData(previous);
+      store.years=[...store.years,previous].sort();
+      store.data[previous]['12月'][30].売上=71;
+      store.data[year]['1月'][0].売上=81;
+    }
+    if(seedManagement){
+      allStores.sharedWeather={...allStores.sharedWeather,[wxKey(year,month,day+1)]:'雨'};
+      store.monthlyOps={[year]:{'6月':{laborK:14}}};
+      store.events=[{id:'fictional-management-event',type:'nearby',scope:'store',startDate:iso,endDate:iso,
+        snapshot:{version:1,title:'架空の催事',location:'架空の会場'}}];
+    }
     renderStoreSel();
     InsightDateContext.setSelectedDate(InsightDateContext.parseIso(iso));
     renderQuickNav();
@@ -3281,7 +3430,7 @@ async function openQuickInputPreview(page,{sameMunicipality=true,followMonthlyIn
       });
     }else window.quickPreview=await InsightIndexedDBQuickInputPreviewV1.connect();
     return {year,month,day,iso,active,peer,raw,category:HAIKI_CATS[0],countCategory:countCategory.id,otherCategory:otherCategory.id};
-  },{sameMunicipality,followMonthlyInputs,seedCounts,seedHours,seedDailyClear});
+  },{sameMunicipality,followMonthlyInputs,seedCounts,seedHours,seedDailyClear,seedYearBoundary,seedManagement});
 }
 
 async function editQuickInput(page,category){
