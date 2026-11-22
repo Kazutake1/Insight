@@ -1531,3 +1531,66 @@ for(const navigation of ['sidebar','programmatic','period']){
     await expect(status).toHaveText('保存する変更はありません。');
   });
 }
+
+for(const navigation of ['sidebar','programmatic','period']){
+  test('sales edits outside the preview month remain protected via '+navigation,async({page})=>{
+    const seed=await openMonthlySalesPreview(page);
+    const baseline=JSON.parse(seed.raw);
+    const sales=page.locator('#sf_売上');
+    const status=page.locator('#salesSaveBtn + [role=status]');
+    const activeMonth=Number.parseInt(seed.month);
+    const otherMonth=activeMonth===1?2:activeMonth-1;
+    const otherIso=seed.year+'-'+String(otherMonth).padStart(2,'0')+'-01';
+    const activeIso=seed.year+'-'+String(activeMonth).padStart(2,'0')+'-'+String(seed.day).padStart(2,'0');
+    await page.evaluate(()=>{
+      window.otherMonthWarnings=[];
+      window.approveOtherMonth=false;
+      window.confirm=message=>{otherMonthWarnings.push(message);return approveOtherMonth;};
+    });
+
+    // Approve discard of a draft in the connected month, then edit in another month.
+    await sales.click();
+    await sales.fill('456');
+    await page.evaluate(date=>{
+      window.approveOtherMonth=true;
+      InsightInputDayNav.select('sales',date);
+    },otherIso);
+    await expect.poll(()=>page.evaluate(()=>InsightInputDayNav.getSelectedIso('sales'))).toBe(otherIso);
+    const originalValue=await sales.inputValue();
+    await expect.poll(()=>page.evaluate(()=>InsightInputDayNav.hasUnsavedInput())).toBe(false);
+    await sales.click();
+    await sales.fill('987');
+    await page.evaluate(()=>{window.approveOtherMonth=false;});
+    expect(await page.evaluate(()=>InsightInputDayNav.hasUnsavedInput())).toBe(true);
+    await page.locator('#salesSaveBtn').click();
+    await expect(status).toHaveText('この期間は試験用の売上保存の対象外です。');
+    expect(await page.evaluate(()=>InsightInputDayNav.hasUnsavedInput())).toBe(true);
+
+    async function leave(){
+      if(navigation==='sidebar')await page.locator('#nav1').click();
+      else if(navigation==='programmatic')await page.evaluate(()=>gotoNav(1));
+      else await page.evaluate(date=>InsightInputDayNav.select('sales',date),activeIso);
+    }
+    await leave();
+    await expect(page.locator('#pageSales')).toHaveClass(/show/);
+    await expect(sales).toHaveValue('987');
+    expect(await page.evaluate(()=>InsightInputDayNav.getSelectedIso('sales'))).toBe(otherIso);
+    expect(await page.evaluate(()=>otherMonthWarnings.length)).toBe(2);
+
+    await page.evaluate(()=>{window.approveOtherMonth=true;});
+    await leave();
+    if(navigation==='period'){
+      await expect.poll(()=>page.evaluate(()=>InsightInputDayNav.getSelectedIso('sales'))).toBe(activeIso);
+    }else{
+      await expect(page.locator('#pageDash')).toHaveClass(/show/);
+      await page.locator('#nav2').click();
+    }
+    await page.evaluate(date=>InsightInputDayNav.select('sales',date),otherIso);
+    await expect.poll(()=>page.evaluate(()=>InsightInputDayNav.getSelectedIso('sales'))).toBe(otherIso);
+    await expect(sales).toHaveValue(originalValue);
+    expect(await page.evaluate(()=>otherMonthWarnings.length)).toBe(3);
+    expect(await page.evaluate(()=>InsightInputDayNav.hasUnsavedInput())).toBe(false);
+    expect(await page.evaluate(()=>InsightIndexedDBStorageV1.read())).toEqual({revision:0,snapshot:baseline});
+    expect(await page.evaluate(()=>localStorage.getItem('insight_v11'))).toBe(seed.raw);
+  });
+}

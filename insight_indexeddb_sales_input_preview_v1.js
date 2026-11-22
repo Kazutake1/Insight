@@ -25,11 +25,14 @@
       return matchesPeriod()&&
         root.InsightStorage.serialize(allStores)===root.InsightStorage.serialize(committed.snapshot);
     }
-    function rows(snapshot,storeId){
-      return snapshot.stores[storeId]?.data?.[target.year]?.[target.month];
+    function displayedPeriod(){
+      return {storeId:allStores.current,year:editYear.sales,month:editMonth.sales};
     }
-    function changes(){
-      const saved=rows(committed.snapshot,target.storeId);
+    function rows(snapshot,storeId,period=target){
+      return snapshot.stores[storeId]?.data?.[period.year]?.[period.month];
+    }
+    function changes(period=target){
+      const saved=rows(committed.snapshot,period.storeId,period);
       if(!Array.isArray(saved)||saved.length!==drafts.sales.length)
         throw new Error('Sales month is incomplete');
       const edited=[];
@@ -73,7 +76,9 @@
     let held=false,busy=false,timer;
     const getStatus=()=>{
       let dirty=true;
-      try{dirty=matchesPeriod()&&(!matchesScreen()||changes().length>0);}catch(_){}
+      try{
+        dirty=currentNav===2&&((matchesPeriod()&&!matchesScreen())||changes(displayedPeriod()).length>0);
+      }catch(_){}
       return {state:held?'HELD':busy?'ACTIVE':'IDLE_OBSERVED',hasUnsavedInput:dirty};
     };
     function stop(message){
@@ -172,10 +177,14 @@
       approved=null;
       const allowed=approvedClick&&approvedClick.route===destination&&approvedClick.event.eventPhase!==0;
       if(!allowed&&!allowNavigation(screenQuestion))return false;
-      const priorDraft=matchesPeriod()?drafts.sales:null;
+      const priorPeriod=displayedPeriod();
+      const priorDraft=drafts.sales;
       const result=gotoNav.apply(this,arguments);
-      if(priorDraft&&drafts.sales===priorDraft&&!matchesPeriod())
-        drafts.sales=JSON.parse(JSON.stringify(rows(committed.snapshot,target.storeId)));
+      const after=displayedPeriod();
+      if(drafts.sales===priorDraft&&(currentNav!==2||after.storeId!==priorPeriod.storeId||
+         after.year!==priorPeriod.year||after.month!==priorPeriod.month)){
+        drafts.sales=JSON.parse(JSON.stringify(rows(committed.snapshot,priorPeriod.storeId,priorPeriod)??[]));
+      }
       return result;
     };
     allowConnectedNavigation=allowNavigation;
