@@ -1375,13 +1375,8 @@ for(const entrance of ['quick','sales','salesCounts']){
     const year=String(Number(seed.year)-2);
     if(entrance==='sales')await page.locator('#nav2').click();
     if(entrance==='salesCounts')await page.locator('#navSalesCount').click();
-    const apply=()=>page.evaluate(({entrance,year})=>{
-      if(entrance==='sales')return InsightInputPeriodControls.apply(InsightInputPeriodControls.configs[0],year,6);
-      if(entrance==='salesCounts')return InsightSalesCount.setPeriod(year,6);
-      const field=document.getElementById('iqdDateInput');
-      field.value=year+'-06-12';
-      return field.dispatchEvent(new Event('change',{bubbles:true}));
-    },{entrance,year});
+    const picker=page.locator(entrance==='quick'?'#iqdDateInput':'#insightDayNav-'+entrance+' .iqd-date-input');
+    const apply=()=>picker.fill(year+'-06-12');
     await page.evaluate(()=>{window.confirm=()=>false;});
     await apply();
     const expected=JSON.parse(seed.raw);
@@ -1398,6 +1393,7 @@ for(const entrance of ['quick','sales','salesCounts']){
       if(entrance==='salesCounts')return InsightSalesCount.getPeriod().year;
       return InsightDateContext.getSelectedIso().slice(0,4);
     },entrance)).toBe(year);
+    await expect(picker).toHaveValue(year+'-06-12');
     expect(await page.evaluate(()=>localStorage.getItem('insight_v11'))).toBe(seed.raw);
   });
 }

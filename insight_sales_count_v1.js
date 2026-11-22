@@ -504,7 +504,9 @@
       preview=adapter;
     };
     model.getPeriod=function(){return {year:state.year,month:state.month};};
-    model.setPeriod=function(year,month){return setPeriod(year,month);};
+    model.setPeriod=function(year,month,confirmed){
+      return setPeriod(year,month,confirmed&&preview&&root.InsightIndexedDBSalesInputPreviewV1?.managesYears());
+    };
     model.reloadFromStore=reloadFromStore;
     model.confirmLeave=confirmLeave;
     model.createReadOnlyDayCard=createReadOnlyDayCard;

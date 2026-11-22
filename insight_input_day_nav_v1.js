@@ -124,13 +124,20 @@
       focusDate(spec,date,false);
     }else if(spec.key==='kyaku'||spec.kind==='count')focusDate(spec,date,false);
   }
-  function go(spec,date,preservePicker){
+  function go(spec,date,preservePicker,confirmed){
     if(!date||!Number.isFinite(date.getTime()))return false;
     var current=dateFor(spec),p=period(spec);
     if(!p||!current||context.iso(current)===context.iso(date))return false;
     var crossing=Number(p.year)!==date.getFullYear()||Number(p.month)!==date.getMonth()+1;
-    var preview=root.InsightIndexedDBSalesInputPreviewV1?.getConnectedStatus(spec.key);
+    var management=root.InsightIndexedDBSalesInputPreviewV1;
+    var preview=management?.getConnectedStatus(spec.key);
     if(preview&&preview.state!=='IDLE_OBSERVED')return false;
+    if(crossing&&management?.managesYears()&&!root.InsightYearManager.isCurrentRegistered(date.getFullYear())){
+      if(preservePicker)nav(spec).querySelector('.iqd-date-input').value=context.iso(current);
+      var route={sales:2,kyaku:3,haiki:4,salesCounts:'salesCounts'}[spec.key];
+      void management.promoteForPeriod(date.getFullYear(),route,spec.label,()=>go(spec,date,preservePicker,true));
+      return false;
+    }
     var discard=crossing&&spec.kind==='legacy'&&(preview?preview.hasUnsavedInput:dirty[spec.key]);
     if(discard&&!preview&&!root.confirm('未保存の入力があります。\n保存せずに別の日付へ移動しますか？'))return false;
     if(crossing){
@@ -138,8 +145,8 @@
       var oldDay=spec.dayKey?root[spec.dayKey]:null;
       if(spec.dayKey)root[spec.dayKey]=date.getDate();
       var ok=spec.kind==='count'?
-        root.InsightSalesCount.setPeriod(date.getFullYear(),date.getMonth()+1):
-        root.InsightInputPeriodControls.apply({type:spec.key,label:spec.label},date.getFullYear(),date.getMonth()+1);
+        root.InsightSalesCount.setPeriod(date.getFullYear(),date.getMonth()+1,confirmed):
+        root.InsightInputPeriodControls.apply({type:spec.key,label:spec.label},date.getFullYear(),date.getMonth()+1,confirmed);
       if(!ok){
         if(spec.dayKey)root[spec.dayKey]=oldDay;
         return false;
