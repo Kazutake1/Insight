@@ -1183,7 +1183,7 @@ test('isolated adopted startup saves a single sales day after readback and stops
   const fixture='/isolated-adopted-sales-fixture';
   await page.route('**'+fixture,route=>route.fulfill({
     contentType:'text/html',
-    body:`<!doctype html><main id="sales-fixture"></main>
+    body:`<!doctype html><meta charset="utf-8"><main id="sales-fixture"></main>
       <script>window.SK='insight_v11';</script>
       <script src="/insight_storage_v1.js"></script>
       <script src="/insight_indexeddb_storage_v1.js"></script>
