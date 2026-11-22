@@ -88,6 +88,20 @@ for(const [name,fields] of Object.entries(quickDraftChanges)){
   });
 }
 
+test('isolated Quick draft is clean after reverting and protects a draft that cannot be read',async({page})=>{
+  await openQuickInputPreview(page);
+  const trigger=page.locator('#qWeatherCompactTrigger');
+  await trigger.click();
+  await page.locator('#qWeatherCompactMenu [data-wx="雨"]').click();
+  expect(await quickInputBlocksUnload(page)).toBe(true);
+  await trigger.click();
+  await page.locator('#qWeatherCompactMenu [data-wx="曇"]').click();
+  expect(await quickInputBlocksUnload(page)).toBe(false);
+  await page.evaluate(()=>document.getElementById('qi_storeMemo').remove());
+  expect(await quickInputBlocksUnload(page)).toBe(true);
+  expect(await page.evaluate(()=>InsightQuickDateNavV1.hasUnsavedInput())).toBe(true);
+});
+
 test('manual adoption uses the real encrypted backup confirmation and preserves the legacy source',async({page})=>{
   await routeMigrationPage(page);
   async function open(){
@@ -2282,6 +2296,7 @@ for(const sameMunicipality of [true,false]){
     await expect(status).toHaveText('今日の入力を保存しました。');
     await expect(page.locator('#iqdDateInput')).toHaveValue(seed.iso);
     expect(await page.evaluate(()=>quickPreview.getStatus())).toEqual({state:'IDLE_OBSERVED',hasUnsavedInput:false});
+    expect(await quickInputBlocksUnload(page)).toBe(false);
     expect(await page.evaluate(()=>InsightQuickSaveObserverV0.getStatus())).toMatchObject({state:'IDLE_OBSERVED',activeCount:0});
     expect(await page.evaluate(()=>InsightIndexedDBStorageV1.read()))
       .toEqual({revision:1,snapshot:quickExpectedSnapshot(seed,sameMunicipality)});

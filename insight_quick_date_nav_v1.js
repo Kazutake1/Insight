@@ -11,7 +11,10 @@
 
   var selectedStore=allStores.current;
   var dirty=false;
-  window.InsightQuickDateNavV1=Object.freeze({hasUnsavedInput:function(){return dirty;}});
+  function hasUnsavedInput(){
+    return window.InsightIndexedDBQuickInputPreviewV1?.getStatus()?.hasUnsavedInput??dirty;
+  }
+  window.InsightQuickDateNavV1=Object.freeze({hasUnsavedInput:hasUnsavedInput});
   var week=['日','月','火','水','木','金','土'];
   function selectedDate(){return dateContext.getSelectedDate();}
   function todaySelected(){return dateContext.isToday();}
@@ -37,7 +40,7 @@
   function selectDate(date,preserveDatePicker){
     if(!date||typeof date.getTime!=='function'||!Number.isFinite(date.getTime())||dateContext.iso(date)===dateContext.getSelectedIso())return;
     if(window.InsightIndexedDBQuickInputPreviewV1?.allowDateChange(date)===false)return;
-    if(dirty&&!window.confirm('未保存の入力があります。\n保存せずに別の日付へ移動しますか？'))return;
+    if(hasUnsavedInput()&&!window.confirm('未保存の入力があります。\n保存せずに別の日付へ移動しますか？'))return;
     if(!ensureRegisteredYear(date))return;
     dateContext.setSelectedDate(date);
     quickEditDay=dateContext.getSelectedInfo().day;
@@ -49,6 +52,7 @@
     }else window.renderQuickNav();
     window.renderQuickPage();
     dirty=false;
+    window.InsightIndexedDBQuickInputPreviewV1?.dateChanged();
   }
   window.renderQuickNav=function(){
     var date=selectedDate();

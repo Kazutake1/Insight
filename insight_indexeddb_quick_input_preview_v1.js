@@ -40,6 +40,7 @@
     const serialize=root.InsightStorage.serialize;
     let committed=await api.read();
     let busy=false,held=false,noticeTimer;
+    let baselineDraft=null;
     function matchesBaseline(){
       return currentNav===0&&allStores.current===storeId&&store===allStores.stores[storeId]&&
         serialize(allStores)===serialize(committed.snapshot);
@@ -55,11 +56,29 @@
       button.disabled=true;
       status.textContent='保存結果を確認できないため、追加の保存を停止しました。';
     }
+    function rememberDraft(iso,inputs){
+      baselineDraft={iso,values:JSON.stringify(inputs)};
+    }
+    function rememberRenderedDraft(){
+      if(busy||held||dateContext.getSelectedIso()===baselineDraft?.iso)return;
+      baselineDraft=null;
+      try{
+        const {date,iso}=dateContext.getSelectedInfo();
+        if(matchesBaseline()&&supports(date)&&matchesDate(iso))rememberDraft(iso,readInputs());
+      }catch(_){
+        // Without a complete baseline the draft is treated as unsaved.
+      }
+    }
+    function hasUnsavedInput(){
+      if(busy||held||!baselineDraft)return true;
+      // The date input may already contain a new choice while its change event is being handled.
+      if(currentNav!==0||allStores.current!==storeId||store!==allStores.stores[storeId]||
+         dateContext.getSelectedIso()!==baselineDraft.iso)return true;
+      try{return JSON.stringify(readInputs())!==baselineDraft.values;}
+      catch(_){return true;}
+    }
     function getStatus(){
-      return {
-        state:held?'HELD':busy?'ACTIVE':'IDLE_OBSERVED',
-        hasUnsavedInput:busy||held||root.InsightQuickDateNavV1.hasUnsavedInput()
-      };
+      return {state:held?'HELD':busy?'ACTIVE':'IDLE_OBSERVED',hasUnsavedInput:hasUnsavedInput()};
     }
     function matchesDate(iso){
       return dateContext.getSelectedIso()===iso&&doc.getElementById('iqdDateInput')?.value===iso;
@@ -102,6 +121,7 @@
         allStores=JSON.parse(JSON.stringify(result.snapshot));
         store=allStores.stores[storeId];
         committed=result;
+        rememberDraft(iso,inputs);
         root.InsightHooks.emit('quick:preview:committed',{});
         updateMissingBadge();
         button.textContent='✓ 保存しました';
@@ -168,12 +188,15 @@
       event.returnValue='';
     });
     root.gotoNav=root.switchStore=root.showStoreMenu=root.clearTodayData=root.fetchWeather=blockUnsupported;
-    session={getStatus,allowDateChange};
+    rememberRenderedDraft();
+    session={getStatus,allowDateChange,rememberRenderedDraft};
     return Object.freeze({getStatus});
   }
 
   root.InsightIndexedDBQuickInputPreviewV1=Object.freeze({
     connect,
-    allowDateChange:date=>session?.allowDateChange(date)??true
+    getStatus:()=>session?.getStatus()??null,
+    allowDateChange:date=>session?.allowDateChange(date)??true,
+    dateChanged:()=>session?.rememberRenderedDraft()
   });
 })(globalThis);
