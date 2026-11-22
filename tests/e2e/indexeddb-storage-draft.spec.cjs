@@ -1292,3 +1292,85 @@ test('isolated adopted startup saves a single sales day after readback and stops
   await expect(status).toHaveText('保存状態を確認できないため、起動と保存を停止しています。');
   await expect(save).toHaveCount(0);
 });
+
+test('the existing sales save button uses IndexedDB for the selected day in isolation',async({page})=>{
+  await routeMigrationPage(page);
+  await page.goto('/Index.html');
+  await waitForMigrationChecks(page);
+  await page.locator('#nav2').click();
+  await page.waitForFunction(()=>window.InsightInputDayNav?.getSelectedIso('sales')&&
+    document.getElementById('sf_売上'));
+  await page.addScriptTag({url:'/insight_indexeddb_storage_v1.js'});
+  await page.addScriptTag({url:'/insight_indexeddb_sales_input_preview_v1.js'});
+  const seed=await page.evaluate(async ()=>{
+    const year=editYear.sales,month=editMonth.sales,day=window.salesSelDay;
+    const active=allStores.current;
+    const row=store.data[year][month][day-1];
+    row.売上=42;
+    row.買上点数=7;
+    row.客数=77;
+    row.storeMemo='FICTIONAL memo';
+    row.tempMaxC=30;
+    allStores.stores['fictional-second-shop']=JSON.parse(JSON.stringify(store));
+    allStores.stores['fictional-second-shop'].name='架空の別店舗';
+    drafts.sales[day-1]=JSON.parse(JSON.stringify(row));
+    renderSalesForm(year,MONTHS.indexOf(month),day);
+    const raw=InsightStorage.writeSnapshot(allStores);
+    window.InsightMigrationBackupV1={assertReady(){},confirm:async()=>true};
+    await InsightIndexedDBStorageV1.migrate({legacyClientsClosed:true});
+    await InsightIndexedDBSalesInputPreviewV1.connect();
+    return {year,month,day,active,raw};
+  });
+  const expected=JSON.parse(seed.raw);
+  const getRow=snapshot=>snapshot.stores[seed.active].data[seed.year][seed.month][seed.day-1];
+  const save=page.locator('#salesSaveBtn');
+  const notice=page.locator('#savedSales');
+  const status=page.locator('#salesSaveBtn + [role=status]');
+  const sales=page.locator('#sf_売上');
+  const count=page.locator('#sf_買上点数');
+
+  await page.evaluate(()=>{
+    const digest=crypto.subtle.digest;
+    crypto.subtle.digest=async function(...args){
+      await new Promise(resolve=>{
+        window.resumeFixtureSave=window.resumeFixtureSave??[];
+        window.resumeFixtureSave.push(resolve);
+      });
+      return digest.apply(this,args);
+    };
+    window.restoreFixtureDigest=()=>{crypto.subtle.digest=digest;};
+  });
+  await sales.fill('456');
+  await count.fill('8.25');
+  await save.click();
+  await page.waitForFunction(()=>window.resumeFixtureSave?.length===2);
+  await expect(save).toBeDisabled();
+  await expect(status).toHaveText('保存を確認しています。');
+  await expect(notice).not.toHaveClass(/is-visible/);
+  expect(await page.evaluate(()=>store.data[editYear.sales][editMonth.sales][window.salesSelDay-1].売上)).toBe(42);
+  await page.evaluate(()=>{
+    window.restoreFixtureDigest();
+    window.resumeFixtureSave.forEach(resolve=>resolve());
+  });
+  await expect(notice).toHaveClass(/is-visible/);
+  Object.assign(getRow(expected),{売上:456,買上点数:8.25});
+  expect(await page.evaluate(()=>InsightIndexedDBStorageV1.read())).toEqual({revision:1,snapshot:expected});
+  expect(await page.evaluate(()=>localStorage.getItem('insight_v11'))).toBe(seed.raw);
+
+  // Advance the committed revision without updating the open editor.
+  await page.evaluate(async ()=>{
+    const api=InsightIndexedDBStorageV1;
+    const current=await api.read();
+    current.snapshot.stores['fictional-second-shop'].name='別の画面で変更済み';
+    await api.save(current.revision,current.snapshot);
+  });
+  await sales.fill('789');
+  await save.click();
+  await expect(status).toHaveText('保存結果を確認できないため、追加の保存を停止しました。');
+  await expect(sales).toHaveValue('789');
+  await expect(save).toBeDisabled();
+  await expect(notice).not.toHaveClass(/is-visible/);
+  expect(await page.evaluate(()=>InsightIndexedDBStorageV1.diagnose({verifyInterrupted:true})))
+    .toMatchObject({state:'hold',observedRevision:2});
+  expect(await page.evaluate(()=>localStorage.getItem('insight_v11'))).toBe(seed.raw);
+});
