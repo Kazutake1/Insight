@@ -301,6 +301,137 @@ test('combined input session holds the monthly screens when Quick loses its save
   }finally{await other.close();}
 });
 
+
+test('combined input session preserves the draft at month and year boundaries',async({page})=>{
+  const seed=await openQuickInputPreview(page,{followMonthlyInputs:true});
+  await page.locator('#nav2').click();
+  await page.evaluate(iso=>InsightInputDayNav.select('sales',iso),seed.iso);
+  const sales=page.locator('#sf_売上'),button=page.locator('#salesSaveBtn');
+  const status=page.locator('#salesSaveBtn + [role=status]');
+  await button.click();
+  await expect(status).toHaveText('保存する変更はありません。');
+  await sales.fill('9007199254740992');
+  await button.click();
+  await expect(status).toHaveText('売上の入力を確認してください。');
+  await sales.fill('777');
+  await page.evaluate(()=>{
+    window.periodPrompts=[];
+    window.approvePeriodChange=false;
+    window.confirm=message=>{periodPrompts.push(message);return approvePeriodChange;};
+  });
+  const choose=async(year,month)=>page.evaluate(([year,month])=>
+    InsightInputPeriodControls.apply({type:'sales',pageId:'pageSales',label:'売上'},year,month),[year,month]);
+  expect(await choose(Number(seed.year)-30,6)).toBe(false);
+  await expect(status).toHaveText('試験中は登録済みの年度だけを表示できます。');
+  expect(await choose(Number(seed.year),6)).toBe(true);
+  await expect(sales).toHaveValue('777');
+  expect(await page.evaluate(()=>periodPrompts)).toEqual([]);
+  expect(await choose(Number(seed.year),7)).toBe(false);
+  expect(await choose(Number(seed.year)+1,6)).toBe(false);
+  expect(await page.evaluate(()=>periodPrompts.length)).toBe(2);
+  await expect(sales).toHaveValue('777');
+
+  await page.evaluate(()=>{approvePeriodChange=true;});
+  expect(await choose(Number(seed.year),7)).toBe(true);
+  await sales.fill('888');
+  await button.click();
+  await expect(status).toHaveText('この期間は試験用の売上保存の対象外です。');
+  expect(await choose(Number(seed.year)+1,6)).toBe(true);
+  expect(await choose(Number(seed.year),6)).toBe(true);
+  await page.evaluate(iso=>InsightInputDayNav.select('sales',iso),seed.iso);
+  await expect(sales).toHaveValue('47');
+  await page.locator('#nav0').click();
+  await expect(page.locator('#iqdDateInput')).toHaveValue(seed.iso);
+  const temp=page.locator('#qi_tempMinC');
+  await temp.fill('');
+  expect(await quickInputBlocksUnload(page)).toBe(true);
+  await page.evaluate(()=>{approvePeriodChange=false;});
+  await page.locator('#nav3').click();
+  await expect(page.locator('#pageQuick')).toHaveClass(/show/);
+  await expect(temp).toHaveValue('');
+  expect(await committedInput(page)).toEqual({revision:0,snapshot:JSON.parse(seed.raw)});
+  expect(await page.evaluate(()=>localStorage.getItem('insight_v11'))).toBe(seed.raw);
+});
+
+for(const failure of ['quota','readback','tab close']){
+  test('combined monthly save preserves recovery data after '+failure,async({page,context})=>{
+    const seed=await openQuickInputPreview(page,{followMonthlyInputs:true});
+    await page.locator('#nav2').click();
+    await page.evaluate(iso=>InsightInputDayNav.select('sales',iso),seed.iso);
+    const sales=page.locator('#sf_売上');
+    await sales.fill('777');
+    const peer=await openStoreSwitchPeer(context);
+    try{
+      await page.evaluate(failure=>{
+        if(failure==='quota'){
+          const put=IDBObjectStore.prototype.put;
+          IDBObjectStore.prototype.put=function(){
+            IDBObjectStore.prototype.put=put;
+            throw new DOMException('Fictional quota error','QuotaExceededError');
+          };
+          return;
+        }
+        const write=InsightStorage.writeMetadata;
+        let writing=false;
+        InsightStorage.writeMetadata=(key,value)=>{
+          if(key==='insight_indexeddb_adoption_v1'&&JSON.parse(value).state==='writing')writing=true;
+          return write(key,value);
+        };
+        const get=IDBObjectStore.prototype.get;
+        IDBObjectStore.prototype.get=function(...args){
+          const request=get.apply(this,args),tx=this.transaction;
+          if(writing&&tx.mode==='readonly'&&tx.db.name==='insight-store-snapshots-v1'){
+            IDBObjectStore.prototype.get=get;
+            if(failure==='readback')request.addEventListener('success',()=>tx.abort());
+            else{
+              const oncomplete=Object.getOwnPropertyDescriptor(IDBTransaction.prototype,'oncomplete');
+              Object.defineProperty(tx,'oncomplete',{
+                set(){oncomplete.set.call(this,()=>{window.combinedReadbackPaused=true;});}
+              });
+            }
+          }
+          return request;
+        };
+      },failure);
+      const button=page.locator('#salesSaveBtn');
+      await button.click();
+      if(failure==='tab close')await page.waitForFunction(()=>window.combinedReadbackPaused===true);
+      else await expect(page.locator('#salesSaveBtn + [role=status]'))
+        .toHaveText('保存結果を確認できないため、追加の保存を停止しました。');
+      await expect(sales).toHaveValue('777');
+      await expect(button).toBeDisabled();
+      expect(await page.evaluate(()=>combinedPreview.getStatus()))
+        .toEqual({state:failure==='tab close'?'ACTIVE':'HELD',hasUnsavedInput:true});
+      expect(await page.evaluate(()=>gotoNav(0))).toBe(false);
+      expect(await page.evaluate(()=>InsightInputPeriodControls.apply(
+        {type:'sales',pageId:'pageSales',label:'売上'},2030,6))).toBe(false);
+      expect(await quickInputBlocksUnload(page)).toBe(true);
+      const closed=failure==='tab close';
+      if(closed)await page.close();
+      const saved=failure!=='quota';
+      await expect.poll(()=>peer.evaluate(async closed=>{
+        try{return await InsightIndexedDBStorageV1.diagnose({verifyInterrupted:true});}
+        catch(error){
+          if(closed&&error.message==='Another Insight operation is in progress')return {state:'lock-busy'};
+          throw error;
+        }
+      },closed),{timeout:10000}).toMatchObject({
+        state:'hold',observedRevision:saved?1:0,recovery:saved?'save-verified':'prior-save-verified'
+      });
+      const before=JSON.parse(seed.raw), expected=JSON.parse(seed.raw);
+      if(saved)expected.stores[seed.active].data[seed.year][seed.month][seed.day-1].売上=777;
+      const record=await readStoreSwitchRecord(peer);
+      expect(record.revision).toBe(saved?1:0);
+      expect(JSON.parse(record.raw)).toEqual(expected);
+      if(saved){
+        expect(record.previous.revision).toBe(0);
+        expect(JSON.parse(record.previous.raw)).toEqual(before);
+      }
+      expect(await peer.evaluate(()=>localStorage.getItem('insight_v11'))).toBe(seed.raw);
+    }finally{await peer.close();}
+  });
+}
+
 test('manual adoption uses the real encrypted backup confirmation and preserves the legacy source',async({page})=>{
   await routeMigrationPage(page);
   async function open(){

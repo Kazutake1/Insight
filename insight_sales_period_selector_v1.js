@@ -143,6 +143,12 @@
     year=validYear(year);month=monthNumber(month);
     if(!year||!month)return false;
     var preview=root.InsightIndexedDBSalesInputPreviewV1;
+    var allowedPeriod=preview?.allowPeriod?.(config.type,year);
+    if(allowedPeriod===false)return false;
+    if(allowedPeriod===true){
+      var displayed=period(config);
+      if(displayed&&year===displayed.year&&month===displayed.month)return true;
+    }
     if(preview?.getConnectedStatus(config.type)){
       var current=period(config);
       if((!current||year!==current.year||month!==current.month)&&

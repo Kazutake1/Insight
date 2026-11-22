@@ -2,7 +2,7 @@
 (function(root){
   'use strict';
 
-  let connectedType=null,connectedStatus=null,allowConnectedNavigation=null;
+  let connectedType=null,connectedStatus=null,allowConnectedNavigation=null,allowConnectedPeriod=null;
   const screens={
     sales:{route:2,button:'salesSaveBtn',notice:'savedSales',label:'売上'},
     kyaku:{route:3,button:'kyakuSaveBtn',notice:'savedKyaku',label:'客数'},
@@ -372,6 +372,12 @@
       };
     }
     if(quick){
+      allowConnectedPeriod=(inputType,year)=>{
+        if(blocked()||currentNav!==screen.route||inputType!==type)return false;
+        if(root.InsightYearManager?.isCurrentRegistered(year))return true;
+        status.textContent='試験中は登録済みの年度だけを表示できます。';
+        return false;
+      };
       root.clearDayData=root.clearKyakuMonth=()=>false;
       root.addEventListener('beforeunload',event=>{
         if(!getStatus().hasUnsavedInput)return;
@@ -388,6 +394,7 @@
   root.InsightIndexedDBSalesInputPreviewV1=Object.freeze({
     connect,
     getConnectedStatus:(type=connectedType)=>type===connectedType?connectedStatus?.()??null:null,
+    allowPeriod:(type,year)=>allowConnectedPeriod?.(type,year)??null,
     allowNavigation:(type,question)=>type===connectedType?allowConnectedNavigation(question):true
   });
 })(globalThis);
