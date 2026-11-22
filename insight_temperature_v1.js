@@ -89,13 +89,13 @@
     return row&&typeof row==='object'&&!Array.isArray(row)?row:null;
   }
 
-  function syncWeatherAndTemperatureForMunicipality(fy,month,day,sourceRow){
-    var key=municipalityKey(store);
-    if(!key||!sourceRow||!allStores||!allStores.stores)return 0;
+  function syncWeatherAndTemperatureForMunicipality(snapshot,sourceStore,fy,month,day,sourceRow){
+    var key=municipalityKey(sourceStore);
+    if(!key||!sourceRow||!snapshot||!snapshot.stores)return 0;
     var synced=0;
-    Object.keys(allStores.stores).forEach(function(storeId){
-      var targetStore=allStores.stores[storeId];
-      if(!targetStore||targetStore===store||municipalityKey(targetStore)!==key)return;
+    Object.keys(snapshot.stores).forEach(function(storeId){
+      var targetStore=snapshot.stores[storeId];
+      if(!targetStore||targetStore===sourceStore||municipalityKey(targetStore)!==key)return;
       var targetRow=registeredDailyRow(targetStore,fy,month,day);
       if(!targetRow)return;
       targetRow.weather=sourceRow.weather==null?'':sourceRow.weather;
@@ -106,6 +106,12 @@
       synced++;
     });
     return synced;
+  }
+
+  function applyQuickTemperatures(snapshot,sourceStore,fy,month,day,row,values){
+    if(values.max===null)delete row.tempMaxC;else row.tempMaxC=values.max;
+    if(values.min===null)delete row.tempMinC;else row.tempMinC=values.min;
+    syncWeatherAndTemperatureForMunicipality(snapshot,sourceStore,fy,month,day,row);
   }
 
   function updateAverage(){
@@ -176,9 +182,7 @@
           delete rows[ri].tempMaxC;
           delete rows[ri].tempMinC;
         }else{
-          if(values.max===null)delete rows[ri].tempMaxC;else rows[ri].tempMaxC=values.max;
-          if(values.min===null)delete rows[ri].tempMinC;else rows[ri].tempMinC=values.min;
-          syncWeatherAndTemperatureForMunicipality(fy,month,day,rows[ri]);
+          applyQuickTemperatures(allStores,store,fy,month,day,rows[ri],values);
         }
         persist();
       }catch(err){
@@ -193,6 +197,8 @@
     parse:parseTemperature,
     selectedQuickDateInfo:selectedQuickDateInfo,
     isFutureQuickDate:isFutureQuickDate,
+    readQuickInputs:readAndValidate,
+    applyQuickTemperatures:applyQuickTemperatures,
     average:function(max,min){
       max=parseTemperature(max);min=parseTemperature(min);
       return Number.isFinite(max)&&Number.isFinite(min)?(max+min)/2:null;

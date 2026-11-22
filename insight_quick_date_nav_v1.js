@@ -36,6 +36,7 @@
   }
   function selectDate(date,preserveDatePicker){
     if(!date||typeof date.getTime!=='function'||!Number.isFinite(date.getTime())||dateContext.iso(date)===dateContext.getSelectedIso())return;
+    if(window.InsightIndexedDBQuickInputPreviewV1?.allowDateChange(date)===false)return;
     if(dirty&&!window.confirm('未保存の入力があります。\n保存せずに別の日付へ移動しますか？'))return;
     if(!ensureRegisteredYear(date))return;
     dateContext.setSelectedDate(date);
@@ -91,7 +92,9 @@
     if(event.target&&event.target.closest&&event.target.closest('.wx-btn,#autoWxBtn'))dirty=true;
   });
   if(window.InsightHooks){
-    window.InsightHooks.on('quick:save:after','quick-date-clear-dirty',function(){dirty=false;},30);
+    function clearDirty(){dirty=false;}
+    window.InsightHooks.on('quick:save:after','quick-date-clear-dirty',clearDirty,30);
+    window.InsightHooks.on('quick:preview:committed','quick-date-clear-dirty',clearDirty,30);
   }
 
   // STEP4 GATE-3: selected-date Quick clear only; no app-wide authorization.

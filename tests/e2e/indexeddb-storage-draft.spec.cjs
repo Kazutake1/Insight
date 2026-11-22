@@ -2085,3 +2085,238 @@ for(const failure of ['readback abort','acknowledgement lost','tab closed during
     }finally{await other.close();}
   });
 }
+
+async function openQuickInputPreview(page,{sameMunicipality=true}={}){
+  await routeMigrationPage(page);
+  await page.goto('/Index.html');
+  await waitForMigrationChecks(page);
+  await page.addScriptTag({url:'/insight_indexeddb_storage_v1.js'});
+  await page.addScriptTag({url:'/insight_indexeddb_quick_input_preview_v1.js'});
+  return page.evaluate(async sameMunicipality=>{
+    const year=String(Number(todayFY().fy)-1),month='6月',day=12;
+    const iso=year+'-06-12',active=allStores.current,peer='fictional-quick-peer';
+    store.data[year]=blankYearData(year);
+    store.years=[...new Set([...store.years,year])].sort();
+    store.weatherLocation={name:'架空市',admin1:'架空県'};
+    const row=store.data[year][month][day-1];
+    Object.assign(row,{売上:47,客数:62,買上点数:2.5,storeMemo:'架空の元メモ',weather:'曇',
+      tempMaxC:21,tempMinC:9,stockout:{fictional:1}});
+    allStores.stores[peer]=JSON.parse(JSON.stringify(store));
+    const second=allStores.stores[peer];
+    second.name='架空の別店舗';
+    second.weatherLocation.name=sameMunicipality?'架空市':'別の架空市';
+    Object.assign(second.data[year][month][day-1],{売上:87,客数:69,storeMemo:'別店舗の元メモ',
+      tempMaxC:18,tempMinC:8});
+    renderStoreSel();
+    InsightDateContext.setSelectedDate(InsightDateContext.parseIso(iso));
+    renderQuickNav();
+    renderQuickPage();
+    const raw=InsightStorage.writeSnapshot(allStores);
+    window.InsightMigrationBackupV1={assertReady(){},confirm:async()=>true};
+    await InsightIndexedDBStorageV1.migrate({legacyClientsClosed:true});
+    window.quickPreview=await InsightIndexedDBQuickInputPreviewV1.connect();
+    return {year,month,day,iso,active,peer,raw,category:HAIKI_CATS[0]};
+  },sameMunicipality);
+}
+
+async function editQuickInput(page,category){
+  await page.locator('#qi_売上').fill('456');
+  await page.locator('#qi_客数').fill('222');
+  await page.locator('#qi_買上点数').fill('3.125');
+  await page.locator('[id="qi_h_'+category+'"]').fill('123');
+  await page.locator('#qi_storeMemo').fill('架空の入力メモ');
+  await page.locator('#qi_tempMaxC').fill('23.75');
+  await page.locator('#qi_tempMinC').fill('');
+  await page.locator('#qWeatherCompactTrigger').click();
+  await page.locator('#qWeatherCompactMenu [data-wx="雨"]').click();
+}
+
+function quickExpectedSnapshot(seed,sameMunicipality){
+  const expected=JSON.parse(seed.raw);
+  const row=expected.stores[seed.active].data[seed.year][seed.month][seed.day-1];
+  Object.assign(row,{売上:456,客数:222,買上点数:3.125,廃棄金額:123,storeMemo:'架空の入力メモ',weather:'雨',
+    tempMaxC:23.75});
+  row.haiki[seed.category]=123;
+  delete row.tempMinC;
+  const peer=expected.stores[seed.peer].data[seed.year][seed.month][seed.day-1];
+  peer.weather='雨';
+  if(sameMunicipality){
+    peer.tempMaxC=23.75;
+    delete peer.tempMinC;
+  }
+  expected.sharedWeather??={};
+  expected.sharedWeather[seed.year+'-'+seed.month+'-'+seed.day]='雨';
+  return expected;
+}
+
+for(const sameMunicipality of [true,false]){
+  test('isolated Quick input commits one day and respects '+(sameMunicipality?'shared':'different')+
+    ' municipality temperatures',async({page})=>{
+    const seed=await openQuickInputPreview(page,{sameMunicipality});
+    const button=page.locator('#quickSaveBtn'),status=page.locator('#quickSaveBtn + [role=status]');
+    const memo=page.locator('#qi_storeMemo');
+    await editQuickInput(page,seed.category);
+    await page.evaluate(()=>{
+      window.quickDiscardPrompts=[];
+      window.confirm=message=>{quickDiscardPrompts.push(message);return false;};
+    });
+    await page.locator('#iqdPrev').click();
+    await expect(page.locator('#iqdDateInput')).toHaveValue(seed.iso);
+    await expect(memo).toHaveValue('架空の入力メモ');
+    expect(await page.evaluate(()=>quickDiscardPrompts)).toEqual([
+      '未保存の入力があります。\n保存せずに別の日付へ移動しますか？'
+    ]);
+
+    await page.locator('#iqdDateInput').fill(String(Number(seed.year)-30)+'-06-12');
+    await expect(page.locator('#iqdDateInput')).toHaveValue(seed.iso);
+    await expect(status).toHaveText('試験用の保存は登録済み年度の当日・過去日に限ります。');
+    await page.locator('#quickClearBtn').click();
+    await page.locator('#autoWxBtn').click();
+    await page.locator('#storeSel').selectOption(seed.peer);
+    await expect(page.locator('#storeSel')).toHaveValue(seed.active);
+    expect(await page.evaluate(()=>InsightIndexedDBStorageV1.read())).toEqual({revision:0,snapshot:JSON.parse(seed.raw)});
+    await expect(memo).toHaveValue('架空の入力メモ');
+
+    await page.locator('#qi_客数').fill('bad');
+    await button.click();
+    await expect(status).toHaveText('売上・客数・買上点数・廃棄の入力を確認してください。');
+    await page.locator('#qi_客数').fill('222');
+    await page.locator('#qi_tempMinC').fill('30');
+    await button.click();
+    await expect(status).toHaveText('最高気温は最低気温以上になるように入力してください。');
+    expect(await page.evaluate(()=>InsightIndexedDBStorageV1.read())).toMatchObject({revision:0});
+    await page.locator('#qi_tempMinC').fill('');
+
+    await page.evaluate(()=>{
+      const digest=crypto.subtle.digest,resume=[];
+      window.quickSaveDigests=resume;
+      crypto.subtle.digest=async function(...args){
+        await new Promise(resolve=>resume.push(resolve));
+        return digest.apply(this,args);
+      };
+      window.resumeQuickSave=()=>{
+        crypto.subtle.digest=digest;
+        resume.forEach(resolve=>resolve());
+      };
+    });
+    await button.click();
+    await page.waitForFunction(()=>quickSaveDigests.length===2);
+    await expect(button).toBeDisabled();
+    await expect(button).not.toHaveClass(/is-saved-feedback/);
+    await expect(status).toHaveText('保存を確認しています。');
+    expect(await page.evaluate(()=>InsightQuickSaveObserverV0.getStatus()))
+      .toMatchObject({scope:'quick-save-including-indexeddb-preview',state:'ACTIVE',activeCount:1});
+    expect(await page.evaluate(()=>gotoNav(1))).toBe(false);
+    expect(await page.evaluate(()=>clearTodayData())).toBe(false);
+    await page.evaluate(()=>{
+      document.getElementById('iqdPrev').click();
+      resumeQuickSave();
+    });
+
+    await expect(status).toHaveText('今日の入力を保存しました。');
+    await expect(page.locator('#iqdDateInput')).toHaveValue(seed.iso);
+    expect(await page.evaluate(()=>quickPreview.getStatus())).toEqual({state:'IDLE_OBSERVED',hasUnsavedInput:false});
+    expect(await page.evaluate(()=>InsightQuickSaveObserverV0.getStatus())).toMatchObject({state:'IDLE_OBSERVED',activeCount:0});
+    expect(await page.evaluate(()=>InsightIndexedDBStorageV1.read()))
+      .toEqual({revision:1,snapshot:quickExpectedSnapshot(seed,sameMunicipality)});
+    expect(await page.evaluate(()=>localStorage.getItem('insight_v11'))).toBe(seed.raw);
+  });
+}
+
+for(const failure of ['stale revision','quota error','readback aborted','changed input']){
+  test('isolated Quick input retains the draft and stops on '+failure,async({page,context})=>{
+    const seed=await openQuickInputPreview(page);
+    const other=await openStoreSwitchPeer(context);
+    try{
+      await editQuickInput(page,seed.category);
+      const expected=quickExpectedSnapshot(seed,true);
+      if(failure==='stale revision'){
+        await other.evaluate(async peer=>{
+          const api=InsightIndexedDBStorageV1,current=await api.read();
+          current.snapshot.stores[peer].name='別タブで確定した名称';
+          await api.save(current.revision,current.snapshot);
+        },seed.peer);
+      }
+      await page.evaluate(failure=>{
+        if(failure==='quota error'){
+          const put=IDBObjectStore.prototype.put;
+          IDBObjectStore.prototype.put=function(){
+            IDBObjectStore.prototype.put=put;
+            throw new DOMException('Fictional quota error','QuotaExceededError');
+          };
+        }
+        if(failure==='readback aborted'){
+          const write=InsightStorage.writeMetadata,get=IDBObjectStore.prototype.get;
+          let writing=false;
+          InsightStorage.writeMetadata=(key,value)=>{
+            if(key==='insight_indexeddb_adoption_v1'&&JSON.parse(value).state==='writing')writing=true;
+            return write(key,value);
+          };
+          IDBObjectStore.prototype.get=function(...args){
+            const request=get.apply(this,args);
+            const tx=this.transaction;
+            if(writing&&tx.mode==='readonly'&&tx.db.name==='insight-store-snapshots-v1'){
+              IDBObjectStore.prototype.get=get;
+              request.addEventListener('success',()=>tx.abort());
+            }
+            return request;
+          };
+        }
+        if(failure==='changed input'){
+          const digest=crypto.subtle.digest,resume=[];
+          window.quickSaveDigests=resume;
+          crypto.subtle.digest=async function(...args){
+            await new Promise(resolve=>resume.push(resolve));
+            return digest.apply(this,args);
+          };
+          window.resumeQuickSave=()=>{
+            crypto.subtle.digest=digest;
+            resume.forEach(resolve=>resolve());
+          };
+        }
+      },failure);
+
+      const button=page.locator('#quickSaveBtn'),status=page.locator('#quickSaveBtn + [role=status]');
+      await button.click();
+      if(failure==='changed input'){
+        await page.waitForFunction(()=>quickSaveDigests.length===2);
+        await page.evaluate(()=>{
+          document.getElementById('qi_storeMemo').value='途中で変わった下書き';
+          resumeQuickSave();
+        });
+      }
+      await expect(status).toHaveText('保存結果を確認できないため、追加の保存を停止しました。');
+      await expect(button).toBeDisabled();
+      await expect(button).not.toHaveClass(/is-saved-feedback/);
+      await expect(page.locator('#iqdDateInput')).toHaveValue(seed.iso);
+      await expect(page.locator('#qi_売上')).toHaveValue('456');
+      await expect(page.locator('#qi_storeMemo'))
+        .toHaveValue(failure==='changed input'?'途中で変わった下書き':'架空の入力メモ');
+      expect(await page.evaluate(()=>quickPreview.getStatus())).toEqual({state:'HELD',hasUnsavedInput:true});
+      expect(await page.evaluate(()=>InsightQuickSaveObserverV0.getStatus())).toMatchObject({state:'HELD',activeCount:0});
+      expect(await page.evaluate(()=>gotoNav(1))).toBe(false);
+      expect(await page.evaluate(()=>store.data[InsightDateContext.getSelectedInfo().fy]['6月'][11].売上)).toBe(47);
+
+      const record=await readStoreSwitchRecord(other);
+      if(failure==='stale revision'){
+        const otherExpected=JSON.parse(seed.raw);
+        otherExpected.stores[seed.peer].name='別タブで確定した名称';
+        expect(record.revision).toBe(1);
+        expect(JSON.parse(record.raw)).toEqual(otherExpected);
+      }else if(failure==='quota error'){
+        expect(record.revision).toBe(0);
+        expect(JSON.parse(record.raw)).toEqual(JSON.parse(seed.raw));
+      }else{
+        expect(record.revision).toBe(1);
+        expect(JSON.parse(record.raw)).toEqual(expected);
+        expect(record.previous.revision).toBe(0);
+        expect(JSON.parse(record.previous.raw)).toEqual(JSON.parse(seed.raw));
+      }
+      if(failure==='readback aborted'){
+        expect(await other.evaluate(()=>InsightIndexedDBStorageV1.diagnose({verifyInterrupted:true})))
+          .toMatchObject({state:'hold',observedRevision:1,recovery:'save-verified'});
+      }
+      expect(await other.evaluate(()=>localStorage.getItem('insight_v11'))).toBe(seed.raw);
+    }finally{await other.close();}
+  });
+}

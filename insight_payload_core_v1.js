@@ -120,16 +120,19 @@ function wxKey(year,mName,day){return`${year}-${mName}-${day}`;}
 function getSharedWeather(year,mName,day){
   return(allStores.sharedWeather||{})[wxKey(year,mName,day)]||"";
 }
-function setSharedWeather(year,mName,day,wx){
-  if(!allStores.sharedWeather)allStores.sharedWeather={};
-  allStores.sharedWeather[wxKey(year,mName,day)]=wx;
+function updateSharedWeather(snapshot,year,mName,day,wx){
+  if(!snapshot.sharedWeather)snapshot.sharedWeather={};
+  snapshot.sharedWeather[wxKey(year,mName,day)]=wx;
   // 全店舗の同じ日付に反映
-  Object.values(allStores.stores).forEach(st=>{
+  Object.values(snapshot.stores).forEach(st=>{
     const rows=st.data?.[year]?.[mName];
     if(!rows)return;
     const ri=parseInt(day)-1;
     if(rows[ri])rows[ri].weather=wx;
   });
+}
+function setSharedWeather(year,mName,day,wx){
+  updateSharedWeather(allStores,year,mName,day,wx);
   persist();
 }
 function applySharedWeatherToStore(st,snapshot=allStores){
@@ -872,6 +875,21 @@ async function fetchWeather(){
   }
 }
 
+function readQuickValues(itemsValue=document.getElementById("qi_買上点数")?.value){
+  const haiki={};
+  let waste=0;
+  HAIKI_CATS.forEach(category=>{
+    haiki[category]=fromComma(document.getElementById(`qi_h_${category}`)?.value)||0;
+    waste+=haiki[category];
+  });
+  return {
+    売上:fromComma(document.getElementById("qi_売上")?.value)||0,
+    客数:Number(document.getElementById("qi_客数")?.value)||0,
+    買上点数:parseFloat(itemsValue)||0,
+    haiki,廃棄金額:waste,weather:quickWeather
+  };
+}
+
 function saveQuick(){
   const fy=todayInfo.fy,month=todayInfo.month;
   if(!store.data[fy])store.data[fy]=blankYearData(fy);
@@ -879,16 +897,7 @@ function saveQuick(){
   const rows=store.data[fy][month];
   const ri=quickEditDay-1;
   if(!rows[ri])rows[ri]=blankRow(quickEditDay);
-  const r=rows[ri];
-  r.売上=fromComma(document.getElementById("qi_売上")?.value)||0;
-  r.客数=Number(document.getElementById("qi_客数")?.value)||0;
-  r.買上点数=parseFloat(document.getElementById("qi_買上点数")?.value)||0;
-  const h={};let total=0;
-  HAIKI_CATS.forEach(c=>{
-    h[c]=fromComma(document.getElementById(`qi_h_${c}`)?.value)||0;
-    total+=h[c];
-  });
-  r.haiki=h;r.廃棄金額=total;r.weather=quickWeather;
+  Object.assign(rows[ri],readQuickValues());
   setSharedWeather(fy,month,quickEditDay,quickWeather);
   persist();
   // Flash feedback
