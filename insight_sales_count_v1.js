@@ -294,14 +294,20 @@
     function notifyPeriodChange(){
       try{root.dispatchEvent(new CustomEvent('insight:sales-count-period-change',{detail:{year:state.year,month:state.month}}));}catch(_){}
     }
-    function setPeriod(year,month){
+    function setPeriod(year,month,confirmed){
       if(preview&&(!preview.canEdit()||categoryDialog?.open))return false;
       var y=Number(year),m=Number(month);
       if(!Number.isInteger(y)||y<1000||!Number.isInteger(m)||m<1||m>12)return false;
       // A no-op route sync only displays the period; it must not attempt year registration.
       if(String(y)===state.year&&m===state.month)return true;
-      if(preview&&!yearRegistered(y))return false;
-      if(!confirmLeave())return false;
+      if(preview&&!yearRegistered(y)){
+        var management=root.InsightIndexedDBSalesInputPreviewV1;
+        if(management?.managesYears()){
+          void management.promoteForPeriod(y,'salesCounts','販売数',()=>setPeriod(y,m,true));
+        }
+        return false;
+      }
+      if(!confirmed&&!confirmLeave())return false;
       // Observe the outermost period change: year promotion can persist before
       // readMonth/render finish. Unknown early exits remain HELD, never CLEAN.
       return observeForecastOperation('sales_period_change',function(markOutcome){

@@ -139,17 +139,23 @@
   model.cleanupLegacy=syncAll;
   model.legacyCleanupMode='runtime';
 
-  function apply(config,year,month){
+  function apply(config,year,month,confirmed){
     year=validYear(year);month=monthNumber(month);
     if(!year||!month)return false;
     var preview=root.InsightIndexedDBSalesInputPreviewV1;
     var allowedPeriod=preview?.allowPeriod?.(config.type,year);
-    if(allowedPeriod===false)return false;
+    if(allowedPeriod===false){
+      if(preview.managesYears?.()&&!registered(year)){
+        void preview.promoteForPeriod(year,{sales:2,kyaku:3,haiki:4}[config.type],config.label,
+          ()=>apply(config,year,month,true));
+      }
+      return false;
+    }
     if(allowedPeriod===true){
       var displayed=period(config);
       if(displayed&&year===displayed.year&&month===displayed.month)return true;
     }
-    if(preview?.getConnectedStatus(config.type)){
+    if(!(confirmed&&preview?.managesYears?.())&&preview?.getConnectedStatus(config.type)){
       var current=period(config);
       if((!current||year!==current.year||month!==current.month)&&
          !preview.allowNavigation(config.type,'保存せずに別の日付へ移動しますか？'))return false;

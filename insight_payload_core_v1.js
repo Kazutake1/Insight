@@ -591,7 +591,7 @@ function renderStoreSelection(id,beforeRender){
   document.getElementById("storeMenu").classList.remove("is-open");
 }
 
-function showStoreMenu(){
+function showStoreMenu(previewAction){
   const menu=document.getElementById("storeMenu");
   if(menu.classList.contains("is-open")){menu.classList.remove("is-open");return;}
   menu.innerHTML="";
@@ -601,6 +601,7 @@ function showStoreMenu(){
   rename.className="store-menu-item";
   rename.innerHTML=`<span>✏️</span> 店舗名を変更`;
   rename.onclick=()=>{
+    if(typeof previewAction==="function")return previewAction("rename");
     const cur=allStores.stores[allStores.current];
     const name=prompt("店舗名を入力してください",cur.name);
     if(name&&name.trim()){
@@ -615,6 +616,7 @@ function showStoreMenu(){
   add.className="store-menu-item";
   add.innerHTML=`<span>＋</span> 新しい店舗を追加`;
   add.onclick=()=>{
+    if(typeof previewAction==="function")return previewAction("add");
     const name=prompt("新しい店舗名を入力してください","店舗2");
     if(name&&name.trim()){
       const id=genStoreId();
@@ -636,6 +638,7 @@ function showStoreMenu(){
     del.className="store-menu-item danger";
     del.innerHTML=`<span>🗑</span> この店舗を削除`;
     del.onclick=()=>{
+      if(typeof previewAction==="function")return previewAction("delete");
       const cur=allStores.stores[allStores.current];
       if(!confirm(`「${cur.name}」を削除します。\nこの店舗のデータはすべて消えます。よろしいですか？`)){
         menu.classList.remove("is-open");return;

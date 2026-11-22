@@ -1287,6 +1287,202 @@ for(const operation of ['store','year']){
   }
 }
 
+test('management preview saves a store rename, add and delete as separate revisions',async({page})=>{
+  const seed=await openQuickInputPreview(page,{followMonthlyInputs:true,manageStoresAndYears:true,seedManagement:true});
+  const expected=JSON.parse(seed.raw);
+  await page.locator('#nav2').click();
+  const menu=page.locator('#storeMenu');
+  const open=()=>page.locator('#storeMenuBtn').click();
+  const status=page.locator('#storeSel + [role=status]');
+
+  await open();
+  page.once('dialog',dialog=>dialog.accept('架空の名称変更'));
+  await menu.getByRole('button',{name:/店舗名を変更/}).click();
+  await expect(status).toHaveText('保存しました。');
+  expected.stores[seed.active].name='架空の名称変更';
+  expect(await committedInput(page)).toEqual({revision:1,snapshot:expected});
+
+  await open();
+  page.once('dialog',dialog=>dialog.accept('架空の追加店舗'));
+  await menu.getByRole('button',{name:/新しい店舗を追加/}).click();
+  await expect(page.locator('#storeSel option:checked')).toHaveText('架空の追加店舗');
+  const id=await page.locator('#storeSel').inputValue();
+  expect(id).not.toBe(seed.active);
+  const added=await page.evaluate(()=>({year:todayFY().fy,data:blankYearData(todayFY().fy)}));
+  expected.current=id;
+  expected.stores[id]={name:'架空の追加店舗',years:[added.year],data:{[added.year]:added.data}};
+  expect(await committedInput(page)).toEqual({revision:2,snapshot:expected});
+
+  await open();
+  page.once('dialog',dialog=>dialog.dismiss());
+  await menu.getByRole('button',{name:/この店舗を削除/}).click();
+  expect(await committedInput(page)).toEqual({revision:2,snapshot:expected});
+  page.once('dialog',dialog=>dialog.accept());
+  await menu.getByRole('button',{name:/この店舗を削除/}).click();
+  await expect(page.locator('#storeSel')).toHaveValue(seed.active);
+  delete expected.stores[id];
+  expected.current=seed.active;
+  expected.stores[seed.active].data[seed.year][seed.month][seed.day].weather='雨';
+  expect(await committedInput(page)).toEqual({revision:3,snapshot:expected});
+  expect(await page.evaluate(()=>localStorage.getItem('insight_v11'))).toBe(seed.raw);
+});
+
+test('management preview adds and deletes a year through the existing settings controls',async({page})=>{
+  const seed=await openQuickInputPreview(page,{followMonthlyInputs:true,manageStoresAndYears:true,
+    seedManagement:true,seedCounts:true,seedHours:true});
+  await page.locator('#navSettings').click();
+  const added=String(Number(seed.year)-2);
+  await page.locator('#addYearBtn').click();
+  await page.locator('#ayInput').fill(added);
+  await page.locator('#ayAddBtn').click();
+  await expect(page.locator('#insightSettingsYearSection [role=status]')).toHaveText('保存しました。');
+  const expected=JSON.parse(seed.raw);
+  const shop=expected.stores[seed.active];
+  shop.years=[...shop.years,added].sort();
+  shop.data[added]=await page.evaluate(year=>blankYearData(year),added);
+  expect(await committedInput(page)).toEqual({revision:1,snapshot:expected});
+
+  const overlay=page.locator('#insightYearDeleteOverlay');
+  await page.locator('#insightDeleteYearButton').click();
+  await overlay.locator('select').selectOption(seed.year);
+  await overlay.getByRole('button',{name:'キャンセル'}).click();
+  await expect(overlay).toBeHidden();
+  expect(await committedInput(page)).toEqual({revision:1,snapshot:expected});
+  await page.locator('#insightDeleteYearButton').click();
+  await overlay.locator('select').selectOption(seed.year);
+  await overlay.getByRole('button',{name:'削除する'}).click();
+  await expect(overlay).toBeHidden();
+  shop.years=shop.years.filter(year=>year!==seed.year);
+  delete shop.data[seed.year];
+  delete shop.monthlyOps[seed.year];
+  for(const key of ['salesCounts','wasteCounts','hourlyCustomers']){
+    for(const date of Object.keys(shop[key])){
+      if(date.startsWith(seed.year+'-'))delete shop[key][date];
+    }
+  }
+  expect(await committedInput(page)).toEqual({revision:2,snapshot:expected});
+  expect(await page.evaluate(()=>InsightDateContext.getSelectedIso())).not.toBe(seed.iso);
+  expect(await page.evaluate(()=>localStorage.getItem('insight_v11'))).toBe(seed.raw);
+});
+
+for(const entrance of ['quick','sales','salesCounts']){
+  test('management preview registers an unregistered year from '+entrance,async({page})=>{
+    const seed=await openQuickInputPreview(page,{followMonthlyInputs:true,manageStoresAndYears:true});
+    const year=String(Number(seed.year)-2);
+    if(entrance==='sales')await page.locator('#nav2').click();
+    if(entrance==='salesCounts')await page.locator('#navSalesCount').click();
+    const apply=()=>page.evaluate(({entrance,year})=>{
+      if(entrance==='sales')return InsightInputPeriodControls.apply(InsightInputPeriodControls.configs[0],year,6);
+      if(entrance==='salesCounts')return InsightSalesCount.setPeriod(year,6);
+      const field=document.getElementById('iqdDateInput');
+      field.value=year+'-06-12';
+      return field.dispatchEvent(new Event('change',{bubbles:true}));
+    },{entrance,year});
+    await page.evaluate(()=>{window.confirm=()=>false;});
+    await apply();
+    const expected=JSON.parse(seed.raw);
+    expect(await committedInput(page)).toEqual({revision:0,snapshot:expected});
+    await page.evaluate(()=>{window.confirm=()=>true;});
+    await apply();
+    await expect(page.locator('#storeSel + [role=status]')).toHaveText('保存しました。');
+    const shop=expected.stores[seed.active];
+    shop.years=[...shop.years,year].sort();
+    shop.data[year]=await page.evaluate(year=>blankYearData(year),year);
+    expect(await committedInput(page)).toEqual({revision:1,snapshot:expected});
+    await expect.poll(()=>page.evaluate(entrance=>{
+      if(entrance==='sales')return String(editYear.sales);
+      if(entrance==='salesCounts')return InsightSalesCount.getPeriod().year;
+      return InsightDateContext.getSelectedIso().slice(0,4);
+    },entrance)).toBe(year);
+    expect(await page.evaluate(()=>localStorage.getItem('insight_v11'))).toBe(seed.raw);
+  });
+}
+
+for(const [operation,failure] of [
+  ['store','quota'],['store','conflict'],['store','changed confirmation'],
+  ['year','readback failure'],['year','tab close']
+]){
+  test('management preview stops '+operation+' deletion on '+failure,async({page,context})=>{
+    const seed=await openQuickInputPreview(page,{followMonthlyInputs:true,manageStoresAndYears:true,
+      seedManagement:true,seedCounts:true,seedHours:true});
+    const observer=await openStoreSwitchPeer(context);
+    const expected=JSON.parse(seed.raw);
+    const closed=failure==='tab close';
+    const written=closed||failure==='readback failure';
+    try{
+      if(failure==='conflict'){
+        await observer.evaluate(async id=>{
+          const api=InsightIndexedDBStorageV1,record=await api.read();
+          record.snapshot.stores[id].name='削除より先に別タブで保存';
+          await api.save(record.revision,record.snapshot);
+        },seed.peer);
+        expected.stores[seed.peer].name='削除より先に別タブで保存';
+      }
+      if(written)await interruptCountReadback(page,failure);
+      if(failure==='quota')await page.evaluate(()=>{
+        const put=IDBObjectStore.prototype.put;
+        IDBObjectStore.prototype.put=function(){
+          IDBObjectStore.prototype.put=put;
+          throw new DOMException('Fictional management quota error','QuotaExceededError');
+        };
+      });
+      if(operation==='store'){
+        await page.locator('#nav2').click();
+        await page.evaluate(iso=>InsightInputDayNav.select('sales',iso),seed.iso);
+        const sales=page.locator('#sf_売上');
+        await fillCombinedInput(sales,'123');
+        await page.locator('#storeMenuBtn').click();
+        await page.evaluate(failure=>{window.confirm=message=>{
+          if(failure==='changed confirmation'&&message.includes('すべて消えます')){
+            const input=document.getElementById('sf_売上');
+            input.value='124';
+            input.dispatchEvent(new Event('input',{bubbles:true}));
+          }
+          return true;
+        };},failure);
+        await page.locator('#storeMenu').getByRole('button',{name:/この店舗を削除/}).click();
+        await expect(page.locator('#storeSel + [role=status]')).toHaveText(/追加の保存を停止しました/);
+        await expect(sales).toHaveValue(failure==='changed confirmation'?'124':'123');
+      }else{
+        await page.locator('#navSettings').click();
+        await page.locator('#insightDeleteYearButton').click();
+        const dialog=page.locator('#insightYearDeleteDialog');
+        await dialog.locator('select').selectOption(seed.year);
+        await dialog.getByRole('button',{name:'削除する'}).click();
+        if(closed)await page.waitForFunction(()=>window.countReadbackPaused===true);
+        else await expect(dialog.getByRole('status')).toHaveText(/追加の保存を停止しました/);
+        await expect(dialog.locator('select')).toHaveValue(seed.year);
+      }
+      expect(await page.evaluate(()=>combinedPreview.getStatus().state)).toBe(closed?'ACTIVE':'HELD');
+      expect(await page.locator('#storeSel').inputValue()).toBe(seed.active);
+      if(closed)await page.close();
+      if(written){
+        await expect.poll(()=>observer.evaluate(async closed=>{
+          try{return await InsightIndexedDBStorageV1.diagnose({verifyInterrupted:true});}
+          catch(error){
+            if(closed&&error.message==='Another Insight operation is in progress')return null;
+            throw error;
+          }
+        },closed)).toMatchObject({state:'hold',observedRevision:1,recovery:'save-verified'});
+        const shop=expected.stores[seed.active];
+        shop.years=shop.years.filter(year=>year!==seed.year);
+        delete shop.data[seed.year];
+        delete shop.monthlyOps[seed.year];
+        for(const key of ['salesCounts','wasteCounts','hourlyCustomers']){
+          for(const date of Object.keys(shop[key])){
+            if(date.startsWith(seed.year+'-'))delete shop[key][date];
+          }
+        }
+      }
+      const record=await readStoreSwitchRecord(observer);
+      expect(record.revision).toBe(written||failure==='conflict'?1:0);
+      expect(JSON.parse(record.raw)).toEqual(expected);
+      if(record.revision===1)expect(record.previous.raw).toBe(seed.raw);
+      expect(await observer.evaluate(()=>localStorage.getItem('insight_v11'))).toBe(seed.raw);
+    }finally{await observer.close();}
+  });
+}
+
 test('manual adoption uses the real encrypted backup confirmation and preserves the legacy source',async({page})=>{
   await routeMigrationPage(page);
   async function open(){
@@ -3351,7 +3547,7 @@ for(const failure of ['readback abort','acknowledgement lost','tab closed during
 }
 
 async function openQuickInputPreview(page,{sameMunicipality=true,followMonthlyInputs=false,seedCounts=false,
-  seedHours=false,seedDailyClear=false,seedYearBoundary=false,seedManagement=false}={}){
+  seedHours=false,seedDailyClear=false,seedYearBoundary=false,seedManagement=false,manageStoresAndYears=false}={}){
   await routeMigrationPage(page);
   await page.goto('/Index.html');
   await waitForMigrationChecks(page);
@@ -3361,7 +3557,7 @@ async function openQuickInputPreview(page,{sameMunicipality=true,followMonthlyIn
     await page.waitForFunction(()=>typeof InsightHourlyCustomers?.connectIndexedDBPreview==='function');
     await page.addScriptTag({url:'/insight_indexeddb_sales_input_preview_v1.js'});
   }
-  return page.evaluate(async ({sameMunicipality,followMonthlyInputs,seedCounts,seedHours,seedDailyClear,seedYearBoundary,seedManagement})=>{
+  return page.evaluate(async ({sameMunicipality,followMonthlyInputs,seedCounts,seedHours,seedDailyClear,seedYearBoundary,seedManagement,manageStoresAndYears})=>{
     const year=String(Number(todayFY().fy)-1),month='6月',day=12;
     const iso=year+'-06-12',active=allStores.current,peer='fictional-quick-peer';
     store.data[year]=blankYearData(year);
@@ -3426,11 +3622,11 @@ async function openQuickInputPreview(page,{sameMunicipality=true,followMonthlyIn
     await InsightIndexedDBStorageV1.migrate({legacyClientsClosed:true});
     if(followMonthlyInputs){
       window.combinedPreview=await InsightIndexedDBSalesInputPreviewV1.connect('sales',{
-        followInputScreens:true,followQuickInput:true
+        followInputScreens:true,followQuickInput:true,manageStoresAndYears
       });
     }else window.quickPreview=await InsightIndexedDBQuickInputPreviewV1.connect();
     return {year,month,day,iso,active,peer,raw,category:HAIKI_CATS[0],countCategory:countCategory.id,otherCategory:otherCategory.id};
-  },{sameMunicipality,followMonthlyInputs,seedCounts,seedHours,seedDailyClear,seedYearBoundary,seedManagement});
+  },{sameMunicipality,followMonthlyInputs,seedCounts,seedHours,seedDailyClear,seedYearBoundary,seedManagement,manageStoresAndYears});
 }
 
 async function editQuickInput(page,category){

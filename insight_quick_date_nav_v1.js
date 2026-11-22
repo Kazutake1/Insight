@@ -39,9 +39,19 @@
   }
   function selectDate(date,preserveDatePicker){
     if(!date||typeof date.getTime!=='function'||!Number.isFinite(date.getTime())||dateContext.iso(date)===dateContext.getSelectedIso())return;
+    var management=window.InsightIndexedDBSalesInputPreviewV1,year=String(date.getFullYear());
+    if(management?.managesYears()&&!dateContext.isFuture(date)&&!window.InsightYearManager.isCurrentRegistered(year)){
+      // The date picker stores its proposed value before it dispatches change.
+      if(preserveDatePicker)document.getElementById('iqdDateInput').value=dateContext.getSelectedIso();
+      void management.promoteForPeriod(year,0,'この日付',()=>applySelectedDate(date,preserveDatePicker));
+      return;
+    }
     if(window.InsightIndexedDBQuickInputPreviewV1?.allowDateChange(date)===false)return;
     if(hasUnsavedInput()&&!window.confirm('未保存の入力があります。\n保存せずに別の日付へ移動しますか？'))return;
     if(!ensureRegisteredYear(date))return;
+    applySelectedDate(date,preserveDatePicker);
+  }
+  function applySelectedDate(date,preserveDatePicker){
     dateContext.setSelectedDate(date);
     quickEditDay=dateContext.getSelectedInfo().day;
     if(preserveDatePicker){
