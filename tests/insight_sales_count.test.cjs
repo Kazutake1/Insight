@@ -236,7 +236,7 @@ test('廃棄数3行目は販売数入力ページだけに追加し既存平均�
   const css=fs.readFileSync(path.join(__dirname,'..','insight_payload_core_v1.css'),'utf8');
   assert.match(source,/wasteRow\.append\(buildWasteInput/);
   assert.match(source,/nextStore\.wasteCounts=savedWaste/);
-  assert.match(source,/persistTransaction\(next\);state\.wasteTouched=\{\};setDirty\(false\)/);
+  assert.match(source,/persistTransaction\(next\);finishSave\(\)/);
   assert.match(css,/#pageSalesCount \.sc-calendar>\.sc-day:not\(\.empty\)/);
   assert.doesNotMatch(source,/function createAverageCard[^\n]*sc-total-waste/);
 });
@@ -255,7 +255,9 @@ test('廃棄集計と参照で過去の対象便の不明状態を保持する',
 test('廃棄数の保存成功時のみ編集済みフラグを初期化する',()=>{
   const source=fs.readFileSync(path.join(__dirname,'..','insight_sales_count_v1.js'),'utf8');
   const save=source.slice(source.indexOf('function save(){'),source.indexOf('function notifyPeriodChange()'));
-  assert.match(save,/persistTransaction\(next\);state\.wasteTouched=\{\};setDirty\(false\)/);
+  assert.match(save,/persistTransaction\(next\);finishSave\(\)/);
+  assert.match(source,/function finishSave\(\)\{\s*state\.wasteTouched=\{\};setDirty\(false\)/);
+  assert.match(source,/return commit\(\)\.then\(function\(saved\)\{\s*if\(saved\)\{finishSave\(\)/);
   assert.match(save,/catch\(e\)\{markOutcome\('failed'\);alert\('販売数を保存できませんでした/);
 });
 
