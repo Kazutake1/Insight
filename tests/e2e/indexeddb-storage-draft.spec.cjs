@@ -1811,3 +1811,78 @@ test('sales, customer and waste screens share one committed revision when switch
     expect(await page.evaluate(()=>localStorage.getItem('insight_v11'))).toBe(seed.raw);
   }finally{await other.close();}
 });
+
+test('isolated store selection keeps drafts on cancellation and changes the save target only after commit',async({page})=>{
+  const seed=await openMonthlySalesPreview(page,{followInputScreens:true});
+  const sales=page.locator('#sf_売上'),save=page.locator('#salesSaveBtn'),selector=page.locator('#storeSel');
+  const peer='fictional-second-shop';
+  await page.evaluate(()=>{renderStoreSel();});
+  await sales.click();
+  await sales.fill('891');
+  await page.evaluate(()=>{
+    window.storeDecisions=[];
+    window.approveStoreSwitch=false;
+    window.confirm=message=>{storeDecisions.push(message);return approveStoreSwitch;};
+  });
+  await selector.selectOption(peer);
+  await expect(selector).toHaveValue(seed.active);
+  await expect(sales).toHaveValue('891');
+  expect(await page.evaluate(()=>storeDecisions)).toEqual(['未保存の入力があります。\n保存せずに店舗を切り替えますか？']);
+  expect(await page.evaluate(()=>InsightIndexedDBStorageV1.read().then(value=>value.revision))).toBe(0);
+
+  await page.evaluate(()=>{
+    window.approveStoreSwitch=true;
+    const digest=crypto.subtle.digest,resume=[];
+    window.storeSwitchDigests=resume;
+    crypto.subtle.digest=async function(...args){
+      await new Promise(resolve=>resume.push(resolve));
+      return digest.apply(this,args);
+    };
+    window.resumeStoreSwitch=()=>{
+      crypto.subtle.digest=digest;
+      resume.forEach(resolve=>resolve());
+    };
+  });
+  await selector.selectOption(peer);
+  await page.waitForFunction(()=>storeSwitchDigests.length===2);
+  await expect(selector).toHaveValue(seed.active);
+  await expect(save).toBeDisabled();
+  expect(await page.evaluate(()=>allStores.current)).toBe(seed.active);
+  expect(await page.evaluate(()=>switchStore('fictional-second-shop'))).toBe(false);
+  expect(await page.evaluate(()=>gotoNav(3))).toBe(false);
+  await page.evaluate(()=>resumeStoreSwitch());
+  await expect(selector).toHaveValue(peer);
+  await expect(page.locator('#storeSel + [role=status]')).toHaveText('店舗を切り替えました。');
+  expect(await page.evaluate(()=>storeDecisions.length)).toBe(2);
+  const expected=JSON.parse(seed.raw);
+  expected.current=peer;
+  expect(await page.evaluate(()=>InsightIndexedDBStorageV1.read())).toEqual({revision:1,snapshot:expected});
+
+  const date=seed.year+'-'+String(Number.parseInt(seed.month)).padStart(2,'0')+'-'+String(seed.day).padStart(2,'0');
+  await page.evaluate(date=>InsightInputDayNav.select('sales',date),date);
+  await expect(sales).toHaveValue('42');
+  await sales.click();
+  await sales.fill('789');
+  await save.click();
+  await expect(page.locator('#savedSales')).toHaveClass(/is-visible/);
+  expected.stores[peer].data[seed.year][seed.month][seed.day-1].売上=789;
+  expect(await page.evaluate(()=>InsightIndexedDBStorageV1.read())).toEqual({revision:2,snapshot:expected});
+  await sales.click();
+  await sales.fill('999');
+  await page.evaluate(()=>{
+    const put=IDBObjectStore.prototype.put;
+    IDBObjectStore.prototype.put=function(){
+      IDBObjectStore.prototype.put=put;
+      throw new DOMException('Fictional quota error','QuotaExceededError');
+    };
+  });
+  await selector.selectOption(seed.active);
+  await expect(page.locator('#storeSel + [role=status]'))
+    .toHaveText('店舗切替の結果を確認できないため、追加の保存を停止しました。');
+  await expect(selector).toHaveValue(peer);
+  await expect(sales).toHaveValue('999');
+  await expect(save).toBeDisabled();
+  expect(await page.evaluate(()=>InsightIndexedDBStorageV1.diagnose({verifyInterrupted:true})))
+    .toMatchObject({state:'hold',observedRevision:2,recovery:'prior-save-verified'});
+  expect(await page.evaluate(()=>localStorage.getItem('insight_v11'))).toBe(seed.raw);
+});

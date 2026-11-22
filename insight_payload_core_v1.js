@@ -132,8 +132,8 @@ function setSharedWeather(year,mName,day,wx){
   });
   persist();
 }
-function applySharedWeatherToStore(st){
-  const sw=allStores.sharedWeather||{};
+function applySharedWeatherToStore(st,snapshot=allStores){
+  const sw=snapshot.sharedWeather||{};
   Object.entries(sw).forEach(([key,wx])=>{
     const [year,mName,day]=key.split('-');
     if(!mName||!day)return;
@@ -565,6 +565,13 @@ function renderStoreSel(){
 
 function switchStore(id){
   if(!allStores.stores[id])return;
+  renderStoreSelection(id,()=>{
+    applySharedWeatherToStore(store);
+    persist();
+  });
+}
+
+function renderStoreSelection(id,beforeRender){
   allStores.current=id;
   store=allStores.stores[id];
   baseYear=store.years[store.years.length-1];
@@ -572,9 +579,7 @@ function switchStore(id){
   editYear={sales:baseYear,kyaku:baseYear,haiki:baseYear};
   const t=todayFY();
   editMonth={sales:t.month,kyaku:t.month,haiki:t.month};
-  // 共有天気を新店舗に適用
-  applySharedWeatherToStore(store);
-  persist();
+  if(beforeRender)beforeRender();
   renderStoreSel();
   if(currentNav===0)initQuickPage();
   else if(currentNav===1)refreshDash();

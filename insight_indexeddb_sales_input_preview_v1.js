@@ -29,7 +29,7 @@
 
     const api=root.InsightIndexedDBStorageV1;
     let committed=await api.read();
-    const sessionStore=allStores.current;
+    let sessionStore=allStores.current;
     let target=displayedPeriod();
     function matchesPeriod(){
       return currentNav===screen.route&&allStores.current===target.storeId&&
@@ -117,7 +117,9 @@
         const period=displayedPeriod();
         attachments.set(type,{target:{...period,storeId:sessionStore},...controlsFor(screen)});
       }
-      ({target,button,notice,status}=attachments.get(type));
+      const attachment=attachments.get(type);
+      attachment.target??={...displayedPeriod(),storeId:sessionStore};
+      ({target,button,notice,status}=attachment);
       connectedType=type;
     }
     let held=false,busy=false,timer;
@@ -126,7 +128,7 @@
       try{
         dirty=currentNav===screen.route&&((matchesPeriod()&&!matchesScreen())||changes(displayedPeriod()).length>0);
       }catch(_){}
-      return {state:held?'HELD':busy?'ACTIVE':'IDLE_OBSERVED',hasUnsavedInput:dirty};
+      return {state:held?'HELD':busy?'ACTIVE':'IDLE_OBSERVED',hasUnsavedInput:dirty||busy||held};
     };
     function stop(message){
       held=true;
@@ -242,6 +244,80 @@
       followCurrentScreen();
       return result;
     };
+    if(followInputScreens){
+      const selector=doc.getElementById('storeSel');
+      const storeStatus=doc.createElement('span');
+      storeStatus.setAttribute('role','status');
+      selector.parentNode.insertBefore(storeStatus,selector.nextSibling);
+
+      async function switchStore(id){
+        // The browser changes the select value before dispatching the change event.
+        selector.value=sessionStore;
+        if(busy||held||id===sessionStore||!Object.hasOwn(committed.snapshot.stores,id))return false;
+        if(currentNav!==screen.route){
+          storeStatus.textContent='試験用の店舗切替は月次入力画面で行ってください。';
+          return false;
+        }
+        if(allStores.current!==sessionStore||
+           root.InsightStorage.serialize(allStores)!==root.InsightStorage.serialize(committed.snapshot)){
+          stop('保存済みデータとの一致を確認できないため、店舗切替を停止しました。');
+          return false;
+        }
+        const dirty=getStatus().hasUnsavedInput;
+        if(!root.confirm(dirty
+          ?'未保存の入力があります。\n保存せずに店舗を切り替えますか？'
+          :'店舗を切り替えますか？'))return false;
+
+        const period=root.InsightPagePeriodSync?.getTarget();
+        const priorDraft=JSON.stringify(drafts[type]);
+        const candidate=JSON.parse(JSON.stringify(committed.snapshot));
+        candidate.current=id;
+        applySharedWeatherToStore(candidate.stores[id],candidate);
+        const wasInert=doc.body.inert;
+        clearTimeout(timer);
+        notice.classList.remove('is-visible');
+        busy=true;
+        selector.disabled=button.disabled=true;
+        doc.body.inert=true;
+        storeStatus.textContent='店舗の切替を確認しています。';
+        try{
+          const result=await api.save(committed.revision,candidate);
+          if(currentNav!==screen.route||allStores.current!==sessionStore||
+             root.InsightStorage.serialize(allStores)!==root.InsightStorage.serialize(committed.snapshot)||
+             JSON.stringify(drafts[type])!==priorDraft){
+            throw new Error('Store selection changed during save');
+          }
+          committed=result;
+          sessionStore=id;
+          allStores=JSON.parse(JSON.stringify(result.snapshot));
+          renderStoreSelection(id);
+          root.InsightPagePeriodSync?.reconcileCurrentStore(period);
+          for(const attachment of attachments.values())attachment.target=null;
+          target={...displayedPeriod(),storeId:sessionStore};
+          attachments.get(type).target=target;
+          storeStatus.textContent='店舗を切り替えました。';
+          return true;
+        }catch(_){
+          stop('店舗切替の結果を確認できないため、追加の保存を停止しました。');
+          storeStatus.textContent=status.textContent;
+          return false;
+        }finally{
+          busy=false;
+          doc.body.inert=wasInert;
+          selector.disabled=button.disabled=held;
+          selector.value=sessionStore;
+        }
+      }
+      selector.addEventListener('change',event=>{
+        event.stopImmediatePropagation();
+        void switchStore(selector.value);
+      },true);
+      root.switchStore=switchStore;
+      root.showStoreMenu=function(){
+        storeStatus.textContent='店舗の追加・変更・削除は試験対象外です。';
+        return false;
+      };
+    }
     allowConnectedNavigation=allowNavigation;
     connectedType=type;
     connectedStatus=getStatus;
