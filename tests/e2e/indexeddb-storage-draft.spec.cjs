@@ -524,7 +524,7 @@ for(const outcome of ['success','quota']){
 }
 
 test('combined hourly save deletes only the selected day when all hours are cleared',async({page})=>{
-  const seed=await openQuickInputPreview(page,{followMonthlyInputs:true});
+  const seed=await openQuickInputPreview(page,{followMonthlyInputs:true,seedHours:true});
   const expected=JSON.parse(seed.raw),button=page.locator('#hourlyCustomersQuick button');
   const dialog=page.locator('.hourly-dialog');
   await button.click();
@@ -549,7 +549,7 @@ test('combined hourly save deletes only the selected day when all hours are clea
   expect(await page.evaluate(()=>localStorage.getItem('insight_v11'))).toBe(seed.raw);
 });
 
-for(const failure of ['competing revision','lost acknowledgement','changed date','changed store']){
+for(const failure of ['competing revision','readback failure','lost acknowledgement','changed date','changed store']){
   test('combined hourly save holds the draft after '+failure,async({page,context})=>{
     const seed=await openQuickInputPreview(page,{followMonthlyInputs:true});
     await page.locator('#hourlyCustomersQuick button').click();
@@ -566,15 +566,31 @@ for(const failure of ['competing revision','lost acknowledgement','changed date'
           await api.save(record.revision,record.snapshot);
         },seed.peer);
         expected.stores[seed.peer].name='別タブで保存した架空店舗';
-      }else if(failure==='lost acknowledgement'){
-        await page.evaluate(()=>{
+      }else if(failure==='lost acknowledgement'||failure==='readback failure'){
+        await page.evaluate(failure=>{
           const write=InsightStorage.writeMetadata;
+          let writing=false;
           InsightStorage.writeMetadata=(key,value)=>{
-            if(key==='insight_indexeddb_adoption_v1'&&JSON.parse(value).state==='active')
-              throw new Error('Fictional lost hourly acknowledgement');
+            if(key==='insight_indexeddb_adoption_v1'){
+              const state=JSON.parse(value).state;
+              if(state==='writing')writing=true;
+              if(state==='active'&&failure==='lost acknowledgement')
+                throw new Error('Fictional lost hourly acknowledgement');
+            }
             return write(key,value);
           };
-        });
+          if(failure==='readback failure'){
+            const get=IDBObjectStore.prototype.get;
+            IDBObjectStore.prototype.get=function(...args){
+              const request=get.apply(this,args),tx=this.transaction;
+              if(writing&&tx.mode==='readonly'&&tx.db.name==='insight-store-snapshots-v1'){
+                IDBObjectStore.prototype.get=get;
+                request.addEventListener('success',()=>tx.abort());
+              }
+              return request;
+            };
+          }
+        },failure);
         const wanted=Array(24).fill(null);wanted[0]=19;
         expected.stores[seed.active].hourlyCustomers??={};
         expected.stores[seed.active].hourlyCustomers[seed.iso]=wanted;
@@ -596,7 +612,7 @@ for(const failure of ['competing revision','lost acknowledgement','changed date'
       const record=await readStoreSwitchRecord(peer);
       expect(record.revision).toBe(failure.startsWith('changed')?0:1);
       expect(JSON.parse(record.raw)).toEqual(expected);
-      if(failure==='lost acknowledgement'){
+      if(failure==='lost acknowledgement'||failure==='readback failure'){
         expect(JSON.parse(record.previous.raw)).toEqual(JSON.parse(seed.raw));
         expect(await peer.evaluate(()=>InsightIndexedDBStorageV1.diagnose({verifyInterrupted:true})))
           .toMatchObject({state:'hold',observedRevision:1,recovery:'save-verified'});
@@ -2747,7 +2763,7 @@ for(const failure of ['readback abort','acknowledgement lost','tab closed during
   });
 }
 
-async function openQuickInputPreview(page,{sameMunicipality=true,followMonthlyInputs=false,seedCounts=false}={}){
+async function openQuickInputPreview(page,{sameMunicipality=true,followMonthlyInputs=false,seedCounts=false,seedHours=false}={}){
   await routeMigrationPage(page);
   await page.goto('/Index.html');
   await waitForMigrationChecks(page);
@@ -2757,7 +2773,7 @@ async function openQuickInputPreview(page,{sameMunicipality=true,followMonthlyIn
     await page.waitForFunction(()=>typeof InsightHourlyCustomers?.connectIndexedDBPreview==='function');
     await page.addScriptTag({url:'/insight_indexeddb_sales_input_preview_v1.js'});
   }
-  return page.evaluate(async ({sameMunicipality,followMonthlyInputs,seedCounts})=>{
+  return page.evaluate(async ({sameMunicipality,followMonthlyInputs,seedCounts,seedHours})=>{
     const year=String(Number(todayFY().fy)-1),month='6月',day=12;
     const iso=year+'-06-12',active=allStores.current,peer='fictional-quick-peer';
     store.data[year]=blankYearData(year);
@@ -2773,6 +2789,11 @@ async function openQuickInputPreview(page,{sameMunicipality=true,followMonthlyIn
     Object.assign(second.data[year][month][day-1],{売上:87,客数:69,storeMemo:'別店舗の元メモ',
       tempMaxC:18,tempMinC:8});
     const [countCategory,otherCategory]=allStores.salesCountManagement.categories;
+    if(seedHours){
+      const hours=Array(24).fill(null);hours[0]=35;
+      store.hourlyCustomers={[year+'-06-11']:hours};
+      second.hourlyCustomers={[iso]:hours};
+    }
     if(seedCounts){
       countCategory.activeTrips=[true,false,true];
       const count={trips:[{delivery:8,sales:6},{delivery:22,sales:20},{delivery:3,sales:1}]};
@@ -2797,7 +2818,7 @@ async function openQuickInputPreview(page,{sameMunicipality=true,followMonthlyIn
       });
     }else window.quickPreview=await InsightIndexedDBQuickInputPreviewV1.connect();
     return {year,month,day,iso,active,peer,raw,category:HAIKI_CATS[0],countCategory:countCategory.id,otherCategory:otherCategory.id};
-  },{sameMunicipality,followMonthlyInputs,seedCounts});
+  },{sameMunicipality,followMonthlyInputs,seedCounts,seedHours});
 }
 
 async function editQuickInput(page,category){
