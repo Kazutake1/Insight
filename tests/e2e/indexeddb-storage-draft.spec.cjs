@@ -1178,3 +1178,117 @@ test('isolated startup and migration button gate the real shell and encrypted ba
   await expect(page.getByRole('status')).toHaveText('IndexedDBにコピーを確認しました。保存を停止しています。');
   await expect(page.locator('#quickGrid')).toHaveCount(0);
 });
+
+test('isolated adopted startup saves a single sales day after readback and stops on uncertain commit',async({page})=>{
+  const fixture='/isolated-adopted-sales-fixture';
+  await page.route('**'+fixture,route=>route.fulfill({
+    contentType:'text/html',
+    body:`<!doctype html><main id="sales-fixture"></main>
+      <script>window.SK='insight_v11';</script>
+      <script src="/insight_storage_v1.js"></script>
+      <script src="/insight_indexeddb_storage_v1.js"></script>
+      <script src="/insight_indexeddb_migration_preview_v1.js"></script>
+      <script src="/insight_indexeddb_sales_preview_v1.js"></script>
+      <script>
+        const pane=document.getElementById('sales-fixture');
+        InsightIndexedDBMigrationPreviewV1.start(pane,
+          ()=>{pane.textContent='旧方式の起動';},
+          ()=>InsightIndexedDBSalesPreviewV1.open(pane,{year:'2026',month:'4月',day:1}));
+      </script>`
+  }));
+  await page.goto(fixture);
+  const status=page.getByRole('status');
+  await expect(status).toHaveText('保存状態を確認できないため、起動と保存を停止しています。');
+  const source={
+    current:'a',stores:{
+      a:{name:'架空店舗A',years:['2025','2026'],data:{
+        2025:{'4月':[{d:1,売上:100}]},2026:{'4月':[{d:1,売上:123,客数:10,weather:'晴'},{d:2,売上:234}]}
+      }},
+      b:{name:'架空店舗B',years:['2025','2026'],data:{
+        2025:{'4月':[{d:1,売上:300}]},2026:{'4月':[{d:1,売上:345}]}
+      }}
+    }
+  };
+  const raw=JSON.stringify(source);
+  await page.evaluate(async raw=>{
+    localStorage.setItem('insight_v11',raw);
+    window.InsightMigrationBackupV1={assertReady(){},confirm:async()=>true};
+    await InsightIndexedDBStorageV1.migrate({legacyClientsClosed:true});
+  },raw);
+  await page.reload();
+  await expect(page.getByText('架空店舗A 2026年度 4月1日')).toBeVisible();
+  const input=page.getByRole('spinbutton',{name:'売上（円）'});
+  const save=page.getByRole('button',{name:'売上を保存'});
+  await expect(input).toHaveValue('123');
+  const confirmed=page.getByText(/^確定済みの売上 /);
+
+  // Delay the committed record readback while the real IndexedDB transaction runs.
+  await page.evaluate(()=>{
+    const writeMetadata=InsightStorage.writeMetadata;
+    let delayRead=false;
+    InsightStorage.writeMetadata=(key,value)=>{
+      const result=writeMetadata(key,value);
+      if(key==='insight_indexeddb_adoption_v1'&&JSON.parse(value).state==='writing')delayRead=true;
+      return result;
+    };
+    const get=IDBObjectStore.prototype.get;
+    IDBObjectStore.prototype.get=function(...args){
+      const request=get.apply(this,args);
+      if(delayRead&&this.transaction.mode==='readonly'&&this.transaction.db.name==='insight-store-snapshots-v1'){
+        delayRead=false;
+        const transaction=this.transaction;
+        const oncomplete=Object.getOwnPropertyDescriptor(IDBTransaction.prototype,'oncomplete');
+        Object.defineProperty(transaction,'oncomplete',{
+          set(listener){
+            oncomplete.set.call(this,event=>{
+              window.releaseSalesReadback=()=>listener.call(this,event);
+            });
+          }
+        });
+      }
+      return request;
+    };
+    window.restoreSalesHooks=()=>{
+      InsightStorage.writeMetadata=writeMetadata;
+      IDBObjectStore.prototype.get=get;
+    };
+  });
+  await input.fill('456');
+  await save.click();
+  await page.waitForFunction(()=>typeof window.releaseSalesReadback==='function');
+  await expect(status).toHaveText('保存を確認しています。');
+  await expect(save).toBeDisabled();
+  await expect(input).toHaveValue('456');
+  await expect(confirmed).toHaveText('確定済みの売上 123円');
+  await page.evaluate(()=>{window.restoreSalesHooks();window.releaseSalesReadback();});
+  await expect(status).toHaveText('売上を保存しました。');
+  await expect(confirmed).toHaveText('確定済みの売上 456円');
+
+  const saved=JSON.parse(raw);
+  saved.stores.a.data['2026']['4月'][0].売上=456;
+  expect(await page.evaluate(()=>InsightIndexedDBStorageV1.read())).toEqual({revision:1,snapshot:saved});
+  expect(await page.evaluate(()=>localStorage.getItem('insight_v11'))).toBe(raw);
+  await page.reload();
+  await expect(input).toHaveValue('456');
+
+  await page.evaluate(()=>{
+    const writeMetadata=InsightStorage.writeMetadata;
+    InsightStorage.writeMetadata=(key,value)=>{
+      if(key==='insight_indexeddb_adoption_v1'&&JSON.parse(value).state==='active')
+        throw new Error('Fixture lost commit acknowledgement');
+      return writeMetadata(key,value);
+    };
+  });
+  await input.fill('789');
+  await save.click();
+  await expect(status).toHaveText('保存結果を確認できないため、追加の保存を停止しました。');
+  await expect(input).toHaveValue('789');
+  await expect(confirmed).toHaveText('確定済みの売上 456円');
+  await expect(save).toBeDisabled();
+  expect(await page.evaluate(()=>InsightIndexedDBStorageV1.diagnose({verifyInterrupted:true})))
+    .toEqual({state:'hold',reason:'writing',observedRevision:2,recovery:'save-verified'});
+  expect(await page.evaluate(()=>localStorage.getItem('insight_v11'))).toBe(raw);
+  await page.reload();
+  await expect(status).toHaveText('保存状態を確認できないため、起動と保存を停止しています。');
+  await expect(save).toHaveCount(0);
+});

@@ -12,11 +12,15 @@
     return root.InsightIndexedDBStorageV1;
   }
 
-  async function start(container,loadLegacy){
+  async function start(container,loadLegacy,loadAdopted){
     container.textContent='保存状態を確認しています。';
     const diagnostic=await storage().diagnoseStartup();
     if(diagnostic.state==='legacy'){
       loadLegacy();
+      return;
+    }
+    if(diagnostic.reason==='indexeddb-adopted'&&typeof loadAdopted==='function'){
+      await loadAdopted();
       return;
     }
     const message=diagnostic.reason==='indexeddb-adopted'
