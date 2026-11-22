@@ -1293,107 +1293,121 @@ test('isolated adopted startup saves a single sales day after readback and stops
   await expect(save).toHaveCount(0);
 });
 
-test('the existing sales save button saves monthly sales and shared weather together in isolation',async({page})=>{
-  await routeMigrationPage(page);
-  await page.goto('/Index.html');
-  await waitForMigrationChecks(page);
-  await page.locator('#nav2').click();
-  await page.waitForFunction(()=>window.InsightInputDayNav?.getSelectedIso('sales')&&
-    document.getElementById('sf_売上'));
-  await page.addScriptTag({url:'/insight_indexeddb_storage_v1.js'});
-  await page.addScriptTag({url:'/insight_indexeddb_sales_input_preview_v1.js'});
-  const seed=await page.evaluate(async ()=>{
-    const year=editYear.sales,month=editMonth.sales,day=window.salesSelDay;
-    const active=allStores.current;
-    const row=store.data[year][month][day-1];
-    row.売上=42;
-    row.買上点数=7;
-    row.客数=77;
-    row.storeMemo='FICTIONAL memo';
-    row.tempMaxC=30;
-    allStores.stores['fictional-second-shop']=JSON.parse(JSON.stringify(store));
-    allStores.stores['fictional-second-shop'].name='架空の別店舗';
-    drafts.sales[day-1]=JSON.parse(JSON.stringify(row));
-    renderSalesForm(year,MONTHS.indexOf(month),day);
-    const raw=InsightStorage.writeSnapshot(allStores);
-    window.InsightMigrationBackupV1={assertReady(){},confirm:async()=>true};
-    await InsightIndexedDBStorageV1.migrate({legacyClientsClosed:true});
-    window.fixtureSalesPreview=await InsightIndexedDBSalesInputPreviewV1.connect();
-    return {year,month,day,active,raw,weather:WX_KEYS.find(key=>key!==(row.weather||''))};
-  });
-  const expected=JSON.parse(seed.raw);
-  const getRow=snapshot=>snapshot.stores[seed.active].data[seed.year][seed.month][seed.day-1];
-  const save=page.locator('#salesSaveBtn');
-  const notice=page.locator('#savedSales');
-  const status=page.locator('#salesSaveBtn + [role=status]');
-  const sales=page.locator('#sf_売上');
-  const count=page.locator('#sf_買上点数');
+for(const failure of ['stale revision','quota failure']){
+  test('monthly sales and weather use one revision, with '+failure+' stopping the next save',async({page})=>{
+    await routeMigrationPage(page);
+    await page.goto('/Index.html');
+    await waitForMigrationChecks(page);
+    await page.locator('#nav2').click();
+    await page.waitForFunction(()=>window.InsightInputDayNav?.getSelectedIso('sales')&&
+      document.getElementById('sf_売上'));
+    await page.addScriptTag({url:'/insight_indexeddb_storage_v1.js'});
+    await page.addScriptTag({url:'/insight_indexeddb_sales_input_preview_v1.js'});
+    const seed=await page.evaluate(async ()=>{
+      const year=editYear.sales,month=editMonth.sales,day=window.salesSelDay;
+      const active=allStores.current;
+      const row=store.data[year][month][day-1];
+      row.売上=42;
+      row.買上点数=7;
+      row.客数=77;
+      row.storeMemo='FICTIONAL memo';
+      row.tempMaxC=30;
+      allStores.stores['fictional-second-shop']=JSON.parse(JSON.stringify(store));
+      allStores.stores['fictional-second-shop'].name='架空の別店舗';
+      drafts.sales[day-1]=JSON.parse(JSON.stringify(row));
+      renderSalesForm(year,MONTHS.indexOf(month),day);
+      const raw=InsightStorage.writeSnapshot(allStores);
+      window.InsightMigrationBackupV1={assertReady(){},confirm:async()=>true};
+      await InsightIndexedDBStorageV1.migrate({legacyClientsClosed:true});
+      window.fixtureSalesPreview=await InsightIndexedDBSalesInputPreviewV1.connect();
+      return {year,month,day,active,raw,weather:WX_KEYS.find(key=>key!==(row.weather||''))};
+    });
+    const expected=JSON.parse(seed.raw);
+    const getRow=snapshot=>snapshot.stores[seed.active].data[seed.year][seed.month][seed.day-1];
+    const save=page.locator('#salesSaveBtn');
+    const notice=page.locator('#savedSales');
+    const status=page.locator('#salesSaveBtn + [role=status]');
+    const sales=page.locator('#sf_売上');
+    const count=page.locator('#sf_買上点数');
 
-  await page.evaluate(()=>{
-    const digest=crypto.subtle.digest;
-    crypto.subtle.digest=async function(...args){
-      await new Promise(resolve=>{
-        window.resumeFixtureSave=window.resumeFixtureSave??[];
-        window.resumeFixtureSave.push(resolve);
+    await page.evaluate(()=>{
+      const digest=crypto.subtle.digest;
+      crypto.subtle.digest=async function(...args){
+        await new Promise(resolve=>{
+          window.resumeFixtureSave=window.resumeFixtureSave??[];
+          window.resumeFixtureSave.push(resolve);
+        });
+        return digest.apply(this,args);
+      };
+      window.restoreFixtureDigest=()=>{crypto.subtle.digest=digest;};
+    });
+    await sales.fill('456');
+    await count.click();
+    await count.fill('8.25');
+    await expect(count).toHaveValue('8.25');
+    const siblingDay=seed.day===1?2:1;
+    await page.locator('#salesDayList button').nth(siblingDay-1).click();
+    await sales.click();
+    await sales.fill('222');
+    await page.locator('#salesDayList button').nth(seed.day-1).click();
+    await page.locator('#salesForm [data-sales-weather="'+seed.weather+'"]').click();
+    expect(await page.evaluate(()=>fixtureSalesPreview.getStatus()))
+      .toEqual({state:'IDLE_OBSERVED',hasUnsavedInput:true});
+    expect(await page.evaluate(()=>localStorage.getItem('insight_v11'))).toBe(seed.raw);
+    expect(await page.evaluate(()=>InsightIndexedDBStorageV1.read().then(value=>value.revision))).toBe(0);
+    await save.click();
+    await page.waitForFunction(()=>window.resumeFixtureSave?.length===2);
+    await expect(save).toBeDisabled();
+    expect(await page.evaluate(()=>fixtureSalesPreview.getStatus()))
+      .toEqual({state:'ACTIVE',hasUnsavedInput:true});
+    await expect(status).toHaveText('保存を確認しています。');
+    await expect(notice).not.toHaveClass(/is-visible/);
+    expect(await page.evaluate(()=>store.data[editYear.sales][editMonth.sales][window.salesSelDay-1].売上)).toBe(42);
+    await page.evaluate(()=>{
+      window.restoreFixtureDigest();
+      window.resumeFixtureSave.forEach(resolve=>resolve());
+    });
+    await expect(notice).toHaveClass(/is-visible/);
+    Object.assign(getRow(expected),{売上:456,買上点数:8.25,weather:seed.weather});
+    expected.stores[seed.active].data[seed.year][seed.month][siblingDay-1].売上=222;
+    expected.stores['fictional-second-shop'].data[seed.year][seed.month][seed.day-1].weather=seed.weather;
+    expected.sharedWeather={...expected.sharedWeather,[seed.year+'-'+seed.month+'-'+seed.day]:seed.weather};
+    expect(await page.evaluate(()=>fixtureSalesPreview.getStatus()))
+      .toEqual({state:'IDLE_OBSERVED',hasUnsavedInput:false});
+    expect(await page.evaluate(()=>InsightIndexedDBStorageV1.read())).toEqual({revision:1,snapshot:expected});
+    expect(await page.evaluate(()=>localStorage.getItem('insight_v11'))).toBe(seed.raw);
+
+    if(failure==='stale revision'){
+      // Advance the committed revision without updating the open editor.
+      await page.evaluate(async ()=>{
+        const api=InsightIndexedDBStorageV1;
+        const current=await api.read();
+        current.snapshot.stores['fictional-second-shop'].name='別の画面で変更済み';
+        await api.save(current.revision,current.snapshot);
       });
-      return digest.apply(this,args);
-    };
-    window.restoreFixtureDigest=()=>{crypto.subtle.digest=digest;};
+    }else{
+      await page.evaluate(()=>{
+        const put=IDBObjectStore.prototype.put;
+        IDBObjectStore.prototype.put=function(){
+          IDBObjectStore.prototype.put=put;
+          throw new DOMException('Fictional storage quota exceeded','QuotaExceededError');
+        };
+      });
+    }
+    await sales.click();
+    await sales.fill('789');
+    await expect(sales).toHaveValue('789');
+    await save.click();
+    await expect(status).toHaveText('保存結果を確認できないため、追加の保存を停止しました。');
+    await expect(sales).toHaveValue('789');
+    expect(await page.evaluate(()=>fixtureSalesPreview.getStatus()))
+      .toEqual({state:'HELD',hasUnsavedInput:true});
+    await expect(save).toBeDisabled();
+    await expect(notice).not.toHaveClass(/is-visible/);
+    expect(await page.evaluate(()=>InsightIndexedDBStorageV1.diagnose({verifyInterrupted:true})))
+      .toMatchObject(failure==='stale revision'
+        ?{state:'hold',observedRevision:2}
+        :{state:'hold',observedRevision:1,recovery:'prior-save-verified'});
+    expect(await page.evaluate(()=>localStorage.getItem('insight_v11'))).toBe(seed.raw);
   });
-  await sales.fill('456');
-  await count.click();
-  await count.fill('8.25');
-  await expect(count).toHaveValue('8.25');
-  const siblingDay=seed.day===1?2:1;
-  await page.locator('#salesDayList button').nth(siblingDay-1).click();
-  await sales.click();
-  await sales.fill('222');
-  await page.locator('#salesDayList button').nth(seed.day-1).click();
-  await page.locator('#salesForm [data-sales-weather="'+seed.weather+'"]').click();
-  expect(await page.evaluate(()=>fixtureSalesPreview.getStatus()))
-    .toEqual({state:'IDLE_OBSERVED',hasUnsavedInput:true});
-  expect(await page.evaluate(()=>localStorage.getItem('insight_v11'))).toBe(seed.raw);
-  expect(await page.evaluate(()=>InsightIndexedDBStorageV1.read().then(value=>value.revision))).toBe(0);
-  await save.click();
-  await page.waitForFunction(()=>window.resumeFixtureSave?.length===2);
-  await expect(save).toBeDisabled();
-  expect(await page.evaluate(()=>fixtureSalesPreview.getStatus()))
-    .toEqual({state:'ACTIVE',hasUnsavedInput:true});
-  await expect(status).toHaveText('保存を確認しています。');
-  await expect(notice).not.toHaveClass(/is-visible/);
-  expect(await page.evaluate(()=>store.data[editYear.sales][editMonth.sales][window.salesSelDay-1].売上)).toBe(42);
-  await page.evaluate(()=>{
-    window.restoreFixtureDigest();
-    window.resumeFixtureSave.forEach(resolve=>resolve());
-  });
-  await expect(notice).toHaveClass(/is-visible/);
-  Object.assign(getRow(expected),{売上:456,買上点数:8.25,weather:seed.weather});
-  expected.stores[seed.active].data[seed.year][seed.month][siblingDay-1].売上=222;
-  expected.stores['fictional-second-shop'].data[seed.year][seed.month][seed.day-1].weather=seed.weather;
-  expected.sharedWeather={...expected.sharedWeather,[seed.year+'-'+seed.month+'-'+seed.day]:seed.weather};
-  expect(await page.evaluate(()=>fixtureSalesPreview.getStatus()))
-    .toEqual({state:'IDLE_OBSERVED',hasUnsavedInput:false});
-  expect(await page.evaluate(()=>InsightIndexedDBStorageV1.read())).toEqual({revision:1,snapshot:expected});
-  expect(await page.evaluate(()=>localStorage.getItem('insight_v11'))).toBe(seed.raw);
-
-  // Advance the committed revision without updating the open editor.
-  await page.evaluate(async ()=>{
-    const api=InsightIndexedDBStorageV1;
-    const current=await api.read();
-    current.snapshot.stores['fictional-second-shop'].name='別の画面で変更済み';
-    await api.save(current.revision,current.snapshot);
-  });
-  await sales.click();
-  await sales.fill('789');
-  await expect(sales).toHaveValue('789');
-  await save.click();
-  await expect(status).toHaveText('保存結果を確認できないため、追加の保存を停止しました。');
-  await expect(sales).toHaveValue('789');
-  expect(await page.evaluate(()=>fixtureSalesPreview.getStatus()))
-    .toEqual({state:'HELD',hasUnsavedInput:true});
-  await expect(save).toBeDisabled();
-  await expect(notice).not.toHaveClass(/is-visible/);
-  expect(await page.evaluate(()=>InsightIndexedDBStorageV1.diagnose({verifyInterrupted:true})))
-    .toMatchObject({state:'hold',observedRevision:2});
-  expect(await page.evaluate(()=>localStorage.getItem('insight_v11'))).toBe(seed.raw);
-});
+}
