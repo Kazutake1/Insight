@@ -445,7 +445,7 @@ for(const outcome of ['success','quota']){
     const dialog=page.locator('.hourly-dialog');
     await button.click();
     await expect(dialog).toBeVisible();
-    const hourly=dialog.getByRole('spinbutton',{name:'0時台の客数'});
+    const hourly=dialog.getByRole('spinbutton',{name:'0時台の客数',exact:true});
     await hourly.fill('12');
     expect(await quickInputBlocksUnload(page)).toBe(true);
     await dialog.getByRole('button',{name:'キャンセル'}).click();
