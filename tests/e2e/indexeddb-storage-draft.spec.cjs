@@ -103,6 +103,11 @@ test('isolated Quick draft is clean after reverting and protects a draft that ca
 });
 
 
+async function fillCombinedInput(input,value){
+  await input.click();
+  await input.fill(value);
+}
+
 function committedInput(page){
   return page.evaluate(()=>InsightIndexedDBStorageV1.read());
 }
@@ -132,7 +137,7 @@ test('combined input session shares four saves and guards both destinations and 
   await page.evaluate(iso=>InsightInputDayNav.select('sales',iso),seed.iso);
   const sales=page.locator('#sf_売上');
   await expect(sales).toHaveValue('456');
-  await sales.fill('777');
+  await fillCombinedInput(sales,'777');
   await page.locator('#nav0').click();
   await expect(page.locator('#pageSales')).toHaveClass(/show/);
   await expect(sales).toHaveValue('777');
@@ -171,7 +176,7 @@ test('combined input session shares four saves and guards both destinations and 
   await page.locator('#nav3').click();
   const customer=page.locator('.kyaku-input[data-ri="'+(seed.day-1)+'"]');
   await expect(customer).toHaveValue('222');
-  await customer.fill('303');
+  await fillCombinedInput(customer,'303');
   await page.locator('#kyakuSaveBtn').click();
   await expect(page.locator('#savedKyaku')).toHaveClass(/is-visible/);
   row.客数=303;
@@ -181,7 +186,7 @@ test('combined input session shares four saves and guards both destinations and 
   await page.evaluate(iso=>InsightInputDayNav.select('haiki',iso),seed.iso);
   const waste=page.locator('#haikiForm [data-hc="'+seed.category+'"]');
   await expect(waste).toHaveValue('123');
-  await waste.fill('404');
+  await fillCombinedInput(waste,'404');
   await page.locator('#haikiSaveBtn').click();
   await expect(page.locator('#savedHaiki')).toHaveClass(/is-visible/);
   row.haiki[seed.category]=404;
@@ -202,7 +207,7 @@ test('combined input session shares four saves and guards both destinations and 
 
   await page.locator('#nav2').click();
   await page.evaluate(iso=>InsightInputDayNav.select('sales',iso),seed.iso);
-  await sales.fill('999');
+  await fillCombinedInput(sales,'999');
   await page.locator('#storeSel').selectOption(seed.peer);
   await expect(page.locator('#storeSel')).toHaveValue(seed.active);
   await expect(sales).toHaveValue('999');
@@ -230,7 +235,7 @@ test('combined input session keeps a monthly draft and holds Quick after a compe
   await page.locator('#nav2').click();
   await page.evaluate(iso=>InsightInputDayNav.select('sales',iso),seed.iso);
   const sales=page.locator('#sf_売上');
-  await sales.fill('777');
+  await fillCombinedInput(sales,'777');
   const other=await openStoreSwitchPeer(context);
   try{
     await other.evaluate(async peer=>{
@@ -263,7 +268,7 @@ test('combined input session holds the monthly screens when Quick loses its save
   const seed=await openQuickInputPreview(page,{followMonthlyInputs:true});
   await page.locator('#nav2').click();
   await page.evaluate(iso=>InsightInputDayNav.select('sales',iso),seed.iso);
-  await page.locator('#sf_売上').fill('777');
+  await fillCombinedInput(page.locator('#sf_売上'),'777');
   await page.locator('#salesSaveBtn').click();
   await expect(page.locator('#savedSales')).toHaveClass(/is-visible/);
   const prior=JSON.parse(seed.raw);
@@ -310,10 +315,10 @@ test('combined input session preserves the draft at month and year boundaries',a
   const status=page.locator('#salesSaveBtn + [role=status]');
   await button.click();
   await expect(status).toHaveText('保存する変更はありません。');
-  await sales.fill('9007199254740992');
+  await fillCombinedInput(sales,'9007199254740992');
   await button.click();
   await expect(status).toHaveText('売上の入力を確認してください。');
-  await sales.fill('777');
+  await fillCombinedInput(sales,'777');
   await page.evaluate(()=>{
     window.periodPrompts=[];
     window.approvePeriodChange=false;
@@ -333,7 +338,7 @@ test('combined input session preserves the draft at month and year boundaries',a
 
   await page.evaluate(()=>{approvePeriodChange=true;});
   expect(await choose(Number(seed.year),7)).toBe(true);
-  await sales.fill('888');
+  await fillCombinedInput(sales,'888');
   await button.click();
   await expect(status).toHaveText('この期間は試験用の売上保存の対象外です。');
   expect(await choose(Number(seed.year)+1,6)).toBe(true);
@@ -359,7 +364,7 @@ for(const failure of ['quota','readback','tab close']){
     await page.locator('#nav2').click();
     await page.evaluate(iso=>InsightInputDayNav.select('sales',iso),seed.iso);
     const sales=page.locator('#sf_売上');
-    await sales.fill('777');
+    await fillCombinedInput(sales,'777');
     const peer=await openStoreSwitchPeer(context);
     try{
       await page.evaluate(failure=>{
@@ -2587,7 +2592,10 @@ async function openQuickInputPreview(page,{sameMunicipality=true,followMonthlyIn
   await waitForMigrationChecks(page);
   await page.addScriptTag({url:'/insight_indexeddb_storage_v1.js'});
   await page.addScriptTag({url:'/insight_indexeddb_quick_input_preview_v1.js'});
-  if(followMonthlyInputs)await page.addScriptTag({url:'/insight_indexeddb_sales_input_preview_v1.js'});
+  if(followMonthlyInputs){
+    await page.waitForFunction(()=>typeof InsightHourlyCustomers?.connectIndexedDBPreview==='function');
+    await page.addScriptTag({url:'/insight_indexeddb_sales_input_preview_v1.js'});
+  }
   return page.evaluate(async ({sameMunicipality,followMonthlyInputs})=>{
     const year=String(Number(todayFY().fy)-1),month='6月',day=12;
     const iso=year+'-06-12',active=allStores.current,peer='fictional-quick-peer';
