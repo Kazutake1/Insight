@@ -27,23 +27,22 @@
     };
   }
 
-  async function connect(){
-    if(session||currentNav!==0||root.InsightIndexedDBSalesInputPreviewV1?.getConnectedStatus()||
+  async function connect({sharedState}={}){
+    if(session||currentNav!==0||(!sharedState&&root.InsightIndexedDBSalesInputPreviewV1?.getConnectedStatus())||
        root.InsightWeatherTemperatureAuto.hasPendingFetch()){
       throw new Error('Quick input preview cannot start in this session');
     }
-    const storeId=allStores.current;
     const api=root.InsightIndexedDBStorageV1;
     const button=doc.getElementById('quickSaveBtn');
     const page=doc.getElementById('pageQuick');
     const selector=doc.getElementById('storeSel');
     const serialize=root.InsightStorage.serialize;
-    let committed=await api.read();
-    let busy=false,held=false,noticeTimer;
+    const state=sharedState??{storeId:allStores.current,committed:await api.read(),busy:false,held:false};
+    let noticeTimer;
     let baselineDraft=null;
     function matchesBaseline(){
-      return currentNav===0&&allStores.current===storeId&&store===allStores.stores[storeId]&&
-        serialize(allStores)===serialize(committed.snapshot);
+      return currentNav===0&&allStores.current===state.storeId&&store===allStores.stores[state.storeId]&&
+        serialize(allStores)===serialize(state.committed.snapshot);
     }
     if(session||!matchesBaseline()||root.InsightWeatherTemperatureAuto.hasPendingFetch())
       throw new Error('Quick input preview does not match the committed store');
@@ -52,7 +51,7 @@
     status.setAttribute('role','status');
     button.after(status);
     function stop(){
-      held=true;
+      state.held=true;
       button.disabled=true;
       status.textContent='保存結果を確認できないため、追加の保存を停止しました。';
     }
@@ -60,7 +59,7 @@
       baselineDraft={iso,values:JSON.stringify(inputs)};
     }
     function rememberRenderedDraft(){
-      if(busy||held||dateContext.getSelectedIso()===baselineDraft?.iso)return;
+      if(state.busy||state.held||dateContext.getSelectedIso()===baselineDraft?.iso)return;
       baselineDraft=null;
       try{
         const {date,iso}=dateContext.getSelectedInfo();
@@ -70,27 +69,29 @@
       }
     }
     function hasUnsavedInput(){
-      if(busy||held||!baselineDraft)return true;
+      if(state.busy||state.held||state.pending)return true;
+      if(sharedState&&currentNav!==0)return false;
+      if(!baselineDraft)return true;
       // The date input may already contain a new choice while its change event is being handled.
-      if(currentNav!==0||allStores.current!==storeId||store!==allStores.stores[storeId]||
+      if(currentNav!==0||allStores.current!==state.storeId||store!==allStores.stores[state.storeId]||
          dateContext.getSelectedIso()!==baselineDraft.iso)return true;
       try{return JSON.stringify(readInputs())!==baselineDraft.values;}
       catch(_){return true;}
     }
     function getStatus(){
-      return {state:held?'HELD':busy?'ACTIVE':'IDLE_OBSERVED',hasUnsavedInput:hasUnsavedInput()};
+      return {state:state.held?'HELD':(state.busy||state.pending)?'ACTIVE':'IDLE_OBSERVED',hasUnsavedInput:hasUnsavedInput()};
     }
     function matchesDate(iso){
       return dateContext.getSelectedIso()===iso&&doc.getElementById('iqdDateInput')?.value===iso;
     }
     function supports(date){
       const info=dateContext.info(date);
-      const shop=committed.snapshot.stores[storeId];
+      const shop=state.committed.snapshot.stores[state.storeId];
       return info&&!dateContext.isFuture(date)&&shop.years.some(year=>String(year)===info.fy)&&
         shop.data?.[info.fy]?.[info.month]?.[info.day-1];
     }
     function allowDateChange(date){
-      if(busy||held)return false;
+      if(state.busy||state.held||state.pending)return false;
       if(supports(date))return true;
       status.textContent='試験用の保存は登録済み年度の当日・過去日に限ります。';
       return false;
@@ -108,7 +109,7 @@
       try{
         const {fy,month,day,iso}=target;
         const candidate=JSON.parse(JSON.stringify(baseline.snapshot));
-        const shop=candidate.stores[storeId];
+        const shop=candidate.stores[state.storeId];
         const row=shop.data[fy][month][day-1];
         Object.assign(row,inputs.values,{storeMemo:inputs.memo});
         updateSharedWeather(candidate,fy,month,day,inputs.values.weather);
@@ -119,8 +120,8 @@
         const result=await api.save(baseline.revision,candidate);
         if(!unchanged())throw new Error('Quick input changed during save');
         allStores=JSON.parse(JSON.stringify(result.snapshot));
-        store=allStores.stores[storeId];
-        committed=result;
+        store=allStores.stores[state.storeId];
+        state.committed=result;
         rememberDraft(iso,inputs);
         root.InsightHooks.emit('quick:preview:committed',{});
         updateMissingBadge();
@@ -133,14 +134,14 @@
         stop();
         return 'unknown';
       }finally{
-        busy=false;
-        button.disabled=held;
+        state.busy=false;
+        button.disabled=state.held;
         doc.body.inert=wasInert;
       }
     }
 
     root.InsightHooks.on('quick:save:before','indexeddb-quick-input-preview',ctx=>{
-      if(busy||held)return false;
+      if(currentNav!==0||state.busy||state.held||state.pending)return false;
       finishFeedback();
       const target=dateContext.getSelectedInfo();
       if(!supports(target.date)){
@@ -157,8 +158,8 @@
         status.textContent=error.message;
         return false;
       }
-      const baseline=committed;
-      busy=true;
+      const baseline=state.committed;
+      state.busy=true;
       button.disabled=true;
       status.textContent='保存を確認しています。';
       ctx.runIndexedDBPreview=()=>save(target,inputs,baseline);
@@ -167,30 +168,39 @@
 
     // Other write entrances are outside this one-screen preview.
     function blockUnsupported(){
-      if(!busy&&!held)status.textContent='この試験では今日の入力の保存と日付移動を行えます。';
+      if(!state.busy&&!state.held&&!state.pending)status.textContent='この試験では今日の入力の保存と日付移動を行えます。';
       return false;
     }
-    root.addEventListener('click',event=>{
-      if(!busy&&!held&&page.contains(event.target)&&!event.target.closest('#quickClearBtn,#autoWxBtn'))return;
-      event.preventDefault();
-      event.stopImmediatePropagation();
-      blockUnsupported();
-    },true);
-    root.addEventListener('change',event=>{
-      if(!busy&&!held&&page.contains(event.target))return;
-      if(event.target===selector)selector.value=storeId;
-      event.preventDefault();
-      event.stopImmediatePropagation();
-    },true);
-    root.addEventListener('beforeunload',event=>{
-      if(!getStatus().hasUnsavedInput)return;
-      event.preventDefault();
-      event.returnValue='';
-    });
-    root.gotoNav=root.switchStore=root.showStoreMenu=root.clearTodayData=root.fetchWeather=blockUnsupported;
+    if(!sharedState){
+      root.addEventListener('click',event=>{
+        if(!state.busy&&!state.held&&page.contains(event.target)&&!event.target.closest('#quickClearBtn,#autoWxBtn'))return;
+        event.preventDefault();
+        event.stopImmediatePropagation();
+        blockUnsupported();
+      },true);
+      root.addEventListener('change',event=>{
+        if(!state.busy&&!state.held&&page.contains(event.target))return;
+        if(event.target===selector)selector.value=state.storeId;
+        event.preventDefault();
+        event.stopImmediatePropagation();
+      },true);
+      root.addEventListener('beforeunload',event=>{
+        if(!getStatus().hasUnsavedInput)return;
+        event.preventDefault();
+        event.returnValue='';
+      });
+      root.gotoNav=root.switchStore=root.showStoreMenu=blockUnsupported;
+    }
+    root.clearTodayData=root.fetchWeather=blockUnsupported;
+    function onEnter(){
+      baselineDraft=null;
+      finishFeedback();
+      status.textContent='';
+      rememberRenderedDraft();
+    }
     rememberRenderedDraft();
     session={getStatus,allowDateChange,rememberRenderedDraft};
-    return Object.freeze({getStatus});
+    return Object.freeze({getStatus,onEnter});
   }
 
   root.InsightIndexedDBQuickInputPreviewV1=Object.freeze({

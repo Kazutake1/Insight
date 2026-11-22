@@ -102,6 +102,205 @@ test('isolated Quick draft is clean after reverting and protects a draft that ca
   expect(await page.evaluate(()=>InsightQuickDateNavV1.hasUnsavedInput())).toBe(true);
 });
 
+
+function committedInput(page){
+  return page.evaluate(()=>InsightIndexedDBStorageV1.read());
+}
+
+test('combined input session shares four saves and guards both destinations and the store change',async({page})=>{
+  const seed=await openQuickInputPreview(page,{followMonthlyInputs:true});
+  const expected=quickExpectedSnapshot(seed,true);
+  const row=expected.stores[seed.active].data[seed.year][seed.month][seed.day-1];
+  const quickStatus=page.locator('#quickSaveBtn + [role=status]');
+  await editQuickInput(page,seed.category);
+  await page.evaluate(()=>{
+    window.combinedPrompts=[];
+    window.approveCombinedNavigation=false;
+    window.confirm=msg=>{combinedPrompts.push(msg);return approveCombinedNavigation;};
+  });
+  await page.locator('#nav2').click();
+  await expect(page.locator('#pageQuick')).toHaveClass(/show/);
+  await expect(page.locator('#qi_storeMemo')).toHaveValue('架空の入力メモ');
+  await expect(page.locator('#qWeatherCompactTrigger .qwc-label')).toHaveText('雨');
+  expect(await page.evaluate(()=>combinedPrompts)).toEqual(['未保存の入力があります。\n保存せずに画面を移動しますか？']);
+  expect(await quickInputBlocksUnload(page)).toBe(true);
+
+  await page.locator('#quickSaveBtn').click();
+  await expect(quickStatus).toHaveText('今日の入力を保存しました。');
+  expect(await committedInput(page)).toEqual({revision:1,snapshot:expected});
+  await page.locator('#nav2').click();
+  await page.evaluate(iso=>InsightInputDayNav.select('sales',iso),seed.iso);
+  const sales=page.locator('#sf_売上');
+  await expect(sales).toHaveValue('456');
+  await sales.fill('777');
+  await page.locator('#nav0').click();
+  await expect(page.locator('#pageSales')).toHaveClass(/show/);
+  await expect(sales).toHaveValue('777');
+  expect(await page.evaluate(()=>combinedPrompts.length)).toBe(2);
+  expect(await quickInputBlocksUnload(page)).toBe(true);
+
+  await page.evaluate(()=>{
+    const digest=crypto.subtle.digest,resume=[];
+    window.combinedDigests=resume;
+    crypto.subtle.digest=async function(...args){
+      await new Promise(resolve=>resume.push(resolve));
+      return digest.apply(this,args);
+    };
+    window.resumeCombinedSave=()=>{
+      crypto.subtle.digest=digest;
+      resume.forEach(resolve=>resolve());
+    };
+  });
+  const reservation=await page.evaluate(()=>{
+    window.combinedSave=saveInput('sales');
+    const state=combinedPreview.getStatus().state;
+    const route=gotoNav(0);
+    const save=saveQuick();
+    return {state,route,otherSave:save===undefined};
+  });
+  expect(reservation).toEqual({state:'ACTIVE',route:false,otherSave:true});
+  await page.waitForFunction(()=>combinedDigests.length===2);
+  await expect(page.locator('#salesSaveBtn')).toBeDisabled();
+  expect(await page.evaluate(peer=>switchStore(peer),seed.peer)).toBe(false);
+  expect(await page.evaluate(()=>InsightIndexedDBQuickInputPreviewV1.getStatus().state)).toBe('ACTIVE');
+  await page.evaluate(()=>resumeCombinedSave());
+  await expect(page.locator('#savedSales')).toHaveClass(/is-visible/);
+  row.売上=777;
+  expect(await committedInput(page)).toEqual({revision:2,snapshot:expected});
+
+  await page.locator('#nav3').click();
+  const customer=page.locator('.kyaku-input[data-ri="'+(seed.day-1)+'"]');
+  await expect(customer).toHaveValue('222');
+  await customer.fill('303');
+  await page.locator('#kyakuSaveBtn').click();
+  await expect(page.locator('#savedKyaku')).toHaveClass(/is-visible/);
+  row.客数=303;
+  expect(await committedInput(page)).toEqual({revision:3,snapshot:expected});
+
+  await page.locator('#nav4').click();
+  await page.evaluate(iso=>InsightInputDayNav.select('haiki',iso),seed.iso);
+  const waste=page.locator('#haikiForm [data-hc="'+seed.category+'"]');
+  await expect(waste).toHaveValue('123');
+  await waste.fill('404');
+  await page.locator('#haikiSaveBtn').click();
+  await expect(page.locator('#savedHaiki')).toHaveClass(/is-visible/);
+  row.haiki[seed.category]=404;
+  row.廃棄金額=404;
+  expect(await committedInput(page)).toEqual({revision:4,snapshot:expected});
+
+  await page.locator('#nav0').click();
+  await expect(page.locator('#iqdDateInput')).toHaveValue(seed.iso);
+  await expect(page.locator('#qi_売上')).toHaveValue('777');
+  await expect(page.locator('#qi_客数')).toHaveValue('303');
+  await expect(page.locator('[id="qi_h_'+seed.category+'"]')).toHaveValue('404');
+  await expect(page.locator('#qi_storeMemo')).toHaveValue('架空の入力メモ');
+  expect(await quickInputBlocksUnload(page)).toBe(false);
+  await page.locator('#storeSel').selectOption(seed.peer);
+  await expect(page.locator('#storeSel')).toHaveValue(seed.active);
+  await expect(page.locator('#storeSel + [role=status]')).toHaveText('試験用の店舗切替は月次入力画面で行ってください。');
+  expect(await committedInput(page)).toEqual({revision:4,snapshot:expected});
+
+  await page.locator('#nav2').click();
+  await page.evaluate(iso=>InsightInputDayNav.select('sales',iso),seed.iso);
+  await sales.fill('999');
+  await page.locator('#storeSel').selectOption(seed.peer);
+  await expect(page.locator('#storeSel')).toHaveValue(seed.active);
+  await expect(sales).toHaveValue('999');
+  expect(await committedInput(page)).toEqual({revision:4,snapshot:expected});
+
+  await page.evaluate(()=>{approveCombinedNavigation=true;});
+  await page.locator('#storeSel').selectOption(seed.peer);
+  await expect(page.locator('#storeSel + [role=status]')).toHaveText('店舗を切り替えました。');
+  expected.current=seed.peer;
+  expect(await committedInput(page)).toEqual({revision:5,snapshot:expected});
+  await page.locator('#nav0').click();
+  await page.locator('#iqdDateInput').fill(seed.iso);
+  await expect(page.locator('#qi_売上')).toHaveValue('87');
+  await expect(page.locator('#qi_storeMemo')).toHaveValue('別店舗の元メモ');
+  expect(await quickInputBlocksUnload(page)).toBe(false);
+  expect(await page.evaluate(()=>localStorage.getItem('insight_v11'))).toBe(seed.raw);
+});
+
+test('combined input session keeps a monthly draft and holds Quick after a competing revision',async({page,context})=>{
+  const seed=await openQuickInputPreview(page,{followMonthlyInputs:true});
+  await editQuickInput(page,seed.category);
+  await page.locator('#quickSaveBtn').click();
+  await expect(page.locator('#quickSaveBtn + [role=status]')).toHaveText('今日の入力を保存しました。');
+  const expected=quickExpectedSnapshot(seed,true);
+  await page.locator('#nav2').click();
+  await page.evaluate(iso=>InsightInputDayNav.select('sales',iso),seed.iso);
+  const sales=page.locator('#sf_売上');
+  await sales.fill('777');
+  const other=await openStoreSwitchPeer(context);
+  try{
+    await other.evaluate(async peer=>{
+      const api=InsightIndexedDBStorageV1,current=await api.read();
+      current.snapshot.stores[peer].name='別タブの確定済み店舗名';
+      await api.save(current.revision,current.snapshot);
+    },seed.peer);
+    await page.locator('#salesSaveBtn').click();
+    await expect(page.locator('#salesSaveBtn + [role=status]'))
+      .toHaveText('保存結果を確認できないため、追加の保存を停止しました。');
+    await expect(sales).toHaveValue('777');
+    expect(await page.evaluate(()=>combinedPreview.getStatus())).toEqual({state:'HELD',hasUnsavedInput:true});
+    expect(await page.evaluate(()=>InsightIndexedDBQuickInputPreviewV1.getStatus().state)).toBe('HELD');
+    expect(await page.evaluate(()=>gotoNav(0))).toBe(false);
+    expect(await page.evaluate(peer=>switchStore(peer),seed.peer)).toBe(false);
+    expect(await quickInputBlocksUnload(page)).toBe(true);
+    await page.evaluate(()=>saveQuick());
+    expect(await other.evaluate(()=>InsightIndexedDBStorageV1.diagnose({verifyInterrupted:true})))
+      .toMatchObject({state:'hold',observedRevision:2});
+    expected.stores[seed.peer].name='別タブの確定済み店舗名';
+    const record=await readStoreSwitchRecord(other);
+    expect(record.revision).toBe(2);
+    expect(JSON.parse(record.raw)).toEqual(expected);
+    expect(JSON.parse(record.previous.raw)).toEqual(quickExpectedSnapshot(seed,true));
+    expect(await other.evaluate(()=>localStorage.getItem('insight_v11'))).toBe(seed.raw);
+  }finally{await other.close();}
+});
+
+test('combined input session holds the monthly screens when Quick loses its save confirmation',async({page,context})=>{
+  const seed=await openQuickInputPreview(page,{followMonthlyInputs:true});
+  await page.locator('#nav2').click();
+  await page.evaluate(iso=>InsightInputDayNav.select('sales',iso),seed.iso);
+  await page.locator('#sf_売上').fill('777');
+  await page.locator('#salesSaveBtn').click();
+  await expect(page.locator('#savedSales')).toHaveClass(/is-visible/);
+  const prior=JSON.parse(seed.raw);
+  prior.stores[seed.active].data[seed.year][seed.month][seed.day-1].売上=777;
+  expect(await committedInput(page)).toEqual({revision:1,snapshot:prior});
+  await page.locator('#nav0').click();
+  await expect(page.locator('#qi_売上')).toHaveValue('777');
+  await editQuickInput(page,seed.category);
+  await page.evaluate(()=>{
+    const write=InsightStorage.writeMetadata;
+    InsightStorage.writeMetadata=(key,value)=>{
+      if(key==='insight_indexeddb_adoption_v1'&&JSON.parse(value).state==='active')
+        throw new Error('Fictional lost Quick save confirmation');
+      return write(key,value);
+    };
+  });
+  await page.locator('#quickSaveBtn').click();
+  await expect(page.locator('#quickSaveBtn + [role=status]'))
+    .toHaveText('保存結果を確認できないため、追加の保存を停止しました。');
+  await expect(page.locator('#qi_売上')).toHaveValue('456');
+  await expect(page.locator('#qi_storeMemo')).toHaveValue('架空の入力メモ');
+  expect(await page.evaluate(()=>combinedPreview.getStatus())).toEqual({state:'HELD',hasUnsavedInput:true});
+  expect(await page.evaluate(()=>gotoNav(2))).toBe(false);
+  expect(await page.evaluate(peer=>switchStore(peer),seed.peer)).toBe(false);
+  await page.evaluate(()=>saveInput('sales'));
+  const other=await openStoreSwitchPeer(context);
+  try{
+    expect(await other.evaluate(()=>InsightIndexedDBStorageV1.diagnose({verifyInterrupted:true})))
+      .toMatchObject({state:'hold',observedRevision:2,recovery:'save-verified'});
+    const record=await readStoreSwitchRecord(other);
+    expect(record.revision).toBe(2);
+    expect(JSON.parse(record.raw)).toEqual(quickExpectedSnapshot(seed,true));
+    expect(JSON.parse(record.previous.raw)).toEqual(prior);
+    expect(await other.evaluate(()=>localStorage.getItem('insight_v11'))).toBe(seed.raw);
+  }finally{await other.close();}
+});
+
 test('manual adoption uses the real encrypted backup confirmation and preserves the legacy source',async({page})=>{
   await routeMigrationPage(page);
   async function open(){
@@ -2165,13 +2364,14 @@ for(const failure of ['readback abort','acknowledgement lost','tab closed during
   });
 }
 
-async function openQuickInputPreview(page,{sameMunicipality=true}={}){
+async function openQuickInputPreview(page,{sameMunicipality=true,followMonthlyInputs=false}={}){
   await routeMigrationPage(page);
   await page.goto('/Index.html');
   await waitForMigrationChecks(page);
   await page.addScriptTag({url:'/insight_indexeddb_storage_v1.js'});
   await page.addScriptTag({url:'/insight_indexeddb_quick_input_preview_v1.js'});
-  return page.evaluate(async sameMunicipality=>{
+  if(followMonthlyInputs)await page.addScriptTag({url:'/insight_indexeddb_sales_input_preview_v1.js'});
+  return page.evaluate(async ({sameMunicipality,followMonthlyInputs})=>{
     const year=String(Number(todayFY().fy)-1),month='6月',day=12;
     const iso=year+'-06-12',active=allStores.current,peer='fictional-quick-peer';
     store.data[year]=blankYearData(year);
@@ -2193,9 +2393,13 @@ async function openQuickInputPreview(page,{sameMunicipality=true}={}){
     const raw=InsightStorage.writeSnapshot(allStores);
     window.InsightMigrationBackupV1={assertReady(){},confirm:async()=>true};
     await InsightIndexedDBStorageV1.migrate({legacyClientsClosed:true});
-    window.quickPreview=await InsightIndexedDBQuickInputPreviewV1.connect();
+    if(followMonthlyInputs){
+      window.combinedPreview=await InsightIndexedDBSalesInputPreviewV1.connect('sales',{
+        followInputScreens:true,followQuickInput:true
+      });
+    }else window.quickPreview=await InsightIndexedDBQuickInputPreviewV1.connect();
     return {year,month,day,iso,active,peer,raw,category:HAIKI_CATS[0]};
-  },sameMunicipality);
+  },{sameMunicipality,followMonthlyInputs});
 }
 
 async function editQuickInput(page,category){
