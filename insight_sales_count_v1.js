@@ -162,7 +162,7 @@
   // It must never be interpreted as an app-wide clean or model authorization signal.
   // The observer must never suppress, retry, replace the exception from, or
   // change the return value of the pre-existing business callback.
-  function observeForecastOperation(kind,operation){
+  function observeForecastOperation(kind,operation,asyncPreview){
     var observer=forecastOperationObserver,ticket=null,outcome='unknown',registered=false;
     if(observer&&!forecastOperationFault){
       try{
@@ -176,15 +176,20 @@
         }
       }catch(_){forecastOperationFault=true;}
     }
-    try{return operation(function(result){outcome=result;});}
-    finally{
-      if(registered){
-        try{if(observer.end(ticket,outcome)!==true)forecastOperationFault=true;}
-        catch(_){forecastOperationFault=true;}
-        forecastOperationActive-=1;
-        if(!forecastOperationFault)observedOperationStatus();
-      }
+    function finish(){
+      if(!registered)return;
+      try{if(observer.end(ticket,outcome)!==true)forecastOperationFault=true;}
+      catch(_){forecastOperationFault=true;}
+      forecastOperationActive-=1;
+      if(!forecastOperationFault)observedOperationStatus();
     }
+    function mark(result){outcome=result;}
+    if(asyncPreview){
+      try{return Promise.resolve(operation(mark)).finally(finish);}
+      catch(error){finish();throw error;}
+    }
+    try{return operation(mark);}
+    finally{finish();}
   }
   if(typeof module!=='undefined'&&module.exports)module.exports=model;
   if(!root.document)return;
@@ -193,6 +198,7 @@
   function init(){
     if(root.__insightSalesCountV1)return;root.__insightSalesCountV1=true;ensure(allStores);initForecastOperationObserver();
     var doc=root.document,state={year:String(new Date().getFullYear()),month:new Date().getMonth()+1,categoryId:null,draft:{},wasteDraft:{},wasteTouched:{},dirty:false};
+    var preview=null;
     function el(tag,text,cls){var n=doc.createElement(tag);if(text!==undefined)n.textContent=text;if(cls)n.className=cls;return n;}
     function pad(v){return String(v).padStart(2,'0');}
     function monthPrefix(){return state.year+'-'+pad(state.month);}
@@ -203,29 +209,71 @@
     function setDirty(v){state.dirty=!!v;var mark=doc.getElementById('scDirty'),save=doc.getElementById('scSave');if(mark){mark.textContent=v?'未保存の変更があります':'保存済み';mark.className='sc-status '+(v?'dirty':'saved');}if(save)save.disabled=!v;}
     function confirmLeave(){return !state.dirty||confirm('販売数入力に未保存の変更があります。\n保存せずに移動しますか？');}
     function yearRegistered(year){return !!(store&&Array.isArray(store.years)&&/^\d{4}$/.test(String(year))&&store.years.some(function(value){return String(value)===String(year);}));}
-    function ensureRegisteredYear(year){var y=String(year);if(yearRegistered(y))return true;if(!root.InsightYearManager||typeof root.InsightYearManager.promoteCurrent!=='function'){alert('この年度を追加する機能を使用できません。');return false;}if(!confirm(y+'年度はダッシュボードに登録されていません。\n年度を追加して販売数を入力しますか？\n\n既にある過去データは保持したまま、未入力日を正常な空データで補完します。'))return false;try{root.InsightYearManager.promoteCurrent(y);store=allStores.stores[allStores.current];if(typeof renderYearPills==='function')renderYearPills();if(typeof showToast==='function')showToast('✓ '+y+'年度を追加しました','#15803d','#f0fdf4');return true;}catch(error){alert('年度を追加できませんでした。\n'+(error&&error.message?error.message:error));return false;}}
+    function ensureRegisteredYear(year){var y=String(year);if(yearRegistered(y))return true;if(preview)return false;if(!root.InsightYearManager||typeof root.InsightYearManager.promoteCurrent!=='function'){alert('この年度を追加する機能を使用できません。');return false;}if(!confirm(y+'年度はダッシュボードに登録されていません。\n年度を追加して販売数を入力しますか？\n\n既にある過去データは保持したまま、未入力日を正常な空データで補完します。'))return false;try{root.InsightYearManager.promoteCurrent(y);store=allStores.stores[allStores.current];if(typeof renderYearPills==='function')renderYearPills();if(typeof showToast==='function')showToast('✓ '+y+'年度を追加しました','#15803d','#f0fdf4');return true;}catch(error){alert('年度を追加できませんでした。\n'+(error&&error.message?error.message:error));return false;}}
     function readMonth(){state.draft={};var prefix=monthPrefix(),data=store.salesCounts||{};Object.keys(data).forEach(function(date){if(date.slice(0,7)===prefix&&data[date][state.categoryId])state.draft[date]=normalizeRecord(data[date][state.categoryId]);});var waste=store.wasteCounts||{};state.wasteDraft={};state.wasteTouched={};Object.keys(waste).forEach(function(date){if(date.slice(0,7)===prefix&&waste[date][state.categoryId])state.wasteDraft[date]=normalizeWasteRecord(waste[date][state.categoryId]);});setDirty(false);}
     function record(date){return state.draft[date]||(state.draft[date]=emptyRecord());}
     function total(r,key,mask){mask=Array.isArray(mask)&&mask.length===3?mask:activeTrips(selectedCategory());var indexes=[0,1,2].filter(function(i){return mask[i]!==false;});var values=indexes.map(function(i){return r.trips[i][key];});return values.every(function(v){return v===null;})?null:values.reduce(function(sum,v){return sum+(v===null?0:v);},0);}
     function fmt(v){return v===null?'—':Number(v).toFixed(1).replace(/\.0$/,'');}
     function persistTransaction(next){if(!root.InsightStorage)throw new Error('保存機能を初期化できませんでした。');validate(next);root.InsightStorage.writeSnapshot(next);allStores.salesCountManagement=next.salesCountManagement;Object.keys(next.stores).forEach(function(id){allStores.stores[id].salesCounts=next.stores[id].salesCounts;if(Object.prototype.hasOwnProperty.call(next.stores[id],'wasteCounts'))allStores.stores[id].wasteCounts=next.stores[id].wasteCounts;});store=allStores.stores[allStores.current];}
+    function applyCountDraft(next,storeId,prefix,categoryId,draft,wasteDraft,wasteTouched){
+      var nextStore=next.stores[storeId];Object.keys(nextStore.salesCounts).forEach(function(date){if(date.slice(0,7)===prefix&&nextStore.salesCounts[date][categoryId]){delete nextStore.salesCounts[date][categoryId];if(!Object.keys(nextStore.salesCounts[date]).length)delete nextStore.salesCounts[date];}});
+      Object.keys(draft).forEach(function(date){var r=normalizeRecord(draft[date]);if(r.trips.some(function(t){return t.delivery!==null||t.sales!==null;})){if(!nextStore.salesCounts[date])nextStore.salesCounts[date]={};nextStore.salesCounts[date][categoryId]=r;}});
+      if(Object.keys(wasteTouched).length){var savedWaste=nextStore.wasteCounts||{};Object.keys(wasteTouched).forEach(function(date){var rec=normalizeWasteRecord(wasteDraft[date]);if(rec.trips.some(function(v){return v!==null;})){if(!savedWaste[date])savedWaste[date]={};savedWaste[date][categoryId]=rec;}else if(savedWaste[date]){delete savedWaste[date][categoryId];if(!Object.keys(savedWaste[date]).length)delete savedWaste[date];}});nextStore.wasteCounts=savedWaste;}
+    }
+    function finishSave(){
+      state.wasteTouched={};setDirty(false);
+      showToast('✓ 販売数を保存しました','#15803d','#f0fdf4');renderAnalysis();
+    }
+    function draftFingerprint(){
+      return JSON.stringify([state.draft,state.wasteDraft,state.wasteTouched]);
+    }
+    function savePreview(markOutcome){
+      var storeId=allStores.current,prefix=monthPrefix(),categoryId=state.categoryId;
+      var captured=draftFingerprint(),values=JSON.parse(captured);
+      var button=doc.getElementById('scSave'),label=doc.getElementById('scDirty');
+      var commit=preview.prepareSave({
+        storeId:storeId,year:state.year,
+        unchanged:function(){
+          return monthPrefix()===prefix&&state.categoryId===categoryId&&state.dirty&&
+            draftFingerprint()===captured&&!doc.querySelector('#pageSalesCount input:invalid');
+        },
+        apply:function(next){
+          applyCountDraft(next,storeId,prefix,categoryId,values[0],values[1],values[2]);
+          validate(next);
+        }
+      });
+      if(!commit){markOutcome('cancelled_before_mutation');return;}
+      button.disabled=true;label.textContent='保存を確認しています。';
+      return commit().then(function(saved){
+        if(saved){finishSave();markOutcome('completed');}
+        else{label.textContent='保存結果を確認できないため、追加の保存を停止しました。';markOutcome('unknown');}
+      });
+    }
     function save(){
+      if(preview&&(!preview.canEdit()||!state.dirty))return;
       return observeForecastOperation('sales_count_save',function(markOutcome){
       if(!ensureRegisteredYear(state.year))return;
       var invalid=doc.querySelector('#pageSalesCount input:invalid');if(invalid){invalid.reportValidity();invalid.focus();return;}
       var mask=activeTrips(selectedCategory()),large=[];Object.keys(state.draft).forEach(function(date){state.draft[date].trips.forEach(function(t,i){if(mask[i]===false)return;['delivery','sales'].forEach(function(k){if(t[k]>=1000)large.push(date+' '+(i+1)+'便 '+(k==='delivery'?'納品':'販売')+' '+t[k]);});});});
       Object.keys(state.wasteTouched).forEach(function(date){var rec=state.wasteDraft[date];if(!rec)return;rec.trips.forEach(function(v,i){if(v!==null&&v>=1000)large.push(date+' '+(i+1)+'便 廃棄 '+v);});});if(large.length&&!confirm('4桁以上の入力があります。内容を確認して保存しますか？\n\n'+large.slice(0,8).join('\n')+(large.length>8?'\nほか '+(large.length-8)+'件':'')))return;
-      try{var next=copy(allStores);ensure(next);var nextStore=next.stores[allStores.current],prefix=monthPrefix();Object.keys(nextStore.salesCounts).forEach(function(date){if(date.slice(0,7)===prefix&&nextStore.salesCounts[date][state.categoryId]){delete nextStore.salesCounts[date][state.categoryId];if(!Object.keys(nextStore.salesCounts[date]).length)delete nextStore.salesCounts[date];}});Object.keys(state.draft).forEach(function(date){var r=normalizeRecord(state.draft[date]);if(r.trips.some(function(t){return t.delivery!==null||t.sales!==null;})){if(!nextStore.salesCounts[date])nextStore.salesCounts[date]={};nextStore.salesCounts[date][state.categoryId]=r;}});if(Object.keys(state.wasteTouched).length){var savedWaste=nextStore.wasteCounts||{};Object.keys(state.wasteTouched).forEach(function(date){var rec=normalizeWasteRecord(state.wasteDraft[date]);if(rec.trips.some(function(v){return v!==null;})){if(!savedWaste[date])savedWaste[date]={};savedWaste[date][state.categoryId]=rec;}else if(savedWaste[date]){delete savedWaste[date][state.categoryId];if(!Object.keys(savedWaste[date]).length)delete savedWaste[date];}});nextStore.wasteCounts=savedWaste;}persistTransaction(next);state.wasteTouched={};setDirty(false);showToast('✓ 販売数を保存しました','#15803d','#f0fdf4');renderAnalysis();markOutcome('completed');}catch(e){markOutcome('failed');alert('販売数を保存できませんでした。\n'+e.message);}
-      });
+      if(preview)return savePreview(markOutcome);
+      try{
+        var next=copy(allStores);ensure(next);
+        applyCountDraft(next,allStores.current,monthPrefix(),state.categoryId,state.draft,state.wasteDraft,state.wasteTouched);
+        persistTransaction(next);finishSave();markOutcome('completed');
+      }catch(e){markOutcome('failed');alert('販売数を保存できませんでした。\n'+e.message);}
+      },!!preview);
     }
     function notifyPeriodChange(){
       try{root.dispatchEvent(new CustomEvent('insight:sales-count-period-change',{detail:{year:state.year,month:state.month}}));}catch(_){}
     }
     function setPeriod(year,month){
+      if(preview&&!preview.canEdit())return false;
       var y=Number(year),m=Number(month);
       if(!Number.isInteger(y)||y<1000||!Number.isInteger(m)||m<1||m>12)return false;
       // A no-op route sync only displays the period; it must not attempt year registration.
       if(String(y)===state.year&&m===state.month)return true;
+      if(preview&&!yearRegistered(y))return false;
       if(!confirmLeave())return false;
       // Observe the outermost period change: year promotion can persist before
       // readMonth/render finish. Unknown early exits remain HELD, never CLEAN.
@@ -236,7 +284,7 @@
       });
     }
     function changePeriod(delta){var d=new Date(Number(state.year),state.month-1+delta,1);setPeriod(d.getFullYear(),d.getMonth()+1);}
-    function changeCategory(id){if(id===state.categoryId)return;if(!confirmLeave()){doc.getElementById('scCategory').value=state.categoryId;return;}state.categoryId=id;readMonth();render();}
+    function changeCategory(id){if(preview&&!preview.canEdit()){doc.getElementById('scCategory').value=state.categoryId;return;}if(id===state.categoryId)return;if(!confirmLeave()){doc.getElementById('scCategory').value=state.categoryId;return;}state.categoryId=id;readMonth();render();}
     function normalizeEditableCountInput(input){
       // Only strip redundant leading zeroes from complete, safe non-negative integers.
       // Keep blank/invalid/intermediate input intact for the existing validation flow.
@@ -405,6 +453,7 @@
     function analysisData(){var saleRows=[],normal=[],saleWeekdays=new Set(),days=daysInMonth(),storeId=allStores.current,st=allStores.stores[storeId];if(!st)return {sales:saleRows,normal:normal};for(var d=1;d<=days;d++){var date=monthPrefix()+'-'+pad(d),evs=eventsFor(storeId,date),r=st.salesCounts&&st.salesCounts[date]&&st.salesCounts[date][state.categoryId]?normalizeRecord(st.salesCounts[date][state.categoryId]):null;if(evs.length){saleWeekdays.add(new Date(date+'T12:00:00').getDay());evs.forEach(function(e){saleRows.push({date:date,store:st.name,event:e,record:r||emptyRecord()});});}}for(var n=1;n<=days;n++){var normalDate=monthPrefix()+'-'+pad(n),wd=new Date(normalDate+'T12:00:00').getDay();if(saleWeekdays.has(wd)&&eventsFor(storeId,normalDate).length===0){var normalRecord=st.salesCounts&&st.salesCounts[normalDate]&&st.salesCounts[normalDate][state.categoryId];if(normalRecord)normal.push(normalizeRecord(normalRecord));}}return {sales:saleRows,normal:normal};}
 
     function reloadFromStore(){
+      if(preview&&(!preview.canEdit()||state.dirty))return false;
       ensure(allStores);
       store=allStores.stores[allStores.current];
       if(!store)return false;
@@ -417,6 +466,10 @@
     }
 
     // Read-only snapshot for automatic AI comments; reuse the page's calculations.
+    model.connectIndexedDBPreview=function(adapter){
+      if(preview)throw new Error('Sales count preview is already active');
+      preview=adapter;
+    };
     model.getPeriod=function(){return {year:state.year,month:state.month};};
     model.setPeriod=function(year,month){return setPeriod(year,month);};
     model.reloadFromStore=reloadFromStore;
@@ -530,7 +583,7 @@
       poll();
     }
     function openCategoryManager(){
-      if(categoryDialogOpening)return;
+      if(preview||categoryDialogOpening)return;
       blurSalesCountInput();
       if(Date.now()-lastCountInputBlurAt>2000){manageCategories();return;}
       categoryDialogOpening=true;
@@ -549,7 +602,7 @@
       manageButton.onclick=openCategoryManager;}
     buildPage();
     if(!activeCategories().length)categories()[0].hidden=false;state.categoryId=activeCategories()[0].id;readMonth();render();
-    var originalGoto=root.gotoNav;root.gotoNav=function(i){if(i==='salesCounts'){if(currentNav==='salesCounts')return;doc.querySelectorAll('.nav-btn').forEach(function(n){n.classList.remove('active');});doc.querySelectorAll('.page').forEach(function(n){n.classList.remove('show');});doc.getElementById('navSalesCount').classList.add('active');doc.getElementById('pageSalesCount').classList.add('show');currentNav='salesCounts';ensure(allStores);store=allStores.stores[allStores.current];readMonth();render();return;}if(currentNav==='salesCounts'&&!confirmLeave())return;doc.getElementById('navSalesCount').classList.remove('active');doc.getElementById('pageSalesCount').classList.remove('show');return originalGoto(i);};
+    var originalGoto=root.gotoNav;root.gotoNav=function(i){if(i==='salesCounts'){if(currentNav==='salesCounts')return;doc.querySelectorAll('.nav-btn').forEach(function(n){n.classList.remove('active');});doc.querySelectorAll('.page').forEach(function(n){n.classList.remove('show');});doc.getElementById('navSalesCount').classList.add('active');doc.getElementById('pageSalesCount').classList.add('show');currentNav='salesCounts';if(!preview)ensure(allStores);store=allStores.stores[allStores.current];readMonth();render();return;}if(currentNav==='salesCounts'){if(!preview&&!confirmLeave())return;if(preview)setDirty(false);}doc.getElementById('navSalesCount').classList.remove('active');doc.getElementById('pageSalesCount').classList.remove('show');return originalGoto(i);};
     var originalSwitch=root.switchStore;root.switchStore=function(id){if(currentNav!=='salesCounts')return originalSwitch(id);if(!allStores.stores[id]||!confirmLeave()){doc.getElementById('storeSel').value=allStores.current;return;}allStores.current=id;store=allStores.stores[id];baseYear=store.years[store.years.length-1];cmpYear=store.years.length>1?store.years[store.years.length-2]:null;editYear={sales:baseYear,kyaku:baseYear,haiki:baseYear};var t=todayFY();editMonth={sales:t.month,kyaku:t.month,haiki:t.month};applySharedWeatherToStore(store);persist();renderStoreSel();updateMissingBadge();doc.getElementById('storeMenu').classList.add('hidden');ensure(allStores);readMonth();render();};
     root.addEventListener('beforeunload',function(e){if(!state.dirty)return;e.preventDefault();e.returnValue='';});
   }

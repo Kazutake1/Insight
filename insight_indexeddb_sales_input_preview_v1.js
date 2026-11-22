@@ -156,8 +156,40 @@
         }finally{state.busy=false;}
       };
     }
+    const canEditCounts=()=>!blocked()&&currentNav==='salesCounts';
+    function prepareCountSave({storeId,year,unchanged,apply}){
+      if(!canEditCounts()||!root.InsightYearManager.isCurrentRegistered(year))return null;
+      state.busy=true;
+      const wasInert=doc.body.inert;
+      doc.body.inert=true;
+      return async ()=>{
+        try{
+          const current=()=>currentNav==='salesCounts'&&storeId===state.storeId&&allStores.current===storeId&&
+            unchanged()&&root.InsightStorage.serialize(allStores)===root.InsightStorage.serialize(state.committed.snapshot);
+          if(!current())throw new Error('Sales count target changed');
+          const candidate=JSON.parse(JSON.stringify(state.committed.snapshot));
+          apply(candidate);
+          const result=await api.save(state.committed.revision,candidate);
+          if(!current())throw new Error('Sales count draft changed during save');
+          allStores=JSON.parse(JSON.stringify(result.snapshot));
+          store=allStores.stores[state.storeId];
+          state.committed=result;
+          return true;
+        }catch(_){
+          state.held=true;
+          return false;
+        }finally{
+          state.busy=false;
+          doc.body.inert=wasInert;
+        }
+      };
+    }
     const getStatus=()=>{
       if(quick&&currentNav===0)return quick.getStatus();
+      if(quick&&currentNav==='salesCounts')return {
+        state:state.held?'HELD':blocked()?'ACTIVE':'IDLE_OBSERVED',
+        hasUnsavedInput:blocked()||root.InsightSalesCount.hasUnsavedInput()
+      };
       let dirty=true;
       try{
         dirty=currentNav===screen.route&&((matchesPeriod()&&!matchesScreen())||changes(displayedPeriod()).length>0);
@@ -247,7 +279,7 @@
     const sidebarSelector=Object.keys(sidebarRoutes).map(id=>'#'+id).join(',');
     let approved=null;
     const screenQuestion='保存せずに画面を移動しますか？';
-    const isInputRoute=route=>route===0||Object.values(screens).some(screen=>screen.route===route);
+    const isInputRoute=route=>route===0||route==='salesCounts'||Object.values(screens).some(screen=>screen.route===route);
     root.addEventListener('click',event=>{
       const item=event.target.closest?.(sidebarSelector);
       if(quick){
@@ -284,7 +316,7 @@
         const period=root.InsightPagePeriodSync;
         const previous=period?.getTarget();
         const daily=root.InsightDateContext.getSelectedInfo();
-        const priorPeriod=fromQuick?null:displayedPeriod();
+        const priorPeriod=fromQuick||currentNav==='salesCounts'?null:displayedPeriod();
         const priorType=type;
         const result=gotoNav.apply(this,arguments);
         if(priorPeriod){
@@ -299,7 +331,8 @@
             period.setTarget(next);
             period.syncCurrentPage();
           }
-          followCurrentScreen();
+          if(destination==='salesCounts')connectedType=null;
+          else followCurrentScreen();
         }
         return result;
       }
@@ -406,6 +439,7 @@
         prepareSave:prepareHourlySave
       });
       state.hourly=hourly;
+      root.InsightSalesCount.connectIndexedDBPreview({canEdit:canEditCounts,prepareSave:prepareCountSave});
       allowConnectedPeriod=(inputType,year)=>{
         if(blocked()||currentNav!==screen.route||inputType!==type)return false;
         if(root.InsightYearManager?.isCurrentRegistered(year))return true;
