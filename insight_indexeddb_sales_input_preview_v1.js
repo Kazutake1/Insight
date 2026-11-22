@@ -131,6 +131,31 @@
     }
     let timer;
     const blocked=()=>state.busy||state.pending||state.held;
+    let hourly;
+    function prepareHourlySave({storeId,date,hours,unchanged}){
+      if(blocked()||currentNav!==0)return null;
+      state.busy=true;
+      return async ()=>{
+        try{
+          const current=()=>currentNav===0&&storeId===state.storeId&&allStores.current===storeId&&
+            root.InsightDateContext.getSelectedIso()===date&&unchanged()&&
+            root.InsightStorage.serialize(allStores)===root.InsightStorage.serialize(state.committed.snapshot);
+          if(!current()||!root.InsightYearManager.isCurrentRegistered(date.slice(0,4))||
+             root.InsightDateContext.isFuture())throw new Error('Hourly input target changed');
+          const candidate=JSON.parse(JSON.stringify(state.committed.snapshot));
+          root.InsightHourlyCustomers.set(candidate,storeId,date,hours);
+          const result=await api.save(state.committed.revision,candidate);
+          if(!current())throw new Error('Hourly input changed during save');
+          allStores=JSON.parse(JSON.stringify(result.snapshot));
+          store=allStores.stores[state.storeId];
+          state.committed=result;
+          return true;
+        }catch(_){
+          state.held=true;
+          return false;
+        }finally{state.busy=false;}
+      };
+    }
     const getStatus=()=>{
       if(quick&&currentNav===0)return quick.getStatus();
       let dirty=true;
@@ -232,6 +257,7 @@
           root.gotoNav(sidebarRoutes[item.id]);
           return;
         }
+        if(hourly?.dialog()?.contains(event.target)&&!blocked())return;
         const inside=event.target.closest?.('.page.show');
         const excluded=event.target.closest?.('.clear-btn,#autoWxBtn');
         if(!blocked()&&((inside&&!excluded)||event.target.closest?.('#storeSel,#storeMenuBtn')))return;
@@ -253,7 +279,7 @@
     root.gotoNav=function(destination){
       if(followInputScreens&&blocked())return false;
       if(quick){
-        if(!isInputRoute(destination)||destination===currentNav||!allowNavigation(screenQuestion))return false;
+        if(hourly?.dialog()?.open||!isInputRoute(destination)||destination===currentNav||!allowNavigation(screenQuestion))return false;
         const fromQuick=currentNav===0;
         const period=root.InsightPagePeriodSync;
         const previous=period?.getTarget();
@@ -372,6 +398,14 @@
       };
     }
     if(quick){
+      hourly=root.InsightHourlyCustomers.connectIndexedDBPreview({
+        canOpen:()=>!blocked()&&currentNav===0&&
+          root.InsightYearManager.isCurrentRegistered(root.InsightDateContext.getSelectedInfo().fy)&&
+          !root.InsightDateContext.isFuture(),
+        canClose:()=>!blocked(),
+        prepareSave:prepareHourlySave
+      });
+      state.hourly=hourly;
       allowConnectedPeriod=(inputType,year)=>{
         if(blocked()||currentNav!==screen.route||inputType!==type)return false;
         if(root.InsightYearManager?.isCurrentRegistered(year))return true;

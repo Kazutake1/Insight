@@ -75,6 +75,7 @@
     if(!root.InsightHooks||!root.InsightDateContext||!root.InsightStorage){setTimeout(init,0);return;}
     root.__insightHourlyCustomersV1=true;
     var doc=root.document,activeDialog=null;
+    var preview=null,previewDraftChanged=null;
 
     function el(tag,text,cls){
       var node=doc.createElement(tag);
@@ -128,7 +129,7 @@
       }catch(_){hourlyObserverFault=true;}
     })();
     model.getHourlySaveOperationStatus=hourlyOperationStatus;
-    function observeHourlySave(operation){
+    function observeHourlySave(operation,asyncPreview){
       var observer=hourlyObserver,ticket=null,registered=false,outcome='unknown';
       if(observer&&!hourlyObserverFault){
         try{
@@ -141,18 +142,27 @@
           }
         }catch(_){hourlyObserverFault=true;}
       }
+      function finish(result){
+        if(!registered)return;
+        try{if(observer.end(ticket,result)!==true)hourlyObserverFault=true;}
+        catch(_){hourlyObserverFault=true;}
+        hourlyObserverActive-=1;
+        if(!hourlyObserverFault)hourlyOperationStatus();
+      }
+      if(asyncPreview){
+        return Promise.resolve().then(operation).then(function(result){
+          finish(result===true?'completed':'unknown');
+          return result;
+        },function(error){
+          finish('unknown');
+          throw error;
+        });
+      }
       try{
         var value=operation();
         outcome='completed';
         return value;
-      }finally{
-        if(registered){
-          try{if(observer.end(ticket,outcome)!==true)hourlyObserverFault=true;}
-          catch(_){hourlyObserverFault=true;}
-          hourlyObserverActive-=1;
-          if(!hourlyObserverFault)hourlyOperationStatus();
-        }
-      }
+      }finally{finish(outcome);}
     }
 
     function persist(date,hours){
@@ -180,10 +190,13 @@
       else host.append(card);
     }
     function openDialog(date){
-      if(activeDialog)return;
-      var saved=status(allStores,selectedStore(),date),draft=saved.hours.slice();
+      if(activeDialog||(preview&&!preview.canOpen()))return;
+      var storeId=selectedStore(),saved=status(allStores,storeId,date),draft=saved.hours.slice();
       var dialog=el('dialog',undefined,'hourly-dialog');activeDialog=dialog;
-      var head=el('header'),heading=el('h2','時間帯別客数　'+date),close=el('button','閉じる');close.type='button';close.onclick=function(){dialog.close();};
+      var head=el('header'),heading=el('h2','時間帯別客数　'+date),close=el('button','閉じる');close.type='button';close.onclick=closeDialog;
+      function closeDialog(){
+        if(!preview||preview.canClose())dialog.close();
+      }
       head.append(heading,close);dialog.append(head);
 
       var grid=el('div',undefined,'hourly-input-grid'),inputs=[];
@@ -227,22 +240,51 @@
       refresh();
 
       var actions=el('div',undefined,'hourly-actions'),cancel=el('button','キャンセル'),save=el('button','保存する','hourly-primary');
-      cancel.type='button';cancel.onclick=function(){dialog.close();};save.type='button';save.onclick=function(){
+      var feedback=el('span');feedback.setAttribute('role','status');
+      function readDraft(){return JSON.stringify(inputs.map(function(input){return input.value;}));}
+      if(preview){
+        var initial=readDraft();
+        previewDraftChanged=function(){return readDraft()!==initial;};
+        dialog.addEventListener('cancel',function(event){if(!preview.canClose())event.preventDefault();});
+      }
+      function savedFeedback(){
+        dialog.close();
+        renderQuick();
+        if(root.InsightEventResults&&typeof root.InsightEventResults.render==='function')root.InsightEventResults.render();
+        if(typeof showToast==='function')showToast('✓ 時間帯別客数を保存しました','#15803d','#f0fdf4');
+      }
+      cancel.type='button';cancel.onclick=closeDialog;save.type='button';save.onclick=function(){
         refresh();
         var invalid=inputs.find(function(input){return !input.checkValidity();});
         if(invalid){invalid.reportValidity();invalid.focus();return;}
+        if(preview){
+          var captured=readDraft();
+          var commit=preview.prepareSave({storeId:storeId,date:date,hours:draft.slice(),
+            unchanged:function(){return dialog.isConnected&&dialog.open&&readDraft()===captured;}});
+          if(!commit)return;
+          save.disabled=true;dialog.inert=true;
+          feedback.textContent='保存を確認しています。';
+          return observeHourlySave(async function(){
+            try{
+              if(await commit()){savedFeedback();return true;}
+              feedback.textContent='保存結果を確認できないため、追加の保存を停止しました。';
+              return false;
+            }finally{
+              dialog.inert=false;
+              save.disabled=!preview.canClose();
+            }
+          },true);
+        }
         try{
-          observeHourlySave(function(){
-          persist(date,draft);
-          dialog.close();
-          renderQuick();
-          if(root.InsightEventResults&&typeof root.InsightEventResults.render==='function')root.InsightEventResults.render();
-          if(typeof showToast==='function')showToast('✓ 時間帯別客数を保存しました','#15803d','#f0fdf4');
-          });
+          observeHourlySave(function(){persist(date,draft);savedFeedback();});
         }catch(error){alert('時間帯別客数を保存できませんでした。\n'+error.message);}
       };
+      if(preview)actions.append(feedback);
       actions.append(cancel,save);dialog.append(actions);
-      dialog.addEventListener('close',function(){dialog.remove();if(activeDialog===dialog)activeDialog=null;});
+      dialog.addEventListener('close',function(){
+        dialog.remove();
+        if(activeDialog===dialog){activeDialog=null;previewDraftChanged=null;}
+      });
       doc.body.append(dialog);dialog.showModal();
       setTimeout(function(){var first=inputs.find(function(input){return input.value==='';})||inputs[0];if(first)first.focus();},0);
     }
@@ -252,6 +294,14 @@
     root.InsightHooks.on('quick:render:after','hourly-customers-render',renderQuick,25);
     if(typeof currentNav!=='undefined'&&currentNav===0)renderQuick();
     model.renderQuick=renderQuick;
+    model.connectIndexedDBPreview=function(adapter){
+      if(preview||activeDialog)throw new Error('Hourly customer preview is already active');
+      preview=adapter;
+      return Object.freeze({
+        dialog:function(){return activeDialog;},
+        hasUnsavedInput:function(){return !!previewDraftChanged&&previewDraftChanged();}
+      });
+    };
   }
 
   if(root.document.readyState==='loading')root.document.addEventListener('DOMContentLoaded',init);

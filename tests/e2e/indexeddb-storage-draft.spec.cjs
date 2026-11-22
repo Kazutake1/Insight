@@ -432,6 +432,92 @@ for(const failure of ['quota','readback','tab close']){
   });
 }
 
+for(const outcome of ['success','quota']){
+  test('combined input session uses the shared revision for hourly customers with '+outcome,async({page,context})=>{
+    const seed=await openQuickInputPreview(page,{followMonthlyInputs:true});
+    const baseline=JSON.parse(seed.raw);
+    const button=page.locator('#hourlyCustomersQuick button');
+    const dialog=page.locator('.hourly-dialog');
+    await button.click();
+    await expect(dialog).toBeVisible();
+    const hourly=dialog.getByRole('spinbutton',{name:'0時台の客数'});
+    await hourly.fill('12');
+    expect(await quickInputBlocksUnload(page)).toBe(true);
+    await dialog.getByRole('button',{name:'キャンセル'}).click();
+    await expect(dialog).toHaveCount(0);
+    expect(await quickInputBlocksUnload(page)).toBe(false);
+    expect(await committedInput(page)).toEqual({revision:0,snapshot:baseline});
+
+    await button.click();
+    await hourly.fill('-1');
+    await dialog.getByRole('button',{name:'保存する'}).click();
+    await expect(dialog).toBeVisible();
+    expect(await committedInput(page)).toEqual({revision:0,snapshot:baseline});
+    await hourly.fill('0');
+    await dialog.getByRole('spinbutton',{name:'23時台の客数'}).fill('18');
+    await page.evaluate(outcome=>{
+      if(outcome==='quota'){
+        const put=IDBObjectStore.prototype.put;
+        IDBObjectStore.prototype.put=function(){
+          IDBObjectStore.prototype.put=put;
+          throw new DOMException('Fictional quota error','QuotaExceededError');
+        };
+        return;
+      }
+      const digest=crypto.subtle.digest,resume=[];
+      window.hourlyDigests=resume;
+      crypto.subtle.digest=async function(...args){
+        await new Promise(resolve=>resume.push(resolve));
+        return digest.apply(this,args);
+      };
+      window.resumeHourlySave=()=>{
+        crypto.subtle.digest=digest;
+        resume.forEach(resolve=>resolve());
+      };
+    },outcome);
+    await dialog.getByRole('button',{name:'保存する'}).click();
+    if(outcome==='success'){
+      await page.waitForFunction(()=>hourlyDigests.length===2);
+      await expect(dialog.getByRole('status')).toHaveText('保存を確認しています。');
+      expect(await page.evaluate(()=>InsightHourlyCustomers.getHourlySaveOperationStatus()))
+        .toMatchObject({state:'ACTIVE',activeCount:1});
+      expect(await page.evaluate(()=>gotoNav(2))).toBe(false);
+      expect(await page.evaluate(()=>saveQuick())).toBeUndefined();
+      await page.evaluate(()=>resumeHourlySave());
+      await expect(dialog).toHaveCount(0);
+      const expected=JSON.parse(seed.raw);
+      const hours=Array(24).fill(null);hours[0]=0;hours[23]=18;
+      expected.stores[seed.active].hourlyCustomers??={};
+      expected.stores[seed.active].hourlyCustomers[seed.iso]=hours;
+      expect(await committedInput(page)).toEqual({revision:1,snapshot:expected});
+      await expect(page.locator('#hourlyCustomersQuick')).toContainText('途中 2/24');
+      await page.locator('#qi_客数').fill('123');
+      await page.locator('#quickSaveBtn').click();
+      await expect(page.locator('#quickSaveBtn + [role=status]')).toHaveText('今日の入力を保存しました。');
+      const row=expected.stores[seed.active].data[seed.year][seed.month][seed.day-1];
+      row.客数=123;
+      const peer=expected.stores[seed.peer].data[seed.year][seed.month][seed.day-1];
+      peer.weather=row.weather;peer.tempMaxC=row.tempMaxC;peer.tempMinC=row.tempMinC;
+      expected.sharedWeather??={};
+      expected.sharedWeather[seed.year+'-'+seed.month+'-'+seed.day]=row.weather;
+      expect(await committedInput(page)).toEqual({revision:2,snapshot:expected});
+    }else{
+      await expect(dialog.getByRole('status')).toHaveText('保存結果を確認できないため、追加の保存を停止しました。');
+      await expect(hourly).toHaveValue('0');
+      await expect(dialog.getByRole('spinbutton',{name:'23時台の客数'})).toHaveValue('18');
+      expect(await page.evaluate(()=>combinedPreview.getStatus())).toEqual({state:'HELD',hasUnsavedInput:true});
+      expect(await page.evaluate(()=>gotoNav(2))).toBe(false);
+      const peer=await openStoreSwitchPeer(context);
+      try{
+        const record=await readStoreSwitchRecord(peer);
+        expect(record.revision).toBe(0);
+        expect(JSON.parse(record.raw)).toEqual(baseline);
+      }finally{await peer.close();}
+    }
+    expect(await page.evaluate(()=>localStorage.getItem('insight_v11'))).toBe(seed.raw);
+  });
+}
+
 test('manual adoption uses the real encrypted backup confirmation and preserves the legacy source',async({page})=>{
   await routeMigrationPage(page);
   async function open(){
