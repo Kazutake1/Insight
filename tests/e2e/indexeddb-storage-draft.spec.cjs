@@ -2062,14 +2062,17 @@ for(const failure of ['readback abort','acknowledgement lost','tab closed during
       await expect(selector).toHaveValue(seed.active);
       await expect(sales).toHaveValue('876');
       await expect(page.locator('#salesSaveBtn')).toBeDisabled();
-      if(failure==='tab closed during readback'){
-        await page.close();
-        // Closing a tab and releasing its browser-managed lock are separate events.
-        await other.waitForFunction(async ()=>!(await navigator.locks.query()).held
-          .some(lock=>lock.name==='insight-store-snapshots-v1'));
-      }
+      const closed=failure==='tab closed during readback';
+      if(closed)await page.close();
 
-      expect(await other.evaluate(()=>InsightIndexedDBStorageV1.diagnose({verifyInterrupted:true})))
+      await expect.poll(()=>other.evaluate(async closed=>{
+        try{return await InsightIndexedDBStorageV1.diagnose({verifyInterrupted:true});}
+        catch(error){
+          // Chromium can finish closing the page before releasing its Web Lock.
+          if(closed&&error.message==='Another Insight operation is in progress')return {state:'lock-busy'};
+          throw error;
+        }
+      },closed),{timeout:10000})
         .toMatchObject({state:'hold',reason:'writing',observedRevision:1,recovery:'save-verified'});
       const expected=JSON.parse(seed.raw);
       expected.current='fictional-second-shop';
