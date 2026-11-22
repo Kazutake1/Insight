@@ -647,8 +647,6 @@ for(const outcome of ['success','conflict','quota']){
     await expect(delivery).toHaveValue('14');
     expect(await quickInputBlocksUnload(page)).toBe(true);
     if(outcome==='success'){
-      await page.locator('#scManage').click();
-      await expect(page.locator('dialog.sc-dialog')).toHaveCount(0);
       expect(await page.evaluate(year=>InsightSalesCount.setPeriod(Number(year)-30,6),seed.year)).toBe(false);
       await page.locator('#scCategory').selectOption(seed.otherCategory);
       await expect(page.locator('#scCategory')).toHaveValue(seed.countCategory);
@@ -697,6 +695,174 @@ for(const outcome of ['success','conflict','quota']){
       }finally{await peer.close();}
     }
     expect(await page.evaluate(()=>localStorage.getItem('insight_v11'))).toBe(seed.raw);
+  });
+}
+
+
+function countField(page,seed,label){
+  return page.locator('#scCalendar').getByLabel(seed.iso+' '+label,{exact:true});
+}
+
+async function interruptCountReadback(page,mode){
+  await page.evaluate(mode=>{
+    const write=InsightStorage.writeMetadata;
+    let writing=false;
+    InsightStorage.writeMetadata=(key,value)=>{
+      if(key==='insight_indexeddb_adoption_v1'){
+        const state=JSON.parse(value).state;
+        if(state==='writing')writing=true;
+        if(state==='active'&&mode==='lost acknowledgement')throw new Error('Fictional lost acknowledgement');
+      }
+      return write(key,value);
+    };
+    if(mode==='lost acknowledgement')return;
+    const get=IDBObjectStore.prototype.get;
+    IDBObjectStore.prototype.get=function(...args){
+      const request=get.apply(this,args),tx=this.transaction;
+      if(writing&&tx.mode==='readonly'&&tx.db.name==='insight-store-snapshots-v1'){
+        IDBObjectStore.prototype.get=get;
+        if(mode==='readback failure')request.addEventListener('success',()=>tx.abort());
+        else{
+          const handler=Object.getOwnPropertyDescriptor(IDBTransaction.prototype,'oncomplete');
+          Object.defineProperty(tx,'oncomplete',{
+            set(){handler.set.call(this,()=>{window.countReadbackPaused=true;});}
+          });
+        }
+      }
+      return request;
+    };
+  },mode);
+}
+
+for(const mode of ['readback failure','lost acknowledgement','tab close']){
+  test('combined sales count retains verified revisions after '+mode,async({page,context})=>{
+    const seed=await openQuickInputPreview(page,{followMonthlyInputs:true,seedCounts:true});
+    await page.locator('#navSalesCount').click();
+    const delivery=countField(page,seed,'1便 納品数');
+    await delivery.fill('');
+    const other=await openStoreSwitchPeer(context);
+    try{
+      await interruptCountReadback(page,mode);
+      await page.locator('#scSave').click();
+      const closed=mode==='tab close';
+      if(closed)await page.waitForFunction(()=>window.countReadbackPaused===true);
+      else await expect(page.locator('#scDirty')).toHaveText('保存結果を確認できないため、追加の保存を停止しました。');
+      await expect(delivery).toHaveValue('');
+      expect(await page.evaluate(()=>combinedPreview.getStatus()))
+        .toEqual({state:closed?'ACTIVE':'HELD',hasUnsavedInput:true});
+      expect(await page.evaluate(async ({year,peer})=>({
+        period:InsightSalesCount.setPeriod(year,5),store:await switchStore(peer),route:gotoNav(0)
+      }),seed))
+        .toEqual({period:false,store:false,route:false});
+      if(closed)await page.close();
+      await expect.poll(()=>other.evaluate(async closed=>{
+        try{return await InsightIndexedDBStorageV1.diagnose({verifyInterrupted:true});}
+        catch(error){
+          if(closed&&error.message==='Another Insight operation is in progress')return {state:'lock-busy'};
+          throw error;
+        }
+      },closed),{timeout:10000}).toMatchObject({state:'hold',observedRevision:1,recovery:'save-verified'});
+      const expected=JSON.parse(seed.raw);
+      expected.stores[seed.active].salesCounts[seed.iso][seed.countCategory].trips[0].delivery=null;
+      const record=await readStoreSwitchRecord(other);
+      expect(record.revision).toBe(1);
+      expect(JSON.parse(record.raw)).toEqual(expected);
+      expect(JSON.parse(record.previous.raw)).toEqual(JSON.parse(seed.raw));
+      expect(await other.evaluate(()=>localStorage.getItem('insight_v11'))).toBe(seed.raw);
+    }finally{await other.close();}
+  });
+}
+
+test('combined category changes preserve count drafts and require approval before switching',async({page})=>{
+  const seed=await openQuickInputPreview(page,{followMonthlyInputs:true,seedCounts:true});
+  const expected=JSON.parse(seed.raw),categories=expected.salesCountManagement.categories;
+  const originalName=categories[0].name;
+  await page.locator('#navSalesCount').click();
+  const delivery=countField(page,seed,'1便 納品数');
+  await delivery.fill('17');
+  const dialog=page.locator('dialog.sc-dialog');
+  async function manage(){
+    await page.locator('#scManage').click();
+    await expect(dialog).toBeVisible();
+  }
+  await manage();
+  const first=dialog.getByLabel('カテゴリー名',{exact:true}).first();
+  await first.fill(categories[1].name);
+  await dialog.getByRole('button',{name:'保存する'}).click();
+  await expect(dialog.getByRole('status')).toHaveText('同じカテゴリー名は使用できません');
+  expect(await committedInput(page)).toEqual({revision:0,snapshot:expected});
+  await first.fill('架空カテゴリの新名称');
+  await dialog.getByRole('checkbox',{name:originalName+' 3便を対象にする',exact:true}).uncheck();
+  expect(await page.evaluate(()=>gotoNav(0))).toBe(false);
+  await dialog.getByRole('button',{name:'保存する'}).click();
+  await expect(dialog).toHaveCount(0);
+  categories[0].name='架空カテゴリの新名称';categories[0].aliases.push(originalName);
+  categories[0].activeTrips[2]=false;
+  expect(await committedInput(page)).toEqual({revision:1,snapshot:expected});
+  await expect(delivery).toHaveValue('17');
+
+  await manage();
+  await dialog.getByRole('button',{name:'非表示にする',exact:true}).first().click();
+  await page.evaluate(()=>{window.confirm=()=>false;});
+  await dialog.getByRole('button',{name:'保存する'}).click();
+  await expect(dialog).toBeVisible();
+  await expect(delivery).toHaveValue('17');
+  expect(await committedInput(page)).toEqual({revision:1,snapshot:expected});
+  await page.evaluate(()=>{window.confirm=()=>true;});
+  await dialog.getByRole('button',{name:'保存する'}).click();
+  await expect(dialog).toHaveCount(0);
+  categories[0].hidden=true;
+  await expect(page.locator('#scCategory')).toHaveValue(seed.otherCategory);
+  expect(await committedInput(page)).toEqual({revision:2,snapshot:expected});
+  expect(await page.evaluate(()=>localStorage.getItem('insight_v11'))).toBe(seed.raw);
+});
+
+for(const mode of ['conflict','quota','readback failure']){
+  test('combined category save holds its dialog and count draft on '+mode,async({page,context})=>{
+    const seed=await openQuickInputPreview(page,{followMonthlyInputs:true,seedCounts:true});
+    const expected=JSON.parse(seed.raw);
+    await page.locator('#navSalesCount').click();
+    const delivery=countField(page,seed,'1便 納品数');
+    await delivery.fill('17');
+    await page.locator('#scManage').click();
+    const dialog=page.locator('dialog.sc-dialog');
+    const name=dialog.getByLabel('カテゴリー名',{exact:true}).first();
+    await name.fill('架空カテゴリの新名称');
+    const other=await openStoreSwitchPeer(context);
+    try{
+      if(mode==='conflict'){
+        await other.evaluate(async peer=>{
+          const api=InsightIndexedDBStorageV1,record=await api.read();
+          record.snapshot.stores[peer].name='別タブで確定';
+          await api.save(record.revision,record.snapshot);
+        },seed.peer);
+        expected.stores[seed.peer].name='別タブで確定';
+      }else if(mode==='quota'){
+        await page.evaluate(()=>{
+          const put=IDBObjectStore.prototype.put;
+          IDBObjectStore.prototype.put=function(){
+            IDBObjectStore.prototype.put=put;
+            throw new DOMException('Fictional quota error','QuotaExceededError');
+          };
+        });
+      }else{
+        await interruptCountReadback(page,mode);
+        const category=expected.salesCountManagement.categories[0];
+        category.aliases.push(category.name);category.name='架空カテゴリの新名称';
+      }
+      await dialog.getByRole('button',{name:'保存する'}).click();
+      await expect(dialog.getByRole('status')).toHaveText('保存結果を確認できないため、追加の保存を停止しました。');
+      await expect(name).toHaveValue('架空カテゴリの新名称');
+      await expect(delivery).toHaveValue('17');
+      expect(await page.evaluate(()=>combinedPreview.getStatus())).toEqual({state:'HELD',hasUnsavedInput:true});
+      await dialog.getByRole('button',{name:'閉じる'}).press('Escape');
+      await expect(dialog).toBeVisible();
+      const record=await readStoreSwitchRecord(other);
+      expect(record.revision).toBe(mode==='quota'?0:1);
+      expect(JSON.parse(record.raw)).toEqual(expected);
+      if(mode==='readback failure')expect(JSON.parse(record.previous.raw)).toEqual(JSON.parse(seed.raw));
+      expect(await other.evaluate(()=>localStorage.getItem('insight_v11'))).toBe(seed.raw);
+    }finally{await other.close();}
   });
 }
 

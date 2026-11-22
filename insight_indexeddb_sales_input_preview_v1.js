@@ -289,7 +289,8 @@
           root.gotoNav(sidebarRoutes[item.id]);
           return;
         }
-        if(hourly?.dialog()?.contains(event.target)&&!blocked())return;
+        if(!blocked()&&(hourly?.dialog()?.contains(event.target)||
+                        root.InsightSalesCount.getCategoryDialog()?.contains(event.target)))return;
         const inside=event.target.closest?.('.page.show');
         const excluded=event.target.closest?.('.clear-btn,#autoWxBtn');
         if(!blocked()&&((inside&&!excluded)||event.target.closest?.('#storeSel,#storeMenuBtn')))return;
@@ -311,7 +312,8 @@
     root.gotoNav=function(destination){
       if(followInputScreens&&blocked())return false;
       if(quick){
-        if(hourly?.dialog()?.open||!isInputRoute(destination)||destination===currentNav||!allowNavigation(screenQuestion))return false;
+        if(hourly?.dialog()?.open||root.InsightSalesCount.getCategoryDialog()?.open||
+           !isInputRoute(destination)||destination===currentNav||!allowNavigation(screenQuestion))return false;
         const fromQuick=currentNav===0;
         const period=root.InsightPagePeriodSync;
         const previous=period?.getTarget();
