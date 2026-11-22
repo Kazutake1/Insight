@@ -113,8 +113,9 @@
   // This observer cannot authorize model input or assert whole-application cleanliness.
   var inputSaveObserver=null,inputSaveFault=false,inputSaveActive=0,inputSaveInitClosed=false;
   var inputSaveScope='input-month-save-core-and-sync-after-hooks-only';
+  var inputSaveAsyncObserved=false;
   function inputSaveStatus(){
-    var scope=inputSaveScope;
+    var scope=inputSaveAsyncObserved?'input-month-save-including-indexeddb-preview':inputSaveScope;
     if(inputSaveFault)return Object.freeze({scope:scope,state:'HELD',activeCount:null,epoch:null});
     if(!inputSaveObserver)return Object.freeze({scope:scope,state:'UNAVAILABLE',activeCount:null,epoch:null});
     try{
@@ -145,7 +146,8 @@
       if(initial.state!=='IDLE_OBSERVED'||initial.activeCount!==0)inputSaveFault=true;
     }catch(_){inputSaveFault=true;}
   }
-  function observeInputSave(action,context){
+  function observeInputSave(action,context,asyncPreview){
+    if(asyncPreview)inputSaveAsyncObserved=true;
     initInputSaveObserver();
     // Do not retroactively mark an unobserved save IDLE if the factory appears later.
     inputSaveInitClosed=true;
@@ -161,18 +163,27 @@
         }
       }catch(_){inputSaveFault=true;}
     }
+    function finish(outcome){
+      if(!registered)return;
+      try{if(ref.end(token,outcome)!==true)inputSaveFault=true;}
+      catch(_){inputSaveFault=true;}
+      inputSaveActive--;
+      if(!inputSaveFault)inputSaveStatus();
+    }
+    if(asyncPreview){
+      return Promise.resolve().then(action).then(function(value){
+        finish(value==='completed'||value==='cancelled_before_mutation'?value:'unknown');
+        return value;
+      },function(error){
+        finish('unknown');
+        throw error;
+      });
+    }
     try{
       var result=action();
       if(context.cancel!==true)outcome='completed';
       return result;
-    }finally{
-      if(registered){
-        try{if(ref.end(token,outcome)!==true)inputSaveFault=true;}
-        catch(_){inputSaveFault=true;}
-        inputSaveActive--;
-        if(!inputSaveFault)inputSaveStatus();
-      }
-    }
+    }finally{finish(outcome);}
   }
   root.InsightInputSaveObserverV0=Object.freeze({getStatus:function(){initInputSaveObserver();return inputSaveStatus();}});
 
@@ -188,6 +199,8 @@
         var context={name:functionName,thisArg:self,args:args,state:{},cancel:false,result:undefined};
         if(beforeEvent)emit(beforeEvent,context);
         if(context.cancel){
+          if(functionName==='saveInput'&&context.args[0]==='sales'&&typeof context.runIndexedDBPreview==='function')
+            return observeInputSave(context.runIndexedDBPreview,context,true);
           if(afterEvent&&context.afterOnCancel)emit(afterEvent,context);
           return context.result;
         }

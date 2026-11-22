@@ -2,7 +2,10 @@
 (function(root){
   'use strict';
 
+  let connectedStatus=null;
+
   async function connect(){
+    if(connectedStatus)throw new Error('Sales preview already connected');
     const doc=root.document;
     const button=doc.getElementById('salesSaveBtn');
     const notice=doc.getElementById('savedSales');
@@ -77,19 +80,23 @@
     }
 
     async function save(){
-      if(held||busy)return;
+      if(held||busy)return 'cancelled_before_mutation';
       clearTimeout(timer);
       notice.classList.remove('is-visible');
       if(!matchesScreen()){
         stop('表示中の店舗・日付または保存済みデータが変わったため、保存を停止しました。');
-        return;
+        return 'unknown';
       }
 
       let edited;
       try{edited=changes();}
       catch(_){
         status.textContent='売上・買上点数・天気の入力を確認してください。';
-        return;
+        return 'cancelled_before_mutation';
+      }
+      if(!edited.length){
+        status.textContent='保存する変更はありません。';
+        return 'cancelled_before_mutation';
       }
       const candidate=JSON.parse(JSON.stringify(committed.snapshot));
       apply(candidate,edited);
@@ -103,7 +110,7 @@
         const result=await api.save(committed.revision,candidate);
         if(!matchesScreen()||JSON.stringify(changes())!==JSON.stringify(edited)){
           stop('表示中の店舗・日付または保存済みデータが変わりました。保存済みの内容を確認してください。');
-          return;
+          return 'unknown';
         }
         apply(allStores,edited);
         committed=result;
@@ -111,8 +118,10 @@
         status.textContent='';
         notice.classList.add('is-visible');
         timer=root.setTimeout(()=>notice.classList.remove('is-visible'),3000);
+        return 'completed';
       }catch(_){
         stop('保存結果を確認できないため、追加の保存を停止しました。');
+        return 'unknown';
       }finally{
         busy=false;
         body.inert=wasInert;
@@ -123,11 +132,22 @@
     // Cancel the synchronous core and its after-save writers in the isolated sales screen.
     root.InsightHooks.on('input:save:before','indexeddb-sales-input-preview',ctx=>{
       if(ctx.args[0]!=='sales')return;
-      ctx.result=save();
+      if(!held&&!busy)ctx.runIndexedDBPreview=save;
       return false;
     },-1000);
+    const gotoNav=root.gotoNav;
+    root.gotoNav=function(){
+      if(currentNav===2){
+        const current=getStatus();
+        if(current.state!=='IDLE_OBSERVED')return false;
+        if(matchesPeriod()&&current.hasUnsavedInput&&
+           !root.confirm('未保存の入力があります。\n保存せずに画面を移動しますか？'))return false;
+      }
+      return gotoNav.apply(this,arguments);
+    };
+    connectedStatus=getStatus;
     return Object.freeze({getStatus});
   }
 
-  root.InsightIndexedDBSalesInputPreviewV1=Object.freeze({connect});
+  root.InsightIndexedDBSalesInputPreviewV1=Object.freeze({connect,getConnectedStatus:()=>connectedStatus?.()??null});
 })(globalThis);
