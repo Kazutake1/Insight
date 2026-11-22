@@ -3136,6 +3136,9 @@ async function openQuickInputPreview(page,{sameMunicipality=true,followMonthlyIn
       second.hourlyCustomers={[iso]:hours};
     }
     if(seedCounts){
+      store.data[year]['5月'][0].客数=41;
+      store.data[year]['6月'][0].客数=83;
+      second.data[year]['6月'][0].客数=81;
       countCategory.activeTrips=[true,false,true];
       const count={trips:[{delivery:8,sales:6},{delivery:22,sales:20},{delivery:3,sales:1}]};
       const waste={trips:[2,2,2]};
