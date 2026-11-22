@@ -1850,6 +1850,10 @@ test('isolated store selection keeps drafts on cancellation and changes the save
   expect(await page.evaluate(()=>allStores.current)).toBe(seed.active);
   expect(await page.evaluate(()=>switchStore('fictional-second-shop'))).toBe(false);
   expect(await page.evaluate(()=>gotoNav(3))).toBe(false);
+  expect(await page.evaluate(()=>showStoreMenu())).toBe(false);
+  expect(await page.evaluate(()=>document.body.inert)).toBe(true);
+  expect(await page.evaluate(()=>fixtureSalesPreview.getStatus()))
+    .toEqual({state:'ACTIVE',hasUnsavedInput:true});
   await page.evaluate(()=>resumeStoreSwitch());
   await expect(selector).toHaveValue(peer);
   await expect(page.locator('#storeSel + [role=status]')).toHaveText('店舗を切り替えました。');
@@ -1867,6 +1871,33 @@ test('isolated store selection keeps drafts on cancellation and changes the save
   await expect(page.locator('#savedSales')).toHaveClass(/is-visible/);
   expected.stores[peer].data[seed.year][seed.month][seed.day-1].売上=789;
   expect(await page.evaluate(()=>InsightIndexedDBStorageV1.read())).toEqual({revision:2,snapshot:expected});
+
+  await page.locator('#nav3').click();
+  const customer=page.locator('.kyaku-input[data-ri="'+(seed.day-1)+'"]');
+  await customer.click();
+  await customer.fill('678');
+  await page.locator('#kyakuSaveBtn').click();
+  await expect(page.locator('#savedKyaku')).toHaveClass(/is-visible/);
+  const peerRow=expected.stores[peer].data[seed.year][seed.month][seed.day-1];
+  peerRow.客数=678;
+  expect(await page.evaluate(()=>InsightIndexedDBStorageV1.read())).toEqual({revision:3,snapshot:expected});
+
+  await page.locator('#nav4').click();
+  const categories=await page.evaluate(()=>HAIKI_CATS);
+  const category=categories[0];
+  const waste=page.locator('#haikiForm [data-hc="'+category+'"]');
+  await page.evaluate(date=>InsightInputDayNav.select('haiki',date),date);
+  await waste.click();
+  await waste.fill('321');
+  await page.locator('#haikiSaveBtn').click();
+  await expect(page.locator('#savedHaiki')).toHaveClass(/is-visible/);
+  peerRow.haiki={...peerRow.haiki,[category]:321};
+  peerRow.廃棄金額=categories.reduce((sum,key)=>sum+Number(peerRow.haiki[key]??0),0);
+  expect(await page.evaluate(()=>InsightIndexedDBStorageV1.read())).toEqual({revision:4,snapshot:expected});
+
+  await page.locator('#nav2').click();
+  await page.evaluate(date=>InsightInputDayNav.select('sales',date),date);
+  await expect(sales).toHaveValue('789');
   await sales.click();
   await sales.fill('999');
   await page.evaluate(()=>{
@@ -1883,6 +1914,166 @@ test('isolated store selection keeps drafts on cancellation and changes the save
   await expect(sales).toHaveValue('999');
   await expect(save).toBeDisabled();
   expect(await page.evaluate(()=>InsightIndexedDBStorageV1.diagnose({verifyInterrupted:true})))
-    .toMatchObject({state:'hold',observedRevision:2,recovery:'prior-save-verified'});
+    .toMatchObject({state:'hold',observedRevision:4,recovery:'prior-save-verified'});
   expect(await page.evaluate(()=>localStorage.getItem('insight_v11'))).toBe(seed.raw);
 });
+
+async function openStoreSwitchPeer(context){
+  const peer=await context.newPage();
+  await peer.route('**/store-switch-fixture',route=>route.fulfill({
+    contentType:'text/html',body:'<!doctype html><title>Fictional store switch peer</title>'
+  }));
+  await peer.goto('/store-switch-fixture');
+  await peer.evaluate(()=>{window.SK='insight_v11';});
+  await peer.addScriptTag({url:'/insight_storage_v1.js'});
+  await peer.addScriptTag({url:'/insight_indexeddb_storage_v1.js'});
+  return peer;
+}
+
+function readStoreSwitchRecord(page){
+  return page.evaluate(()=>new Promise((resolve,reject)=>{
+    const open=indexedDB.open('insight-store-snapshots-v1',1);
+    open.onerror=()=>reject(open.error);
+    open.onsuccess=()=>{
+      const db=open.result;
+      const tx=db.transaction('snapshots','readonly');
+      const get=tx.objectStore('snapshots').get('current');
+      tx.oncomplete=()=>{db.close();resolve(get.result);};
+      tx.onabort=()=>{db.close();reject(tx.error);};
+    };
+  }));
+}
+
+for(const overlap of ['previously saved','save in progress']){
+  test('isolated store switch preserves both shops when a different tab has '+overlap,async({page,context})=>{
+    const seed=await openMonthlySalesPreview(page,{followInputScreens:true});
+    const other=await openStoreSwitchPeer(context);
+    try{
+      await page.evaluate(()=>{renderStoreSel();window.confirm=()=>true;});
+      const expected=JSON.parse(seed.raw);
+      expected.stores[seed.active].name='確定した店舗A';
+      expected.stores['fictional-second-shop'].name='確定した店舗B';
+      await other.evaluate(async hold=>{
+        const api=InsightIndexedDBStorageV1;
+        const current=await api.read();
+        if(hold){
+          const digest=crypto.subtle.digest,resume=[];
+          window.peerSaveDigests=resume;
+          crypto.subtle.digest=async function(...args){
+            await new Promise(resolve=>resume.push(resolve));
+            return digest.apply(this,args);
+          };
+          window.resumePeerSave=()=>{
+            crypto.subtle.digest=digest;
+            resume.forEach(resolve=>resolve());
+          };
+        }
+        current.snapshot.stores[current.snapshot.current].name='確定した店舗A';
+        current.snapshot.stores['fictional-second-shop'].name='確定した店舗B';
+        window.peerWrite=api.save(current.revision,current.snapshot);
+        if(!hold)await peerWrite;
+      },overlap==='save in progress');
+      if(overlap==='save in progress')await other.waitForFunction(()=>peerSaveDigests.length===2);
+
+      const sales=page.locator('#sf_売上'),selector=page.locator('#storeSel');
+      await sales.click();
+      await sales.fill('875');
+      await selector.selectOption('fictional-second-shop');
+      await expect(page.locator('#storeSel + [role=status]'))
+        .toHaveText('店舗切替の結果を確認できないため、追加の保存を停止しました。');
+      await expect(selector).toHaveValue(seed.active);
+      await expect(sales).toHaveValue('875');
+      await expect(page.locator('#salesSaveBtn')).toBeDisabled();
+      expect(await page.evaluate(()=>fixtureSalesPreview.getStatus()))
+        .toEqual({state:'HELD',hasUnsavedInput:true});
+      expect(await page.evaluate(()=>gotoNav(3))).toBe(false);
+      if(overlap==='save in progress'){
+        await other.evaluate(async ()=>{resumePeerSave();await peerWrite;});
+        expect(await other.evaluate(()=>InsightIndexedDBStorageV1.read()))
+          .toEqual({revision:1,snapshot:expected});
+      }else{
+        expect(await other.evaluate(()=>InsightIndexedDBStorageV1.diagnose({verifyInterrupted:true})))
+          .toMatchObject({state:'hold',reason:'writing',observedRevision:1});
+      }
+      const record=await readStoreSwitchRecord(other);
+      expect(record.revision).toBe(1);
+      expect(JSON.parse(record.raw)).toEqual(expected);
+      expect(record.previous).toMatchObject({revision:0});
+      expect(JSON.parse(record.previous.raw)).toEqual(JSON.parse(seed.raw));
+      expect(await other.evaluate(()=>localStorage.getItem('insight_v11'))).toBe(seed.raw);
+    }finally{await other.close();}
+  });
+}
+
+for(const failure of ['readback abort','acknowledgement lost','tab closed during readback']){
+  test('isolated store switch leaves a recoverable committed snapshot after '+failure,async({page,context})=>{
+    const seed=await openMonthlySalesPreview(page,{followInputScreens:true});
+    const other=await openStoreSwitchPeer(context);
+    try{
+      await page.evaluate(failure=>{
+        renderStoreSel();
+        window.confirm=()=>true;
+        const write=InsightStorage.writeMetadata;
+        let writing=false;
+        InsightStorage.writeMetadata=(key,value)=>{
+          if(key==='insight_indexeddb_adoption_v1'){
+            const state=JSON.parse(value).state;
+            if(state==='writing')writing=true;
+            if(writing&&state==='active'&&failure==='acknowledgement lost')
+              throw new Error('Fictional store switch acknowledgement lost');
+          }
+          return write(key,value);
+        };
+        if(failure==='acknowledgement lost')return;
+        const get=IDBObjectStore.prototype.get;
+        IDBObjectStore.prototype.get=function(...args){
+          const request=get.apply(this,args);
+          const tx=this.transaction;
+          if(writing&&tx.mode==='readonly'&&tx.db.name==='insight-store-snapshots-v1'){
+            IDBObjectStore.prototype.get=get;
+            if(failure==='readback abort'){
+              request.addEventListener('success',()=>tx.abort());
+            }else{
+              const oncomplete=Object.getOwnPropertyDescriptor(IDBTransaction.prototype,'oncomplete');
+              Object.defineProperty(tx,'oncomplete',{
+                set(){oncomplete.set.call(this,()=>{window.storeReadbackPaused=true;});}
+              });
+            }
+          }
+          return request;
+        };
+      },failure);
+
+      const sales=page.locator('#sf_売上'),selector=page.locator('#storeSel');
+      await sales.click();
+      await sales.fill('876');
+      await selector.selectOption('fictional-second-shop');
+      if(failure==='tab closed during readback'){
+        await page.waitForFunction(()=>window.storeReadbackPaused===true);
+        await expect(page.locator('#storeSel + [role=status]')).toHaveText('店舗の切替を確認しています。');
+        expect(await page.evaluate(()=>fixtureSalesPreview.getStatus()))
+          .toEqual({state:'ACTIVE',hasUnsavedInput:true});
+      }else{
+        await expect(page.locator('#storeSel + [role=status]'))
+          .toHaveText('店舗切替の結果を確認できないため、追加の保存を停止しました。');
+        expect(await page.evaluate(()=>fixtureSalesPreview.getStatus()))
+          .toEqual({state:'HELD',hasUnsavedInput:true});
+      }
+      await expect(selector).toHaveValue(seed.active);
+      await expect(sales).toHaveValue('876');
+      await expect(page.locator('#salesSaveBtn')).toBeDisabled();
+      if(failure==='tab closed during readback')await page.close();
+
+      await expect.poll(()=>other.evaluate(()=>InsightIndexedDBStorageV1.diagnose({verifyInterrupted:true})))
+        .toMatchObject({state:'hold',reason:'writing',observedRevision:1,recovery:'save-verified'});
+      const expected=JSON.parse(seed.raw);
+      expected.current='fictional-second-shop';
+      const record=await readStoreSwitchRecord(other);
+      expect(record.revision).toBe(1);
+      expect(JSON.parse(record.raw)).toEqual(expected);
+      expect(record.previous).toMatchObject({revision:0});
+      expect(JSON.parse(record.previous.raw)).toEqual(JSON.parse(seed.raw));
+      expect(await other.evaluate(()=>localStorage.getItem('insight_v11'))).toBe(seed.raw);
+    }finally{await other.close();}
+  });
+}
