@@ -1358,6 +1358,8 @@ for(const failure of ['stale revision','quota failure','draft changed during sav
       window.confirm=message=>{window.fixtureWarnings.push(message);return false;};
     });
     await page.locator('#nav1').click();
+    await expect(page.locator('#pageSales')).toHaveClass(/show/);
+    expect(await readMonitor()).toMatchObject({dirty:true});
     expect(await page.evaluate(()=>{
       const next=new Date(Number(editYear.sales),MONTHS.indexOf(editMonth.sales)+1,1);
       return InsightInputDayNav.select('sales',

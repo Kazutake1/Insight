@@ -135,14 +135,19 @@
       if(!held&&!busy)ctx.runIndexedDBPreview=save;
       return false;
     },-1000);
+    // Check sidebar clicks before document capture updates the shared date target.
+    root.addEventListener('click',event=>{
+      if(currentNav!==2||!event.target.closest?.('#nav0,#nav1,#nav2,#nav3,#nav4,#navSalesCount,#navSaleResults'))return;
+      const current=getStatus();
+      if(current.state==='IDLE_OBSERVED'&&
+         (!matchesPeriod()||!current.hasUnsavedInput||
+          root.confirm('未保存の入力があります。\n保存せずに画面を移動しますか？')))return;
+      event.preventDefault();
+      event.stopImmediatePropagation();
+    },true);
     const gotoNav=root.gotoNav;
     root.gotoNav=function(){
-      if(currentNav===2){
-        const current=getStatus();
-        if(current.state!=='IDLE_OBSERVED')return false;
-        if(matchesPeriod()&&current.hasUnsavedInput&&
-           !root.confirm('未保存の入力があります。\n保存せずに画面を移動しますか？'))return false;
-      }
+      if(currentNav===2&&getStatus().state!=='IDLE_OBSERVED')return false;
       return gotoNav.apply(this,arguments);
     };
     connectedStatus=getStatus;
