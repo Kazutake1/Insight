@@ -220,12 +220,13 @@ test('販売数入力は不正値の保存と同じページの再読込を防�
 
 test('カテゴリー保存後も選択中カテゴリーの未保存入力を保持する',()=>{
   const source=fs.readFileSync(path.join(root,'insight_sales_count_v1.js'),'utf8');
-  const start=source.indexOf("d.querySelector('[data-save]').onclick");
+  const start=source.indexOf("saveButton.onclick=function()",source.indexOf("function manageCategories"));
   const end=source.indexOf("d.addEventListener('close'",start);
+  assert.ok(start>=0&&end>start);
   const handler=source.slice(start,end);
-  assert.match(handler,/previousDraft=state\.draft/);
-  assert.match(handler,/state\.draft=previousDraft/);
-  assert.match(handler,/setDirty\(wasDirty\)/);
+  assert.match(handler,/if\(nextCategoryId!==previousCategoryId\)readMonth\(\)/);
+  assert.doesNotMatch(handler,/state\.(?:draft|wasteDraft|wasteTouched)\s*=/);
+  assert.match(handler,/if\(nextCategoryId===previousCategoryId\)setDirty\(wasDirty\)/);
   assert.match(handler,/未保存の変更があります/);
 });
 
