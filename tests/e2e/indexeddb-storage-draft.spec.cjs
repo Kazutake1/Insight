@@ -2177,7 +2177,8 @@ for(const sameMunicipality of [true,false]){
     expect(await page.evaluate(()=>InsightIndexedDBStorageV1.read())).toEqual({revision:0,snapshot:JSON.parse(seed.raw)});
     await expect(memo).toHaveValue('架空の入力メモ');
 
-    await page.locator('#qi_客数').fill('bad');
+    await page.locator('#qi_客数').fill('9007199254740992');
+    await expect(page.locator('#qi_客数')).toHaveValue('9007199254740992');
     await button.click();
     await expect(status).toHaveText('売上・客数・買上点数・廃棄の入力を確認してください。');
     await page.locator('#qi_客数').fill('222');
