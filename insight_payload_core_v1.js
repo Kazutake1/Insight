@@ -1446,6 +1446,7 @@ function initInputPage(type){
 function getHaikiBudget(){
   // store.haikibudget = {total:0, cats:{カテゴリ名:0, ...}}
   if(!store.haikibudget){
+    if(window.InsightIndexedDBSalesInputPreviewV1?.managesYears?.())return {total:0,cats:blankHaiki()};
     store.haikibudget={total:0,cats:{}};
     HAIKI_CATS.forEach(c=>{store.haikibudget.cats[c]=0;});
   }

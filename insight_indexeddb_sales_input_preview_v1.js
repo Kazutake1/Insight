@@ -558,6 +558,8 @@
           store=allStores.stores[state.storeId];
           state.committed=result;
           render(action);
+          if(root.InsightStorage.serialize(allStores)!==root.InsightStorage.serialize(result.snapshot))
+            throw new Error('Management rendering changed the committed snapshot');
           message.textContent='保存しました。';
           return true;
         }catch(_){
