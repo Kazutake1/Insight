@@ -12,7 +12,7 @@
     nav0:0,nav1:1,nav2:2,nav3:3,nav4:4,navSalesCount:'salesCounts',navSaleResults:'saleResults'
   };
 
-  async function connect(type='sales',{followInputScreens=false,followQuickInput=false,manageStoresAndYears=false}={}){
+  async function connect(type='sales',{followInputScreens=false,followQuickInput=false,manageStoresAndYears=false,recoverySettings}={}){
     if(connectedStatus||root.InsightIndexedDBQuickInputPreviewV1?.getStatus())
       throw new Error('An input preview is already connected');
     let screen=screens[type];
@@ -341,12 +341,19 @@
     const eventDialogs=()=>management?Array.from(doc.querySelectorAll('dialog.ie-dialog[open]')):[];
     const yearControl='#addYearBtn,#ayInput,#ayAddBtn,#insightDeleteYearButton';
     const storeControl='#storeSel,#storeMenuBtn';
+    let recoveryDialog,recoveryRestarting=false;
     const budgetDialog=()=>management&&currentNav===screens.haiki.route&&doc.querySelector('#budgetModalBg.show');
     let saveBudgetPreview;
     const storeActionControl='#storeMenu [data-indexeddb-store-action],#storeMenu #weatherLocationMenuItem';
     root.addEventListener('click',event=>{
       const item=event.target.closest?.(sidebarSelector);
       if(quick){
+        if(recoveryDialog?.open){
+          if(recoveryDialog.contains(event.target))return;
+          event.preventDefault();
+          event.stopImmediatePropagation();
+          return;
+        }
         const budget=budgetDialog();
         if(budget){
           if(!blocked()&&budget.contains(event.target)&&!event.target.closest?.('#budgetSaveBtn'))return;
@@ -380,7 +387,9 @@
           return;
         }
         if(management&&(yearOverlay||currentNav==='settings')){
-          if(!blocked()&&(yearOverlay?yearOverlay.contains(event.target):
+          const recoveryAction=recoveryDialog&&event.target.closest?.('#backupBtn,#restoreBtn');
+          if(!blocked()&&(yearOverlay?yearOverlay.contains(event.target):recoveryAction||
+
             event.target.closest?.(yearControl+','+storeControl+','+storeActionControl+',#csvImportBtn,#csvImportFile,#insightWeatherBulkStart,#insightWeatherBulkCancel')))return;
           event.preventDefault();
           event.stopImmediatePropagation();
@@ -415,7 +424,7 @@
     let navigationVersion=0;
     const gotoNav=root.gotoNav;
     root.gotoNav=function(destination){
-      if(followInputScreens&&(blocked()||yearDialog()||eventDialogs().length||budgetDialog()))return false;
+      if(followInputScreens&&(blocked()||yearDialog()||eventDialogs().length||budgetDialog()||recoveryDialog?.open))return false;
       if(quick){
         if(hourly?.dialog()?.open||root.InsightSalesCount.getCategoryDialog()?.open||
            (!isInputRoute(destination)&&!(management&&(destination==='settings'||destination===1)))||
@@ -476,7 +485,7 @@
       async function switchStore(id){
         // The browser changes the select value before dispatching the change event.
         selector.value=state.storeId;
-        if(blocked()||yearDialog()||eventDialogs().length||budgetDialog()||id===state.storeId||!Object.hasOwn(state.committed.snapshot.stores,id))return false;
+        if(blocked()||yearDialog()||eventDialogs().length||budgetDialog()||recoveryDialog?.open||id===state.storeId||!Object.hasOwn(state.committed.snapshot.stores,id))return false;
         if(currentNav!==screen.route){
           storeStatus.textContent='試験用の店舗切替は月次入力画面で行ってください。';
           return false;
@@ -553,7 +562,7 @@
       };
 
       function canOpenStoreMenu(){
-        return !blocked()&&!yearDialog()&&!eventDialogs().length&&!budgetDialog()&&(currentNav===0||currentNav==='settings'||currentNav===screen.route)&&
+        return !blocked()&&!yearDialog()&&!eventDialogs().length&&!budgetDialog()&&!recoveryDialog?.open&&(currentNav===0||currentNav==='settings'||currentNav===screen.route)&&
           !hourly?.dialog()?.open;
       }
 
@@ -685,6 +694,23 @@
       }
 
       if(management){
+        if(recoverySettings){
+          const actions=doc.getElementById('insightSettingsDataActions');
+          recoveryDialog=root.InsightIndexedDBRecoveryPreviewV1.connectSettings(actions,{onCommitted:revision=>{
+            recoveryRestarting=true;
+            state.held=true;
+            return recoverySettings.restart(revision);
+          }});
+          const warning=doc.createElement('p');
+          warning.setAttribute('role','status');
+          doc.getElementById('storeSel').after(warning);
+          root.addEventListener('storage',event=>{
+            if(event.storageArea!==root.localStorage||
+               ![null,'insight_v11','insight_indexeddb_adoption_v1'].includes(event.key))return;
+            state.held=true;
+            warning.textContent='別のタブで保存状態が変わりました。画面を開き直してください。';
+          });
+        }
         const monthlyOpsStatus=doc.createElement('p');
         monthlyOpsStatus.setAttribute('role','status');
         monthlyOpsStatus.id='insightMonthlyOpsPreviewStatus';
@@ -955,7 +981,7 @@
       };
       root.clearKyakuMonth=()=>clearInput('kyaku');
       root.addEventListener('beforeunload',event=>{
-        if(!getStatus().hasUnsavedInput)return;
+        if(recoveryRestarting||!getStatus().hasUnsavedInput)return;
         event.preventDefault();
         event.returnValue='';
       });

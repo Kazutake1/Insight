@@ -2123,6 +2123,50 @@ test('monthly KPIs and waste budget update only the selected store and scope',as
   }finally{await observer.close();}
 });
 
+test('monthly KPI conflict preserves the competing revision and its prior snapshot',async({page,context})=>{
+  const seed=await openQuickInputPreview(page,{followMonthlyInputs:true,manageStoresAndYears:true,seedManagement:true});
+  await page.locator('#nav1').click();
+  const peer=await openStoreSwitchPeer(context);
+  try{
+    const expected=JSON.parse(seed.raw);
+    expected.stores[seed.peer].name='別タブの確定値';
+    await peer.evaluate(snapshot=>InsightIndexedDBStorageV1.save(0,snapshot),expected);
+    await page.evaluate(()=>{window.prompt=()=>'42000';});
+    await page.locator('[data-monthly-ops="labor"]').click();
+    await expect(page.locator('#insightMonthlyOpsPreviewStatus')).toContainText('追加の保存を停止');
+    const record=await readStoreSwitchRecord(peer);
+    expect(record.revision).toBe(1);
+    expect(JSON.parse(record.raw)).toEqual(expected);
+    expect(record.previous.raw).toBe(seed.raw);
+    expect(await page.evaluate(()=>localStorage.getItem('insight_v11'))).toBe(seed.raw);
+  }finally{await peer.close();}
+});
+
+test('waste budget holds its edit and does not acknowledge an uncertain readback',async({page,context})=>{
+  const seed=await openQuickInputPreview(page,{followMonthlyInputs:true,manageStoresAndYears:true});
+  await page.locator('#nav4').click();
+  const budget=page.locator('#budgetModalBg');
+  await page.locator('#haikiBudgetEditBtn').click();
+  await budget.locator('#be_total').fill('32000');
+  await interruptCountReadback(page,'readback failure');
+  await budget.getByRole('button',{name:'保存する'}).click();
+  await expect(budget).toBeVisible();
+  await expect(budget.locator('#be_total')).toHaveValue('32,000');
+  await expect(page.locator('#insightBudgetPreviewStatus')).toContainText('追加の保存を停止');
+  const expected=JSON.parse(seed.raw);
+  const cats=await page.evaluate(()=>blankHaiki());
+  const shop=expected.stores[seed.active];
+  shop.haikibudget={...shop.haikibudget,total:32000,cats:{...shop.haikibudget?.cats,...cats}};
+  const peer=await openStoreSwitchPeer(context);
+  try{
+    const record=await readStoreSwitchRecord(peer);
+    expect(record.revision).toBe(1);
+    expect(JSON.parse(record.raw)).toEqual(expected);
+    expect(record.previous.raw).toBe(seed.raw);
+    expect(await page.evaluate(()=>localStorage.getItem('insight_v11'))).toBe(seed.raw);
+  }finally{await peer.close();}
+});
+
 test('isolated theme remains device-local without creating a business data revision',async({page})=>{
   const seed=await openQuickInputPreview(page,{followMonthlyInputs:true,manageStoresAndYears:true});
   await page.locator('#navSettings').click();
@@ -2775,6 +2819,7 @@ test('encrypted restore keeps the pre-restore revision and resumes only the veri
 async function openRealRecoveryForm(page){
   const seed=await openQuickInputPreview(page,{useRealBackupAfterMigration:true,connectQuick:false});
   await page.addScriptTag({url:'/insight_indexeddb_recovery_preview_v1.js'});
+  await page.addScriptTag({url:'/insight_indexeddb_migration_preview_v1.js'});
   await page.route('**/reopened-recovery-fixture',route=>route.fulfill({contentType:'text/html',body:
     '<!doctype html><meta charset="utf-8"><output></output><script src="/insight_indexeddb_storage_v1.js"></script>'+
     '<script>InsightIndexedDBStorageV1.read().then(result=>document.querySelector("output").textContent=result.revision);</script>'}));
@@ -2786,8 +2831,11 @@ async function openRealRecoveryForm(page){
     window.mountRecoveryMode=mode=>{
       screen.replaceChildren();
       const preview=InsightIndexedDBRecoveryPreviewV1;
+      const restart=()=>location.replace('/reopened-recovery-fixture');
       if(mode==='export')preview.mountExport(screen);
-      else preview.mount(screen,{mode,onCommitted:()=>location.replace('/reopened-recovery-fixture')});
+      else if(mode==='resume')return InsightIndexedDBMigrationPreviewV1.start(screen,
+        ()=>{throw new Error('Unexpected legacy load');},()=>{throw new Error('Unexpected adopted load');},{restart});
+      else preview.mount(screen,{mode,onCommitted:restart});
     };
   });
   return seed;
@@ -2874,7 +2922,7 @@ for(const outcome of ['close','confirm']){
     };
     try{await api.save(0,before.snapshot).catch(()=>{});}
     finally{InsightStorage.writeMetadata=write;}
-    mountRecoveryMode('resume');
+    await mountRecoveryMode('resume');
     return JSON.stringify(file.encrypted);
   },password);
   const screen=page.locator('#recoveryFixture');
@@ -2911,6 +2959,66 @@ for(const outcome of ['close','confirm']){
   }finally{await peer.close();}
   });
 }
+
+test('adopted settings opens only isolated backup controls and reloads after restoration',async({page,context})=>{
+  const seed=await openQuickInputPreview(page,{useRealBackupAfterMigration:true,connectQuick:false});
+  await page.waitForSelector('#insightSettingsYearSection',{state:'attached'});
+  for(const src of ['insight_indexeddb_recovery_preview_v1.js','insight_indexeddb_migration_preview_v1.js',
+    'insight_indexeddb_sales_input_preview_v1.js'])await page.addScriptTag({url:'/'+src});
+  await page.route('**/adopted-settings-result-fixture',route=>route.fulfill({contentType:'text/html',body:
+    '<!doctype html><output></output><script src="/insight_indexeddb_storage_v1.js"></script>'+
+    '<script>InsightIndexedDBStorageV1.read().then(result=>document.querySelector("output").textContent=result.revision);</script>'}));
+  await page.evaluate(async ()=>{
+    const status=document.createElement('div');
+    await InsightIndexedDBMigrationPreviewV1.start(status,()=>{throw new Error('Legacy loader called');},
+      async (_record,recoverySettings)=>{
+        window.settingsPreview=await InsightIndexedDBSalesInputPreviewV1.connect('sales',{
+          followInputScreens:true,followQuickInput:true,manageStoresAndYears:true,recoverySettings
+        });
+      },{restart:()=>location.replace('/adopted-settings-result-fixture')});
+  });
+  await page.locator('#navSettings').click();
+  expect(await page.locator('#restoreFile').count()).toBe(0);
+  const password='FictionalSettings37';
+  const target=await writeFictionalRecoveryFile(page,seed,password);
+  const dialog=page.locator('dialog#insightIndexedDBBackupDialog');
+  await page.locator('#backupBtn').click();
+  await dialog.getByLabel('バックアップ用パスワード').fill(password);
+  await dialog.getByLabel('パスワードの確認').fill(password);
+  const download=page.waitForEvent('download');
+  await dialog.getByRole('button',{name:'暗号化してダウンロード'}).click();
+  const safety=await fs.readFile(await (await download).path(),'utf8');
+  await expect(dialog.getByRole('status')).toContainText('確定版 0');
+  await dialog.getByRole('button',{name:'閉じる'}).click();
+  await expect(dialog).not.toBeVisible();
+
+  const file=content=>({name:'Insight_261119_0900.json',mimeType:'application/json',buffer:Buffer.from(content)});
+  const restore=async ()=>{
+    await dialog.getByLabel('復元する暗号化バックアップ',{exact:true}).setInputFiles(file(target));
+    await dialog.getByLabel('現在の確定版の暗号化バックアップ',{exact:true}).setInputFiles(file(safety));
+    await dialog.getByLabel('復元するバックアップのパスワード',{exact:true}).fill(password);
+    await dialog.getByLabel('現在の確定版のパスワード',{exact:true}).fill(password);
+    await dialog.getByLabel('旧版のInsightをすべて閉じました').check();
+    await dialog.getByRole('button',{name:'内容を表示'}).click();
+  };
+  await page.locator('#restoreBtn').click();
+  await restore();
+  expect(await page.evaluate(()=>{gotoNav(0);return currentNav;})).toBe('settings');
+  await dialog.getByRole('button',{name:'取り消す'}).click();
+  await expect(dialog.getByRole('status')).toHaveText('取り消しました。');
+  expect(await committedInput(page)).toEqual({revision:0,snapshot:JSON.parse(seed.raw)});
+  await restore();
+  await dialog.getByRole('button',{name:'この内容を復元する'}).click();
+  await expect(page.locator('output')).toHaveText('1');
+  const peer=await openStoreSwitchPeer(context);
+  try{
+    const record=await readStoreSwitchRecord(peer);
+    expect(record.revision).toBe(1);
+    expect(JSON.parse(record.raw).stores[seed.peer].name).toBe('架空の復元対象');
+    expect(record.previous.raw).toBe(seed.raw);
+    expect(await peer.evaluate(()=>localStorage.getItem('insight_v11'))).toBe(seed.raw);
+  }finally{await peer.close();}
+});
 
 test('offline migration does not request a backup or create an adoption marker',async({page,context})=>{
   await page.route('**/offline-migration-fixture',route=>route.fulfill({
@@ -3123,6 +3231,86 @@ test('a cached legacy PWA writing after adoption preserves both copies and stops
     currentRaw:JSON.stringify({current:'fictional',stores:{fictional:{value:2}}}),
     previousRaw:original,revision:1
   });
+});
+
+test('cached legacy shell runs with its origin unavailable and adopted startup stops on an old write',async({page,context})=>{
+  const http=require('node:http');
+  const path=require('node:path');
+  const worker=await fs.readFile(path.join(__dirname,'fixtures/legacy-pwa-worker.js'));
+  const storageScript=await fs.readFile(path.join(__dirname,'../../insight_indexeddb_storage_v1.js'),'utf8');
+  const shell=await fs.readFile(path.join(__dirname,'../../insight_indexeddb_migration_preview_v1.js'),'utf8');
+  const server=http.createServer((request,response)=>{
+    const url=new URL(request.url,'http://127.0.0.1');
+    if(url.pathname==='/legacy-pwa-worker.js'){
+      response.setHeader('Content-Type','application/javascript');
+      response.end(worker);
+    }else if(url.pathname==='/Index.html'&&url.searchParams.has('insight_migration_probe')){
+      response.setHeader('Content-Type','text/html');
+      response.end('<!doctype html><meta name="insight-shell-version" content="20261121-sale-scroll20-build-113">');
+    }else if(url.pathname==='/legacy-pwa-fixture'){
+      response.setHeader('Content-Type','text/html');
+      response.end('<!doctype html><title>Fictional online migration page</title>');
+    }else{response.statusCode=404;response.end();}
+  });
+  await new Promise((resolve,reject)=>{
+    server.once('error',reject);
+    server.listen(0,'127.0.0.1',resolve);
+  });
+  const url='http://127.0.0.1:'+server.address().port+'/legacy-pwa-fixture';
+  const stopServer=async ()=>{
+    if(!server.listening)return;
+    await new Promise((resolve,reject)=>{
+      server.close(error=>error?reject(error):resolve());
+      server.closeAllConnections();
+    });
+  };
+  try{
+    await page.goto(url);
+    await page.addScriptTag({content:storageScript});
+    await page.addScriptTag({content:shell});
+    const seed=await page.evaluate(async ()=>{
+      const api=InsightIndexedDBStorageV1;
+      const snapshot={current:'fictional',stores:{fictional:{value:1}}};
+      const raw=JSON.stringify(snapshot);
+      localStorage.setItem('insight_v11',raw);
+      window.InsightStorage={writeMetadata(key,value){localStorage.setItem(key,value);}};
+      window.InsightMigrationBackupV1={assertReady(){},confirm:async()=>true};
+      await api.migrate({legacyClientsClosed:true});
+      snapshot.stores.fictional.value=2;
+      await api.save(0,snapshot);
+      return {raw,snapshot};
+    });
+    await page.evaluate(async ()=>navigator.serviceWorker.register('/legacy-pwa-worker.js'));
+    await page.waitForFunction(()=>Boolean(navigator.serviceWorker.controller));
+    await stopServer();
+
+    const reopened=await context.newPage();
+    try{
+      await reopened.goto(url);
+      await expect(reopened).toHaveTitle('Fictional cached legacy PWA');
+      expect(await reopened.evaluate(async ()=>{
+        try{await fetch('/offline-proof',{cache:'no-store'});return false;}
+        catch(_){return true;}
+      })).toBe(true);
+      expect(await reopened.evaluate(()=>localStorage.getItem('insight_v11'))).toBe(seed.raw);
+      const edited=await reopened.evaluate(()=>{
+        const raw=JSON.stringify({current:'fictional',stores:{fictional:{value:3}}});
+        localStorage.setItem('insight_v11',raw);
+        return raw;
+      });
+      const result=await page.evaluate(async ()=>{
+        let loadCount=0;
+        const container=document.createElement('main');
+        await InsightIndexedDBMigrationPreviewV1.start(container,()=>loadCount++,()=>loadCount++,
+          {restart:()=>{throw new Error('Unexpected restart');}});
+        return {text:container.textContent,loadCount,old:localStorage.getItem('insight_v11')};
+      });
+      expect(result).toEqual({text:'保存状態を確認できないため、起動と保存を停止しています。',loadCount:0,old:edited});
+      const record=await readStoreSwitchRecord(reopened);
+      expect(JSON.parse(record.raw)).toEqual(seed.snapshot);
+      expect(record.previous.raw).toBe(seed.raw);
+    }finally{await reopened.close();}
+  }finally{await stopServer();}
 });
 
 test('migration enforces the pinned environment before and after backup confirmation',async({page})=>{
@@ -3651,6 +3839,53 @@ test('isolated startup removes only future weather, and holds the screen on unce
     expect(record.previous.raw).toBe(seed.raw);
     expect(await observer.evaluate(()=>localStorage.getItem('insight_v11'))).toBe(seed.raw);
   }finally{await observer.close();}
+});
+
+test('adopted loader keeps editing closed with missing or corrupted adoption evidence',async({page})=>{
+  const fixture='/adopted-evidence-guard-fixture';
+  await page.route('**'+fixture,route=>route.fulfill({contentType:'text/html',body:'<!doctype html><main></main>'}));
+  await page.goto(fixture);
+  for(const src of ['insight_indexeddb_storage_v1.js','insight_indexeddb_recovery_preview_v1.js',
+    'insight_indexeddb_migration_preview_v1.js'])await page.addScriptTag({url:'/'+src});
+  const result=await page.evaluate(async ()=>{
+    const api=InsightIndexedDBStorageV1,marker='insight_indexeddb_adoption_v1';
+    const raw=JSON.stringify({current:'fictional',stores:{fictional:{value:1}}});
+    localStorage.setItem('insight_v11',raw);
+    window.InsightStorage={writeMetadata(key,value){localStorage.setItem(key,value);}};
+    window.InsightMigrationBackupV1={assertReady(){},confirm:async()=>true};
+    await api.migrate({legacyClientsClosed:true});
+    const adopted=localStorage.getItem(marker),host=document.querySelector('main');
+    let opened=0;
+    const cases=[];
+    async function inspect(){
+      const before=localStorage.getItem(marker);
+      await InsightIndexedDBMigrationPreviewV1.start(host,()=>opened++,()=>opened++,{restart:()=>opened++});
+      cases.push({reason:(await api.diagnoseStartup()).reason,form:!!host.querySelector('form'),
+        markerPreserved:before===localStorage.getItem(marker),sourcePreserved:raw===localStorage.getItem('insight_v11')});
+    }
+    function remove(name){
+      return new Promise((resolve,reject)=>{
+        const request=indexedDB.deleteDatabase(name);
+        request.onsuccess=resolve;
+        request.onerror=()=>reject(request.error);
+      });
+    }
+    localStorage.setItem(marker,'{破損');
+    await inspect();
+    localStorage.removeItem(marker);
+    await inspect();
+    localStorage.setItem(marker,adopted);
+    await remove('insight-migration-history-v1');
+    await inspect();
+    await remove('insight-store-snapshots-v1');
+    await inspect();
+    return {cases,opened,text:host.textContent};
+  });
+  expect(result).toEqual({
+    cases:['invalid-marker','marker-missing','history-missing','database-missing'].map(reason=>({
+      reason,form:false,markerPreserved:true,sourcePreserved:true
+    })),opened:0,text:'保存状態を確認できないため、起動と保存を停止しています。'
+  });
 });
 
 test('isolated adopted startup saves a single sales day after readback and stops on uncertain commit',async({page})=>{

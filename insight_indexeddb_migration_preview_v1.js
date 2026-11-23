@@ -52,7 +52,7 @@
     return clearFutureWeather(candidate,today)?storage().save(active.revision,candidate):active;
   }
 
-  async function start(container,loadLegacy,loadAdopted){
+  async function start(container,loadLegacy,loadAdopted,{restart}={}){
     container.textContent='保存状態を確認しています。';
     const diagnostic=await storage().diagnoseStartup();
     if(diagnostic.state==='legacy'){
@@ -67,8 +67,26 @@
         container.textContent='起動時の保存を確認できないため、入力を停止しています。';
         return;
       }
-      await loadAdopted(prepared);
+      await loadAdopted(prepared,typeof restart==='function'?{restart}:undefined);
       return;
+    }
+    if(typeof restart==='function'&&root.InsightIndexedDBRecoveryPreviewV1){
+      const preview=root.InsightIndexedDBRecoveryPreviewV1;
+      if(diagnostic.reason==='writing'||diagnostic.reason==='preparing'){
+        let checked;
+        try{checked=await storage().diagnose({verifyInterrupted:true});}
+        catch(_){/* Leave startup held when the operation cannot be inspected. */}
+        if(checked?.reason===diagnostic.reason&&
+          ['migration-copy-verified','prior-save-verified','save-verified'].includes(checked.recovery)){
+          container.replaceChildren();
+          preview.mount(container,{mode:'resume',onCommitted:restart});
+          return;
+        }
+      }else if(diagnostic.reason==='storage-history-unknown'){
+        container.replaceChildren();
+        preview.mount(container);
+        return;
+      }
     }
     const message=diagnostic.reason==='indexeddb-adopted'
       ?'IndexedDBにコピーを確認しました。保存を停止しています。'

@@ -176,5 +176,49 @@
     });
   }
 
-  root.InsightIndexedDBRecoveryPreviewV1=Object.freeze({mount,mountExport});
+  function connectSettings(actions,{onCommitted}){
+    const backup=actions.querySelector('#backupBtn');
+    const restore=actions.querySelector('#restoreBtn');
+    const legacyFile=actions.querySelector('#restoreFile');
+    if(!backup||!restore||!legacyFile||typeof onCommitted!=='function')
+      throw new Error('Missing isolated settings controls');
+    const dialog=element('dialog');
+    dialog.id='insightIndexedDBBackupDialog';
+    const heading=element('h2');
+    heading.id='insightIndexedDBBackupHeading';
+    dialog.setAttribute('aria-labelledby',heading.id);
+    const formHost=element('div');
+    const close=element('button','閉じる');
+    close.type='button';
+    dialog.append(heading,formHost,close);
+    actions.after(dialog);
+    let committed=false;
+    const initiating=()=>committed||Boolean(formHost.querySelector('fieldset:disabled'));
+    close.addEventListener('click',()=>{if(!initiating())dialog.close();});
+    dialog.addEventListener('cancel',event=>{if(initiating())event.preventDefault();});
+    dialog.addEventListener('close',()=>{if(!committed)formHost.replaceChildren();});
+    function replaceAction(original,mode,title){
+      const button=original.cloneNode(true);
+      original.replaceWith(button);
+      button.addEventListener('click',()=>{
+        if(dialog.open||committed)return;
+        heading.textContent=title;
+        formHost.replaceChildren();
+        if(mode==='export')mountExport(formHost);
+        else mount(formHost,{mode,onCommitted:async revision=>{
+          committed=true;
+          close.disabled=true;
+          await onCommitted(revision);
+        }});
+        dialog.showModal();
+      });
+    }
+    replaceAction(backup,'export','データバックアップ');
+    replaceAction(restore,'restore','データ復元');
+    actions.querySelector('#insightRestoreSafetyBackup')?.closest('label')?.remove();
+    legacyFile.remove();
+    return dialog;
+  }
+
+  root.InsightIndexedDBRecoveryPreviewV1=Object.freeze({mount,mountExport,connectSettings});
 })(globalThis);
