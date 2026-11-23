@@ -3795,13 +3795,12 @@ test('isolated release rehearsal verifies the downloaded backup, migrates, edits
   await selectFile(file,password);
   await expect(button).toHaveCount(0);
   await waitForMigrationChecks(page);
+  await page.waitForFunction(()=>InsightIndexedDBCandidateV1.isAdopted()&&!document.body.inert&&
+    !!document.getElementById('insightIndexedDBBackupDialog'));
   expect(JSON.parse(await marker()).state).toBe('active');
   expect(await committedInput(page)).toEqual({revision:0,snapshot:JSON.parse(raw)});
   await expect(page.locator('#storeSel')).toHaveValue(seed.id);
   await expect(page.locator('#qi_売上')).toHaveValue('123');
-
-  await page.waitForFunction(()=>InsightIndexedDBCandidateV1.isAdopted()&&!document.body.inert&&
-    !!document.getElementById('insightIndexedDBBackupDialog'));
   await page.evaluate(()=>{window.confirm=()=>true;});
 
   await page.locator('#qi_売上').fill('321');
