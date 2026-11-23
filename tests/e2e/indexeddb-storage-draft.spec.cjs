@@ -2202,7 +2202,7 @@ test('manual adoption uses the real encrypted backup confirmation and preserves 
   const divergent=await page.evaluate(async ()=>{
     const name=store.name;
     store.name='画面側だけ変更';
-    try{return await InsightIndexedDBStorageV1.migrate({legacyClientsClosed:true}).catch(error=>error.message);}
+    try{return await InsightIndexedDBStorageV1.migrate({legacyClientsClosed:true,selectVerifiedBackup:()=>({file:new Blob(['fictional-test-backup']),password:'Fixture123'})}).catch(error=>error.message);}
     finally{store.name=name;}
   });
   expect(divergent).toContain('未保存の入力または保存データの変更');
@@ -2213,7 +2213,9 @@ test('manual adoption uses the real encrypted backup confirmation and preserves 
   const confirm=page.getByRole('button',{name:'保存したファイルを確認した',exact:true});
   async function startBackup(){
     await page.evaluate(()=>{
-      window.migrationResult=InsightIndexedDBStorageV1.migrate({legacyClientsClosed:true}).catch(error=>error.message);
+      window.migrationResult=InsightIndexedDBStorageV1.migrate({legacyClientsClosed:true,
+        selectVerifiedBackup:()=>({file:new Blob([JSON.stringify(window.migrationDownloadedFile)]),password:'Fit123'})
+      }).catch(error=>error.message);
     });
     await page.locator('#insightBackupPassword').fill(password);
     await page.locator('#insightBackupPasswordConfirm').fill(password);
@@ -2222,7 +2224,9 @@ test('manual adoption uses the real encrypted backup confirmation and preserves 
     const download=await event;
     await expect(confirm).toBeVisible();
     expect(await page.evaluate(()=>localStorage.getItem('insight_indexeddb_adoption_v1'))).toBeNull();
-    return JSON.parse(await fs.readFile(await download.path(),'utf8'));
+    const file=JSON.parse(await fs.readFile(await download.path(),'utf8'));
+    await page.evaluate(file=>{window.migrationDownloadedFile=file;},file);
+    return file;
   }
 
   await startBackup();
@@ -2344,7 +2348,7 @@ test('manual adoption uses the real encrypted backup confirmation and preserves 
       return true;
     }).catch(error=>error.message);
     localStorage.setItem('insight_v11',originalRaw);
-    const repeatedMigration=await store.migrate({legacyClientsClosed:true}).catch(error=>error.message);
+    const repeatedMigration=await store.migrate({legacyClientsClosed:true,selectVerifiedBackup:()=>({file:new Blob(['fictional-test-backup']),password:'Fixture123'})}).catch(error=>error.message);
     const markerStillMissing=localStorage.getItem(markerKey)===null;
     const stillMissing=await store.diagnose();
     localStorage.setItem(markerKey,before);
@@ -2410,7 +2414,7 @@ test('missing storage keeps migration stopped and only previews a selected encry
     }).catch(error=>error.message);
     const legacyPreserved=localStorage.getItem('insight_v8')==='{"years":["2025"],"data":{}}';
     localStorage.removeItem('insight_v8');
-    const migration=await api.migrate({legacyClientsClosed:true}).catch(error=>error.message);
+    const migration=await api.migrate({legacyClientsClosed:true,selectVerifiedBackup:()=>({file:new Blob(['fictional-test-backup']),password:'Fixture123'})}).catch(error=>error.message);
     const invalidFile=await api.reviewMissingStorageBackup(new File(['{'],'invalid.json'),password,()=>true)
       .catch(error=>error.message);
     const badPassword=await api.reviewMissingStorageBackup(file,'Wrong6',()=>true)
@@ -2620,8 +2624,8 @@ for(const operation of ['read','save']){
       const raw=JSON.stringify(source);
       localStorage.setItem('insight_v11',raw);
       window.InsightStorage={writeMetadata(key,value){localStorage.setItem(key,value);}};
-      window.InsightMigrationBackupV1={confirm:async()=>true,assertReady(){}};
-      await InsightIndexedDBStorageV1.migrate({legacyClientsClosed:true});
+      window.InsightMigrationBackupV1={verify(){},confirm:async()=>true,assertReady(){}};
+      await InsightIndexedDBStorageV1.migrate({legacyClientsClosed:true,selectVerifiedBackup:()=>({file:new Blob(['fictional-test-backup']),password:'Fixture123'})});
       await InsightIndexedDBStorageV1.save(0,{...source,stores:{fictional:{value:2}}});
       return raw;
     });
@@ -3034,7 +3038,7 @@ test('offline migration does not request a backup or create an adoption marker',
   await page.evaluate(raw=>{
     localStorage.setItem('insight_v11',raw);
     window.backupRequested=false;
-    window.InsightMigrationBackupV1={
+    window.InsightMigrationBackupV1={verify(){},
       assertReady(){},
       confirm(){window.backupRequested=true;return true;}
     };
@@ -3046,7 +3050,7 @@ test('offline migration does not request a backup or create an adoption marker',
       let networkRejected=false;
       try{await fetch('/Index.html',{cache:'no-store'});}
       catch(_){networkRejected=true;}
-      return {networkRejected,status:await api.migrate({legacyClientsClosed:true}).catch(error=>error.message),
+      return {networkRejected,status:await api.migrate({legacyClientsClosed:true,selectVerifiedBackup:()=>({file:new Blob(['fictional-test-backup']),password:'Fixture123'})}).catch(error=>error.message),
         backup:backupRequested,marker:localStorage.getItem('insight_indexeddb_adoption_v1'),
         startup:await api.diagnoseStartup(),raw:localStorage.getItem('insight_v11')};
     });
@@ -3083,9 +3087,9 @@ test('a fully restarted browser keeps the adopted revision and holds the legacy 
     expect(await initial.page.evaluate(async ({raw,snapshot})=>{
       localStorage.setItem('insight_v11',raw);
       window.InsightStorage={writeMetadata(key,value){localStorage.setItem(key,value);}};
-      window.InsightMigrationBackupV1={assertReady(){},confirm:async()=>true};
+      window.InsightMigrationBackupV1={verify(){},assertReady(){},confirm:async()=>true};
       const api=InsightIndexedDBStorageV1;
-      await api.migrate({legacyClientsClosed:true});
+      await api.migrate({legacyClientsClosed:true,selectVerifiedBackup:()=>({file:new Blob(['fictional-test-backup']),password:'Fixture123'})});
       return api.save(0,snapshot);
     },{raw,snapshot})).toEqual({revision:1,snapshot});
   }finally{await initial.context.close();}
@@ -3144,11 +3148,11 @@ test('a real legacy service worker stops migration during backup and serves a ca
     const source=JSON.stringify({current:'fictional',stores:{fictional:{value:1}}});
     localStorage.setItem('insight_v11',source);
     window.InsightStorage={writeMetadata(key,value){localStorage.setItem(key,value);}};
-    window.InsightMigrationBackupV1={
+    window.InsightMigrationBackupV1={verify(){},
       assertReady(){},
       confirm(){return new Promise(resolve=>{window.finishFictionalBackup=resolve;});}
     };
-    window.migrationOutcome=InsightIndexedDBStorageV1.migrate({legacyClientsClosed:true}).then(
+    window.migrationOutcome=InsightIndexedDBStorageV1.migrate({legacyClientsClosed:true,selectVerifiedBackup:()=>({file:new Blob(['fictional-test-backup']),password:'Fixture123'})}).then(
       ()=>null,error=>error.message
     );
     return source;
@@ -3181,8 +3185,8 @@ test('a cached legacy PWA writing after adoption preserves both copies and stops
     const raw=JSON.stringify(source);
     localStorage.setItem('insight_v11',raw);
     window.InsightStorage={writeMetadata(key,value){localStorage.setItem(key,value);}};
-    window.InsightMigrationBackupV1={confirm:async()=>true,assertReady(){}};
-    await InsightIndexedDBStorageV1.migrate({legacyClientsClosed:true});
+    window.InsightMigrationBackupV1={verify(){},confirm:async()=>true,assertReady(){}};
+    await InsightIndexedDBStorageV1.migrate({legacyClientsClosed:true,selectVerifiedBackup:()=>({file:new Blob(['fictional-test-backup']),password:'Fixture123'})});
     await InsightIndexedDBStorageV1.save(0,{...source,stores:{fictional:{value:2}}});
     return raw;
   });
@@ -3278,8 +3282,8 @@ test('cached legacy shell runs with its origin unavailable and adopted startup s
       const raw=JSON.stringify(snapshot);
       localStorage.setItem('insight_v11',raw);
       window.InsightStorage={writeMetadata(key,value){localStorage.setItem(key,value);}};
-      window.InsightMigrationBackupV1={assertReady(){},confirm:async()=>true};
-      await api.migrate({legacyClientsClosed:true});
+      window.InsightMigrationBackupV1={verify(){},assertReady(){},confirm:async()=>true};
+      await api.migrate({legacyClientsClosed:true,selectVerifiedBackup:()=>({file:new Blob(['fictional-test-backup']),password:'Fixture123'})});
       snapshot.stores.fictional.value=2;
       await api.save(0,snapshot);
       return {raw,snapshot};
@@ -3331,7 +3335,7 @@ test('migration enforces the pinned environment before and after backup confirma
   await page.evaluate(()=>{
     window.confirmations=0;
     window.InsightStorage={writeMetadata(key,value){localStorage.setItem(key,value);}};
-    window.InsightMigrationBackupV1={
+    window.InsightMigrationBackupV1={verify(){},
       confirm:async()=>{
         window.confirmations++;
         return await new Promise(resolve=>{window.finishBackup=resolve;});
@@ -3353,11 +3357,14 @@ test('migration enforces the pinned environment before and after backup confirma
   await page.evaluate(build=>{window.__INSIGHT_SHELL_VERSION__=build;},build);
   serverBuild=build;
   expect(await page.evaluate(()=>window.confirmations)).toBe(0);
+  expect(await attempt({legacyClientsClosed:true})).toBe('A verified backup file is required');
+  expect(await page.evaluate(()=>({confirmations,marker:localStorage.getItem('insight_indexeddb_adoption_v1')})))
+    .toEqual({confirmations:0,marker:null});
 
   for(const scenario of ['server-changed','source-changed','ready']){
     await page.evaluate(()=>{
       window.finishBackup=null;
-      window.attemptResult=InsightIndexedDBStorageV1.migrate({legacyClientsClosed:true})
+      window.attemptResult=InsightIndexedDBStorageV1.migrate({legacyClientsClosed:true,selectVerifiedBackup:()=>({file:new Blob(['fictional-test-backup']),password:'Fixture123'})})
         .catch(error=>error.message);
     });
     await page.waitForFunction(()=>typeof window.finishBackup==='function');
@@ -3399,7 +3406,7 @@ for(const inputPage of [
       return InsightStorage.writeSnapshot(next);
     });
     await field.fill('987');
-    const attempt=()=>page.evaluate(()=>InsightIndexedDBStorageV1.migrate({legacyClientsClosed:true}).catch(error=>error.message));
+    const attempt=()=>page.evaluate(()=>InsightIndexedDBStorageV1.migrate({legacyClientsClosed:true,selectVerifiedBackup:()=>({file:new Blob(['fictional-test-backup']),password:'Fixture123'})}).catch(error=>error.message));
     expect(await attempt()).toContain('未保存の入力または保存データの変更');
     await expect(field).toHaveValue('987');
     await expect(page.locator('#insightBackupOverlay')).toHaveCount(0);
@@ -3413,7 +3420,7 @@ for(const inputPage of [
 
     async function checkMigrationCanStart(){
       await page.evaluate(()=>{
-        window.migrationAfterSave=InsightIndexedDBStorageV1.migrate({legacyClientsClosed:true}).catch(error=>error.message);
+        window.migrationAfterSave=InsightIndexedDBStorageV1.migrate({legacyClientsClosed:true,selectVerifiedBackup:()=>({file:new Blob(['fictional-test-backup']),password:'Fixture123'})}).catch(error=>error.message);
       });
       await expect(page.locator('#insightBackupPassword')).toBeVisible();
       await page.getByRole('button',{name:'キャンセル',exact:true}).click();
@@ -3472,8 +3479,8 @@ test('recovery distinguishes an interrupted migration copy, an aborted save and 
       if(JSON.parse(value).state==='active')throw new Error('Fixture interrupted adoption');
       writeMetadata(key,value);
     }};
-    window.InsightMigrationBackupV1={confirm:async()=>true,assertReady(){}};
-    const adoptionError=await storage.migrate({legacyClientsClosed:true}).catch(error=>error.message);
+    window.InsightMigrationBackupV1={verify(){},confirm:async()=>true,assertReady(){}};
+    const adoptionError=await storage.migrate({legacyClientsClosed:true,selectVerifiedBackup:()=>({file:new Blob(['fictional-test-backup']),password:'Fixture123'})}).catch(error=>error.message);
     const preparingMarker=localStorage.getItem(markerKey);
     const inspect=()=>storage.diagnose({verifyInterrupted:true});
     const preparing=await inspect();
@@ -3562,15 +3569,15 @@ test('history-only migration attempt stays held after reload with two-store sour
     }};
     const raw=JSON.stringify(snapshot);
     localStorage.setItem('insight_v11',raw);
-    window.InsightMigrationBackupV1={confirm:async()=>true,assertReady(){}};
+    window.InsightMigrationBackupV1={verify(){},confirm:async()=>true,assertReady(){}};
     window.InsightStorage={writeMetadata(key,value){
       if(JSON.parse(value).state==='preparing')throw new Error('Fixture interrupted before marker');
       localStorage.setItem(key,value);
     }};
     const storage=InsightIndexedDBStorageV1;
-    const interrupted=await storage.migrate({legacyClientsClosed:true}).catch(error=>error.message);
+    const interrupted=await storage.migrate({legacyClientsClosed:true,selectVerifiedBackup:()=>({file:new Blob(['fictional-test-backup']),password:'Fixture123'})}).catch(error=>error.message);
     const diagnosis=await storage.diagnose({verifyInterrupted:true});
-    const rejected=await storage.migrate({legacyClientsClosed:true}).catch(error=>error.message);
+    const rejected=await storage.migrate({legacyClientsClosed:true,selectVerifiedBackup:()=>({file:new Blob(['fictional-test-backup']),password:'Fixture123'})}).catch(error=>error.message);
     const review=await storage.reviewRecovery(()=>true).catch(error=>error.message);
     return {interrupted,diagnosis,rejected,review,rawIntact:localStorage.getItem('insight_v11')===raw,
       markerMissing:localStorage.getItem('insight_indexeddb_adoption_v1')===null};
@@ -3586,7 +3593,7 @@ test('history-only migration attempt stays held after reload with two-store sour
   await page.addScriptTag({url:'/insight_indexeddb_storage_v1.js'});
   const afterReload=await page.evaluate(async()=>({
     diagnosis:await InsightIndexedDBStorageV1.diagnose({verifyInterrupted:true}),
-    retry:await InsightIndexedDBStorageV1.migrate({legacyClientsClosed:true}).catch(error=>error.message),
+    retry:await InsightIndexedDBStorageV1.migrate({legacyClientsClosed:true,selectVerifiedBackup:()=>({file:new Blob(['fictional-test-backup']),password:'Fixture123'})}).catch(error=>error.message),
     original:JSON.parse(localStorage.getItem('insight_v11')).stores.b.data['2026'].sales,
     marker:localStorage.getItem('insight_indexeddb_adoption_v1')
   }));
@@ -3607,9 +3614,9 @@ test('lost or mismatched migration history blocks reads and saves without changi
     const raw=JSON.stringify(snapshot);
     localStorage.setItem('insight_v11',raw);
     window.InsightStorage={writeMetadata(key,value){localStorage.setItem(key,value);}};
-    window.InsightMigrationBackupV1={confirm:async()=>true,assertReady(){}};
+    window.InsightMigrationBackupV1={verify(){},confirm:async()=>true,assertReady(){}};
     const storage=InsightIndexedDBStorageV1;
-    await storage.migrate({legacyClientsClosed:true});
+    await storage.migrate({legacyClientsClosed:true,selectVerifiedBackup:()=>({file:new Blob(['fictional-test-backup']),password:'Fixture123'})});
     const marker=localStorage.getItem('insight_indexeddb_adoption_v1');
     const db=await new Promise((resolve,reject)=>{
       const request=indexedDB.open('insight-migration-history-v1',1);
@@ -3656,7 +3663,7 @@ test('migration pauses while a dialog, CSV import or weather fetch is pending',a
   await waitForMigrationChecks(page);
   await page.addScriptTag({url:'/insight_indexeddb_storage_v1.js'});
   const result=await page.evaluate(async ()=>{
-    const attempt=()=>InsightIndexedDBStorageV1.migrate({legacyClientsClosed:true}).catch(error=>error.message);
+    const attempt=()=>InsightIndexedDBStorageV1.migrate({legacyClientsClosed:true,selectVerifiedBackup:()=>({file:new Blob(['fictional-test-backup']),password:'Fixture123'})}).catch(error=>error.message);
     const raw=InsightStorage.writeSnapshot(allStores);
     const editor=document.createElement('dialog');
     document.body.append(editor);
@@ -3697,19 +3704,6 @@ test('migration pauses while a dialog, CSV import or weather fetch is pending',a
 
 test('isolated release rehearsal verifies the downloaded backup, migrates, edits and restores both stores',async({page,context})=>{
   test.setTimeout(60000);
-  await page.route('**/isolated-migration-start.js',route=>route.fulfill({
-    contentType:'application/javascript',
-    body:`const container=document.getElementById('loading');
-      function loadShell(){
-        const loader=document.createElement('script');
-        loader.src=container.dataset.loader;
-        document.body.append(loader);
-      }
-      InsightIndexedDBMigrationPreviewV1.start(container,loadShell,result=>{
-        window.__draftFixtureSnapshot=result.snapshot;
-        loadShell();
-      });`
-  }));
   await page.route('**/Index.html*',async route=>{
     const response=await route.fetch();
     let body=(await response.text()).replace(/;?\s*upgrade-insecure-requests/g,'');
@@ -3720,19 +3714,13 @@ test('isolated release rehearsal verifies the downloaded backup, migrates, edits
         .replace(loader[0],[
           'insight_indexeddb_storage_v1.js',
           'insight_indexeddb_migration_preview_v1.js',
-          'isolated-migration-start.js'
-        ].map(path=>'<script src="./'+path+'"></script>').join(''));
+          'insight_indexeddb_recovery_preview_v1.js'
+        ].map(path=>'<script src="./'+path+'"></script>').join('')+
+          '<script src="./draft/insight_indexeddb_candidate_v1.js" data-loader="'+loader[1]+'"></script>');
     }
     await route.fulfill({response,body});
   });
 
-  await page.route('**/insight_payload_core_v1.js*',async route=>{
-    const response=await route.fetch();
-    const source=await response.text();
-    const hooked=source.replace('let allStores=loadAll();','let allStores=window.__draftFixtureSnapshot ?? loadAll();');
-    if(hooked===source)throw new Error('Adopted fixture could not inject the verified snapshot');
-    await route.fulfill({response,body:hooked});
-  });
   const fixture='/Index.html?isolated-migration-fixture=1';
   await page.goto(fixture);
   await expect(page.getByRole('status')).toHaveText('保存状態を確認できないため、起動と保存を停止しています。');
@@ -3814,16 +3802,8 @@ test('isolated release rehearsal verifies the downloaded backup, migrates, edits
   await expect(page.locator('#storeSel')).toHaveValue(seed.id);
   await expect(page.locator('#qi_売上')).toHaveValue('123');
 
-  await page.waitForSelector('#insightSettingsYearSection',{state:'attached'});
-  for(const src of ['insight_indexeddb_quick_input_preview_v1.js','insight_indexeddb_sales_input_preview_v1.js',
-    'insight_indexeddb_recovery_preview_v1.js'])await page.addScriptTag({url:'/'+src});
-  await page.evaluate(async ()=>{
-    await InsightIndexedDBSalesInputPreviewV1.connect('sales',{
-      followInputScreens:true,followQuickInput:true,manageStoresAndYears:true,
-      recoverySettings:{restart:()=>location.reload()}
-    });
-    window.confirm=()=>true;
-  });
+  await page.waitForFunction(()=>InsightIndexedDBCandidateV1.isAdopted()&&!document.body.inert);
+  await page.evaluate(()=>{window.confirm=()=>true;});
 
   await page.locator('#qi_売上').fill('321');
   await page.locator('#quickSaveBtn').click();
@@ -3858,6 +3838,7 @@ test('isolated release rehearsal verifies the downloaded backup, migrates, edits
   await settings.getByRole('button',{name:'この内容を復元する'}).click();
   await expect(page.locator('#qi_売上')).toHaveValue('123');
   await expect(page.locator('#storeSel')).toHaveValue(seed.id);
+  await page.waitForFunction(()=>InsightIndexedDBCandidateV1.isAdopted()&&!document.body.inert);
   const readback=await committedInput(page);
   expect(readback.revision).toBe(3);
   expect(readback.snapshot.stores[seed.id].years).toEqual(JSON.parse(raw).stores[seed.id].years);
@@ -3879,7 +3860,7 @@ test('isolated startup removes only future weather, and holds the screen on unce
   await page.addScriptTag({url:'/insight_indexeddb_migration_preview_v1.js'});
   const seed=await page.evaluate(async ()=>{
     window.InsightStorage={writeMetadata(key,value){localStorage.setItem(key,value);}};
-    window.InsightMigrationBackupV1={assertReady(){},confirm:async()=>true};
+    window.InsightMigrationBackupV1={verify(){},assertReady(){},confirm:async()=>true};
     const dates=[-1,0,1].map(offset=>{
       const date=new Date();
       date.setDate(date.getDate()+offset);
@@ -3896,7 +3877,7 @@ test('isolated startup removes only future weather, and holds the screen on unce
     }
     const raw=JSON.stringify(source);
     localStorage.setItem('insight_v11',raw);
-    await InsightIndexedDBStorageV1.migrate({legacyClientsClosed:true});
+    await InsightIndexedDBStorageV1.migrate({legacyClientsClosed:true,selectVerifiedBackup:()=>({file:new Blob(['fictional-test-backup']),password:'Fixture123'})});
     window.tryStartup=()=>InsightIndexedDBMigrationPreviewV1.start(
       document.querySelector('main'),()=>{throw new Error('Legacy shell opened');},result=>{
         document.querySelector('main').textContent='採用済み '+result.revision;
@@ -3943,8 +3924,8 @@ test('adopted loader keeps editing closed with missing or corrupted adoption evi
     const raw=JSON.stringify({current:'fictional',stores:{fictional:{value:1}}});
     localStorage.setItem('insight_v11',raw);
     window.InsightStorage={writeMetadata(key,value){localStorage.setItem(key,value);}};
-    window.InsightMigrationBackupV1={assertReady(){},confirm:async()=>true};
-    await api.migrate({legacyClientsClosed:true});
+    window.InsightMigrationBackupV1={verify(){},assertReady(){},confirm:async()=>true};
+    await api.migrate({legacyClientsClosed:true,selectVerifiedBackup:()=>({file:new Blob(['fictional-test-backup']),password:'Fixture123'})});
     const adopted=localStorage.getItem(marker),host=document.querySelector('main');
     let opened=0;
     const cases=[];
@@ -4012,8 +3993,8 @@ test('isolated adopted startup saves a single sales day after readback and stops
   const raw=JSON.stringify(source);
   await page.evaluate(async raw=>{
     localStorage.setItem('insight_v11',raw);
-    window.InsightMigrationBackupV1={assertReady(){},confirm:async()=>true};
-    await InsightIndexedDBStorageV1.migrate({legacyClientsClosed:true});
+    window.InsightMigrationBackupV1={verify(){},assertReady(){},confirm:async()=>true};
+    await InsightIndexedDBStorageV1.migrate({legacyClientsClosed:true,selectVerifiedBackup:()=>({file:new Blob(['fictional-test-backup']),password:'Fixture123'})});
   },raw);
   await page.reload();
   await expect(page.getByText('架空店舗A 2026年度 4月1日')).toBeVisible();
@@ -4123,8 +4104,8 @@ async function openMonthlySalesPreview(page,{followInputScreens=false}={}){
     drafts.sales[day-1]=JSON.parse(JSON.stringify(row));
     renderSalesForm(year,MONTHS.indexOf(month),day);
     const raw=InsightStorage.writeSnapshot(allStores);
-    window.InsightMigrationBackupV1={assertReady(){},confirm:async()=>true};
-    await InsightIndexedDBStorageV1.migrate({legacyClientsClosed:true});
+    window.InsightMigrationBackupV1={verify(){},assertReady(){},confirm:async()=>true};
+    await InsightIndexedDBStorageV1.migrate({legacyClientsClosed:true,selectVerifiedBackup:()=>({file:new Blob(['fictional-test-backup']),password:'Fixture123'})});
     window.fixtureSalesPreview=await InsightIndexedDBSalesInputPreviewV1.connect('sales',{followInputScreens});
     return {year,month,day,active,raw,weather:WX_KEYS.find(key=>key!==(row.weather||''))};
   },followInputScreens);
@@ -4431,8 +4412,8 @@ for(const config of [
       if(type==='haiki')renderHaikiForm(year,MONTHS.indexOf(month),day);
       else renderKyakuGrid(year,MONTHS.indexOf(month));
       const raw=InsightStorage.writeSnapshot(allStores);
-      window.InsightMigrationBackupV1={assertReady(){},confirm:async()=>true};
-      await InsightIndexedDBStorageV1.migrate({legacyClientsClosed:true});
+      window.InsightMigrationBackupV1={verify(){},assertReady(){},confirm:async()=>true};
+      await InsightIndexedDBStorageV1.migrate({legacyClientsClosed:true,selectVerifiedBackup:()=>({file:new Blob(['fictional-test-backup']),password:'Fixture123'})});
       await InsightIndexedDBSalesInputPreviewV1.connect(type);
       return {raw,current,year,month,day,category};
     },config.type);
@@ -4976,8 +4957,8 @@ async function openQuickInputPreview(page,{sameMunicipality=true,followMonthlyIn
     renderQuickPage();
     const raw=InsightStorage.writeSnapshot(allStores);
     const realBackup=window.InsightMigrationBackupV1;
-    window.InsightMigrationBackupV1={assertReady(){},confirm:async()=>true};
-    await InsightIndexedDBStorageV1.migrate({legacyClientsClosed:true});
+    window.InsightMigrationBackupV1={verify(){},assertReady(){},confirm:async()=>true};
+    await InsightIndexedDBStorageV1.migrate({legacyClientsClosed:true,selectVerifiedBackup:()=>({file:new Blob(['fictional-test-backup']),password:'Fixture123'})});
     if(useRealBackupAfterMigration)window.InsightMigrationBackupV1=realBackup;
     if(followMonthlyInputs){
       window.combinedPreview=await InsightIndexedDBSalesInputPreviewV1.connect('sales',{

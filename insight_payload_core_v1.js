@@ -524,7 +524,9 @@ function sampleYearData(factor){
 
 
 /* ══ State ══ */
-let allStores=loadAll();  // 新旧どちらの形式でも初期値取得
+let allStores=window.InsightIndexedDBCandidateV1?.isAdopted()
+  ?window.InsightIndexedDBCandidateV1.initializeAdopted()
+  :loadAll();  // 新旧どちらの形式でも初期値取得
 // 旧形式（単店舗）を多店舗形式に変換
 if(!allStores.stores){
   const sid="store_1";

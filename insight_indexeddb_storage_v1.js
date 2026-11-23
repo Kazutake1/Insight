@@ -209,12 +209,12 @@
       root.InsightMigrationBackupV1.assertReady(raw);
       await requireMigrationEnvironment(legacyClientsClosed);
       root.InsightMigrationBackupV1.assertReady(raw);
+      if(typeof selectVerifiedBackup!=='function')throw new Error('A verified backup file is required');
       if(await root.InsightMigrationBackupV1.confirm(raw)!==true)throw new Error('Backup save was not confirmed');
-      if(selectVerifiedBackup){
-        const selected=await selectVerifiedBackup();
-        if(!(selected?.file instanceof root.Blob))throw new Error('Backup save was not confirmed');
-        await root.InsightMigrationBackupV1.verify(selected.file,selected.password,raw);
-      }
+      root.InsightMigrationBackupV1.assertReady(raw);
+      const selected=await selectVerifiedBackup();
+      if(!(selected?.file instanceof root.Blob))throw new Error('Backup save was not confirmed');
+      await root.InsightMigrationBackupV1.verify(selected.file,selected.password,raw);
       await requireMigrationEnvironment(legacyClientsClosed);
       await requireFirstMigration();
       root.InsightMigrationBackupV1.assertReady(raw);
