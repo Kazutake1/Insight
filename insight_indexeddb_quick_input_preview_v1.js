@@ -27,7 +27,7 @@
     };
   }
 
-  async function connect({sharedState}={}){
+  async function connect({sharedState,allowAutomaticWeather=false}={}){
     if(session||currentNav!==0||(!sharedState&&root.InsightIndexedDBSalesInputPreviewV1?.getConnectedStatus())||
        root.InsightWeatherTemperatureAuto.hasPendingFetch()){
       throw new Error('Quick input preview cannot start in this session');
@@ -40,6 +40,7 @@
     const state=sharedState??{storeId:allStores.current,committed:await api.read(),busy:false,held:false};
     let noticeTimer;
     let baselineDraft=null;
+    let weatherView=0;
     function matchesBaseline(){
       return currentNav===0&&allStores.current===state.storeId&&store===allStores.stores[state.storeId]&&
         serialize(allStores)===serialize(state.committed.snapshot);
@@ -217,7 +218,23 @@
       }
     }
 
-    // Weather fetching remains outside this one-screen preview.
+    const fetchWeather=root.fetchWeather;
+    async function fillWeatherDraft(){
+      if(!allowAutomaticWeather||currentNav!==0||state.busy||state.held||state.pending||
+        state.hourly?.dialog()?.open||state.eventDialogOpen?.()||!supports(dateContext.getSelectedDate()))return false;
+      const iso=dateContext.getSelectedIso(),baseline=state.committed,view=weatherView;
+      let edited=false;
+      const recordEdit=event=>{
+        if(event.target.id==='qi_tempMaxC'||event.target.id==='qi_tempMinC')edited=true;
+      };
+      page.addEventListener('input',recordEdit);
+      try{
+        await fetchWeather(()=>!edited&&view===weatherView&&matchesDate(iso)&&state.committed===baseline&&
+          !state.busy&&!state.held&&!state.pending&&!state.hourly?.dialog()?.open&&!state.eventDialogOpen?.()&&matchesBaseline());
+      }finally{page.removeEventListener('input',recordEdit);}
+    }
+
+    // Automatic calls made by the ordinary Quick renderer remain blocked.
     function blockUnsupported(){
       if(!state.busy&&!state.held&&!state.pending)status.textContent='この試験では今日の入力の保存・クリアと日付移動を行えます。';
       return false;
@@ -245,20 +262,25 @@
     root.clearTodayData=clearTodayData;
     root.fetchWeather=blockUnsupported;
     function onEnter(){
+      weatherView++;
       baselineDraft=null;
       finishFeedback();
       status.textContent='';
       rememberRenderedDraft();
     }
     rememberRenderedDraft();
-    session={getStatus,allowDateChange,rememberRenderedDraft};
-    return Object.freeze({getStatus,onEnter});
+    function dateChanged(){
+      weatherView++;
+      rememberRenderedDraft();
+    }
+    session={getStatus,allowDateChange,dateChanged};
+    return Object.freeze({getStatus,onEnter,fillWeatherDraft});
   }
 
   root.InsightIndexedDBQuickInputPreviewV1=Object.freeze({
     connect,
     getStatus:()=>session?.getStatus()??null,
     allowDateChange:date=>session?.allowDateChange(date)??true,
-    dateChanged:()=>session?.rememberRenderedDraft()
+    dateChanged:()=>session?.dateChanged()
   });
 })(globalThis);

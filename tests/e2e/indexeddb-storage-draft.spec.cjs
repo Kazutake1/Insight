@@ -1730,6 +1730,241 @@ test('event preview retains the editing dialog and previous version when readbac
   }finally{await observer.close();}
 });
 
+for(const fault of ['conflict','quota','lost acknowledgement','tab close']){
+  test('event preview protects snapshots on '+fault,async({page,context})=>{
+    const seed=await openQuickInputPreview(page,{followMonthlyInputs:true,manageStoresAndYears:true});
+    const dialog=await openIsolatedEvent(page,'nearby','架空の確認用イベント');
+    await dialog.getByLabel('イベント場所',{exact:true}).fill('架空の会場');
+    const observer=await openStoreSwitchPeer(context);
+    const expected=JSON.parse(seed.raw);
+    const interrupted=fault==='lost acknowledgement'||fault==='tab close';
+    try{
+      if(fault==='conflict'){
+        expected.stores[seed.peer].name='別タブの店名';
+        await observer.evaluate(async id=>{
+          const api=InsightIndexedDBStorageV1,record=await api.read();
+          record.snapshot.stores[id].name='別タブの店名';
+          await api.save(record.revision,record.snapshot);
+        },seed.peer);
+      }else if(fault==='quota'){
+        await page.evaluate(()=>{
+          const put=IDBObjectStore.prototype.put;
+          IDBObjectStore.prototype.put=function(){
+            IDBObjectStore.prototype.put=put;
+            throw new DOMException('Fictional event quota error','QuotaExceededError');
+          };
+        });
+      }else await interruptCountReadback(page,fault);
+
+      await dialog.getByRole('button',{name:'登録する',exact:true}).click();
+      if(fault==='tab close'){
+        await page.waitForFunction(()=>window.countReadbackPaused===true);
+        await page.close();
+      }else{
+        await expect(dialog.locator('.ie-preview-save-status')).toContainText('追加の保存を停止しました');
+        await expect(dialog.getByLabel('イベント名',{exact:true})).toHaveValue('架空の確認用イベント');
+        expect(await page.evaluate(()=>combinedPreview.getStatus().state)).toBe('HELD');
+      }
+
+      if(interrupted){
+        await expect.poll(()=>observer.evaluate(async()=>{
+          try{return await InsightIndexedDBStorageV1.diagnose({verifyInterrupted:true});}
+          catch(error){
+            if(error.message==='Another Insight operation is in progress')return null;
+            throw error;
+          }
+        })).toMatchObject({state:'hold',observedRevision:1,recovery:'save-verified'});
+      }
+      const record=await readStoreSwitchRecord(observer);
+      const actual=JSON.parse(record.raw);
+      if(interrupted){
+        const event=actual.stores[seed.active].events.at(-1);
+        expect(event).toMatchObject({type:'nearby',scope:'store',snapshot:{title:'架空の確認用イベント',location:'架空の会場'}});
+        expected.stores[seed.active].events=[...(expected.stores[seed.active].events??[]),event];
+        expected.eventManagement={version:1,presets:[],events:[],demandCategories:[]};
+      }
+      expect(record.revision).toBe(fault==='quota'?0:1);
+      expect(actual).toEqual(expected);
+      if(fault!=='quota')expect(record.previous.raw).toBe(seed.raw);
+      expect(await observer.evaluate(()=>localStorage.getItem('insight_v11'))).toBe(seed.raw);
+    }finally{await observer.close();}
+  });
+}
+
+test('event preview keeps a cancelled deletion and saves shared demand categories in order',async({page})=>{
+  const seed=await openQuickInputPreview(page,{followMonthlyInputs:true,manageStoresAndYears:true,seedManagement:true});
+  const expected=JSON.parse(seed.raw);
+  await page.evaluate(()=>{window.confirm=()=>false;});
+  await page.locator('#insightEvents').getByRole('button',{name:/架空の催事.*を削除/}).click();
+  expect(await committedInput(page)).toEqual({revision:0,snapshot:expected});
+  const editor=await openIsolatedEvent(page,'special','架空のカテゴリー確認');
+  await editor.getByRole('button',{name:'カテゴリー管理'}).click();
+  const manager=page.locator('dialog.ie-preset-editor');
+  const names=manager.getByLabel('カテゴリー名',{exact:true});
+  const add=manager.getByRole('button',{name:'＋ カテゴリーを追加'});
+  await add.click();
+  await names.nth(0).fill('架空の惣菜');
+  await add.click();
+  await names.nth(1).fill('架空のお菓子');
+  await manager.getByRole('button',{name:'架空のお菓子を上へ移動'}).click();
+  await manager.getByRole('button',{name:'保存する'}).click();
+  await expect(manager).toHaveCount(0);
+  const current=await committedInput(page);
+  const categories=current.snapshot.eventManagement.demandCategories;
+  expect(categories.map(category=>category.name)).toEqual(['架空のお菓子','架空の惣菜']);
+  expected.eventManagement={version:1,presets:[],events:[],demandCategories:categories};
+  expect(current).toEqual({revision:1,snapshot:expected});
+  expect(await page.evaluate(()=>localStorage.getItem('insight_v11'))).toBe(seed.raw);
+});
+
+const fictionalWeatherLocation={name:'架空町',query:'架空町',label:'架空町 / 架空県',
+  latitude:35.1,longitude:136.8,timezone:'Asia/Tokyo',admin1:'架空県',admin2:'',admin3:'',admin4:'',
+  source:'open-meteo-geocoding'};
+
+async function mockPreviewWeather(page){
+  await page.evaluate(location=>{
+    const realFetch=window.fetch;
+    window.previewWeatherQuery=location.query;
+    window.previewWeatherConfirmations=0;
+    window.prompt=()=>previewWeatherQuery;
+    window.confirm=()=>{previewWeatherConfirmations++;return true;};
+    window.alert=()=>{};
+    window.fetch=(input,...args)=>{
+      const url=new URL(input,document.baseURI);
+      if(url.hostname==='geocoding-api.open-meteo.com'){
+        return new Promise(resolve=>{
+          window.finishPreviewLocation=()=>resolve(new Response(JSON.stringify({results:[location]})));
+        });
+      }
+      if(url.hostname==='historical-forecast-api.open-meteo.com'){
+        return new Promise(resolve=>{
+          window.finishPreviewWeather=()=>resolve(new Response(JSON.stringify({daily:{
+            time:[url.searchParams.get('start_date')],weather_code:[63],temperature_2m_max:[27],temperature_2m_min:[13]
+          }})));
+        });
+      }
+      return realFetch(input,...args);
+    };
+  },fictionalWeatherLocation);
+}
+
+async function openPreviewLocation(page){
+  await page.locator('#storeMenuBtn').click();
+  await page.locator('#weatherLocationMenuItem').click();
+}
+
+test('weather location saves only the selected store and preserves the prior revision when cleared',async({page,context})=>{
+  const seed=await openQuickInputPreview(page,{followMonthlyInputs:true,manageStoresAndYears:true,seedManagement:true});
+  await mockPreviewWeather(page);
+  await openPreviewLocation(page);
+  await page.waitForFunction(()=>typeof window.finishPreviewLocation==='function');
+  await page.evaluate(()=>finishPreviewLocation());
+  await expect(page.locator('#storeSel + [role=status]')).toHaveText('保存しました。');
+  const expected=JSON.parse(seed.raw);
+  expected.stores[seed.active].weatherLocation=fictionalWeatherLocation;
+  expect(await committedInput(page)).toEqual({revision:1,snapshot:expected});
+  const prior=await committedInput(page);
+  await page.evaluate(()=>{window.previewWeatherQuery='';});
+  await openPreviewLocation(page);
+  await expect.poll(async()=>(await committedInput(page)).revision).toBe(2);
+  delete expected.stores[seed.active].weatherLocation;
+  expect(await committedInput(page)).toEqual({revision:2,snapshot:expected});
+  const observer=await openStoreSwitchPeer(context);
+  try{
+    expect(JSON.parse((await readStoreSwitchRecord(observer)).previous.raw)).toEqual(prior.snapshot);
+    expect(await observer.evaluate(()=>localStorage.getItem('insight_v11'))).toBe(seed.raw);
+  }finally{await observer.close();}
+});
+
+test('a delayed location search cannot update a different store',async({page})=>{
+  const seed=await openQuickInputPreview(page,{followMonthlyInputs:true,manageStoresAndYears:true});
+  await mockPreviewWeather(page);
+  await openPreviewLocation(page);
+  await page.waitForFunction(()=>typeof window.finishPreviewLocation==='function');
+  await page.locator('#nav2').click();
+  await page.locator('#storeSel').selectOption(seed.peer);
+  await expect(page.locator('#storeSel + [role=status]')).toHaveText('店舗を切り替えました。');
+  const switched=await committedInput(page);
+  expect(switched.revision).toBe(1);
+  await page.evaluate(()=>finishPreviewLocation());
+  await page.waitForFunction(()=>!InsightWeatherLocation.hasPendingSearch());
+  expect(await committedInput(page)).toEqual(switched);
+  expect(switched.snapshot.stores[seed.active].weatherLocation).toEqual(JSON.parse(seed.raw).stores[seed.active].weatherLocation);
+  expect(await page.evaluate(()=>localStorage.getItem('insight_v11'))).toBe(seed.raw);
+});
+
+test('weather location holds on an interrupted readback and keeps the previous version',async({page,context})=>{
+  const seed=await openQuickInputPreview(page,{followMonthlyInputs:true,manageStoresAndYears:true});
+  await mockPreviewWeather(page);
+  const observer=await openStoreSwitchPeer(context);
+  try{
+    await interruptCountReadback(page,'readback failure');
+    await openPreviewLocation(page);
+    await page.waitForFunction(()=>typeof window.finishPreviewLocation==='function');
+    await page.evaluate(()=>finishPreviewLocation());
+    await expect(page.locator('#storeSel + [role=status]')).toContainText('追加の保存を停止しました');
+    expect(await page.evaluate(()=>({status:combinedPreview.getStatus().state,location:store.weatherLocation})))
+      .toEqual({status:'HELD',location:JSON.parse(seed.raw).stores[seed.active].weatherLocation});
+    const record=await readStoreSwitchRecord(observer);
+    const expected=JSON.parse(seed.raw);
+    expected.stores[seed.active].weatherLocation=fictionalWeatherLocation;
+    expect(record.revision).toBe(1);
+    expect(JSON.parse(record.raw)).toEqual(expected);
+    expect(record.previous.raw).toBe(seed.raw);
+    expect(await observer.evaluate(()=>localStorage.getItem('insight_v11'))).toBe(seed.raw);
+  }finally{await observer.close();}
+});
+
+test('explicit automatic weather fills only the draft and ignores manual changes and stale dates',async({page})=>{
+  const seed=await openQuickInputPreview(page,{followMonthlyInputs:true,manageStoresAndYears:true});
+  await mockPreviewWeather(page);
+  await openPreviewLocation(page);
+  await page.waitForFunction(()=>typeof window.finishPreviewLocation==='function');
+  await page.evaluate(()=>finishPreviewLocation());
+  await expect(page.locator('#storeSel + [role=status]')).toHaveText('保存しました。');
+  const baseline=await committedInput(page);
+  const maximum=page.locator('#qi_tempMaxC');
+  async function start(){
+    await page.evaluate(()=>{delete window.finishPreviewWeather;});
+    await page.locator('#autoWxBtn').click();
+    await page.waitForFunction(()=>typeof window.finishPreviewWeather==='function');
+  }
+  async function finish(){
+    await page.evaluate(()=>finishPreviewWeather());
+    await page.waitForFunction(()=>!InsightWeatherTemperatureAuto.hasPendingFetch());
+  }
+  await start();
+  await maximum.fill('24');
+  await finish();
+  await expect(maximum).toHaveValue('24');
+  await start();
+  await page.locator('#qWeatherCompactTrigger').click();
+  await page.locator('#qWeatherCompactMenu [data-wx="晴"]').click();
+  await finish();
+  await expect(page.locator('#qWeatherCompactTrigger .qwc-label')).toHaveText('晴');
+  await start();
+  await page.locator('#iqdDateInput').fill(seed.year+'-06-11');
+  await finish();
+  await expect(maximum).toHaveValue('');
+  expect(await committedInput(page)).toEqual(baseline);
+
+  await page.locator('#iqdDateInput').fill(seed.iso);
+  await start();
+  await finish();
+  await expect(maximum).toHaveValue('27');
+  await expect(page.locator('#qi_tempMinC')).toHaveValue('13');
+  await expect(page.locator('#qWeatherCompactTrigger .qwc-label')).toHaveText('雨');
+  expect(await committedInput(page)).toEqual(baseline);
+  await page.locator('#quickSaveBtn').click();
+  await expect(page.locator('#quickSaveBtn + [role=status]')).toHaveText('今日の入力を保存しました。');
+  const expected=baseline.snapshot;
+  Object.assign(expected.stores[seed.active].data[seed.year][seed.month][seed.day-1],{weather:'雨',tempMaxC:27,tempMinC:13});
+  expected.stores[seed.peer].data[seed.year][seed.month][seed.day-1].weather='雨';
+  expected.sharedWeather[seed.year+'-'+seed.month+'-'+seed.day]='雨';
+  expect(await committedInput(page)).toEqual({revision:2,snapshot:expected});
+  expect(await page.evaluate(()=>localStorage.getItem('insight_v11'))).toBe(seed.raw);
+});
+
 test('isolated theme remains device-local without creating a business data revision',async({page})=>{
   const seed=await openQuickInputPreview(page,{followMonthlyInputs:true,manageStoresAndYears:true});
   await page.locator('#navSettings').click();
@@ -2290,6 +2525,80 @@ test('migration startup gate requires a confirmed restart and a fresh build with
   expect(await check()).toEqual({state:'hold',reason:'service-worker-present'});
 
   expect(await page.evaluate(()=>localStorage.length)).toBe(0);
+});
+
+test('offline migration does not request a backup or create an adoption marker',async({page,context})=>{
+  await page.route('**/offline-migration-fixture',route=>route.fulfill({
+    contentType:'text/html',body:'<!doctype html><title>Fictional offline migration</title>'
+  }));
+  await page.goto('/offline-migration-fixture');
+  await page.addScriptTag({url:'/insight_indexeddb_storage_v1.js'});
+  const raw='{"current":"fictional","stores":{"fictional":{"value":10}}}';
+  await page.evaluate(raw=>{
+    localStorage.setItem('insight_v11',raw);
+    window.backupRequested=false;
+    window.InsightMigrationBackupV1={
+      assertReady(){},
+      confirm(){window.backupRequested=true;return true;}
+    };
+  },raw);
+  await context.setOffline(true);
+  try{
+    const result=await page.evaluate(async ()=>{
+      const api=InsightIndexedDBStorageV1;
+      let networkRejected=false;
+      try{await fetch('/Index.html',{cache:'no-store'});}
+      catch(_){networkRejected=true;}
+      return {networkRejected,status:await api.migrate({legacyClientsClosed:true}).catch(error=>error.message),
+        backup:backupRequested,marker:localStorage.getItem('insight_indexeddb_adoption_v1'),
+        startup:await api.diagnoseStartup(),raw:localStorage.getItem('insight_v11')};
+    });
+    expect(result).toMatchObject({networkRejected:true,backup:false,marker:null,startup:{state:'legacy'},raw});
+    expect(result.status).toMatch(/^Migration environment requires review: (offline|build-check-unavailable)$/);
+  }finally{await context.setOffline(false);}
+});
+
+test('a fully restarted browser keeps the adopted revision and holds the legacy shell',async({browserName,baseURL},info)=>{
+  const browserType=require('@playwright/test')[browserName];
+  const userDir=info.outputPath('restart-profile');
+  const url=new URL('/restart-migration-fixture',baseURL).href;
+  const raw='{"current":"fictional","stores":{"fictional":{"value":10}}}';
+  const snapshot={current:'fictional',stores:{fictional:{value:20}}};
+  async function openProfile(){
+    const context=await browserType.launchPersistentContext(userDir,{headless:true});
+    try{
+      await context.route(url,route=>route.fulfill({contentType:'text/html',body:'<!doctype html><title>Fictional browser restart</title>'}));
+      const page=context.pages()[0]??await context.newPage();
+      await page.goto(url);
+      await page.evaluate(()=>{
+        window.__INSIGHT_SHELL_VERSION__='20261121-sale-scroll20-build-113';
+        window.__INSIGHT_FEATURE_SIGNATURE__='f2dd343f';
+      });
+      await page.addScriptTag({url:new URL('/insight_indexeddb_storage_v1.js',url).href});
+      return {context,page};
+    }catch(error){
+      await context.close();
+      throw error;
+    }
+  }
+  const initial=await openProfile();
+  try{
+    expect(await initial.page.evaluate(async ({raw,snapshot})=>{
+      localStorage.setItem('insight_v11',raw);
+      window.InsightStorage={writeMetadata(key,value){localStorage.setItem(key,value);}};
+      window.InsightMigrationBackupV1={assertReady(){},confirm:async()=>true};
+      const api=InsightIndexedDBStorageV1;
+      await api.migrate({legacyClientsClosed:true});
+      return api.save(0,snapshot);
+    },{raw,snapshot})).toEqual({revision:1,snapshot});
+  }finally{await initial.context.close();}
+  const restarted=await openProfile();
+  try{
+    expect(await restarted.page.evaluate(async ()=>{
+      const api=InsightIndexedDBStorageV1;
+      return {startup:await api.diagnoseStartup(),current:await api.read(),raw:localStorage.getItem('insight_v11')};
+    })).toEqual({startup:{state:'hold',reason:'indexeddb-adopted'},current:{revision:1,snapshot},raw});
+  }finally{await restarted.context.close();}
 });
 
 const legacyPwaFixture='/tests/e2e/fixtures/legacy-pwa-fixture';

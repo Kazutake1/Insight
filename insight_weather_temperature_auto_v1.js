@@ -203,11 +203,12 @@
     var compact=root.InsightWeatherCompact;
     return compact&&typeof compact.manualSelectionRevision==='function'?compact.manualSelectionRevision():0;
   }
-  root.fetchWeather=async function(){
+  root.fetchWeather=async function(previewIsCurrent){
     var requestId=++latestFetchRequest;
     var date=targetDate(),dateKey=localYmd(date),originStore=store,revision=manualRevision();
     function sameTarget(){
-      return requestId===latestFetchRequest&&store===originStore&&localYmd(targetDate())===dateKey;
+      return requestId===latestFetchRequest&&store===originStore&&localYmd(targetDate())===dateKey&&
+        (!previewIsCurrent||previewIsCurrent());
     }
     function manualOverride(){return manualRevision()!==revision;}
     var btn=document.getElementById('autoWxBtn');if(btn)btn.disabled=true;
@@ -274,6 +275,10 @@
     }finally{
       activeFetches--;
       if(sameTarget()&&btn)btn.disabled=isFutureDate(targetDate());
+      else if(previewIsCurrent&&requestId===latestFetchRequest){
+        label('自動');
+        applyFutureWeatherState();
+      }
     }
   };
 

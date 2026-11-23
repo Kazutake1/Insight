@@ -36,7 +36,7 @@
     const api=root.InsightIndexedDBStorageV1;
     const state={storeId:allStores.current,committed:await api.read(),busy:false,held:false,pending:false};
     const quick=followQuickInput
-      ?await root.InsightIndexedDBQuickInputPreviewV1.connect({sharedState:state}):null;
+      ?await root.InsightIndexedDBQuickInputPreviewV1.connect({sharedState:state,allowAutomaticWeather:manageStoresAndYears}):null;
     const management=manageStoresAndYears&&!!quick;
     let target=displayedPeriod();
     function matchesPeriod(){
@@ -341,7 +341,7 @@
     const eventDialogs=()=>management?Array.from(doc.querySelectorAll('dialog.ie-dialog[open]')):[];
     const yearControl='#addYearBtn,#ayInput,#ayAddBtn,#insightDeleteYearButton';
     const storeControl='#storeSel,#storeMenuBtn';
-    const storeActionControl='#storeMenu [data-indexeddb-store-action]';
+    const storeActionControl='#storeMenu [data-indexeddb-store-action],#storeMenu #weatherLocationMenuItem';
     root.addEventListener('click',event=>{
       const item=event.target.closest?.(sidebarSelector);
       if(quick){
@@ -378,6 +378,12 @@
         }
         if(!blocked()&&(hourly?.dialog()?.contains(event.target)||
                         root.InsightSalesCount.getCategoryDialog()?.contains(event.target)))return;
+        if(management&&currentNav===0&&event.target.closest?.('#autoWxBtn')){
+          event.preventDefault();
+          event.stopImmediatePropagation();
+          if(!blocked())void quick.fillWeatherDraft();
+          return;
+        }
         const inside=event.target.closest?.('.page.show');
         const excluded=event.target.closest?.('.clear-btn:not(#quickClearBtn,#salesClearBtn,#kyakuClearBtn,#haikiClearBtn),#autoWxBtn');
         if(!blocked()&&((inside&&!excluded)||event.target.closest?.(storeControl)||
@@ -396,6 +402,7 @@
       event.stopImmediatePropagation();
     },true);
 
+    let navigationVersion=0;
     const gotoNav=root.gotoNav;
     root.gotoNav=function(destination){
       if(followInputScreens&&(blocked()||yearDialog()||eventDialogs().length))return false;
@@ -410,6 +417,7 @@
         const priorPeriod=currentNav===screen.route?displayedPeriod():null;
         const priorType=type;
         const result=gotoNav.apply(this,arguments);
+        navigationVersion++;
         if(priorPeriod){
           drafts[priorType]=JSON.parse(JSON.stringify(rows(state.committed.snapshot,priorPeriod.storeId,priorPeriod)??[]));
         }
@@ -523,7 +531,11 @@
         if(management&&canOpenStoreMenu()){
           const id=state.storeId;
           const result=showStoreMenu(action=>storeAction(action,id));
-          doc.getElementById('weatherLocationMenuItem')?.remove();
+          const weatherItem=doc.getElementById('weatherLocationMenuItem');
+          if(weatherItem)weatherItem.onclick=event=>{
+            event.stopPropagation();
+            void changeWeatherLocation(id,weatherItem.parentElement);
+          };
           return result;
         }
         storeStatus.textContent='店舗の追加・変更・削除は試験対象外です。';
@@ -533,6 +545,28 @@
       function canOpenStoreMenu(){
         return !blocked()&&!yearDialog()&&!eventDialogs().length&&(currentNav===0||currentNav==='settings'||currentNav===screen.route)&&
           !hourly?.dialog()?.open;
+      }
+
+      async function changeWeatherLocation(id,menu){
+        const weather=root.InsightWeatherLocation;
+        if(!canOpenStoreMenu()||id!==state.storeId||!menu.classList.contains('is-open')||
+          weather.hasPendingSearch())return false;
+        const scope=managementScope(),baseline=state.committed,navVersion=navigationVersion;
+        const isCurrent=()=>navVersion===navigationVersion&&canOpenStoreMenu()&&state.storeId===id&&state.committed===baseline&&
+          managementScope()===scope&&store===allStores.stores[id]&&
+          root.InsightStorage.serialize(allStores)===root.InsightStorage.serialize(baseline.snapshot);
+        menu.classList.remove('is-open');
+        await weather.configure({
+          isCurrent,
+          save:location=>{
+            if(!isCurrent())return false;
+            return runManagement(scope,candidate=>{
+              if(location)candidate.stores[id].weatherLocation=location;
+              else delete candidate.stores[id].weatherLocation;
+              return true;
+            },()=>{});
+          }
+        });
       }
 
       function managementScope(){

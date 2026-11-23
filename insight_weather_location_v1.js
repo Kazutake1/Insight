@@ -175,7 +175,7 @@
     return results[n-1];
   }
   var activeLocationSearches=0;
-  async function configureLocation(){
+  async function configureLocation(preview){
     var current=store&&store.weatherLocation;
     var initial=current&&(current.name||current.query)?String(current.name||current.query):'';
     var query=prompt('天気を取得する市区町村名を入力してください。\n例：稲沢市、一宮市\n\n空欄で設定を解除します。',initial);
@@ -185,10 +185,14 @@
     if(!query){
       if(!current)return;
       if(confirm('この店舗の天気地点設定を解除しますか？')){
-        observeConfirmedLocationClear(function(){
+        var clearedMessage='天気地点設定を解除しました。\n未設定時は従来の愛知県西部／名古屋基準で取得します。';
+        if(preview){
+          if(!preview.isCurrent()||!await preview.save(null))return;
+          alert(clearedMessage);
+        }else observeConfirmedLocationClear(function(){
           delete store.weatherLocation;
           persist();
-          alert('天気地点設定を解除しました。\n未設定時は従来の愛知県西部／名古屋基準で取得します。');
+          alert(clearedMessage);
         });
       }
       return;
@@ -197,30 +201,36 @@
     activeLocationSearches++;
     try{
       var results=await searchLocations(query);
+      if(preview&&!preview.isCurrent())return;
       if(!results.length){alert('「'+query+'」に一致する市区町村が見つかりませんでした。');return;}
       var chosen=chooseCandidate(results);if(!chosen)return;
       var label=candidateLabel(chosen);
       if(!confirm('この地点を使用しますか？\n\n'+label+'\n緯度 '+Number(chosen.latitude).toFixed(4)+' / 経度 '+Number(chosen.longitude).toFixed(4)))return;
 
-      observeConfirmedLocationSet(function(){
-        store.weatherLocation={
-          name:String(chosen.name||query),
-          query:query,
-          label:label||query,
-          latitude:Number(chosen.latitude),
-          longitude:Number(chosen.longitude),
-          timezone:String(chosen.timezone||'Asia/Tokyo'),
-          admin1:text(chosen.admin1),
-          admin2:text(chosen.admin2),
-          admin3:text(chosen.admin3),
-          admin4:text(chosen.admin4),
-          source:'open-meteo-geocoding'
-        };
+      var location={
+        name:String(chosen.name||query),
+        query:query,
+        label:label||query,
+        latitude:Number(chosen.latitude),
+        longitude:Number(chosen.longitude),
+        timezone:String(chosen.timezone||'Asia/Tokyo'),
+        admin1:text(chosen.admin1),
+        admin2:text(chosen.admin2),
+        admin3:text(chosen.admin3),
+        admin4:text(chosen.admin4),
+        source:'open-meteo-geocoding'
+      };
+      var savedMessage='天気地点を「'+(label||query)+'」に設定しました。\n今後「自動」で、この地点の天気・最高気温・最低気温を取得します。';
+      if(preview){
+        if(!preview.isCurrent()||!root.InsightWeatherTemperatureAuto.validLocation(location)||!await preview.save(location))return;
+        alert(savedMessage);
+      }else observeConfirmedLocationSet(function(){
+        store.weatherLocation=location;
         persist();
-        alert('天気地点を「'+(label||query)+'」に設定しました。\n今後「自動」で、この地点の天気・最高気温・最低気温を取得します。');
+        alert(savedMessage);
       });
     }catch(e){
-      alert((e&&e.message)||'地点設定に失敗しました。');
+      if(!preview||preview.isCurrent())alert((e&&e.message)||'地点設定に失敗しました。');
     }finally{activeLocationSearches--;}
   }
 
