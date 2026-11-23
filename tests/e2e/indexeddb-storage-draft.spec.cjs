@@ -2629,7 +2629,7 @@ test('migration startup gate requires a confirmed restart and a fresh build with
 });
 
 test('encrypted restore keeps the pre-restore revision and resumes only the verified committed copy',async({page,context})=>{
-  const seed=await openQuickInputPreview(page);
+  const seed=await openQuickInputPreview(page,{useRealBackupAfterMigration:true});
   const observer=await openStoreSwitchPeer(context);
   try{
     const result=await page.evaluate(async seed=>{
@@ -4302,7 +4302,7 @@ for(const failure of ['readback abort','acknowledgement lost','tab closed during
 }
 
 async function openQuickInputPreview(page,{sameMunicipality=true,followMonthlyInputs=false,seedCounts=false,
-  seedHours=false,seedDailyClear=false,seedYearBoundary=false,seedManagement=false,manageStoresAndYears=false,seedCSV=false,seedBulk=false}={}){
+  seedHours=false,seedDailyClear=false,seedYearBoundary=false,seedManagement=false,manageStoresAndYears=false,seedCSV=false,seedBulk=false,useRealBackupAfterMigration=false}={}){
   await routeMigrationPage(page);
   await page.goto('/Index.html');
   await waitForMigrationChecks(page);
@@ -4313,7 +4313,7 @@ async function openQuickInputPreview(page,{sameMunicipality=true,followMonthlyIn
     if(manageStoresAndYears)await page.waitForSelector('#insightSettingsYearSection',{state:'attached'});
     await page.addScriptTag({url:'/insight_indexeddb_sales_input_preview_v1.js'});
   }
-  return page.evaluate(async ({sameMunicipality,followMonthlyInputs,seedCounts,seedHours,seedDailyClear,seedYearBoundary,seedManagement,manageStoresAndYears,seedCSV,seedBulk})=>{
+  return page.evaluate(async ({sameMunicipality,followMonthlyInputs,seedCounts,seedHours,seedDailyClear,seedYearBoundary,seedManagement,manageStoresAndYears,seedCSV,seedBulk,useRealBackupAfterMigration})=>{
     const year=String(Number(todayFY().fy)-1),month='6月',day=12;
     const iso=year+'-06-12',active=allStores.current,peer='fictional-quick-peer';
     store.data[year]=blankYearData(year);
@@ -4390,15 +4390,17 @@ async function openQuickInputPreview(page,{sameMunicipality=true,followMonthlyIn
     renderQuickNav();
     renderQuickPage();
     const raw=InsightStorage.writeSnapshot(allStores);
+    const realBackup=window.InsightMigrationBackupV1;
     window.InsightMigrationBackupV1={assertReady(){},confirm:async()=>true};
     await InsightIndexedDBStorageV1.migrate({legacyClientsClosed:true});
+    if(useRealBackupAfterMigration)window.InsightMigrationBackupV1=realBackup;
     if(followMonthlyInputs){
       window.combinedPreview=await InsightIndexedDBSalesInputPreviewV1.connect('sales',{
         followInputScreens:true,followQuickInput:true,manageStoresAndYears
       });
     }else window.quickPreview=await InsightIndexedDBQuickInputPreviewV1.connect();
     return {year,month,day,iso,active,peer,raw,category:HAIKI_CATS[0],countCategory:countCategory.id,otherCategory:otherCategory.id};
-  },{sameMunicipality,followMonthlyInputs,seedCounts,seedHours,seedDailyClear,seedYearBoundary,seedManagement,manageStoresAndYears,seedCSV,seedBulk});
+  },{sameMunicipality,followMonthlyInputs,seedCounts,seedHours,seedDailyClear,seedYearBoundary,seedManagement,manageStoresAndYears,seedCSV,seedBulk,useRealBackupAfterMigration});
 }
 
 async function editQuickInput(page,category){
