@@ -6,10 +6,11 @@
   let adopted=false;
   let verifiedSnapshot=null;
 
-  function halt(){
+  function halt(stage){
     document.body.inert=false;
     const status=document.createElement('p');
     status.setAttribute('role','status');
+    status.dataset.indexeddbStartupStage=stage;
     status.textContent='確定版で画面を開けないため、起動と保存を停止しています。';
     document.body.replaceChildren(status);
   }
@@ -25,23 +26,26 @@
   }
 
   async function connectAdopted(){
+    let stage='controls';
     try{
       for(let attempt=0;!document.getElementById('insightSettingsYearSection')||
         typeof root.InsightHourlyCustomers?.connectIndexedDBPreview!=='function';attempt++){
         if(attempt>=100)throw new Error('Adopted controls did not load');
         await new Promise(resolve=>root.setTimeout(resolve,50));
       }
+      stage='modules';
       await Promise.all([
         './insight_indexeddb_quick_input_preview_v1.js',
         './insight_indexeddb_sales_input_preview_v1.js',
         './insight_indexeddb_recovery_preview_v1.js'
       ].map(loadScript));
+      stage='storage-connection';
       await root.InsightIndexedDBSalesInputPreviewV1.connect('sales',{
         followInputScreens:true,followQuickInput:true,manageStoresAndYears:true,
         recoverySettings:{restart:()=>root.location.reload()}
       });
       document.body.inert=false;
-    }catch(_){halt();}
+    }catch(_){halt(stage);}
   }
 
   function mountMigration(){
@@ -72,7 +76,7 @@
         await loadShell();
         await waitForShell();
         if(verifiedSnapshot)throw new Error('The adopted snapshot was not initialized');
-      },{restart:()=>root.location.reload()}).catch(halt);
+      },{restart:()=>root.location.reload()}).catch(()=>halt('shell'));
     },
     isAdopted:()=>adopted,
     initializeAdopted(){

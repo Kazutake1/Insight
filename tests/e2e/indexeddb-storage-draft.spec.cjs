@@ -4041,8 +4041,10 @@ httpsTest('Draft Index rehearses migration, editing and recovery over HTTPS',asy
     await page.waitForFunction(()=>!InsightWeatherLocation.hasPendingSearch());
     await checkManagementSnapshot(located);
     await page.reload();
-    await page.waitForFunction(()=>window.InsightIndexedDBCandidateV1?.isAdopted()&&!document.body.inert&&
-      !!document.getElementById('insightIndexedDBBackupDialog'));
+    const startup=await page.waitForFunction(()=>document.querySelector('[data-indexeddb-startup-stage]')?.dataset.indexeddbStartupStage||
+      (window.InsightIndexedDBCandidateV1?.isAdopted()&&!document.body.inert&&
+        !!document.getElementById('insightIndexedDBBackupDialog')?'ready':false));
+    expect(await startup.jsonValue()).toBe('ready');
 
     await page.locator('#navSaleResults').click();
     await openMenu();

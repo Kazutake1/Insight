@@ -706,7 +706,7 @@ function initQuickPage(){
   renderQuickNav();
   renderQuickPage();
   // 今日のページを開いたとき、天気が未設定なら自動取得
-  if(quickEditDay===todayInfo.day){
+  if(!window.InsightIndexedDBCandidateV1?.isAdopted()&&quickEditDay===todayInfo.day){
     const fy=todayInfo.fy,month=todayInfo.month;
     const row=store.data[fy]?.[month]?.[quickEditDay-1];
     if(!row||!row.weather){
