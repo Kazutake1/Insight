@@ -1,4 +1,4 @@
-/* Isolated IndexedDB migration preview. The public loader does not use it. */
+/* IndexedDB startup diagnosis and the explicitly enabled manual migration flow. */
 (function(root){
   'use strict';
 

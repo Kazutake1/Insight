@@ -1,4 +1,4 @@
-/* IndexedDB storage for the unpublished migration draft. The Draft shell loads it only on the isolated test origin. */
+/* IndexedDB storage for the Insight migration and adopted data. */
 (function(root){
   'use strict';
   const database='insight-store-snapshots-v1';
@@ -8,8 +8,8 @@
   const recordKey='current';
   const storeName='snapshots';
   // Pin the version exercised by the Draft migration. It must be updated with the release that enables it.
-  const migrationBuild='20261124-indexeddb-preview-build-118';
-  const migrationFeatures='e79a5f02';
+  const migrationBuild='20261124-indexeddb-preview-build-119';
+  const migrationFeatures='19105870';
 
   function parse(raw){
     const snapshot=JSON.parse(raw);
@@ -155,7 +155,7 @@
     }
   }
 
-  async function checkMigrationEnvironment({expectedBuild,expectedFeatures,legacyClientsClosed}={}){
+  async function checkMigrationEnvironment({expectedBuild,expectedFeatures,legacyClientsClosed,requireManualMigration=false}={}){
     const hold=reason=>({state:'hold',reason});
     if(legacyClientsClosed!==true)return hold('legacy-client-confirmation-required');
     const matchesLoadedVersion=()=>root.__INSIGHT_SHELL_VERSION__===expectedBuild&&
@@ -182,6 +182,8 @@
       if(!serverBuild)return hold('build-check-unavailable');
       if(await hasWorker())return hold('service-worker-present');
       if(serverBuild!==expectedBuild||!matchesLoadedVersion())return hold('build-mismatch');
+      if(requireManualMigration&&root.location.origin==='https://kazutake1.github.io'&&
+         !document.querySelector('script[data-indexeddb-migration="manual"]'))return hold('manual-migration-disabled');
       if(root.navigator.onLine!==true)return hold('offline');
       return {state:'ready'};
     }catch(_){
@@ -189,9 +191,9 @@
     }
   }
 
-  async function requireMigrationEnvironment(legacyClientsClosed){
+  async function requireMigrationEnvironment(legacyClientsClosed,{requireManualMigration=false}={}){
     const result=await checkMigrationEnvironment({
-      expectedBuild:migrationBuild,expectedFeatures:migrationFeatures,legacyClientsClosed
+      expectedBuild:migrationBuild,expectedFeatures:migrationFeatures,legacyClientsClosed,requireManualMigration
     });
     if(result.state!=='ready')throw new Error('Migration environment requires review: '+result.reason);
   }
@@ -207,7 +209,7 @@
       if(raw===null)throw new Error('Legacy Insight data is missing');
       parse(raw);
       root.InsightMigrationBackupV1.assertReady(raw);
-      await requireMigrationEnvironment(legacyClientsClosed);
+      await requireMigrationEnvironment(legacyClientsClosed,{requireManualMigration:true});
       root.InsightMigrationBackupV1.assertReady(raw);
       if(typeof selectVerifiedBackup!=='function')throw new Error('A verified backup file is required');
       if(await root.InsightMigrationBackupV1.confirm(raw)!==true)throw new Error('Backup save was not confirmed');
@@ -215,7 +217,7 @@
       const selected=await selectVerifiedBackup();
       if(!(selected?.file instanceof root.Blob))throw new Error('Backup save was not confirmed');
       await root.InsightMigrationBackupV1.verify(selected.file,selected.password,raw);
-      await requireMigrationEnvironment(legacyClientsClosed);
+      await requireMigrationEnvironment(legacyClientsClosed,{requireManualMigration:true});
       await requireFirstMigration();
       root.InsightMigrationBackupV1.assertReady(raw);
       if(marker()!==null)throw new Error('Existing migration requires review');

@@ -6,7 +6,7 @@ test.beforeEach(async({page})=>{
     if(!location.pathname.endsWith('-fixture'))return;
     window.__INSIGHT_SHELL_VERSION__=build;
     window.__INSIGHT_FEATURE_SIGNATURE__=features;
-  },{build:'20261124-indexeddb-preview-build-118',features:'e79a5f02'});
+  },{build:'20261124-indexeddb-preview-build-119',features:'19105870'});
   await page.route(/https:\/\/(www\.jma\.go\.jp|[^/]*api\.open-meteo\.com)\//,route=>route.abort());
 });
 // The fixture server uses HTTP; keep the rest of the shell's CSP in effect.
@@ -3100,8 +3100,8 @@ test('a fully restarted browser keeps the adopted revision and holds the legacy 
       const page=context.pages()[0]??await context.newPage();
       await page.goto(url);
       await page.evaluate(()=>{
-        window.__INSIGHT_SHELL_VERSION__='20261124-indexeddb-preview-build-118';
-        window.__INSIGHT_FEATURE_SIGNATURE__='e79a5f02';
+        window.__INSIGHT_SHELL_VERSION__='20261124-indexeddb-preview-build-119';
+        window.__INSIGHT_FEATURE_SIGNATURE__='19105870';
       });
       await page.addScriptTag({url:new URL('/insight_indexeddb_storage_v1.js',url).href});
       return {context,page};
@@ -3137,7 +3137,7 @@ async function openLegacyPwaFixture(page){
     contentType:'text/html',body:'<!doctype html><title>Fictional online migration page</title>'
   }));
   await page.route('**/tests/e2e/fixtures/Index.html?insight_migration_probe=*',route=>route.fulfill({
-    contentType:'text/html',body:'<!doctype html><meta name="insight-shell-version" content="20261124-indexeddb-preview-build-118">'
+    contentType:'text/html',body:'<!doctype html><meta name="insight-shell-version" content="20261124-indexeddb-preview-build-119">'
   }));
   await page.goto(legacyPwaFixture);
   await page.addScriptTag({url:'/insight_indexeddb_storage_v1.js'});
@@ -3362,7 +3362,7 @@ test('cached legacy shell runs with its origin unavailable and adopted startup s
 });
 
 test('migration enforces the pinned environment before and after backup confirmation',async({page})=>{
-  const fixture='/forced-migration-gate-fixture',build='20261124-indexeddb-preview-build-118';
+  const fixture='/forced-migration-gate-fixture',build='20261124-indexeddb-preview-build-119';
   await page.route('**'+fixture,route=>route.fulfill({
     contentType:'text/html',body:'<!doctype html><title>Fictional forced migration fixture</title>'
   }));
@@ -3753,7 +3753,7 @@ for(const connectionFails of [false,true]){
       window.InsightHourlyCustomers={connectIndexedDBPreview(){}};
       window.shellReadyState=document.readyState;
       window.lateSnapshot=InsightIndexedDBCandidateV1.initializeAdopted();`}));
-    await page.route(/\/insight_indexeddb_(quick_input|sales_input|recovery)_preview_v1\.js\?v=20261124-indexeddb-preview-5$/,route=>route.fulfill({
+    await page.route(/\/insight_indexeddb_(quick_input|sales_input|recovery)_preview_v1\.js\?v=20261124-indexeddb-preview-6$/,route=>route.fulfill({
       contentType:'application/javascript',
       body:new URL(route.request().url()).pathname.endsWith('/insight_indexeddb_sales_input_preview_v1.js')
         ?`window.InsightIndexedDBSalesInputPreviewV1={async connect(){
@@ -3796,7 +3796,7 @@ const httpsTest=test.extend({
   ignoreHTTPSErrors:true,
   httpsInsight:async ({},use)=>require('./helpers/https-insight.cjs')(use)
 });
-httpsTest('Draft Index rehearses migration, editing and recovery over HTTPS',async({page,context,httpsInsight})=>{
+httpsTest('Draft Index rehearses migration, editing and recovery at the release HTTPS URL',async({page,context,httpsInsight})=>{
   test.setTimeout(90000);
   await page.clock.setFixedTime(new Date('2026-11-23T03:00:00Z'));
   await page.route('https://www.jma.go.jp/bosai/**',async route=>{
@@ -3811,11 +3811,21 @@ httpsTest('Draft Index rehearses migration, editing and recovery over HTTPS',asy
     ]}]});
   });
   await routeMigrationPage(page,'http://127.0.0.1:4173/Index.html*');
-  const fixture=httpsInsight+'/Index.html';
+  const release='https://kazutake1.github.io/Insight';
+  const fixture=release+'/Index.html';
+  let manualMigration=false;
+  await context.route(release+'/**',async route=>{
+    const url=new URL(route.request().url());
+    const path=url.pathname.slice('/Insight/'.length)||'Index.html';
+    // Serve the Draft files from the test fixture and never contact GitHub Pages.
+    const response=await route.fetch({url:httpsInsight+'/'+path+url.search,maxRedirects:0});
+    if(path!=='Index.html'||manualMigration)return route.fulfill({response});
+    await route.fulfill({response,body:(await response.text()).replace(' data-indexeddb-migration="manual"','')});
+  });
   await page.goto(fixture);
-  expect(await page.evaluate(()=>({protocol:location.protocol,secure:isSecureContext,
+  expect(await page.evaluate(()=>({origin:location.origin,protocol:location.protocol,secure:isSecureContext,
     csp:document.querySelector('meta[http-equiv="Content-Security-Policy"]').content})))
-    .toMatchObject({protocol:'https:',secure:true,csp:expect.stringContaining('upgrade-insecure-requests')});
+    .toMatchObject({origin:'https://kazutake1.github.io',protocol:'https:',secure:true,csp:expect.stringContaining('upgrade-insecure-requests')});
   await expect(page.getByRole('status')).toHaveText('保存状態を確認できないため、起動と保存を停止しています。');
   await expect(page.locator('#quickGrid')).toHaveCount(0);
   expect(await page.evaluate(()=>localStorage.getItem('insight_v11'))).toBeNull();
@@ -3842,12 +3852,29 @@ httpsTest('Draft Index rehearses migration, editing and recovery over HTTPS',asy
   await page.reload();
   await waitForMigrationChecks(page);
   await expect(page.locator('#quickGrid')).toBeAttached();
-  await page.locator('#navSettings').click();
   const checkbox=page.getByRole('checkbox',{name:'Insightの他のタブとホーム画面から開いたアプリを閉じました'});
   const button=page.getByRole('button',{name:'バックアップを作成して移行'});
   const marker=()=>page.evaluate(()=>localStorage.getItem('insight_indexeddb_adoption_v1'));
+  await page.goto(fixture+'?indexeddb-migration=manual');
+  await waitForMigrationChecks(page);
+  await expect(page.locator('#qi_売上')).toHaveValue('123');
+  await page.locator('#navSettings').click();
+  await expect(button).toHaveCount(0);
+  const migrationEnvironment=await page.evaluate(()=>InsightIndexedDBStorageV1.checkMigrationEnvironment({
+    expectedBuild:window.__INSIGHT_SHELL_VERSION__,expectedFeatures:window.__INSIGHT_FEATURE_SIGNATURE__,
+    legacyClientsClosed:true,requireManualMigration:true
+  }));
+  expect(migrationEnvironment).toEqual({state:'hold',reason:'manual-migration-disabled'});
+  expect(await marker()).toBeNull();
+  expect(await page.evaluate(()=>localStorage.getItem('insight_v11'))).toBe(raw);
+
+  manualMigration=true;
+  await page.goto(release+'/');
+  await waitForMigrationChecks(page);
+  await page.locator('#navSettings').click();
   await expect(button).toBeDisabled();
   expect(await marker()).toBeNull();
+  expect(await page.evaluate(()=>InsightIndexedDBStorageV1.diagnoseStartup())).toEqual({state:'legacy'});
 
   const password='Fit123';
   async function start(){
@@ -3940,7 +3967,7 @@ httpsTest('Draft Index rehearses migration, editing and recovery over HTTPS',asy
   expect(readback.revision).toBe(3);
   expect(readback.snapshot.stores[seed.id].years).toEqual(JSON.parse(raw).stores[seed.id].years);
   expect(readback.snapshot.stores['fixture-peer'].data[seed.fy][seed.month][seed.day-1].売上).toBe(999);
-  const peer=await openStoreSwitchPeer(context,httpsInsight);
+  const peer=await openStoreSwitchPeer(context,release);
   try{
     let record=await readStoreSwitchRecord(peer);
     expect(JSON.parse(record.previous.raw)).toEqual(beforeRestore.snapshot);
@@ -4040,6 +4067,7 @@ httpsTest('Draft Index rehearses migration, editing and recovery over HTTPS',asy
     located.stores[id].weatherLocation=fictionalWeatherLocation;
     await page.waitForFunction(()=>!InsightWeatherLocation.hasPendingSearch());
     await checkManagementSnapshot(located);
+    manualMigration=false;
     await page.reload();
     const startup=await page.waitForFunction(()=>document.querySelector('[data-indexeddb-startup-stage]')?.dataset.indexeddbStartupStage||
       (window.InsightIndexedDBCandidateV1?.isAdopted()&&!document.body.inert&&
@@ -4075,12 +4103,18 @@ httpsTest('Draft Index rehearses migration, editing and recovery over HTTPS',asy
     await checkManagementSnapshot(removed);
     await expect(page.locator('#pageSaleResults')).toBeVisible();
 
-    await peer.evaluate(()=>localStorage.setItem('insight_indexeddb_adoption_v1','{'));
-    await page.reload();
-    await expect(page.getByRole('status')).toHaveText('保存状態を確認できないため、起動と保存を停止しています。');
-    await expect(page.locator('#quickGrid')).toHaveCount(0);
-    expect(await readStoreSwitchRecord(peer)).toEqual(record);
-    expect(await peer.evaluate(()=>localStorage.getItem('insight_v11'))).toBe(raw);
+    for(const brokenMarker of [null,'{']){
+      await peer.evaluate(value=>{
+        const key='insight_indexeddb_adoption_v1';
+        if(value===null)localStorage.removeItem(key);
+        else localStorage.setItem(key,value);
+      },brokenMarker);
+      await page.reload();
+      await expect(page.getByRole('status')).toHaveText('保存状態を確認できないため、起動と保存を停止しています。');
+      await expect(page.locator('#quickGrid')).toHaveCount(0);
+      expect(await readStoreSwitchRecord(peer)).toEqual(record);
+      expect(await peer.evaluate(()=>localStorage.getItem('insight_v11'))).toBe(raw);
+    }
   }finally{await peer.close();}
 });
 

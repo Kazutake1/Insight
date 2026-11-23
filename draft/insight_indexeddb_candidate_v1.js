@@ -2,7 +2,7 @@
 (function(root){
   'use strict';
   const document=root.document;
-  const version='20261124-indexeddb-preview-5';
+  const version='20261124-indexeddb-preview-6';
   let adopted=false;
   let verifiedSnapshot=null;
 
@@ -75,11 +75,13 @@
   }
 
   root.InsightIndexedDBCandidateV1=Object.freeze({
-    start(container,loadShell){
+    start(container,loadShell,{allowMigration=false}={}){
       return root.InsightIndexedDBMigrationPreviewV1.start(container,async ()=>{
         await loadShell();
-        await waitForShell();
-        mountMigration();
+        if(allowMigration){
+          await waitForShell();
+          mountMigration();
+        }
       },async result=>{
         adopted=true;
         verifiedSnapshot=result.snapshot;
