@@ -95,7 +95,7 @@
     document.getElementById('todayBadge').textContent='今日';
     window.renderQuickNav();
     window.renderQuickPage();
-    if(todaySelected()){
+    if(!window.InsightIndexedDBCandidateV1?.isAdopted()&&todaySelected()){
       var t=todayFY(),row=store.data[t.fy]&&store.data[t.fy][t.month]&&store.data[t.fy][t.month][t.day-1];
       if(!row||!row.weather)fetchWeather();
     }

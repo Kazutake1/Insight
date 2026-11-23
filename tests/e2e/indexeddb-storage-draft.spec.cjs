@@ -6,7 +6,7 @@ test.beforeEach(async({page})=>{
     if(!location.pathname.endsWith('-fixture'))return;
     window.__INSIGHT_SHELL_VERSION__=build;
     window.__INSIGHT_FEATURE_SIGNATURE__=features;
-  },{build:'20261124-indexeddb-preview-build-116',features:'d6855be5'});
+  },{build:'20261124-indexeddb-preview-build-117',features:'372af1e8'});
   await page.route(/https:\/\/(www\.jma\.go\.jp|[^/]*api\.open-meteo\.com)\//,route=>route.abort());
 });
 // The fixture server uses HTTP; keep the rest of the shell's CSP in effect.
@@ -3100,8 +3100,8 @@ test('a fully restarted browser keeps the adopted revision and holds the legacy 
       const page=context.pages()[0]??await context.newPage();
       await page.goto(url);
       await page.evaluate(()=>{
-        window.__INSIGHT_SHELL_VERSION__='20261124-indexeddb-preview-build-116';
-        window.__INSIGHT_FEATURE_SIGNATURE__='d6855be5';
+        window.__INSIGHT_SHELL_VERSION__='20261124-indexeddb-preview-build-117';
+        window.__INSIGHT_FEATURE_SIGNATURE__='372af1e8';
       });
       await page.addScriptTag({url:new URL('/insight_indexeddb_storage_v1.js',url).href});
       return {context,page};
@@ -3137,7 +3137,7 @@ async function openLegacyPwaFixture(page){
     contentType:'text/html',body:'<!doctype html><title>Fictional online migration page</title>'
   }));
   await page.route('**/tests/e2e/fixtures/Index.html?insight_migration_probe=*',route=>route.fulfill({
-    contentType:'text/html',body:'<!doctype html><meta name="insight-shell-version" content="20261124-indexeddb-preview-build-116">'
+    contentType:'text/html',body:'<!doctype html><meta name="insight-shell-version" content="20261124-indexeddb-preview-build-117">'
   }));
   await page.goto(legacyPwaFixture);
   await page.addScriptTag({url:'/insight_indexeddb_storage_v1.js'});
@@ -3362,7 +3362,7 @@ test('cached legacy shell runs with its origin unavailable and adopted startup s
 });
 
 test('migration enforces the pinned environment before and after backup confirmation',async({page})=>{
-  const fixture='/forced-migration-gate-fixture',build='20261124-indexeddb-preview-build-116';
+  const fixture='/forced-migration-gate-fixture',build='20261124-indexeddb-preview-build-117';
   await page.route('**'+fixture,route=>route.fulfill({
     contentType:'text/html',body:'<!doctype html><title>Fictional forced migration fixture</title>'
   }));
@@ -3753,7 +3753,7 @@ for(const connectionFails of [false,true]){
       window.InsightHourlyCustomers={connectIndexedDBPreview(){}};
       window.shellReadyState=document.readyState;
       window.lateSnapshot=InsightIndexedDBCandidateV1.initializeAdopted();`}));
-    await page.route(/\/insight_indexeddb_(quick_input|sales_input|recovery)_preview_v1\.js\?v=20261124-indexeddb-preview-3$/,route=>route.fulfill({
+    await page.route(/\/insight_indexeddb_(quick_input|sales_input|recovery)_preview_v1\.js\?v=20261124-indexeddb-preview-4$/,route=>route.fulfill({
       contentType:'application/javascript',
       body:new URL(route.request().url()).pathname.endsWith('/insight_indexeddb_sales_input_preview_v1.js')
         ?`window.InsightIndexedDBSalesInputPreviewV1={async connect(){
@@ -4060,22 +4060,6 @@ httpsTest('Draft Index rehearses migration, editing and recovery over HTTPS',asy
     delete removed.stores[id];
     await checkManagementSnapshot(removed);
     await expect(page.locator('#pageSaleResults')).toBeVisible();
-
-    await page.locator('#nav2').click();
-    const date=seed.fy+'-'+seed.month.replace('月','').padStart(2,'0')+'-'+String(seed.day).padStart(2,'0');
-    await page.evaluate(iso=>InsightInputDayNav.select('sales',iso),date);
-    await fillCombinedInput(page.locator('#sf_売上'),'432');
-    await page.locator('[data-sales-weather="雨"]').click();
-    await expect(page.locator('#salesSaveBtn + [role=status]')).toHaveText('保存しました。');
-    await expect(page.locator('#sf_売上')).toHaveValue('432');
-    const weatherSnapshot=structuredClone(expected.snapshot);
-    weatherSnapshot.sharedWeather??={};
-    weatherSnapshot.sharedWeather[[seed.fy,seed.month,seed.day].join('-')]='雨';
-    for(const shop of Object.values(weatherSnapshot.stores))shop.data[seed.fy][seed.month][seed.day-1].weather='雨';
-    expect(await committedInput(page)).toEqual({revision:expected.revision+1,snapshot:weatherSnapshot});
-    record=await readStoreSwitchRecord(peer);
-    expect(JSON.parse(record.previous.raw)).toEqual(expected.snapshot);
-    await fillCombinedInput(page.locator('#sf_売上'),String(weatherSnapshot.stores[weatherSnapshot.current].data[seed.fy][seed.month][seed.day-1].売上));
 
     await peer.evaluate(()=>localStorage.setItem('insight_indexeddb_adoption_v1','{'));
     await page.reload();

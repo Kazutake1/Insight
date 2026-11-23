@@ -1907,10 +1907,6 @@ function setSalesWeather(ri,wx){
   drafts.sales[ri].weather=wx;
   // 共有天気に保存（全店舗に反映）
   setSharedWeather(editYear.sales,editMonth.sales,ri+1,wx);
-  renderSalesWeatherSelection(ri,wx);
-}
-
-function renderSalesWeatherSelection(ri,wx){
   // ボタンのハイライト更新
   WX_KEYS.forEach(w=>{
     const btn=document.getElementById(`swx_${ri}_${w}`);
