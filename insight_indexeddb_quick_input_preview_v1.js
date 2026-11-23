@@ -69,7 +69,7 @@
       }
     }
     function hasUnsavedInput(){
-      if(state.busy||state.held||state.pending||state.hourly?.hasUnsavedInput())return true;
+      if(state.busy||state.held||state.pending||state.hourly?.hasUnsavedInput()||state.eventDialogOpen?.())return true;
       if(sharedState&&currentNav!==0)return false;
       if(!baselineDraft)return true;
       // The date input may already contain a new choice while its change event is being handled.
@@ -91,7 +91,7 @@
         shop.data?.[info.fy]?.[info.month]?.[info.day-1];
     }
     function allowDateChange(date){
-      if(state.busy||state.held||state.pending||state.hourly?.dialog()?.open)return false;
+      if(state.busy||state.held||state.pending||state.hourly?.dialog()?.open||state.eventDialogOpen?.())return false;
       if(supports(date))return true;
       status.textContent='試験用の保存は登録済み年度の当日・過去日に限ります。';
       return false;
@@ -141,7 +141,7 @@
     }
 
     root.InsightHooks.on('quick:save:before','indexeddb-quick-input-preview',ctx=>{
-      if(currentNav!==0||state.busy||state.held||state.pending||state.hourly?.dialog()?.open)return false;
+      if(currentNav!==0||state.busy||state.held||state.pending||state.hourly?.dialog()?.open||state.eventDialogOpen?.())return false;
       finishFeedback();
       const target=dateContext.getSelectedInfo();
       if(!supports(target.date)){
@@ -167,7 +167,7 @@
     },-1000);
 
     async function clearTodayData(){
-      if(state.busy||state.held||state.pending||state.hourly?.dialog()?.open||currentNav!==0)return false;
+      if(state.busy||state.held||state.pending||state.hourly?.dialog()?.open||state.eventDialogOpen?.()||currentNav!==0)return false;
       const {date,fy,month,day,iso}=dateContext.getSelectedInfo();
       if(!supports(date))return false;
       if(!matchesBaseline()||!matchesDate(iso)){

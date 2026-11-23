@@ -2611,7 +2611,7 @@ function parseInsightCSV(text,strict=false){
     if(!value)return 0;
     const shape=decimal?/^[+-]?(?:\d+(?:\.\d*)?|\.\d+)$/:/^[+-]?\d+$/;
     const numeric=Number(value);
-    if(!shape.test(value)||!(decimal?Number.isFinite(numeric):Number.isSafeInteger(numeric)))
+    if(!shape.test(value)||numeric<0||!(decimal?Number.isFinite(numeric):Number.isSafeInteger(numeric)))
       throw new Error('取り込めない数値があります');
     return numeric;
   }

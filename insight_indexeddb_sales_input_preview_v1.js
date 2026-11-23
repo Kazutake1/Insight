@@ -338,12 +338,18 @@
     const screenQuestion='保存せずに画面を移動しますか？';
     const isInputRoute=route=>route===0||route==='salesCounts'||Object.values(screens).some(screen=>screen.route===route);
     const yearDialog=()=>management&&doc.querySelector('#insightYearDeleteOverlay:not([hidden])');
+    const eventDialogs=()=>management?Array.from(doc.querySelectorAll('dialog.ie-dialog[open]')):[];
     const yearControl='#addYearBtn,#ayInput,#ayAddBtn,#insightDeleteYearButton';
     const storeControl='#storeSel,#storeMenuBtn';
     const storeActionControl='#storeMenu [data-indexeddb-store-action]';
     root.addEventListener('click',event=>{
       const item=event.target.closest?.(sidebarSelector);
       if(quick){
+        const eventDialog=eventDialogs().at(-1);
+        if(management&&!blocked()&&!yearDialog()&&!eventDialog&&!hourly?.dialog()?.open&&
+          !root.InsightSalesCount.getCategoryDialog()?.open&&
+          (event.target.closest?.('#insightThemeToggle,#darkModeBtn')||
+           event.target.closest?.('label')?.control?.id==='insightThemeToggle'))return;
         if(item){
           event.preventDefault();
           event.stopImmediatePropagation();
@@ -357,6 +363,12 @@
           return;
         }
         const yearOverlay=yearDialog();
+        if(eventDialog){
+          if(!blocked()&&eventDialog.contains(event.target))return;
+          event.preventDefault();
+          event.stopImmediatePropagation();
+          return;
+        }
         if(management&&(yearOverlay||currentNav==='settings')){
           if(!blocked()&&(yearOverlay?yearOverlay.contains(event.target):
             event.target.closest?.(yearControl+','+storeControl+','+storeActionControl+',#csvImportBtn,#csvImportFile')))return;
@@ -386,7 +398,7 @@
 
     const gotoNav=root.gotoNav;
     root.gotoNav=function(destination){
-      if(followInputScreens&&(blocked()||yearDialog()))return false;
+      if(followInputScreens&&(blocked()||yearDialog()||eventDialogs().length))return false;
       if(quick){
         if(hourly?.dialog()?.open||root.InsightSalesCount.getCategoryDialog()?.open||
            (!isInputRoute(destination)&&!(management&&destination==='settings'))||
@@ -446,7 +458,7 @@
       async function switchStore(id){
         // The browser changes the select value before dispatching the change event.
         selector.value=state.storeId;
-        if(blocked()||yearDialog()||id===state.storeId||!Object.hasOwn(state.committed.snapshot.stores,id))return false;
+        if(blocked()||yearDialog()||eventDialogs().length||id===state.storeId||!Object.hasOwn(state.committed.snapshot.stores,id))return false;
         if(currentNav!==screen.route){
           storeStatus.textContent='試験用の店舗切替は月次入力画面で行ってください。';
           return false;
@@ -519,7 +531,7 @@
       };
 
       function canOpenStoreMenu(){
-        return !blocked()&&!yearDialog()&&(currentNav===0||currentNav==='settings'||currentNav===screen.route)&&
+        return !blocked()&&!yearDialog()&&!eventDialogs().length&&(currentNav===0||currentNav==='settings'||currentNav===screen.route)&&
           !hourly?.dialog()?.open;
       }
 
@@ -629,6 +641,56 @@
       }
 
       if(management){
+        state.eventDialogOpen=()=>eventDialogs().length>0;
+        const eventStatus=doc.createElement('p');
+        eventStatus.id='insightEventSaveStatus';
+        eventStatus.setAttribute('role','status');
+        doc.getElementById('opsDailyWrap').after(eventStatus);
+        root.InsightEvents.connectIndexedDBPreview({
+          async save(edit,render,approve){
+            if(blocked()||currentNav!==0||hourly?.dialog()?.open)return false;
+            const dialogs=eventDialogs();
+            const dialog=dialogs.at(-1);
+            const message=dialog?doc.createElement('p'):eventStatus;
+            if(dialog){
+              message.className='ie-preview-save-status';
+              message.setAttribute('role','status');
+              dialog.querySelector('.ie-preview-save-status')?.remove();
+              dialog.append(message);
+            }
+            const fields=()=>JSON.stringify(dialogs.map(node=>Array.from(
+              node.querySelectorAll('input,textarea,select'),field=>[field.value,field.checked]
+            )));
+            const before=fields();
+            const stillValid=()=>{
+              const open=eventDialogs();
+              return open.length===dialogs.length&&open.every((node,index)=>node===dialogs[index])&&fields()===before;
+            };
+            const inert=dialog?.inert;
+            const stopCancel=event=>event.preventDefault();
+            if(dialog){
+              dialog.inert=true;
+              dialog.addEventListener('cancel',stopCancel);
+            }
+            try{
+              return await runManagement(managementScope(),(candidate,unchanged)=>{
+                if(approve&&!approve())return false;
+                if(!unchanged())throw new Error('Event target changed during confirmation');
+                try{edit(candidate);}
+                catch(error){
+                  message.textContent='イベントを保存できませんでした。'+error.message;
+                  return false;
+                }
+                return true;
+              },render,message,stillValid);
+            }finally{
+              if(dialog){
+                dialog.inert=inert;
+                dialog.removeEventListener('cancel',stopCancel);
+              }
+            }
+          }
+        });
         const csvField=doc.getElementById('csvImportFile');
         const csvStatus=doc.createElement('p');
         csvStatus.id='insightCSVImportStatus';
@@ -714,7 +776,7 @@
               },deleteStatus,stillValid);
           },
           async promoteForPeriod(year,route,label,finish){
-            if(blocked()||yearDialog()||currentNav!==route||!isInputRoute(route)||
+            if(blocked()||yearDialog()||eventDialogs().length||currentNav!==route||!isInputRoute(route)||
                hourly?.dialog()?.open||root.InsightSalesCount.getCategoryDialog()?.open)return false;
             year=root.InsightYearManager.validYear(year);
             if(!year||root.InsightYearManager.isCurrentRegistered(year))return false;
@@ -762,7 +824,7 @@
     }
     if(quick){
       hourly=root.InsightHourlyCustomers.connectIndexedDBPreview({
-        canOpen:()=>!blocked()&&currentNav===0&&
+        canOpen:()=>!blocked()&&!eventDialogs().length&&currentNav===0&&
           root.InsightYearManager.isCurrentRegistered(root.InsightDateContext.getSelectedInfo().fy)&&
           !root.InsightDateContext.isFuture(),
         canClose:()=>!blocked(),

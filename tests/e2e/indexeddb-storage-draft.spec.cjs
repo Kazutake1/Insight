@@ -1492,7 +1492,7 @@ test('CSV preview confirms the store, years and duplicates before a single commi
   await page.locator('#navSettings').click();
   const oldYear=String(Number(seed.year)-2);
   const file=csvFixture('日付,売上,客数,買上点数,FFおでん,FFフライヤー\n'+
-    seed.iso+',170,22,3.25,100,200\n'+seed.iso+',180,0,,,\n'+
+    seed.iso+',170,22,+3.25,100,200\n'+seed.iso+',+180,0,,,\n'+
     oldYear+'-01-02,90,0,,,\n'+oldYear+'-02-30,999,0,,,');
   await page.evaluate(()=>{window.csvPrompts=[];window.allowCsv=false;window.confirm=message=>{
     csvPrompts.push(message);
@@ -1532,13 +1532,29 @@ test('CSV preview confirms the store, years and duplicates before a single commi
 test('CSV preview rejects malformed numbers without changing the stored revision',async({page})=>{
   const seed=await openQuickInputPreview(page,{followMonthlyInputs:true,manageStoresAndYears:true});
   await page.locator('#navSettings').click();
-  await page.locator('#csvImportFile').setInputFiles(csvFixture('日付,売上\n'+seed.iso+',123abc'));
-  await expect(page.locator('#insightCSVImportStatus')).toHaveText(/取り込めない数値/);
-  expect(await committedInput(page)).toEqual({revision:0,snapshot:JSON.parse(seed.raw)});
+  await page.evaluate(()=>{window.csvConfirmed=false;window.confirm=()=>{csvConfirmed=true;return true;};});
+  const file=page.locator('#csvImportFile');
+  for(const [fields,values,error] of [
+    ['売上','123abc',/取り込めない数値/],
+    ['売上,客数','-10,22',/取り込めない数値/],
+    ['客数,買上点数','22,-3.2',/取り込めない数値/],
+    ['売上,廃棄金額','22,-100',/取り込めない数値/],
+    ['FFおでん,FFフライヤー','-100,200',/取り込めない数値/],
+    ['売上','9007199254740992',/取り込めない数値/],
+    ['FFおでん,FFフライヤー','9007199254740991,1',/内訳が範囲/],
+    ['FF,米飯','9007199254740991,1',/廃棄金額が範囲/]
+  ]){
+    await file.setInputFiles(csvFixture('日付,'+fields+'\n'+seed.iso+','+values));
+    await expect(page.locator('#insightCSVImportStatus')).toHaveText(error);
+    await expect(file).toHaveValue('');
+    expect(await committedInput(page)).toEqual({revision:0,snapshot:JSON.parse(seed.raw)});
+  }
+  expect(await page.evaluate(()=>({confirmed:csvConfirmed,raw:localStorage.getItem('insight_v11')})))
+    .toEqual({confirmed:false,raw:seed.raw});
   expect(await page.evaluate(()=>combinedPreview.getStatus().state)).toBe('IDLE_OBSERVED');
 });
 
-for(const fault of ['changed store while reading','conflict','quota','readback failure']){
+for(const fault of ['changed store while reading','conflict','quota','readback failure','lost acknowledgement','tab close']){
   test('CSV preview protects the original snapshot on '+fault,async({page,context})=>{
     const seed=await openQuickInputPreview(page,{followMonthlyInputs:true,manageStoresAndYears:true});
     await page.locator('#navSettings').click();
@@ -1569,7 +1585,8 @@ for(const fault of ['changed store while reading','conflict','quota','readback f
         },seed.peer);
         expected.stores[seed.peer].name='別タブで保存';
       }
-      if(fault==='readback failure')await interruptCountReadback(page,fault);
+      const interrupted=['readback failure','lost acknowledgement','tab close'].includes(fault);
+      if(interrupted)await interruptCountReadback(page,fault);
       await page.locator('#csvImportFile').setInputFiles(csvFixture('日付,売上\n'+seed.iso+',180'));
       if(fault==='changed store while reading'){
         await page.waitForFunction(()=>typeof window.resumeCsvRead==='function');
@@ -1578,12 +1595,27 @@ for(const fault of ['changed store while reading','conflict','quota','readback f
         }))).toEqual({state:'ACTIVE',nav:false,switched:false});
         await page.evaluate(id=>{allStores.current=id;resumeCsvRead();},seed.peer);
       }
-      await expect(page.locator('#insightCSVImportStatus')).toContainText('追加の保存を停止しました');
-      expect(await page.evaluate(()=>combinedPreview.getStatus().state)).toBe('HELD');
-      if(fault==='changed store while reading')expect(await page.evaluate(()=>csvConfirmations)).toBe(0);
-      if(fault==='readback failure')expected.stores[seed.active].data[seed.year][seed.month][seed.day-1].売上=180;
+      if(fault==='tab close'){
+        await page.waitForFunction(()=>window.countReadbackPaused===true);
+        expect(await page.evaluate(()=>combinedPreview.getStatus().state)).toBe('ACTIVE');
+        await page.close();
+      }else{
+        await expect(page.locator('#insightCSVImportStatus')).toContainText('追加の保存を停止しました');
+        expect(await page.evaluate(()=>combinedPreview.getStatus().state)).toBe('HELD');
+        if(fault==='changed store while reading')expect(await page.evaluate(()=>csvConfirmations)).toBe(0);
+      }
+      if(interrupted){
+        await expect.poll(()=>observer.evaluate(async()=>{
+          try{return await InsightIndexedDBStorageV1.diagnose({verifyInterrupted:true});}
+          catch(error){
+            if(error.message==='Another Insight operation is in progress')return null;
+            throw error;
+          }
+        })).toMatchObject({state:'hold',observedRevision:1,recovery:'save-verified'});
+        expected.stores[seed.active].data[seed.year][seed.month][seed.day-1].売上=180;
+      }
       const record=await readStoreSwitchRecord(observer);
-      const wrote=fault==='conflict'||fault==='readback failure';
+      const wrote=fault==='conflict'||interrupted;
       expect(record.revision).toBe(wrote?1:0);
       expect(JSON.parse(record.raw)).toEqual(expected);
       if(wrote)expect(record.previous.raw).toBe(seed.raw);
@@ -1591,6 +1623,121 @@ for(const fault of ['changed store while reading','conflict','quota','readback f
     }finally{await observer.close();}
   });
 }
+
+test('ordinary CSV keeps its existing signed-number import behavior',async({page})=>{
+  await routeMigrationPage(page);
+  await page.goto('/Index.html');
+  await waitForMigrationChecks(page);
+  const seed=await page.evaluate(()=>{
+    const info=InsightDateContext.getSelectedInfo();
+    const row=store.data[info.fy][info.month][info.day-1];
+    row.売上=40;
+    window.confirm=()=>true;
+    return {...info,storeId:allStores.current};
+  });
+  await page.locator('#navSettings').click();
+  await page.locator('#csvImportFile').setInputFiles(csvFixture('日付,売上,客数\n'+seed.iso+',-10,+22'));
+  await expect.poll(()=>page.evaluate(seed=>{
+    const row=JSON.parse(localStorage.getItem('insight_v11')||'{}').stores?.[seed.storeId]?.data?.[seed.fy]?.[seed.month]?.[seed.day-1];
+    return row?[row.売上,row.客数]:null;
+  },seed)).toEqual([40,22]);
+});
+
+async function openIsolatedEvent(page,type,title){
+  await page.locator('#insightEvents').getByRole('button',{name:'＋イベントを追加'}).click();
+  const dialog=page.locator('.ie-event-add');
+  await dialog.getByLabel('イベント種別').selectOption(type);
+  if(title)await dialog.getByLabel(type==='special'?'催事名':'イベント名',{exact:true}).fill(title);
+  return dialog;
+}
+
+test('event preview saves scoped records and shared presets across years on separate revisions',async({page})=>{
+  const seed=await openQuickInputPreview(page,{followMonthlyInputs:true,manageStoresAndYears:true,seedManagement:true});
+  const expected=JSON.parse(seed.raw);
+  const local=expected.stores[seed.active].events;
+  const editor=await openIsolatedEvent(page,'special','架空の年またぎ催事');
+  const start=seed.year+'-01-01',end=String(Number(seed.year)+1)+'-01-01';
+  await editor.getByLabel('開始日',{exact:true}).fill(start);
+  await editor.getByLabel('終了日',{exact:true}).fill(end);
+  await editor.getByRole('button',{name:'登録する',exact:true}).click();
+  await expect(editor).toHaveCount(0);
+  const first=await committedInput(page);
+  const created=first.snapshot.stores[seed.active].events.at(-1);
+  expect(created).toMatchObject({type:'special',scope:'store',startDate:start,endDate:end,snapshot:{title:'架空の年またぎ催事'}});
+  local.push(created);
+  expect(first).toEqual({revision:1,snapshot:expected});
+
+  await page.evaluate(()=>{window.confirm=()=>true;});
+  await page.locator('#insightEvents').getByRole('button',{name:/架空の年またぎ催事.*を編集/}).click();
+  await editor.getByLabel('催事名',{exact:true}).fill('架空の編集済み催事');
+  await editor.getByRole('button',{name:'変更を保存'}).click();
+  await expect(editor).toHaveCount(0);
+  created.snapshot.title='架空の編集済み催事';
+  expect(await committedInput(page)).toEqual({revision:2,snapshot:expected});
+
+  await openIsolatedEvent(page,'sale');
+  await editor.getByRole('button',{name:'編集',exact:true}).click();
+  const presets=page.locator('dialog.ie-preset-editor');
+  await presets.getByRole('button',{name:'＋よく使うセールを追加'}).click();
+  await presets.getByLabel('値引き額（円）',{exact:true}).first().fill('50');
+  await presets.getByRole('button',{name:'保存する',exact:true}).click();
+  await expect(presets.getByRole('button',{name:'＋よく使うセールを追加'})).toBeVisible();
+  const third=await committedInput(page);
+  const preset=third.snapshot.eventManagement.presets[0];
+  expect(preset.snapshot.sale.params.amount).toBe(50);
+  expected.eventManagement={version:1,presets:[preset],events:[]};
+  expect(third).toEqual({revision:3,snapshot:expected});
+  await presets.getByRole('button',{name:'閉じる',exact:true}).click();
+  await editor.getByRole('button',{name:/50円引き/}).click();
+  await expect(editor).toHaveCount(0);
+  const fourth=await committedInput(page);
+  const sale=fourth.snapshot.eventManagement.events[0];
+  expect(sale).toMatchObject({type:'sale',scope:'global',presetId:preset.id,snapshot:preset.snapshot});
+  expect(await page.evaluate(({peer,iso,id})=>InsightEvents.list(allStores,peer,iso).some(event=>event.id===id),
+    {peer:seed.peer,iso:seed.iso,id:sale.id})).toBe(true);
+  expected.eventManagement.events.push(sale);
+  expect(fourth).toEqual({revision:4,snapshot:expected});
+  await page.locator('#insightEvents').getByRole('button',{name:/架空の編集済み催事.*を削除/}).click();
+  await expect(page.locator('#insightEvents').getByRole('button',{name:/架空の編集済み催事.*を削除/})).toHaveCount(0);
+  local.pop();
+  expect(await committedInput(page)).toEqual({revision:5,snapshot:expected});
+  expect(await page.evaluate(()=>localStorage.getItem('insight_v11'))).toBe(seed.raw);
+});
+
+test('event preview retains the editing dialog and previous version when readback is interrupted',async({page,context})=>{
+  const seed=await openQuickInputPreview(page,{followMonthlyInputs:true,manageStoresAndYears:true});
+  const dialog=await openIsolatedEvent(page,'nearby','架空の近隣イベント');
+  await dialog.getByLabel('イベント場所',{exact:true}).fill('架空の会場');
+  const observer=await openStoreSwitchPeer(context);
+  try{
+    await interruptCountReadback(page,'readback failure');
+    await dialog.getByRole('button',{name:'登録する',exact:true}).click();
+    await expect(dialog.locator('.ie-preview-save-status')).toContainText('追加の保存を停止しました');
+    await expect(dialog.getByLabel('イベント名',{exact:true})).toHaveValue('架空の近隣イベント');
+    expect(await page.evaluate(()=>({state:combinedPreview.getStatus().state,events:store.events})))
+      .toEqual({state:'HELD',events:JSON.parse(seed.raw).stores[seed.active].events});
+    const record=await readStoreSwitchRecord(observer);
+    const expected=JSON.parse(seed.raw);
+    const event=JSON.parse(record.raw).stores[seed.active].events.at(-1);
+    expect(event).toMatchObject({type:'nearby',scope:'store',snapshot:{title:'架空の近隣イベント',location:'架空の会場'}});
+    expected.stores[seed.active].events=[...(expected.stores[seed.active].events??[]),event];
+    expect(record.revision).toBe(1);
+    expect(JSON.parse(record.raw)).toEqual(expected);
+    expect(record.previous.raw).toBe(seed.raw);
+    expect(await observer.evaluate(()=>localStorage.getItem('insight_v11'))).toBe(seed.raw);
+  }finally{await observer.close();}
+});
+
+test('isolated theme remains device-local without creating a business data revision',async({page})=>{
+  const seed=await openQuickInputPreview(page,{followMonthlyInputs:true,manageStoresAndYears:true});
+  await page.locator('#navSettings').click();
+  const checkbox=page.locator('#insightThemeToggle');
+  const checked=await checkbox.isChecked();
+  await checkbox.setChecked(!checked,{force:true});
+  await expect.poll(()=>page.evaluate(()=>localStorage.getItem('insight_dark'))).toBe(checked?'0':'1');
+  expect(await committedInput(page)).toEqual({revision:0,snapshot:JSON.parse(seed.raw)});
+  expect(await page.evaluate(()=>localStorage.getItem('insight_v11'))).toBe(seed.raw);
+});
 
 test('manual adoption uses the real encrypted backup confirmation and preserves the legacy source',async({page})=>{
   await routeMigrationPage(page);
