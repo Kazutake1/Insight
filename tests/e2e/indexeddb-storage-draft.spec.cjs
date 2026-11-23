@@ -3702,6 +3702,56 @@ test('migration pauses while a dialog, CSV import or weather fetch is pending',a
   });
 });
 
+for(const connectionFails of [false,true]){
+  test('isolated candidate handles a late shell '+(connectionFails?'with a connection failure':'after DOMContentLoaded'),async({page})=>{
+    await page.route('**/late-adopted-start-fixture',route=>route.fulfill({contentType:'text/html',body:
+      '<!doctype html><meta charset="utf-8"><div id="loading"></div><main>架空店舗A</main>'}));
+    await page.route('**/late-adopted-shell.js',route=>route.fulfill({contentType:'application/javascript',body:
+      `const section=document.createElement('section');
+      section.id='insightSettingsYearSection';
+      document.body.append(section);
+      window.InsightHourlyCustomers={connectIndexedDBPreview(){}};
+      window.shellReadyState=document.readyState;
+      window.lateSnapshot=InsightIndexedDBCandidateV1.initializeAdopted();`}));
+    await page.route(/\/insight_indexeddb_(quick_input|sales_input|recovery)_preview_v1\.js$/,route=>route.fulfill({
+      contentType:'application/javascript',
+      body:route.request().url().endsWith('/insight_indexeddb_sales_input_preview_v1.js')
+        ?`window.InsightIndexedDBSalesInputPreviewV1={async connect(){
+          window.connectionCount=(window.connectionCount??0)+1;
+          await new Promise(resolve=>{window.finishConnection=resolve;});
+          if(${connectionFails})throw new Error('Simulated connection failure');
+        }};`:''
+    }));
+    await page.goto('/late-adopted-start-fixture');
+    await page.evaluate(async ()=>{
+      window.InsightIndexedDBMigrationPreviewV1={start:(_container,_legacy,adopt)=>adopt({
+        snapshot:{current:'fictional',stores:{fictional:{name:'架空店舗A'}}}
+      })};
+      const script=document.createElement('script');
+      script.src='/draft/insight_indexeddb_candidate_v1.js';
+      script.dataset.loader='/late-adopted-shell.js';
+      await new Promise((resolve,reject)=>{
+        script.onload=resolve;
+        script.onerror=reject;
+        document.body.append(script);
+      });
+    });
+    await page.waitForFunction(()=>typeof window.finishConnection==='function');
+    expect(await page.evaluate(()=>({ready:window.shellReadyState,inert:document.body.inert,
+      snapshot:window.lateSnapshot}))).toEqual({ready:'complete',inert:true,
+      snapshot:{current:'fictional',stores:{fictional:{name:'架空店舗A'}}}});
+    await page.evaluate(()=>window.finishConnection());
+    if(connectionFails){
+      await expect(page.getByRole('status')).toHaveText('確定版で画面を開けないため、起動と保存を停止しています。');
+      await expect(page.locator('main')).toHaveCount(0);
+    }else{
+      await page.waitForFunction(()=>!document.body.inert);
+      await expect(page.locator('main')).toHaveText('架空店舗A');
+    }
+    expect(await page.evaluate(()=>window.connectionCount)).toBe(1);
+  });
+}
+
 test('isolated release rehearsal verifies the downloaded backup, migrates, edits and restores both stores',async({page,context})=>{
   test.setTimeout(60000);
   await page.route('**/Index.html*',async route=>{

@@ -53,7 +53,11 @@
       root.persist=()=>{throw new Error('Legacy storage is unavailable after adoption');};
       const snapshot=verifiedSnapshot;
       verifiedSnapshot=null;
-      document.addEventListener('DOMContentLoaded',connectAdopted,{once:true});
+      if(document.readyState==='loading'){
+        document.addEventListener('DOMContentLoaded',connectAdopted,{once:true});
+      }else{
+        queueMicrotask(connectAdopted);
+      }
       return snapshot;
     }
   });
