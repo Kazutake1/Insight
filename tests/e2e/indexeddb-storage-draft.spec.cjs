@@ -4044,7 +4044,21 @@ httpsTest('Draft Index rehearses migration, editing and recovery over HTTPS',asy
     const startup=await page.waitForFunction(()=>document.querySelector('[data-indexeddb-startup-stage]')?.dataset.indexeddbStartupStage||
       (window.InsightIndexedDBCandidateV1?.isAdopted()&&!document.body.inert&&
         !!document.getElementById('insightIndexedDBBackupDialog')?'ready':false));
-    expect(await startup.jsonValue()).toBe('ready');
+    const startupStage=await startup.jsonValue();
+    const startupSnapshot=await page.evaluate(()=>JSON.parse(InsightStorage.serialize(allStores)));
+    function firstSnapshotDifference(actual,expected,path='snapshot'){
+      if(JSON.stringify(actual)===JSON.stringify(expected))return null;
+      if(!actual||!expected||typeof actual!=='object'||typeof expected!=='object')return path;
+      for(const key of new Set([...Object.keys(actual),...Object.keys(expected)])){
+        const changed=firstSnapshotDifference(actual[key],expected[key],path+'.'+key);
+        if(changed)return changed;
+      }
+      return path+' (key order)';
+    }
+    expect({stage:startupStage,changedPath:firstSnapshotDifference(startupSnapshot,expected.snapshot)})
+      .toEqual({stage:'ready',changedPath:null});
+    expect(await committedInput(page)).toEqual(expected);
+    expect(await readStoreSwitchRecord(peer)).toEqual(record);
 
     await page.locator('#navSaleResults').click();
     await openMenu();
