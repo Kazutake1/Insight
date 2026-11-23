@@ -338,9 +338,12 @@
     const routes=management?{...sidebarRoutes,...readRoutes}:sidebarRoutes;
     const sidebarSelector=Object.keys(routes).map(id=>'#'+id).join(',');
     const reportDialog=()=>management&&doc.querySelector('#insightReportDialog[open]');
+    const healthOverlay=()=>management&&doc.querySelector('#insightDataHealthOverlay:not([hidden])');
     let approved=null;
     const screenQuestion='保存せずに画面を移動しますか？';
     const isInputRoute=route=>route===0||route==='salesCounts'||Object.values(screens).some(screen=>screen.route===route);
+    const isReadRoute=route=>Object.values(readRoutes).includes(route);
+    const isManagedRoute=route=>isInputRoute(route)||route===1||route==='settings'||isReadRoute(route);
     const yearDialog=()=>management&&doc.querySelector('#insightYearDeleteOverlay:not([hidden])');
     const eventDialogs=()=>management?Array.from(doc.querySelectorAll('dialog.ie-dialog[open]')):[];
     const yearControl='#addYearBtn,#ayInput,#ayAddBtn,#insightDeleteYearButton';
@@ -354,6 +357,13 @@
       if(quick){
         if(recoveryDialog?.open){
           if(recoveryDialog.contains(event.target))return;
+          event.preventDefault();
+          event.stopImmediatePropagation();
+          return;
+        }
+        const health=healthOverlay();
+        if(health){
+          if(health.contains(event.target))return;
           event.preventDefault();
           event.stopImmediatePropagation();
           return;
@@ -402,7 +412,7 @@
           const recoveryAction=recoveryDialog&&event.target.closest?.('#backupBtn,#restoreBtn');
           if(!blocked()&&(yearOverlay?yearOverlay.contains(event.target):recoveryAction||
 
-            event.target.closest?.(yearControl+','+storeControl+','+storeActionControl+',#csvImportBtn,#csvImportFile,#insightWeatherBulkStart,#insightWeatherBulkCancel')))return;
+            event.target.closest?.(yearControl+','+storeControl+','+storeActionControl+',#insightDataHealthButton,#csvImportBtn,#csvImportFile,#insightWeatherBulkStart,#insightWeatherBulkCancel')))return;
           event.preventDefault();
           event.stopImmediatePropagation();
           return;
@@ -436,10 +446,10 @@
     let navigationVersion=0;
     const gotoNav=root.gotoNav;
     root.gotoNav=function(destination){
-      if(followInputScreens&&(blocked()||yearDialog()||eventDialogs().length||budgetDialog()||recoveryDialog?.open||reportDialog()))return false;
+      if(followInputScreens&&(blocked()||yearDialog()||eventDialogs().length||budgetDialog()||recoveryDialog?.open||reportDialog()||healthOverlay()))return false;
       if(quick){
         if(hourly?.dialog()?.open||root.InsightSalesCount.getCategoryDialog()?.open||
-           (!isInputRoute(destination)&&!(management&&(destination==='settings'||destination===1||Object.values(readRoutes).includes(destination))))||
+           (!isInputRoute(destination)&&!(management&&isManagedRoute(destination)))||
            destination===currentNav||!allowNavigation(screenQuestion))return false;
         const fromQuick=currentNav===0;
         const period=root.InsightPagePeriodSync;
@@ -502,7 +512,7 @@
         if(blocked()||yearDialog()||eventDialogs().length||budgetDialog()||recoveryDialog?.open||id===state.storeId||!Object.hasOwn(state.committed.snapshot.stores,id))return false;
         const route=currentNav;
         const monthly=route===screen.route;
-        if(reportDialog()||hourly?.dialog()?.open||root.InsightSalesCount.getCategoryDialog()?.open)return false;
+        if(reportDialog()||healthOverlay()||hourly?.dialog()?.open||root.InsightSalesCount.getCategoryDialog()?.open)return false;
         if(!monthly&&!management){
           storeStatus.textContent='試験用の店舗切替は月次入力画面で行ってください。';
           return false;
@@ -543,16 +553,7 @@
           state.committed=result;
           state.storeId=id;
           allStores=JSON.parse(JSON.stringify(result.snapshot));
-          renderStoreSelection(id,undefined,typeof route==='string');
-          if(route==='salesCounts')root.InsightSalesCount.refreshCommittedStore();
-          if(Object.values(readRoutes).includes(route))gotoNav(route);
-          if(route==='settings')root.InsightDataHealth?.refresh();
-          root.InsightPagePeriodSync?.reconcileCurrentStore(period);
-          for(const attachment of attachments.values())attachment.target=null;
-          if(monthly){
-            target={...displayedPeriod(),storeId:state.storeId};
-            attachments.get(type).target=target;
-          }
+          renderCommittedStore(period);
           storeStatus.textContent='店舗を切り替えました。';
           return true;
         }catch(_){
@@ -585,13 +586,28 @@
           };
           return result;
         }
-        storeStatus.textContent='店舗の追加・変更・削除は試験対象外です。';
+        storeStatus.textContent=management?'処理中または保存停止中のため、店舗メニューを操作できません。':'店舗の追加・変更・削除は試験対象外です。';
         return false;
       };
 
+      function renderCommittedStore(period){
+        const route=currentNav;
+        renderStoreSelection(state.storeId,undefined,typeof route==='string');
+        if(route==='salesCounts')root.InsightSalesCount.refreshCommittedStore();
+        if(isReadRoute(route))gotoNav(route);
+        if(route==='settings')root.InsightDataHealth?.refresh();
+        root.InsightPagePeriodSync?.reconcileCurrentStore(period);
+        for(const attachment of attachments.values())attachment.target=null;
+        if(route===screen.route){
+          target={...displayedPeriod(),storeId:state.storeId};
+          attachments.get(type).target=target;
+        }
+      }
+
       function canOpenStoreMenu(){
-        return !blocked()&&!yearDialog()&&!eventDialogs().length&&!budgetDialog()&&!recoveryDialog?.open&&(currentNav===0||currentNav==='settings'||currentNav===screen.route)&&
-          !hourly?.dialog()?.open;
+        return isManagedRoute(currentNav)&&!blocked()&&!yearDialog()&&!eventDialogs().length&&
+          !budgetDialog()&&!recoveryDialog?.open&&!reportDialog()&&!healthOverlay()&&!hourly?.dialog()?.open&&
+          !root.InsightSalesCount.getCategoryDialog()?.open&&!doc.querySelector('#ofEventDialog[open]');
       }
 
       async function changeWeatherLocation(id,menu){
@@ -631,7 +647,7 @@
       async function runManagement(scope,create,render,message=storeStatus,stillValid=()=>true){
         if(blocked())return false;
         const baseline=state.committed;
-        const unchanged=()=>state.committed===baseline&&allStores.current===state.storeId&&
+        const unchanged=()=>!state.held&&state.committed===baseline&&allStores.current===state.storeId&&
           store===allStores.stores[state.storeId]&&managementScope()===scope&&stillValid()&&
           root.InsightStorage.serialize(allStores)===root.InsightStorage.serialize(baseline.snapshot);
         const wasInert=doc.body.inert;
@@ -694,7 +710,7 @@
               return null;
             }
             const year=todayFY().fy;
-            candidate.stores[newId]={name,years:[year],data:{[year]:blankYearData(year)}};
+            candidate.stores[newId]={name,years:[year],data:{[year]:blankYearData(year)},salesCounts:{}};
             candidate.current=newId;
           }
           if(dirty&&!root.confirm('未保存の入力があります。\n保存せずに店舗を切り替えますか？'))return null;
@@ -704,13 +720,7 @@
           if(changed==='rename'){
             renderStoreSel();
           }else{
-            renderStoreSelection(state.storeId,undefined,currentNav==='settings');
-            root.InsightPagePeriodSync?.reconcileCurrentStore(period);
-            for(const attachment of attachments.values())attachment.target=null;
-            if(currentNav===screen.route){
-              target={...displayedPeriod(),storeId:state.storeId};
-              attachments.get(type).target=target;
-            }
+            renderCommittedStore(period);
           }
         },storeStatus,()=>menu.classList.contains('is-open'));
         if(!state.held)menu.classList.remove('is-open');

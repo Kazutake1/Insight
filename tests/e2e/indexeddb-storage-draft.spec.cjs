@@ -6,7 +6,7 @@ test.beforeEach(async({page})=>{
     if(!location.pathname.endsWith('-fixture'))return;
     window.__INSIGHT_SHELL_VERSION__=build;
     window.__INSIGHT_FEATURE_SIGNATURE__=features;
-  },{build:'20261123-indexeddb-preview-build-115',features:'e0e7f1e3'});
+  },{build:'20261124-indexeddb-preview-build-116',features:'d6855be5'});
   await page.route(/https:\/\/(www\.jma\.go\.jp|[^/]*api\.open-meteo\.com)\//,route=>route.abort());
 });
 // The fixture server uses HTTP; keep the rest of the shell's CSP in effect.
@@ -1312,7 +1312,7 @@ test('management preview saves a store rename, add and delete as separate revisi
   expect(id).not.toBe(seed.active);
   const added=await page.evaluate(()=>({year:todayFY().fy,data:blankYearData(todayFY().fy)}));
   expected.current=id;
-  expected.stores[id]={name:'架空の追加店舗',years:[added.year],data:{[added.year]:added.data}};
+  expected.stores[id]={name:'架空の追加店舗',years:[added.year],data:{[added.year]:added.data},salesCounts:{}};
   expect(await committedInput(page)).toEqual({revision:2,snapshot:expected});
   expect(await page.evaluate(()=>allStores)).toEqual(expected);
 
@@ -1331,6 +1331,32 @@ test('management preview saves a store rename, add and delete as separate revisi
   expected.stores[seed.active].data[seed.year][seed.month][seed.day].weather='雨';
   expect(await committedInput(page)).toEqual({revision:3,snapshot:expected});
   expect(await page.evaluate(()=>localStorage.getItem('insight_v11'))).toBe(seed.raw);
+});
+
+test('store deletion from the dashboard stops if another tab saves after the menu opens',async({page,context})=>{
+  const seed=await openQuickInputPreview(page,{followMonthlyInputs:true,manageStoresAndYears:true,seedManagement:true});
+  const peer=await openStoreSwitchPeer(context);
+  try{
+    await page.locator('#nav1').click();
+    await page.locator('#storeMenuBtn').click();
+    const before=await readStoreSwitchRecord(peer);
+    const other=await peer.evaluate(async ()=>{
+      const api=InsightIndexedDBStorageV1;
+      const {revision,snapshot}=await api.read();
+      snapshot.stores[snapshot.current].name='別タブで保存した店舗';
+      return api.save(revision,snapshot);
+    });
+    page.once('dialog',dialog=>dialog.accept());
+    await page.locator('#storeMenu').getByRole('button',{name:/この店舗を削除/}).click();
+    await expect(page.locator('#insightIndexedDBStoreStatus')).toContainText('追加の保存を停止しました');
+    expect(await page.evaluate(()=>combinedPreview.getStatus().state)).toBe('HELD');
+    expect(await page.evaluate(()=>allStores.current)).toBe(seed.active);
+    const record=await readStoreSwitchRecord(peer);
+    expect(record.revision).toBe(other.revision);
+    expect(JSON.parse(record.raw)).toEqual(other.snapshot);
+    expect(record.previous.raw).toBe(before.raw);
+    expect(await peer.evaluate(()=>localStorage.getItem('insight_v11'))).toBe(seed.raw);
+  }finally{await peer.close();}
 });
 
 test('management preview adds and deletes a year through the existing settings controls',async({page})=>{
@@ -3074,8 +3100,8 @@ test('a fully restarted browser keeps the adopted revision and holds the legacy 
       const page=context.pages()[0]??await context.newPage();
       await page.goto(url);
       await page.evaluate(()=>{
-        window.__INSIGHT_SHELL_VERSION__='20261123-indexeddb-preview-build-115';
-        window.__INSIGHT_FEATURE_SIGNATURE__='e0e7f1e3';
+        window.__INSIGHT_SHELL_VERSION__='20261124-indexeddb-preview-build-116';
+        window.__INSIGHT_FEATURE_SIGNATURE__='d6855be5';
       });
       await page.addScriptTag({url:new URL('/insight_indexeddb_storage_v1.js',url).href});
       return {context,page};
@@ -3111,7 +3137,7 @@ async function openLegacyPwaFixture(page){
     contentType:'text/html',body:'<!doctype html><title>Fictional online migration page</title>'
   }));
   await page.route('**/tests/e2e/fixtures/Index.html?insight_migration_probe=*',route=>route.fulfill({
-    contentType:'text/html',body:'<!doctype html><meta name="insight-shell-version" content="20261123-indexeddb-preview-build-115">'
+    contentType:'text/html',body:'<!doctype html><meta name="insight-shell-version" content="20261124-indexeddb-preview-build-116">'
   }));
   await page.goto(legacyPwaFixture);
   await page.addScriptTag({url:'/insight_indexeddb_storage_v1.js'});
@@ -3336,7 +3362,7 @@ test('cached legacy shell runs with its origin unavailable and adopted startup s
 });
 
 test('migration enforces the pinned environment before and after backup confirmation',async({page})=>{
-  const fixture='/forced-migration-gate-fixture',build='20261123-indexeddb-preview-build-115';
+  const fixture='/forced-migration-gate-fixture',build='20261124-indexeddb-preview-build-116';
   await page.route('**'+fixture,route=>route.fulfill({
     contentType:'text/html',body:'<!doctype html><title>Fictional forced migration fixture</title>'
   }));
@@ -3727,7 +3753,7 @@ for(const connectionFails of [false,true]){
       window.InsightHourlyCustomers={connectIndexedDBPreview(){}};
       window.shellReadyState=document.readyState;
       window.lateSnapshot=InsightIndexedDBCandidateV1.initializeAdopted();`}));
-    await page.route(/\/insight_indexeddb_(quick_input|sales_input|recovery)_preview_v1\.js\?v=20261123-indexeddb-preview-2$/,route=>route.fulfill({
+    await page.route(/\/insight_indexeddb_(quick_input|sales_input|recovery)_preview_v1\.js\?v=20261124-indexeddb-preview-3$/,route=>route.fulfill({
       contentType:'application/javascript',
       body:new URL(route.request().url()).pathname.endsWith('/insight_indexeddb_sales_input_preview_v1.js')
         ?`window.InsightIndexedDBSalesInputPreviewV1={async connect(){
@@ -3771,7 +3797,7 @@ const httpsTest=test.extend({
   httpsInsight:async ({},use)=>require('./helpers/https-insight.cjs')(use)
 });
 httpsTest('Draft Index rehearses migration, editing and recovery over HTTPS',async({page,context,httpsInsight})=>{
-  test.setTimeout(60000);
+  test.setTimeout(90000);
   await page.clock.setFixedTime(new Date('2026-11-23T03:00:00Z'));
   await page.route('https://www.jma.go.jp/bosai/**',async route=>{
     const url=route.request().url();
@@ -3956,6 +3982,10 @@ httpsTest('Draft Index rehearses migration, editing and recovery over HTTPS',asy
       expect(JSON.parse(record.previous.raw)).toEqual(previous);
       expect(await peer.evaluate(()=>localStorage.getItem('insight_v11'))).toBe(raw);
     }
+    await page.locator('#insightDataHealthButton').click();
+    await expect(page.locator('#insightDataHealthDialog')).toBeVisible();
+    await page.locator('#insightDataHealthClose').click();
+    await expect(page.locator('#insightDataHealthDialog')).toBeHidden();
     await page.locator('#insightReportOpen').click();
     await expect(page.locator('#insightReportDialog')).toBeVisible();
     await expect(page.locator('#irp-store')).toHaveValue(expected.snapshot.current);
@@ -3969,6 +3999,64 @@ httpsTest('Draft Index rehearses migration, editing and recovery over HTTPS',asy
     await expect(page.locator('body')).toHaveClass(/ai-analysis-open/);
     await page.locator('#aiAnalysisToggle').click();
     await expect(page.locator('body')).not.toHaveClass(/ai-analysis-open/);
+
+    const menu=page.locator('#storeMenu');
+    const openMenu=()=>page.locator('#storeMenuBtn').click();
+    const menuStatus=page.locator('#insightIndexedDBStoreStatus');
+    async function checkManagementSnapshot(snapshot){
+      const previous=expected;
+      expected={revision:previous.revision+1,snapshot};
+      await expect(menuStatus).toHaveText('保存しました。');
+      await expect(menu).not.toHaveClass(/is-open/);
+      expect(await committedInput(page)).toEqual(expected);
+      record=await readStoreSwitchRecord(peer);
+      expect(JSON.parse(record.raw)).toEqual(snapshot);
+      expect(JSON.parse(record.previous.raw)).toEqual(previous.snapshot);
+      expect(await peer.evaluate(()=>localStorage.getItem('insight_v11'))).toBe(raw);
+    }
+
+    await openMenu();
+    page.once('dialog',dialog=>dialog.accept('架空の追加店舗'));
+    await menu.getByRole('button',{name:/新しい店舗を追加/}).click();
+    await expect(page.locator('#storeSel option:checked')).toHaveText('架空の追加店舗');
+    const id=await page.locator('#storeSel').inputValue();
+    const yearData=await page.evaluate(()=>({year:todayFY().fy,data:blankYearData(todayFY().fy)}));
+    const added={...expected.snapshot,current:id,stores:{...expected.snapshot.stores,
+      [id]:{name:'架空の追加店舗',years:[yearData.year],data:{[yearData.year]:yearData.data},salesCounts:{}}}};
+    await checkManagementSnapshot(added);
+
+    await page.locator('#navEventResults').click();
+    await openMenu();
+    page.once('dialog',dialog=>dialog.accept('架空の名称変更'));
+    await menu.getByRole('button',{name:/店舗名を変更/}).click();
+    const renamed=structuredClone(expected.snapshot);
+    renamed.stores[id].name='架空の名称変更';
+    await checkManagementSnapshot(renamed);
+    await mockPreviewWeather(page);
+    await openPreviewLocation(page);
+    await page.waitForFunction(()=>typeof window.finishPreviewLocation==='function');
+    await page.evaluate(()=>finishPreviewLocation());
+    const located=structuredClone(expected.snapshot);
+    located.stores[id].weatherLocation=fictionalWeatherLocation;
+    await checkManagementSnapshot(located);
+    await page.reload();
+    await page.waitForFunction(()=>window.InsightIndexedDBCandidateV1?.isAdopted()&&!document.body.inert&&
+      !!document.getElementById('insightIndexedDBBackupDialog'));
+
+    await page.locator('#navSaleResults').click();
+    await openMenu();
+    page.once('dialog',dialog=>dialog.dismiss());
+    await menu.getByRole('button',{name:/この店舗を削除/}).click();
+    await expect(menu).not.toHaveClass(/is-open/);
+    expect(await readStoreSwitchRecord(peer)).toEqual(record);
+    await openMenu();
+    page.once('dialog',dialog=>dialog.accept());
+    await menu.getByRole('button',{name:/この店舗を削除/}).click();
+    const removed=structuredClone(expected.snapshot);
+    removed.current=Object.keys(removed.stores).find(key=>key!==id);
+    delete removed.stores[id];
+    await checkManagementSnapshot(removed);
+    await expect(page.locator('#pageSaleResults')).toBeVisible();
 
     await peer.evaluate(()=>localStorage.setItem('insight_indexeddb_adoption_v1','{'));
     await page.reload();
