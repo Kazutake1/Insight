@@ -371,7 +371,7 @@
         }
         if(management&&(yearOverlay||currentNav==='settings')){
           if(!blocked()&&(yearOverlay?yearOverlay.contains(event.target):
-            event.target.closest?.(yearControl+','+storeControl+','+storeActionControl+',#csvImportBtn,#csvImportFile')))return;
+            event.target.closest?.(yearControl+','+storeControl+','+storeActionControl+',#csvImportBtn,#csvImportFile,#insightWeatherBulkStart,#insightWeatherBulkCancel')))return;
           event.preventDefault();
           event.stopImmediatePropagation();
           return;
@@ -675,6 +675,27 @@
       }
 
       if(management){
+        root.InsightWeatherBulk.install();
+        const bulkStatus=doc.getElementById('insightWeatherBulkStatus');
+        root.InsightWeatherBulk.connectIndexedDBPreview({
+          read(){
+            if(blocked()||currentNav!=='settings')throw new Error('一括取得の画面を確認できません');
+            return {baseline:state.committed,snapshot:state.committed.snapshot,navigationVersion};
+          },
+          async commit(expected,edit){
+            if(blocked()||currentNav!=='settings'||navigationVersion!==expected.navigationVersion||
+              state.committed!==expected.baseline)
+              throw new Error('取得中に画面・店舗設定・確定版が変更されました');
+            let added;
+            const saved=await runManagement(managementScope(),candidate=>{
+              added=edit(candidate);
+              return added.days>0;
+            },()=>{},bulkStatus);
+            if(!saved&&(!added||added.days))throw new Error('一括取得の保存結果を確認できません');
+            return added;
+          },
+          isHeld:()=>state.held
+        });
         state.eventDialogOpen=()=>eventDialogs().length>0;
         const eventStatus=doc.createElement('p');
         eventStatus.id='insightEventSaveStatus';

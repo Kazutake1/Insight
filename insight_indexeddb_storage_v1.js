@@ -252,40 +252,49 @@
     return Array.from(new Uint8Array(hash),byte=>byte.toString(16).padStart(2,'0')).join('');
   }
 
-  async function save(expectedRevision,snapshot){
-    return exclusive(async ()=>{
-      const markerRaw=root.localStorage.getItem(markerKey);
-      const adopted=activeMarker();
-      await requireHistory(adopted.id);
-      const raw=JSON.stringify(snapshot);
-      parse(raw);
-      const record=await readRecord();
-      checkActiveSource(record,adopted,markerRaw);
-      const baseline=validateRecord(record,adopted.id);
-      // Record both versions before opening the write transaction.
-      const [candidateDigest,baselineDigest]=await Promise.all([digest(raw),digest(baseline.raw)]);
-      const operation={id:root.crypto.randomUUID(),expectedRevision,digest:candidateDigest,
-        baselineDigest,baselineWriteId:baseline.writeId??null};
-      // The legacy source can change while hashing the two snapshots.
-      checkActiveSource(baseline,adopted,markerRaw);
-      // Leave a persistent hold if the browser exits or the outcome is unclear.
-      writeMarker('writing',adopted.id,operation);
-      const next=await transact('readwrite',(record,records)=>{
-        const current=verify(record,baseline);
-        if(current.revision!==expectedRevision||current.revision>=Number.MAX_SAFE_INTEGER||
-           current.writeId!==baseline.writeId)
-          throw new Error('IndexedDB revision conflict');
-        const candidate={...current,raw,revision:current.revision+1,writeId:operation.id,
-          previous:{revision:current.revision,raw:current.raw}};
-        records.put(candidate,recordKey);
-        return candidate;
-      });
-      const committed=await readRecord();
-      await requireHistory(adopted.id);
-      verify(committed,next);
-      writeMarker('active',adopted.id);
-      return {revision:next.revision,snapshot:parse(next.raw)};
+  async function activeEvidence(){
+    const markerRaw=root.localStorage.getItem(markerKey);
+    const adopted=activeMarker();
+    await requireHistory(adopted.id);
+    const record=await readRecord();
+    checkActiveSource(record,adopted,markerRaw);
+    return {markerRaw,adopted,record:validateRecord(record,adopted.id)};
+  }
+
+  async function commitSnapshot({markerRaw,adopted,record:baseline},expectedRevision,snapshot){
+    const raw=JSON.stringify(snapshot);
+    parse(raw);
+    // Record both versions before opening the write transaction.
+    const [candidateDigest,baselineDigest]=await Promise.all([digest(raw),digest(baseline.raw)]);
+    const operation={id:root.crypto.randomUUID(),expectedRevision,digest:candidateDigest,
+      baselineDigest,baselineWriteId:baseline.writeId??null};
+    checkActiveSource(baseline,adopted,markerRaw);
+    // Leave a persistent hold if the browser exits or the outcome is unclear.
+    writeMarker('writing',adopted.id,operation);
+    const writingMarker=root.localStorage.getItem(markerKey);
+    const next=await transact('readwrite',(record,records)=>{
+      const current=verify(record,baseline);
+      if(root.localStorage.getItem(markerKey)!==writingMarker||
+         current.revision!==expectedRevision||current.revision>=Number.MAX_SAFE_INTEGER||
+         current.writeId!==baseline.writeId)
+        throw new Error('IndexedDB revision conflict');
+      const candidate={...current,raw,revision:current.revision+1,writeId:operation.id,
+        previous:{revision:current.revision,raw:current.raw}};
+      records.put(candidate,recordKey);
+      return candidate;
     });
+    const committed=await readRecord();
+    await requireHistory(adopted.id);
+    verify(committed,next);
+    if(root.localStorage.getItem(markerKey)!==writingMarker||
+       JSON.stringify(committed)!==JSON.stringify(next))
+      throw new Error('IndexedDB commit could not be verified');
+    writeMarker('active',adopted.id);
+    return {revision:next.revision,snapshot:parse(next.raw)};
+  }
+
+  async function save(expectedRevision,snapshot){
+    return exclusive(async ()=>commitSnapshot(await activeEvidence(),expectedRevision,snapshot));
   }
 
   // Check whether an interrupted operation produced a complete snapshot.
@@ -408,7 +417,7 @@
     const stores=Object.entries(snapshot.stores).map(([id,store])=>({
       id,name:store.name??id,years:Array.isArray(store.years)?store.years:[]
     }));
-    return {markerRaw,frozenRecord,review:{
+    return {adopted,record,markerRaw,frozenRecord,review:{
       outcome,revision:record.revision,previousRevision:record.previous?.revision??null,stores
     }};
   }
@@ -422,6 +431,38 @@
       if(after.markerRaw!==before.markerRaw||after.frozenRecord!==before.frozenRecord)
         throw new Error('Recovery data changed');
       return {state:'hold',review:'confirmed',revision:after.review.revision};
+    });
+  }
+
+  async function resumeRecovery({file,password,confirm,legacyClientsClosed}){
+    await requireMigrationEnvironment(legacyClientsClosed);
+    const before=await exclusive(recoveryEvidence);
+    const backup=await root.InsightMigrationBackupV1.verify(file,password,before.record.raw);
+    if(await confirm({...before.review,backup})!==true)return {state:'hold',review:'cancelled'};
+    return exclusive(async ()=>{
+      await requireMigrationEnvironment(legacyClientsClosed);
+      const after=await recoveryEvidence();
+      if(after.markerRaw!==before.markerRaw||after.frozenRecord!==before.frozenRecord)
+        throw new Error('Recovery data changed');
+      writeMarker('active',after.adopted.id);
+      return {state:'active',revision:after.review.revision};
+    });
+  }
+
+  async function restoreBackup({file,password,safetyFile,safetyPassword,confirm,legacyClientsClosed}){
+    await requireMigrationEnvironment(legacyClientsClosed);
+    const before=await exclusive(activeEvidence);
+    const backup=root.InsightMigrationBackupV1;
+    const safety=await backup.verify(safetyFile,safetyPassword,before.record.raw);
+    const target=await backup.readRestoreCandidate(file,password);
+    if(await confirm({revision:before.record.revision,safety,target:target.summary})!==true)
+      return {state:'active',review:'cancelled',revision:before.record.revision};
+    return exclusive(async ()=>{
+      await requireMigrationEnvironment(legacyClientsClosed);
+      const after=await activeEvidence();
+      if(after.markerRaw!==before.markerRaw||JSON.stringify(after.record)!==JSON.stringify(before.record))
+        throw new Error('Recovery data changed');
+      return commitSnapshot(after,after.record.revision,target.snapshot);
     });
   }
 
@@ -465,6 +506,6 @@
   }
 
   root.InsightIndexedDBStorageV1=Object.freeze({
-    migrate,read,save,diagnose,diagnoseStartup,checkMigrationEnvironment,reviewRecovery,reviewHistoryOnlyBackup,reviewMissingStorageBackup
+    migrate,read,save,diagnose,diagnoseStartup,checkMigrationEnvironment,reviewRecovery,reviewHistoryOnlyBackup,reviewMissingStorageBackup,restoreBackup,resumeRecovery
   });
 })(globalThis);

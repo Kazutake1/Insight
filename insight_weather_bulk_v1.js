@@ -6,6 +6,7 @@ var START='2023-01-01';
 var DAILY='weather_code,temperature_2m_max,temperature_2m_min';
 var running=false;
 var cancelRequested=false;
+var preview=null;
 
 // STEP4 GATE-3: one independent, non-authorizing observer for the public
 // asynchronous weather backfill run. This does not aggregate sales operations.
@@ -228,44 +229,47 @@ async function fetchSeries(loc,group){
   }
   throw lastError||new Error('過去の天気を取得できませんでした');
 }
-function applyGroup(live,group,records){
-  if(!root.InsightStorage||typeof root.InsightStorage.writeSnapshot!=='function')
-    throw new Error('Insightの安全な保存機能を利用できません');
-  var next=root.InsightStorage.clone(live);
-  var originalStore=live.stores[group.storeId];
-  var dest=next.stores[group.storeId];
-  if(!originalStore||!dest)throw new Error('取得中に店舗構成が変更されました');
+function fillGroup(candidate,group,records){
+  var dest=candidate.stores[group.storeId];
+  if(!dest)throw new Error('取得中に店舗構成が変更されました');
   var edits=[],days=0;
   group.dates.forEach(function(date){
-    var current=monthAndRow(originalStore,date),copy=monthAndRow(dest,date),item=records.get(date);
-    if(!current||!copy||!item)return;
+    var row=monthAndRow(dest,date),item=records.get(date);
+    if(!row||!item)return;
     var values={weather:codeToWeather(item.code),
       tempMaxC:finiteTemperature(item.max),tempMinC:finiteTemperature(item.min)};
     var changed={};
     Object.keys(values).forEach(function(key){
-      if(missing(current[key])&&values[key]!==null){
-        copy[key]=values[key];
+      if(missing(row[key])&&values[key]!==null){
+        row[key]=values[key];
         changed[key]=values[key];
       }
     });
     if(Object.keys(changed).length){edits.push({date:date,values:changed});days++;}
   });
-  if(!edits.length)return {days:0,fields:0};
+  return {days:days,fields:edits.reduce(function(total,edit){return total+Object.keys(edit.values).length;},0),edits:edits};
+}
+function applyGroup(live,group,records){
+  if(!root.InsightStorage||typeof root.InsightStorage.writeSnapshot!=='function')
+    throw new Error('Insightの安全な保存機能を利用できません');
+  var next=root.InsightStorage.clone(live),result=fillGroup(next,group,records);
+  if(!result.days)return {days:0,fields:0};
+  var originalStore=live.stores[group.storeId];
   // Write first. If localStorage quota/write fails, no live data is modified.
   root.InsightStorage.writeSnapshot(next);
   var fields=0;
-  edits.forEach(function(edit){
+  result.edits.forEach(function(edit){
     var row=monthAndRow(originalStore,edit.date);
     if(!row)return;
     Object.keys(edit.values).forEach(function(key){
       if(missing(row[key])){row[key]=edit.values[key];fields++;}
     });
   });
-  return {days:days,fields:fields};
+  return {days:result.days,fields:fields};
 }
 async function run(onProgress){
   if(running)throw new Error('一括取得は既に実行中です');
-  var snapshot=readCurrent();
+  var snapshot=preview?preview.read().snapshot:readCurrent();
   if(!snapshot||!snapshot.stores)throw new Error('店舗データを読み込めません');
   var plan=scan(snapshot);
   if(!plan.groups.length)return {plan:plan,days:0,fields:0,requests:0,sourceCounts:{}};
@@ -276,19 +280,24 @@ async function run(onProgress){
     for(var i=0;i<plan.groups.length;i++){
       if(cancelRequested)break;
       var group=plan.groups[i];
-      var current=readCurrent();
+      var token=preview&&preview.read();
+      var current=preview?token.snapshot:readCurrent();
       var target=current&&current.stores&&current.stores[group.storeId];
       if(!target||!isValidLocation(target.weatherLocation))throw new Error(group.storeName+'：天気地点が変更されました');
       if(typeof onProgress==='function')onProgress({done:i,total:plan.groups.length,store:group.storeName,source:null,summary:total});
-      var fetched=await fetchSeries(target.weatherLocation,group);
+      var fetched;
+      try{fetched=await fetchSeries(target.weatherLocation,group);}
+      catch(error){if(preview&&cancelRequested)break;throw error;}
       if(cancelRequested)break;
-      var added=applyGroup(readCurrent(),group,fetched.map);
+      var added=preview?await preview.commit(token,function(candidate){
+        return fillGroup(candidate,group,fetched.map);
+      }):applyGroup(readCurrent(),group,fetched.map);
       total.days+=added.days;total.fields+=added.fields;total.requests++;
       total.sourceCounts[fetched.source]=(total.sourceCounts[fetched.source]||0)+1;
       if(typeof onProgress==='function')onProgress({done:i+1,total:plan.groups.length,store:group.storeName,source:fetched.source,summary:total});
     }
     total.cancelled=cancelRequested;
-    if(!cancelRequested)outcome='completed';
+    if(preview||!cancelRequested)outcome='completed';
     // A cancellation, whether before or after a write, remains conservatively
     // unknown/HELD. We do not infer that earlier groups were uncommitted.
     return total;
@@ -320,7 +329,7 @@ function install(){
   cancel.addEventListener('click',function(){cancelRequested=true;status.textContent='中止を受け付けました。進行中の取得完了後に停止します。';});
   start.addEventListener('click',async function(){
     if(running)return;
-    var plan=scan(readCurrent());
+    var plan=scan(preview?preview.read().snapshot:readCurrent());
     if(!plan.groups.length){
       status.textContent=plan.unconfigured.length?'取得対象なし。天気地点未設定：'+plan.unconfigured.join('、'):'取得対象の未入力欄はありません。対象年度が登録されているか確認してください。';
       return;
@@ -344,7 +353,8 @@ function install(){
         ' 既存の表示を更新するには画面を再読み込みしてください。';
     }catch(error){
       status.textContent='取得を中断しました：'+String(error&&error.message||error)+
-        '。保存済み分は保持されています。時間をおいて再実行すると未入力分から再開します。';
+        (preview&&preview.isHeld()?'。確定状況を確認するまで追加保存を停止しました。':
+          '。保存済み分は保持されています。時間をおいて再実行すると未入力分から再開します。');
     }finally{start.disabled=false;cancel.disabled=true;}
   });
   return true;
@@ -362,5 +372,9 @@ if(root.document){
 }
 root.InsightWeatherBulk={scan:scan,run:run,getWeatherBulkOperationStatus:weatherStatus,applyGroup:applyGroup,urlFor:urlFor,
   fetchSeries:fetchSeries,isValidLocation:isValidLocation,codeToWeather:codeToWeather,
-  cancel:function(){cancelRequested=true;},install:install};
+  cancel:function(){cancelRequested=true;},install:install,
+  connectIndexedDBPreview:function(adapter){
+    if(preview||running||!install())throw new Error('Bulk weather preview cannot start');
+    preview=adapter;
+  }};
 })(typeof window!=='undefined'?window:globalThis);

@@ -1965,6 +1965,107 @@ test('explicit automatic weather fills only the draft and ignores manual changes
   expect(await page.evaluate(()=>localStorage.getItem('insight_v11'))).toBe(seed.raw);
 });
 
+async function openBulkWeatherPreview(page){
+  const seed=await openQuickInputPreview(page,{followMonthlyInputs:true,manageStoresAndYears:true,seedBulk:true});
+  await mockPreviewWeather(page);
+  await page.evaluate(()=>{
+    const fetchOther=window.fetch;
+    window.bulkRequests=[];
+    window.fetch=(input,...args)=>{
+      const url=new URL(input,document.baseURI);
+      if(url.hostname!=='historical-forecast-api.open-meteo.com')return fetchOther(input,...args);
+      return new Promise(resolve=>{
+        const date=url.searchParams.get('start_date'),latitude=url.searchParams.get('latitude');
+        bulkRequests.push({date,latitude,reply(){
+          resolve(new Response(JSON.stringify({daily:{
+            time:[date],weather_code:[63],temperature_2m_max:[28],temperature_2m_min:[7]
+          }})));
+        }});
+      });
+    };
+  });
+  await page.locator('#navSettings').click();
+  return seed;
+}
+
+async function expectBulkRequest(page,index,date,latitude){
+  await expect.poll(()=>page.evaluate(index=>{
+    const pending=bulkRequests[index];
+    return pending?[pending.date,pending.latitude]:null;
+  },index)).toEqual([date,latitude]);
+}
+
+test('bulk weather resumes only missing intervals after cancelling and preserves the previous revision',async({page,context})=>{
+  const seed=await openBulkWeatherPreview(page);
+  const start=page.locator('#insightWeatherBulkStart'),status=page.locator('#insightWeatherBulkStatus');
+  const expected=JSON.parse(seed.raw);
+  await start.click();
+  await expectBulkRequest(page,0,seed.iso,'35.1');
+  await page.evaluate(()=>bulkRequests[0].reply());
+  await expectBulkRequest(page,1,seed.year+'-07-01','35.1');
+  expected.stores[seed.active].data[seed.year]['6月'][seed.day-1].tempMaxC=28;
+  expect(await committedInput(page)).toEqual({revision:1,snapshot:expected});
+  await page.locator('#insightWeatherBulkCancel').click();
+  await page.evaluate(()=>bulkRequests[1].reply());
+  await expect(status).toContainText('中止しました');
+  expect(await committedInput(page)).toEqual({revision:1,snapshot:expected});
+
+  await start.click();
+  await expectBulkRequest(page,2,seed.year+'-07-01','35.1');
+  await page.evaluate(()=>bulkRequests[2].reply());
+  await expectBulkRequest(page,3,seed.year+'-05-01','36.2');
+  expected.stores[seed.active].data[seed.year]['7月'][0].weather='雨';
+  const prior=JSON.stringify(expected);
+  await page.evaluate(()=>bulkRequests[3].reply());
+  await expect(status).toContainText('取得が終了しました');
+  expected.stores[seed.peer].data[seed.year]['5月'][0].tempMinC=7;
+  expect(await committedInput(page)).toEqual({revision:3,snapshot:expected});
+  const observer=await openStoreSwitchPeer(context);
+  try{
+    expect(JSON.parse((await readStoreSwitchRecord(observer)).previous.raw)).toEqual(JSON.parse(prior));
+    expect(await observer.evaluate(()=>localStorage.getItem('insight_v11'))).toBe(seed.raw);
+  }finally{await observer.close();}
+});
+
+for(const cause of ['changed location','competing revision','interrupted readback']){
+  test('bulk weather protects data after '+cause,async({page,context})=>{
+    const seed=await openBulkWeatherPreview(page);
+    const expected=JSON.parse(seed.raw);
+    const observer=await openStoreSwitchPeer(context);
+    try{
+      await page.locator('#insightWeatherBulkStart').click();
+      await expectBulkRequest(page,0,seed.iso,'35.1');
+      if(cause==='changed location'){
+        await openPreviewLocation(page);
+        await page.waitForFunction(()=>typeof window.finishPreviewLocation==='function');
+        await page.evaluate(()=>finishPreviewLocation());
+        await expect(page.locator('#storeSel + [role=status]')).toHaveText('保存しました。');
+        expected.stores[seed.active].weatherLocation=fictionalWeatherLocation;
+      }else if(cause==='competing revision'){
+        await observer.evaluate(async id=>{
+          const api=InsightIndexedDBStorageV1,record=await api.read();
+          record.snapshot.stores[id].name='別タブで保存';
+          await api.save(record.revision,record.snapshot);
+        },seed.peer);
+        expected.stores[seed.peer].name='別タブで保存';
+      }else{
+        await interruptCountReadback(page,'readback failure');
+        expected.stores[seed.active].data[seed.year]['6月'][seed.day-1].tempMaxC=28;
+      }
+      await page.evaluate(()=>bulkRequests[0].reply());
+      await expect(page.locator('#insightWeatherBulkStatus')).toContainText('取得を中断しました');
+      expect(await page.evaluate(()=>combinedPreview.getStatus().state)).toBe(
+        cause==='changed location'?'IDLE_OBSERVED':'HELD');
+      expect(await page.evaluate(()=>bulkRequests.length)).toBe(1);
+      const record=await readStoreSwitchRecord(observer);
+      expect(record.revision).toBe(1);
+      expect(JSON.parse(record.raw)).toEqual(expected);
+      expect(record.previous.raw).toBe(seed.raw);
+      expect(await observer.evaluate(()=>localStorage.getItem('insight_v11'))).toBe(seed.raw);
+    }finally{await observer.close();}
+  });
+}
+
 test('isolated theme remains device-local without creating a business data revision',async({page})=>{
   const seed=await openQuickInputPreview(page,{followMonthlyInputs:true,manageStoresAndYears:true});
   await page.locator('#navSettings').click();
@@ -2525,6 +2626,89 @@ test('migration startup gate requires a confirmed restart and a fresh build with
   expect(await check()).toEqual({state:'hold',reason:'service-worker-present'});
 
   expect(await page.evaluate(()=>localStorage.length)).toBe(0);
+});
+
+test('encrypted restore keeps the pre-restore revision and resumes only the verified committed copy',async({page,context})=>{
+  const seed=await openQuickInputPreview(page);
+  const observer=await openStoreSwitchPeer(context);
+  try{
+    const result=await page.evaluate(async seed=>{
+      const api=InsightIndexedDBStorageV1,password='Backup37';
+      async function backupFile(data){
+        const stores=Object.entries(data.stores).map(([id,shop])=>({id,name:shop.name,years:shop.years.map(String).sort()}));
+        const years=[...new Set(stores.flatMap(shop=>shop.years))].sort();
+        const backupInfo={format:'InsightBackup',formatVersion:2,storageKey:'insight_v11',
+          createdAt:'2026-11-19T00:00:00.000Z',schemaVersion:data.schemaVersion,storeCount:stores.length,
+          currentStoreId:data.current,years,stores};
+        const envelope=await InsightBackupCryptoV1.encrypt({data,backupInfo},password);
+        return new File([JSON.stringify(envelope)],'Insight_261119_0900.json');
+      }
+      const before=await api.read();
+      const candidate=structuredClone(before.snapshot);
+      candidate.stores[seed.peer].name='架空の復元先名';
+      const safetyFile=await backupFile(before.snapshot),file=await backupFile(candidate);
+      const args={file,password,safetyFile,safetyPassword:password,legacyClientsClosed:true};
+      const markerKey='insight_indexeddb_adoption_v1';
+      const marker=localStorage.getItem(markerKey);
+      const mismatch=await api.restoreBackup({...args,safetyFile:file,confirm:()=>{throw new Error('unexpected confirmation');}})
+        .catch(error=>error.message);
+      const cancelled=await api.restoreBackup({...args,confirm:()=>false});
+      const changed=await api.restoreBackup({...args,confirm:()=>{
+        localStorage.setItem('insight_v11',' '+seed.raw);
+        return true;
+      }}).catch(error=>error.message);
+      const conflictingSource=localStorage.getItem('insight_v11')===' '+seed.raw;
+      const conflict=await api.diagnose();
+      // Restore only the fixture's deliberately altered source and marker for the independent interruption case.
+      localStorage.setItem('insight_v11',seed.raw);
+      InsightStorage.writeMetadata(markerKey,marker);
+      const unchanged=await api.read();
+      const write=InsightStorage.writeMetadata;
+      InsightStorage.writeMetadata=(key,value)=>{
+        if(key===markerKey&&JSON.parse(value).state==='active')throw new Error('Fictional restore acknowledgement lost');
+        return write(key,value);
+      };
+      let confirmation,interrupted;
+      try{
+        interrupted=await api.restoreBackup({...args,confirm:info=>{confirmation=info;return true;}})
+          .catch(error=>error.message);
+      }finally{InsightStorage.writeMetadata=write;}
+      const diagnostic=await api.diagnose({verifyInterrupted:true});
+      const waiting=await api.read().catch(error=>error.message);
+      const verifiedFile=await backupFile((await InsightMigrationBackupV1.readRestoreCandidate(file,password)).snapshot);
+      let recovery;
+      const recoveryArgs={file:verifiedFile,password,legacyClientsClosed:true};
+      const resumeMismatch=await api.resumeRecovery({...recoveryArgs,file:safetyFile,confirm:()=>true}).catch(error=>error.message);
+      const resumeCancelled=await api.resumeRecovery({...recoveryArgs,confirm:()=>false});
+      const resumed=await api.resumeRecovery({...recoveryArgs,confirm:info=>{recovery=info;return true;}});
+      const after=await api.read();
+      return {mismatch,cancelled,changed,conflict,conflictingSource,unchanged,interrupted,confirmation,
+        diagnostic,waiting,resumeMismatch,resumeCancelled,resumed,recovery,after,source:localStorage.getItem('insight_v11')};
+    },seed);
+    expect(result.mismatch).toBe('バックアップと移行元のデータが一致しません。');
+    expect(result.cancelled).toEqual({state:'active',review:'cancelled',revision:0});
+    expect(result.changed).toContain('Legacy Insight storage changed');
+    expect(result.conflict).toEqual({state:'hold',reason:'source-conflict'});
+    expect(result.conflictingSource).toBe(true);
+    expect(result.unchanged).toEqual({revision:0,snapshot:JSON.parse(seed.raw)});
+    expect(result.interrupted).toBe('Fictional restore acknowledgement lost');
+    expect(result.confirmation.target.stores.some(shop=>shop.name==='架空の復元先名')).toBe(true);
+    expect(result.diagnostic).toEqual({state:'hold',reason:'writing',observedRevision:1,recovery:'save-verified'});
+    expect(result.waiting).toBe('IndexedDB writes are on hold');
+    expect(result.resumeMismatch).toBe('バックアップと移行元のデータが一致しません。');
+    expect(result.resumeCancelled).toEqual({state:'hold',review:'cancelled'});
+    expect(result.resumed).toEqual({state:'active',revision:1});
+    expect(result.recovery).toMatchObject({outcome:'save-verified',revision:1,previousRevision:0});
+    expect(result.after.revision).toBe(1);
+    expect(result.after.snapshot.stores[seed.peer].name).toBe('架空の復元先名');
+    expect(result.source).toBe(seed.raw);
+    const record=await readStoreSwitchRecord(observer);
+    expect(record.previous).toEqual({revision:0,raw:seed.raw});
+    expect(JSON.parse(record.raw)).toEqual(result.after.snapshot);
+    await observer.reload();
+    await observer.addScriptTag({url:'/insight_indexeddb_storage_v1.js'});
+    expect(await observer.evaluate(()=>InsightIndexedDBStorageV1.read())).toEqual(result.after);
+  }finally{await observer.close();}
 });
 
 test('offline migration does not request a backup or create an adoption marker',async({page,context})=>{
@@ -4114,7 +4298,7 @@ for(const failure of ['readback abort','acknowledgement lost','tab closed during
 }
 
 async function openQuickInputPreview(page,{sameMunicipality=true,followMonthlyInputs=false,seedCounts=false,
-  seedHours=false,seedDailyClear=false,seedYearBoundary=false,seedManagement=false,manageStoresAndYears=false,seedCSV=false}={}){
+  seedHours=false,seedDailyClear=false,seedYearBoundary=false,seedManagement=false,manageStoresAndYears=false,seedCSV=false,seedBulk=false}={}){
   await routeMigrationPage(page);
   await page.goto('/Index.html');
   await waitForMigrationChecks(page);
@@ -4125,7 +4309,7 @@ async function openQuickInputPreview(page,{sameMunicipality=true,followMonthlyIn
     if(manageStoresAndYears)await page.waitForSelector('#insightSettingsYearSection',{state:'attached'});
     await page.addScriptTag({url:'/insight_indexeddb_sales_input_preview_v1.js'});
   }
-  return page.evaluate(async ({sameMunicipality,followMonthlyInputs,seedCounts,seedHours,seedDailyClear,seedYearBoundary,seedManagement,manageStoresAndYears,seedCSV})=>{
+  return page.evaluate(async ({sameMunicipality,followMonthlyInputs,seedCounts,seedHours,seedDailyClear,seedYearBoundary,seedManagement,manageStoresAndYears,seedCSV,seedBulk})=>{
     const year=String(Number(todayFY().fy)-1),month='6月',day=12;
     const iso=year+'-06-12',active=allStores.current,peer='fictional-quick-peer';
     store.data[year]=blankYearData(year);
@@ -4181,6 +4365,19 @@ async function openQuickInputPreview(page,{sameMunicipality=true,followMonthlyIn
       store.events=[{id:'fictional-management-event',type:'nearby',scope:'store',startDate:iso,endDate:iso,
         snapshot:{version:1,title:'架空の催事',note:'',location:'架空の会場'}}];
     }
+    if(seedBulk){
+      for(const [shop,latitude] of [[store,35.1],[second,36.2]]){
+        Object.assign(shop.weatherLocation,{latitude,longitude:136.8,timezone:'Asia/Tokyo'});
+        for(const months of Object.values(shop.data)){
+          for(const rows of Object.values(months)){
+            for(const day of rows)Object.assign(day,{weather:'晴',tempMaxC:21,tempMinC:0});
+          }
+        }
+      }
+      delete store.data[year]['6月'][day-1].tempMaxC;
+      store.data[year]['7月'][0].weather='';
+      delete second.data[year]['5月'][0].tempMinC;
+    }
     if(seedCSV){
       store.data[String(Number(year)-2)]={'1月':[{...blankRow(1),売上:55,storeMemo:'架空の既存実績'}]};
     }
@@ -4197,7 +4394,7 @@ async function openQuickInputPreview(page,{sameMunicipality=true,followMonthlyIn
       });
     }else window.quickPreview=await InsightIndexedDBQuickInputPreviewV1.connect();
     return {year,month,day,iso,active,peer,raw,category:HAIKI_CATS[0],countCategory:countCategory.id,otherCategory:otherCategory.id};
-  },{sameMunicipality,followMonthlyInputs,seedCounts,seedHours,seedDailyClear,seedYearBoundary,seedManagement,manageStoresAndYears,seedCSV});
+  },{sameMunicipality,followMonthlyInputs,seedCounts,seedHours,seedDailyClear,seedYearBoundary,seedManagement,manageStoresAndYears,seedCSV,seedBulk});
 }
 
 async function editQuickInput(page,category){

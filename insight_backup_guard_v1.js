@@ -634,7 +634,7 @@ async function verifyMigrationBackup(file,password,sourceRaw){
     throw validationError('バックアップと移行元のデータが一致しません。');
   return {createdAt:decoded.info.createdAt,stores:backupStoreInfo(decoded.data)};
 }
-async function inspectMissingStorageBackup(file,password){
+async function readRestoreCandidate(file,password){
   if(!(file instanceof Blob)||file.size>ENCRYPTED_FILE_LIMIT)
     throw validationError('21MiB以下の暗号化バックアップを選んでください。');
   var encrypted;
@@ -643,10 +643,13 @@ async function inspectMissingStorageBackup(file,password){
   var decoded=await decodeMigrationBackup(encrypted,password);
   var snapshot=normalizeBackup(decoded.data);
   runRestorePreflight(snapshot);
-  return {createdAt:decoded.info.createdAt,stores:backupStoreInfo(snapshot)};
+  return {snapshot,summary:{createdAt:decoded.info.createdAt,stores:backupStoreInfo(snapshot)}};
+}
+async function inspectMissingStorageBackup(file,password){
+  return (await readRestoreCandidate(file,password)).summary;
 }
 window.InsightMigrationBackupV1=Object.freeze({
   confirm:confirmMigrationBackup,assertReady:assertMigrationReady,verify:verifyMigrationBackup,
-  inspectMissingStorage:inspectMissingStorageBackup
+  inspectMissingStorage:inspectMissingStorageBackup,readRestoreCandidate:readRestoreCandidate
 });
 })();
