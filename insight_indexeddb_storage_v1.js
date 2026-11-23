@@ -1,4 +1,4 @@
-/* IndexedDB storage for the unpublished migration draft. The shell does not load it yet. */
+/* IndexedDB storage for the unpublished migration draft. The Draft shell loads it only on the isolated test origin. */
 (function(root){
   'use strict';
   const database='insight-store-snapshots-v1';
@@ -8,8 +8,8 @@
   const recordKey='current';
   const storeName='snapshots';
   // Pin the version exercised by the Draft migration. It must be updated with the release that enables it.
-  const migrationBuild='20261121-sale-scroll20-build-113';
-  const migrationFeatures='f2dd343f';
+  const migrationBuild='20261123-indexeddb-preview-build-114';
+  const migrationFeatures='80574b3d';
 
   function parse(raw){
     const snapshot=JSON.parse(raw);

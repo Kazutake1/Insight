@@ -3,6 +3,7 @@
 function fail(e){
   var box=document.createElement('div');
   box.className='insight-load-failure';
+  box.setAttribute('role','status');
   box.appendChild(document.createTextNode('Insightの読み込みに失敗しました。'));
   box.appendChild(document.createElement('br'));
   var small=document.createElement('small');
@@ -11,7 +12,9 @@ function fail(e){
   document.body.replaceChildren(box);
 }
 if(typeof Chart==='undefined'){fail(new Error('グラフライブラリを読み込めませんでした'));return;}
-fetch('./insight_payload_source_v1.html?v=20261113-daily-bar-payload-1',{cache:'no-store'}).then(function(r){if(!r.ok)throw new Error('Insight payload の取得に失敗しました ('+r.status+')');return r.text();}).then(function(html){
+var previewHost=document.currentScript?.dataset.indexeddbPreviewHost;
+function loadShell(){
+return fetch('./insight_payload_source_v1.html?v=20261123-indexeddb-preview-1',{cache:'no-store'}).then(function(r){if(!r.ok)throw new Error('Insight payload の取得に失敗しました ('+r.status+')');return r.text();}).then(function(html){
 if(html.indexOf('<!DOCTYPE html>')!==0&&html.indexOf('<!doctype html>')!==0)throw new Error('HTMLデータの検証に失敗しました');
 // STEP5 complete: payload source is self-contained; feature modules are inserted before document.write().
 var orderedFeatureLoads=[
@@ -33,7 +36,7 @@ var orderedFeatureLoads=[
   './insight_ai_ops_v1.js?v=20260930-hooks2',
   './insight_backup_crypto_v1.js?v=20261103-backup-stage2-1',
   './insight_backup_password_v1.js?v=20261103-backup-confirm-1',
-  './insight_backup_guard_v1.js?v=20261113-gate3-backup-name-1',
+  './insight_backup_guard_v1.js?v=20261123-indexeddb-preview-1',
   './insight_data_health_v1.js?v=20261011-trip-manual-1',
   './insight_prediction_data_health_v1.js?v=20261010-prediction-quality-1',
   './insight_waste_insights_v1.js?v=20261112-waste-comparison-1',
@@ -121,6 +124,25 @@ try{
 }catch(_){}
 var orderedFeatureHtml=orderedFeatureLoads.map(function(entry){return '<script src="'+entry+'"></scr'+'ipt>';}).join('');
 html=html.replace('</body>',orderedFeatureHtml+'</body>');
+if(window.InsightIndexedDBCandidateV1?.isAdopted()){
+  if(!html.includes('<body>'))throw new Error('採用済みデータの画面を安全に開けません。');
+  html=html.replace('<body>','<body inert>');
+}
 document.open();document.write(html);document.close();
-}).catch(fail);
+});
+}
+
+async function start(){
+  if(previewHost!=='localhost'||location.hostname!==previewHost)return loadShell();
+  var workers=navigator.serviceWorker;
+  if(!workers||workers.controller||await workers.getRegistration(location.href))
+    throw new Error('旧版のキャッシュ状態を確認できないため、起動と保存を停止しています。');
+  await Promise.all([
+    import('./insight_indexeddb_storage_v1.js?v=20261123-indexeddb-preview-1'),
+    import('./insight_indexeddb_migration_preview_v1.js?v=20261123-indexeddb-preview-1'),
+    import('./draft/insight_indexeddb_candidate_v1.js?v=20261123-indexeddb-preview-1')
+  ]);
+  return window.InsightIndexedDBCandidateV1.start(document.getElementById('loading'),loadShell);
+}
+start().catch(fail);
 })();

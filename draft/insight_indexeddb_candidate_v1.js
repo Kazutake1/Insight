@@ -1,9 +1,8 @@
-/* Isolated deployment candidate. Loaded only by an explicitly selected test host. */
+/* Startup candidate used by the Draft shell on its isolated test origin. */
 (function(root){
   'use strict';
   const document=root.document;
-  const container=document.getElementById('loading');
-  const loader=document.currentScript.dataset.loader;
+  const version='20261123-indexeddb-preview-1';
   let adopted=false;
   let verifiedSnapshot=null;
 
@@ -18,7 +17,7 @@
   function loadScript(url){
     return new Promise((resolve,reject)=>{
       const script=document.createElement('script');
-      script.src=url;
+      script.src=url+'?v='+version;
       script.onload=resolve;
       script.onerror=reject;
       document.body.append(script);
@@ -45,7 +44,36 @@
     }catch(_){halt();}
   }
 
+  function mountMigration(){
+    const actions=document.getElementById('insightSettingsDataActions');
+    if(!actions)throw new Error('Migration settings did not load');
+    const panel=document.createElement('section');
+    panel.id='insightIndexedDBMigration';
+    actions.after(panel);
+    root.InsightIndexedDBMigrationPreviewV1.mount(panel);
+  }
+
+  async function waitForShell(){
+    if(document.readyState==='loading'){
+      await new Promise(resolve=>document.addEventListener('DOMContentLoaded',resolve,{once:true}));
+    }
+    await new Promise(resolve=>root.setTimeout(resolve,0));
+  }
+
   root.InsightIndexedDBCandidateV1=Object.freeze({
+    start(container,loadShell){
+      return root.InsightIndexedDBMigrationPreviewV1.start(container,async ()=>{
+        await loadShell();
+        await waitForShell();
+        mountMigration();
+      },async result=>{
+        adopted=true;
+        verifiedSnapshot=result.snapshot;
+        await loadShell();
+        await waitForShell();
+        if(verifiedSnapshot)throw new Error('The adopted snapshot was not initialized');
+      },{restart:()=>root.location.reload()}).catch(halt);
+    },
     isAdopted:()=>adopted,
     initializeAdopted(){
       document.body.inert=true;
@@ -62,10 +90,4 @@
     }
   });
 
-  function loadShell(){return loadScript(loader).catch(halt);}
-  root.InsightIndexedDBMigrationPreviewV1.start(container,loadShell,result=>{
-    adopted=true;
-    verifiedSnapshot=result.snapshot;
-    return loadShell();
-  },{restart:()=>root.location.reload()}).catch(halt);
 })(globalThis);

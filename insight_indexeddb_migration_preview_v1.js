@@ -56,7 +56,7 @@
     container.textContent='保存状態を確認しています。';
     const diagnostic=await storage().diagnoseStartup();
     if(diagnostic.state==='legacy'){
-      loadLegacy();
+      await loadLegacy();
       return;
     }
     if(diagnostic.reason==='indexeddb-adopted'&&typeof loadAdopted==='function'){

@@ -6,7 +6,7 @@ test.beforeEach(async({page})=>{
     if(!location.pathname.endsWith('-fixture'))return;
     window.__INSIGHT_SHELL_VERSION__=build;
     window.__INSIGHT_FEATURE_SIGNATURE__=features;
-  },{build:'20261121-sale-scroll20-build-113',features:'f2dd343f'});
+  },{build:'20261123-indexeddb-preview-build-114',features:'80574b3d'});
   await page.route(/https:\/\/(www\.jma\.go\.jp|[^/]*api\.open-meteo\.com)\//,route=>route.abort());
 });
 async function routeMigrationPage(page){
@@ -3072,8 +3072,8 @@ test('a fully restarted browser keeps the adopted revision and holds the legacy 
       const page=context.pages()[0]??await context.newPage();
       await page.goto(url);
       await page.evaluate(()=>{
-        window.__INSIGHT_SHELL_VERSION__='20261121-sale-scroll20-build-113';
-        window.__INSIGHT_FEATURE_SIGNATURE__='f2dd343f';
+        window.__INSIGHT_SHELL_VERSION__='20261123-indexeddb-preview-build-114';
+        window.__INSIGHT_FEATURE_SIGNATURE__='80574b3d';
       });
       await page.addScriptTag({url:new URL('/insight_indexeddb_storage_v1.js',url).href});
       return {context,page};
@@ -3109,7 +3109,7 @@ async function openLegacyPwaFixture(page){
     contentType:'text/html',body:'<!doctype html><title>Fictional online migration page</title>'
   }));
   await page.route('**/tests/e2e/fixtures/Index.html?insight_migration_probe=*',route=>route.fulfill({
-    contentType:'text/html',body:'<!doctype html><meta name="insight-shell-version" content="20261121-sale-scroll20-build-113">'
+    contentType:'text/html',body:'<!doctype html><meta name="insight-shell-version" content="20261123-indexeddb-preview-build-114">'
   }));
   await page.goto(legacyPwaFixture);
   await page.addScriptTag({url:'/insight_indexeddb_storage_v1.js'});
@@ -3247,14 +3247,18 @@ test('cached legacy shell runs with its origin unavailable and adopted startup s
   const worker=await fs.readFile(path.join(__dirname,'fixtures/legacy-pwa-worker.js'));
   const storageScript=await fs.readFile(path.join(__dirname,'../../insight_indexeddb_storage_v1.js'),'utf8');
   const shell=await fs.readFile(path.join(__dirname,'../../insight_indexeddb_migration_preview_v1.js'),'utf8');
+  const entryFiles=['Index.html','insight_shell_boot_v1.js','insight_shell_loader_v1.js'];
+  const entryAssets=new Map(await Promise.all(entryFiles.map(async name=>[
+    '/'+name,await fs.readFile(path.join(__dirname,'../..',name))
+  ])));
   const server=http.createServer((request,response)=>{
     const url=new URL(request.url,'http://127.0.0.1');
     if(url.pathname==='/legacy-pwa-worker.js'){
       response.setHeader('Content-Type','application/javascript');
       response.end(worker);
-    }else if(url.pathname==='/Index.html'&&url.searchParams.has('insight_migration_probe')){
-      response.setHeader('Content-Type','text/html');
-      response.end('<!doctype html><meta name="insight-shell-version" content="20261121-sale-scroll20-build-113">');
+    }else if(entryAssets.has(url.pathname)){
+      response.setHeader('Content-Type',url.pathname.endsWith('.js')?'application/javascript':'text/html');
+      response.end(entryAssets.get(url.pathname));
     }else if(url.pathname==='/legacy-pwa-fixture'){
       response.setHeader('Content-Type','text/html');
       response.end('<!doctype html><title>Fictional online migration page</title>');
@@ -3264,7 +3268,8 @@ test('cached legacy shell runs with its origin unavailable and adopted startup s
     server.once('error',reject);
     server.listen(0,'127.0.0.1',resolve);
   });
-  const url='http://127.0.0.1:'+server.address().port+'/legacy-pwa-fixture';
+  const origin='http://localhost:'+server.address().port;
+  const url=origin+'/legacy-pwa-fixture';
   const stopServer=async ()=>{
     if(!server.listening)return;
     await new Promise((resolve,reject)=>{
@@ -3290,6 +3295,12 @@ test('cached legacy shell runs with its origin unavailable and adopted startup s
     });
     await page.evaluate(async ()=>navigator.serviceWorker.register('/legacy-pwa-worker.js'));
     await page.waitForFunction(()=>Boolean(navigator.serviceWorker.controller));
+    const guarded=await context.newPage();
+    try{
+      await guarded.goto(origin+'/Index.html');
+      await expect(guarded.getByRole('status')).toContainText('旧版のキャッシュ状態を確認できないため、起動と保存を停止しています。');
+      await expect(guarded.locator('#quickGrid')).toHaveCount(0);
+    }finally{await guarded.close();}
     await stopServer();
 
     const reopened=await context.newPage();
@@ -3322,7 +3333,7 @@ test('cached legacy shell runs with its origin unavailable and adopted startup s
 });
 
 test('migration enforces the pinned environment before and after backup confirmation',async({page})=>{
-  const fixture='/forced-migration-gate-fixture',build='20261121-sale-scroll20-build-113';
+  const fixture='/forced-migration-gate-fixture',build='20261123-indexeddb-preview-build-114';
   await page.route('**'+fixture,route=>route.fulfill({
     contentType:'text/html',body:'<!doctype html><title>Fictional forced migration fixture</title>'
   }));
@@ -3713,9 +3724,9 @@ for(const connectionFails of [false,true]){
       window.InsightHourlyCustomers={connectIndexedDBPreview(){}};
       window.shellReadyState=document.readyState;
       window.lateSnapshot=InsightIndexedDBCandidateV1.initializeAdopted();`}));
-    await page.route(/\/insight_indexeddb_(quick_input|sales_input|recovery)_preview_v1\.js$/,route=>route.fulfill({
+    await page.route(/\/insight_indexeddb_(quick_input|sales_input|recovery)_preview_v1\.js\?v=20261123-indexeddb-preview-1$/,route=>route.fulfill({
       contentType:'application/javascript',
-      body:route.request().url().endsWith('/insight_indexeddb_sales_input_preview_v1.js')
+      body:new URL(route.request().url()).pathname.endsWith('/insight_indexeddb_sales_input_preview_v1.js')
         ?`window.InsightIndexedDBSalesInputPreviewV1={async connect(){
           window.connectionCount=(window.connectionCount??0)+1;
           await new Promise(resolve=>{window.finishConnection=resolve;});
@@ -3723,18 +3734,18 @@ for(const connectionFails of [false,true]){
         }};`:''
     }));
     await page.goto('/late-adopted-start-fixture');
+    await page.addScriptTag({url:'/draft/insight_indexeddb_candidate_v1.js'});
     await page.evaluate(async ()=>{
       window.InsightIndexedDBMigrationPreviewV1={start:(_container,_legacy,adopt)=>adopt({
         snapshot:{current:'fictional',stores:{fictional:{name:'架空店舗A'}}}
       })};
-      const script=document.createElement('script');
-      script.src='/draft/insight_indexeddb_candidate_v1.js';
-      script.dataset.loader='/late-adopted-shell.js';
-      await new Promise((resolve,reject)=>{
+      await InsightIndexedDBCandidateV1.start(document.getElementById('loading'),()=>new Promise((resolve,reject)=>{
+        const script=document.createElement('script');
+        script.src='/late-adopted-shell.js';
         script.onload=resolve;
         script.onerror=reject;
         document.body.append(script);
-      });
+      }));
     });
     await page.waitForFunction(()=>typeof window.finishConnection==='function');
     expect(await page.evaluate(()=>({ready:window.shellReadyState,inert:document.body.inert,
@@ -3752,32 +3763,19 @@ for(const connectionFails of [false,true]){
   });
 }
 
-test('isolated release rehearsal verifies the downloaded backup, migrates, edits and restores both stores',async({page,context})=>{
+test('Draft Index starts IndexedDB on its isolated origin and rehearses migration, editing and recovery',async({page,context})=>{
   test.setTimeout(60000);
-  await page.route('**/Index.html*',async route=>{
-    const response=await route.fetch();
-    let body=(await response.text()).replace(/;?\s*upgrade-insecure-requests/g,'');
-    if(new URL(route.request().url()).searchParams.has('isolated-migration-fixture')){
-      const loader=body.match(/<script src="([^"]*insight_shell_loader_v1[^"]*)"><\/script>/);
-      if(!loader)throw new Error('The isolated startup fixture could not find the shell loader');
-      body=body.replace(loader[0],[
-          'insight_indexeddb_storage_v1.js',
-          'insight_indexeddb_migration_preview_v1.js'
-        ].map(path=>'<script src="./'+path+'"></script>').join('')+
-          '<script src="./draft/insight_indexeddb_candidate_v1.js" data-loader="'+loader[1]+'"></script>');
-    }
-    await route.fulfill({response,body});
-  });
-
-  const fixture='/Index.html?isolated-migration-fixture=1';
+  const origin='http://localhost:4173';
+  const fixture=origin+'/Index.html';
   await page.goto(fixture);
   await expect(page.getByRole('status')).toHaveText('保存状態を確認できないため、起動と保存を停止しています。');
   await expect(page.locator('#quickGrid')).toHaveCount(0);
   expect(await page.evaluate(()=>localStorage.getItem('insight_v11'))).toBeNull();
 
-  // Create the fictional source with the normal storage format before entering the fixture.
+  // Seed the isolated origin with the snapshot written by the existing app on the regular test origin.
   await page.goto('/Index.html');
   await waitForMigrationChecks(page);
+  expect(await page.evaluate(()=>typeof InsightIndexedDBCandidateV1)).toBe('undefined');
   const seed=await page.evaluate(()=>{
     store.name='架空店舗A';
     const {fy,month,day}=todayFY();
@@ -3788,13 +3786,12 @@ test('isolated release rehearsal verifies the downloaded backup, migrates, edits
   });
   const raw=seed.raw;
   await page.goto(fixture);
+  await expect(page.getByRole('status')).toHaveText('保存状態を確認できないため、起動と保存を停止しています。');
+  await page.evaluate(raw=>localStorage.setItem('insight_v11',raw),raw);
+  await page.reload();
   await waitForMigrationChecks(page);
-  await page.evaluate(()=>{
-    const container=document.createElement('aside');
-    document.body.prepend(container);
-    InsightIndexedDBMigrationPreviewV1.mount(container);
-  });
   await expect(page.locator('#quickGrid')).toBeAttached();
+  await page.locator('#navSettings').click();
   const checkbox=page.getByRole('checkbox',{name:'Insightの他のタブとホーム画面から開いたアプリを閉じました'});
   const button=page.getByRole('button',{name:'バックアップを作成して移行'});
   const marker=()=>page.evaluate(()=>localStorage.getItem('insight_indexeddb_adoption_v1'));
@@ -3892,7 +3889,7 @@ test('isolated release rehearsal verifies the downloaded backup, migrates, edits
   expect(readback.revision).toBe(3);
   expect(readback.snapshot.stores[seed.id].years).toEqual(JSON.parse(raw).stores[seed.id].years);
   expect(readback.snapshot.stores['fixture-peer'].data[seed.fy][seed.month][seed.day-1].売上).toBe(999);
-  const peer=await openStoreSwitchPeer(context);
+  const peer=await openStoreSwitchPeer(context,origin);
   try{
     const record=await readStoreSwitchRecord(peer);
     expect(JSON.parse(record.previous.raw)).toEqual(beforeRestore.snapshot);
@@ -4748,12 +4745,12 @@ test('isolated store selection keeps drafts on cancellation and changes the save
   expect(await page.evaluate(()=>localStorage.getItem('insight_v11'))).toBe(seed.raw);
 });
 
-async function openStoreSwitchPeer(context){
+async function openStoreSwitchPeer(context,origin=''){
   const peer=await context.newPage();
   await peer.route('**/store-switch-fixture',route=>route.fulfill({
     contentType:'text/html',body:'<!doctype html><title>Fictional store switch peer</title>'
   }));
-  await peer.goto('/store-switch-fixture');
+  await peer.goto(origin+'/store-switch-fixture');
   await peer.evaluate(()=>{window.SK='insight_v11';});
   await peer.addScriptTag({url:'/insight_storage_v1.js'});
   await peer.addScriptTag({url:'/insight_indexeddb_storage_v1.js'});

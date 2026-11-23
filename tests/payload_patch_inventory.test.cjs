@@ -15,7 +15,9 @@ test('payload文字列互換パッチは0件でshell loaderもbootstrap patcher�
   const bootstrap=read('insight_bootstrap_patches_v1.js');
   assert.equal((bootstrap.match(/^patch\(/gm)||[]).length,0);
   assert.equal((index.match(/html=html\.replace/g)||[]).length,0);
-  assert.equal((loader.match(/html=html\.replace/g)||[]).length,1);
+  assert.deepEqual(loader.match(/html=html\.replace\('[^']+'/g),[
+    "html=html.replace('</body>'","html=html.replace('<body>'"
+  ]);
   assert.doesNotMatch(index+loader,/insight_bootstrap_patches_v1\.js|InsightBootstrapPatches/);
   assert.match(bootstrap,/return html/);
 });
@@ -25,9 +27,9 @@ test('Index shellはinline script/styleを持たず外部assetへ分離する',(
   const boot=read('insight_shell_boot_v1.js');
   const loader=read('insight_shell_loader_v1.js');
   const css=read('insight_shell_v1.css');
-  assert.match(index,/insight_shell_boot_v1\.js\?v=20261121-sale-scroll20-build-113/);
-  assert.match(index,/insight_shell_loader_v1\.js\?v=20261118-sale-scroll20-1/);
-  assert.match(index,/insight_shell_v1\.css\?v=20261121-sale-scroll20-build-113/);
+  assert.match(index,/insight_shell_boot_v1\.js\?v=20261123-indexeddb-preview-build-114/);
+  assert.match(index,/insight_shell_loader_v1\.js\?v=20261123-indexeddb-preview-1/);
+  assert.match(index,/insight_shell_v1\.css\?v=20261123-indexeddb-preview-build-114/);
   assert.doesNotMatch(index,/<script(?![^>]*\bsrc=)[^>]*>/i);
   assert.doesNotMatch(index,/<style\b/i);
   assert.doesNotMatch(index,/script-src[^;]*'unsafe-inline'/);
@@ -37,7 +39,7 @@ test('Index shellはinline script/styleを持たず外部assetへ分離する',(
   assert.match(boot,/fetch\('\.\/Index\.html\?insight_probe='/);
   assert.match(loader,/fetch\('\.\/insight_shell_loader_v1\.js\?insight_manifest_probe='/);
   assert.match(loader,/document\.open\(\);document\.write\(html\);document\.close\(\)/);
-  assert.match(loader,/fetch\('\.\/insight_payload_source_v1\.html\?v=20261113-daily-bar-payload-1'/);
+  assert.match(loader,/fetch\('\.\/insight_payload_source_v1\.html\?v=20261123-indexeddb-preview-1'/);
   assert.doesNotMatch(index+loader,/pako|insight_payload_v1_part0/);
   assert.match(css,/#loading\{/);
 });
@@ -50,7 +52,7 @@ test('canonical payloadはinline script/styleを持たず外部assetを順序固
   const readability=read('insight_readability_v1.js');
   const css=read('insight_payload_core_v1.css');
   assert.match(payload,/insight_payload_core_v1\.css\?v=20261118-sale-scroll20-1/);
-  assert.match(payload,/insight_payload_core_v1\.js\?v=20261113-daily-bar-core-1/);
+  assert.match(payload,/insight_payload_core_v1\.js\?v=20261123-indexeddb-preview-1/);
   assert.doesNotMatch(core,/label\.style\.color/);
   assert.doesNotMatch(core,/msg\.style\.display/);
   assert.doesNotMatch(core,/badge\.style\.display/);
@@ -186,8 +188,8 @@ test('canonical payloadはinline script/styleを持たず外部assetを順序固
 
 test('トップページはキャッシュ抑止とシェル・機能manifestの自己更新を持つ',()=>{
   const index=readShell();
-  assert.match(index,/insight-shell-version" content="20261121-sale-scroll20-build-113/);
-  assert.match(index,/var BUILD="20261121-sale-scroll20-build-113"/);
+  assert.match(index,/insight-shell-version" content="20261123-indexeddb-preview-build-114/);
+  assert.match(index,/var BUILD="20261123-indexeddb-preview-build-114"/);
   assert.match(index,/Shell rule: bump BUILD whenever the loader/);
   assert.match(index,/Cache-Control" content="no-cache, no-store, must-revalidate/);
   assert.match(index,/insight_probe=/);
@@ -1174,7 +1176,7 @@ test('STEP5完了: bootstrap文字列patch依存は0件',()=>{
   assert.equal((bootstrap.match(/^patch\(/gm)||[]).length,0);
   assert.doesNotMatch(bootstrap,/originalLoadAll|safeLoadAll|互換パッチの適用対象が見つかりません/);
   assert.doesNotMatch(index,/insight_bootstrap_patches_v1\.js|InsightBootstrapPatches/);
-  assert.equal((index.match(/html=html\.replace/g)||[]).length,1);
+  assert.equal((index.match(/html=html\.replace/g)||[]).length,2);
 });
 
 test('分析AI workspace assetはcache bustされている',()=>{

@@ -189,7 +189,7 @@ test('shell loaderの異常メッセージはHTMLとして実行・解釈され�
       created.push(tag);
       return {
         tagName:tag,children:[],className:'',textContent:'',
-        appendChild(node){this.children.push(node);}
+        appendChild(node){this.children.push(node);},setAttribute(){}
       };
     },
     createTextNode(value){return {nodeType:3,textContent:String(value)};},
