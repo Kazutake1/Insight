@@ -750,6 +750,18 @@
             warning.textContent='別のタブで保存状態が変わりました。画面を開き直してください。';
           });
         }
+        root.setSalesWeather=(index,weather)=>{
+          if(blocked()||type!=='sales'||!matchesScreen()||!Number.isInteger(index)||
+            !WX_KEYS.includes(weather)||!drafts.sales[index]||!rows(state.committed.snapshot,state.storeId)?.[index])return false;
+          const {year,month}=displayedPeriod();
+          return runManagement(managementScope(),candidate=>{
+            updateSharedWeather(candidate,year,month,index+1,weather);
+            return true;
+          },()=>{
+            drafts.sales[index].weather=weather;
+            renderSalesWeatherSelection(index,weather);
+          },status);
+        };
         const monthlyOpsStatus=doc.createElement('p');
         monthlyOpsStatus.setAttribute('role','status');
         monthlyOpsStatus.id='insightMonthlyOpsPreviewStatus';

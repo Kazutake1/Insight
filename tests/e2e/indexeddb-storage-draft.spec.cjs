@@ -4058,6 +4058,22 @@ httpsTest('Draft Index rehearses migration, editing and recovery over HTTPS',asy
     await checkManagementSnapshot(removed);
     await expect(page.locator('#pageSaleResults')).toBeVisible();
 
+    await page.locator('#nav2').click();
+    const date=seed.fy+'-'+seed.month.replace('月','').padStart(2,'0')+'-'+String(seed.day).padStart(2,'0');
+    await page.evaluate(iso=>InsightInputDayNav.select('sales',iso),date);
+    await fillCombinedInput(page.locator('#sf_売上'),'432');
+    await page.locator('[data-sales-weather="雨"]').click();
+    await expect(page.locator('#salesSaveBtn + [role=status]')).toHaveText('保存しました。');
+    await expect(page.locator('#sf_売上')).toHaveValue('432');
+    const weatherSnapshot=structuredClone(expected.snapshot);
+    weatherSnapshot.sharedWeather??={};
+    weatherSnapshot.sharedWeather[[seed.fy,seed.month,seed.day].join('-')]='雨';
+    for(const shop of Object.values(weatherSnapshot.stores))shop.data[seed.fy][seed.month][seed.day-1].weather='雨';
+    expect(await committedInput(page)).toEqual({revision:expected.revision+1,snapshot:weatherSnapshot});
+    record=await readStoreSwitchRecord(peer);
+    expect(JSON.parse(record.previous.raw)).toEqual(expected.snapshot);
+    await fillCombinedInput(page.locator('#sf_売上'),String(weatherSnapshot.stores[weatherSnapshot.current].data[seed.fy][seed.month][seed.day-1].売上));
+
     await peer.evaluate(()=>localStorage.setItem('insight_indexeddb_adoption_v1','{'));
     await page.reload();
     await expect(page.getByRole('status')).toHaveText('保存状態を確認できないため、起動と保存を停止しています。');
