@@ -241,7 +241,10 @@
       try{
         var issued=Date.now(),delivery=state.delivery,storage=root.InsightStorage;
         if(autoDelivery&&delivery!==defaultDelivery(new Date(issued)))throw new Error('納品日を表示し直してください。');
-        var snapshot=storage.readSnapshot(),store=snapshot&&snapshot.stores[state.storeId];
+        var adopted=root.InsightIndexedDBCandidateV1?.isAdopted();
+        var committed=adopted&&await root.InsightIndexedDBSalesInputPreviewV1.readCommittedView();
+        var snapshot=adopted?committed?.snapshot:storage.readSnapshot(),store=snapshot&&snapshot.stores[state.storeId];
+        if(adopted&&currentNav!=='orderForecast')throw new Error('発注予測を開き直してください。');
         var available=snapshot&&snapshot.salesCountManagement&&snapshot.salesCountManagement.categories||[];
         var category=available.find(function(item){return item.id===state.categoryId&&!item.hidden;});
         if(!store||!category)throw new Error('保存済みの店舗・カテゴリーを選択してください。');
@@ -258,6 +261,12 @@
         capture.sourceDigest=Array.from(new Uint8Array(digest),function(byte){
           return byte.toString(16).padStart(2,'0');
         }).join('');
+        if(adopted){
+          var latest=await root.InsightIndexedDBSalesInputPreviewV1.readCommittedView();
+          if(latest?.revision!==committed.revision||currentNav!=='orderForecast'||
+            state.storeId!==capture.storeId||state.categoryId!==category.id||state.delivery!==delivery)
+            throw new Error('対象の保存データが変わりました。発注予測を開き直してください。');
+        }
         var result=await saveCapture(root.indexedDB,capture);
         captureStatus.textContent=result==='scope'?'最初に記録した店舗・カテゴリーを選択してください。':
           result==='legacy'?'保存元を確認できない旧記録があります。この記録の評価は保留です。':

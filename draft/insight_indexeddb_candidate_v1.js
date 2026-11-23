@@ -2,7 +2,7 @@
 (function(root){
   'use strict';
   const document=root.document;
-  const version='20261123-indexeddb-preview-1';
+  const version='20261123-indexeddb-preview-2';
   let adopted=false;
   let verifiedSnapshot=null;
 

@@ -3,6 +3,7 @@
   'use strict';
 
   let connectedType=null,connectedStatus=null,allowConnectedNavigation=null,allowConnectedPeriod=null,yearManagement=null;
+  let readCommittedView=null;
   const screens={
     sales:{route:2,button:'salesSaveBtn',notice:'savedSales',label:'売上'},
     kyaku:{route:3,button:'kyakuSaveBtn',notice:'savedKyaku',label:'客数'},
@@ -333,7 +334,10 @@
     }
 
     // Approve a sidebar dispatch once, before document capture can start date synchronization.
-    const sidebarSelector=Object.keys(sidebarRoutes).map(id=>'#'+id).join(',');
+    const readRoutes={navSaleResults:'saleResults',navEventResults:'eventResults',navOrderForecast:'orderForecast'};
+    const routes=management?{...sidebarRoutes,...readRoutes}:sidebarRoutes;
+    const sidebarSelector=Object.keys(routes).map(id=>'#'+id).join(',');
+    const reportDialog=()=>management&&doc.querySelector('#insightReportDialog[open]');
     let approved=null;
     const screenQuestion='保存せずに画面を移動しますか？';
     const isInputRoute=route=>route===0||route==='salesCounts'||Object.values(screens).some(screen=>screen.route===route);
@@ -354,6 +358,14 @@
           event.stopImmediatePropagation();
           return;
         }
+        const report=reportDialog();
+        if(report||management&&event.target.closest?.('#insightReportOpen')){
+          if(!blocked()&&(report?report.contains(event.target):!yearDialog()&&!eventDialogs().length&&
+            !budgetDialog()&&!hourly?.dialog()?.open&&!root.InsightSalesCount.getCategoryDialog()?.open))return;
+          event.preventDefault();
+          event.stopImmediatePropagation();
+          return;
+        }
         const budget=budgetDialog();
         if(budget){
           if(!blocked()&&budget.contains(event.target)&&!event.target.closest?.('#budgetSaveBtn'))return;
@@ -370,7 +382,7 @@
         if(item){
           event.preventDefault();
           event.stopImmediatePropagation();
-          root.gotoNav(sidebarRoutes[item.id]);
+          root.gotoNav(routes[item.id]);
           return;
         }
         if(management&&event.target.closest?.('#navSettings')){
@@ -424,10 +436,10 @@
     let navigationVersion=0;
     const gotoNav=root.gotoNav;
     root.gotoNav=function(destination){
-      if(followInputScreens&&(blocked()||yearDialog()||eventDialogs().length||budgetDialog()||recoveryDialog?.open))return false;
+      if(followInputScreens&&(blocked()||yearDialog()||eventDialogs().length||budgetDialog()||recoveryDialog?.open||reportDialog()))return false;
       if(quick){
         if(hourly?.dialog()?.open||root.InsightSalesCount.getCategoryDialog()?.open||
-           (!isInputRoute(destination)&&!(management&&(destination==='settings'||destination===1)))||
+           (!isInputRoute(destination)&&!(management&&(destination==='settings'||destination===1||Object.values(readRoutes).includes(destination))))||
            destination===currentNav||!allowNavigation(screenQuestion))return false;
         const fromQuick=currentNav===0;
         const period=root.InsightPagePeriodSync;
@@ -436,6 +448,7 @@
         const priorPeriod=currentNav===screen.route?displayedPeriod():null;
         const priorType=type;
         const result=gotoNav.apply(this,arguments);
+        if(currentNav!==destination)return false;
         navigationVersion++;
         if(priorPeriod){
           drafts[priorType]=JSON.parse(JSON.stringify(rows(state.committed.snapshot,priorPeriod.storeId,priorPeriod)??[]));
@@ -443,7 +456,7 @@
         if(destination===0){
           connectedType=null;
           quick.onEnter();
-        }else if(destination==='settings'||destination===1){
+        }else if(!isInputRoute(destination)){
           connectedType=null;
         }else{
           const next=fromQuick?{year:daily.fy,month:daily.mIdx+1,day:daily.day,source:'daily'}:previous;
@@ -486,13 +499,17 @@
         // The browser changes the select value before dispatching the change event.
         selector.value=state.storeId;
         if(blocked()||yearDialog()||eventDialogs().length||budgetDialog()||recoveryDialog?.open||id===state.storeId||!Object.hasOwn(state.committed.snapshot.stores,id))return false;
-        if(currentNav!==screen.route){
+        const route=currentNav;
+        const monthly=route===screen.route;
+        if(reportDialog()||hourly?.dialog()?.open||root.InsightSalesCount.getCategoryDialog()?.open)return false;
+        if(!monthly&&!management){
           storeStatus.textContent='試験用の店舗切替は月次入力画面で行ってください。';
           return false;
         }
         if(allStores.current!==state.storeId||
            root.InsightStorage.serialize(allStores)!==root.InsightStorage.serialize(state.committed.snapshot)){
-          stop('保存済みデータとの一致を確認できないため、店舗切替を停止しました。');
+          state.held=true;
+          storeStatus.textContent='保存済みデータとの一致を確認できないため、店舗切替を停止しました。';
           return false;
         }
         const dirty=getStatus().hasUnsavedInput;
@@ -501,43 +518,53 @@
           :'店舗を切り替えますか？'))return false;
 
         const period=root.InsightPagePeriodSync?.getTarget();
-        const priorDraft=JSON.stringify(drafts[type]);
+        const draftInput=()=>monthly?JSON.stringify(drafts[type]):route===0?quick.getDraftSignature():
+          route==='salesCounts'?root.InsightSalesCount.getDraftSignature():null;
+        const priorDraft=draftInput();
         const candidate=JSON.parse(JSON.stringify(state.committed.snapshot));
         candidate.current=id;
         applySharedWeatherToStore(candidate.stores[id],candidate);
         const wasInert=doc.body.inert;
         clearTimeout(timer);
-        notice.classList.remove('is-visible');
+        notice?.classList.remove('is-visible');
         state.busy=true;
-        selector.disabled=button.disabled=true;
+        selector.disabled=true;
+        if(button)button.disabled=true;
         doc.body.inert=true;
         storeStatus.textContent='店舗の切替を確認しています。';
         try{
           const result=await api.save(state.committed.revision,candidate);
-          if(currentNav!==screen.route||allStores.current!==state.storeId||
+          if(currentNav!==route||allStores.current!==state.storeId||
              root.InsightStorage.serialize(allStores)!==root.InsightStorage.serialize(state.committed.snapshot)||
-             JSON.stringify(drafts[type])!==priorDraft){
+             draftInput()!==priorDraft){
             throw new Error('Store selection changed during save');
           }
           state.committed=result;
           state.storeId=id;
           allStores=JSON.parse(JSON.stringify(result.snapshot));
-          renderStoreSelection(id);
+          renderStoreSelection(id,undefined,typeof route==='string');
+          if(route==='salesCounts')root.InsightSalesCount.refreshCommittedStore();
+          if(Object.values(readRoutes).includes(route))gotoNav(route);
+          if(route==='settings')root.InsightDataHealth?.refresh();
           root.InsightPagePeriodSync?.reconcileCurrentStore(period);
           for(const attachment of attachments.values())attachment.target=null;
-          target={...displayedPeriod(),storeId:state.storeId};
-          attachments.get(type).target=target;
+          if(monthly){
+            target={...displayedPeriod(),storeId:state.storeId};
+            attachments.get(type).target=target;
+          }
           storeStatus.textContent='店舗を切り替えました。';
           return true;
         }catch(_){
-          stop('店舗切替の結果を確認できないため、追加の保存を停止しました。');
-          storeStatus.textContent=status.textContent;
+          state.held=true;
+          storeStatus.textContent='店舗切替の結果を確認できないため、追加の保存を停止しました。';
           return false;
         }finally{
           state.busy=false;
           doc.body.inert=wasInert;
-          selector.disabled=button.disabled=state.held;
+          selector.disabled=state.held;
+          if(button)button.disabled=state.held;
           selector.value=state.storeId;
+          if(route===0&&!state.held&&state.storeId===id)quick.onEnter();
         }
       }
       selector.addEventListener('change',event=>{
@@ -708,6 +735,7 @@
             if(event.storageArea!==root.localStorage||
                ![null,'insight_v11','insight_indexeddb_adoption_v1'].includes(event.key))return;
             state.held=true;
+            root.InsightReportPreview?.onStorageUpdate({phase:'external'});
             warning.textContent='別のタブで保存状態が変わりました。画面を開き直してください。';
           });
         }
@@ -989,11 +1017,21 @@
     allowConnectedNavigation=allowNavigation;
     connectedType=quick?null:type;
     connectedStatus=getStatus;
+    if(management)readCommittedView=async ()=>{
+      if(blocked())throw new Error('The committed snapshot is unavailable');
+      const expected=state.committed;
+      const actual=await api.read();
+      if(blocked()||expected!==state.committed||actual.revision!==expected.revision||
+        root.InsightStorage.serialize(actual.snapshot)!==root.InsightStorage.serialize(expected.snapshot))
+        throw new Error('The committed snapshot has changed');
+      return actual;
+    };
     return Object.freeze({getStatus});
   }
 
   root.InsightIndexedDBSalesInputPreviewV1=Object.freeze({
     connect,
+    readCommittedView:()=>readCommittedView?.()??null,
     getConnectedStatus:(type=connectedType)=>type===connectedType?connectedStatus?.()??null:null,
     allowPeriod:(type,year)=>allowConnectedPeriod?.(type,year)??null,
     allowNavigation:(type,question)=>type===connectedType?allowConnectedNavigation(question):true,

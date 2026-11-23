@@ -8,8 +8,8 @@
   const recordKey='current';
   const storeName='snapshots';
   // Pin the version exercised by the Draft migration. It must be updated with the release that enables it.
-  const migrationBuild='20261123-indexeddb-preview-build-114';
-  const migrationFeatures='80574b3d';
+  const migrationBuild='20261123-indexeddb-preview-build-115';
+  const migrationFeatures='e0e7f1e3';
 
   function parse(raw){
     const snapshot=JSON.parse(raw);

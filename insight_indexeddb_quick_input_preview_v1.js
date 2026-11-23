@@ -274,7 +274,8 @@
       rememberRenderedDraft();
     }
     session={getStatus,allowDateChange,dateChanged};
-    return Object.freeze({getStatus,onEnter,fillWeatherDraft});
+    return Object.freeze({getStatus,onEnter,fillWeatherDraft,
+      getDraftSignature:()=>JSON.stringify([dateContext.getSelectedIso(),readInputs()])});
   }
 
   root.InsightIndexedDBQuickInputPreviewV1=Object.freeze({

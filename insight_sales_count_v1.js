@@ -508,6 +508,12 @@
       return setPeriod(year,month,confirmed&&preview&&root.InsightIndexedDBSalesInputPreviewV1?.managesYears());
     };
     model.reloadFromStore=reloadFromStore;
+    model.getDraftSignature=function(){return JSON.stringify([state.year,state.month,state.categoryId,state.draft,state.wasteDraft,state.wasteTouched]);};
+    model.refreshCommittedStore=function(){
+      if(!preview)throw new Error('No committed sales-count session');
+      store=allStores.stores[allStores.current];
+      readMonth();render();
+    };
     model.confirmLeave=confirmLeave;
     model.createReadOnlyDayCard=createReadOnlyDayCard;
     model.createHistoricalWeatherRow=createHistoricalWeatherRow;
