@@ -147,6 +147,7 @@
   }
 
   window.InsightMonthlyOps={
+    get:ensureMonthlyOps,
     connectIndexedDBPreview:function(save){previewSave=save;}
   };
   window.editMonthlyOpsKpi=function(type){

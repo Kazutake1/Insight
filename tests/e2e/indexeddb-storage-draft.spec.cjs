@@ -2071,6 +2071,7 @@ test('monthly KPIs and waste budget update only the selected store and scope',as
   const expected=JSON.parse(seed.raw);
   await page.locator('#nav1').click();
   const {year,month}=await page.evaluate(()=>({year:String(baseYear),month:selMonth}));
+  expect(await page.evaluate(()=>InsightStorage.serialize(allStores))).toBe(seed.raw);
   expect(await committedInput(page)).toEqual({revision:0,snapshot:expected});
   const labor=page.locator('[data-monthly-ops="labor"]');
   const grossMargin=page.locator('[data-monthly-ops="grossMargin"]');
