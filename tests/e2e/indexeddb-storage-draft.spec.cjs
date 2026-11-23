@@ -3938,7 +3938,7 @@ httpsTest('Draft Index rehearses migration, editing and recovery over HTTPS',asy
       const id=expected.snapshot.current===seed.id?'fixture-peer':seed.id;
       page.once('dialog',dialog=>dialog.accept());
       await page.locator('#storeSel').selectOption(id);
-      await expect(page.locator('#storeSel + [role=status]')).toHaveText('店舗を切り替えました。');
+      await expect(page.locator('#insightIndexedDBStoreStatus')).toHaveText('店舗を切り替えました。');
       await expect(page.locator('#storeSel')).toHaveValue(id);
       await expect(page.locator(screen)).toBeVisible();
       if(nav==='#nav0')await expect(page.locator('#qi_売上')).toHaveValue('999');

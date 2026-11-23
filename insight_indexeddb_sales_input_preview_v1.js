@@ -492,6 +492,7 @@
     if(followInputScreens){
       const selector=doc.getElementById('storeSel');
       const storeStatus=doc.createElement('span');
+      storeStatus.id='insightIndexedDBStoreStatus';
       storeStatus.setAttribute('role','status');
       selector.parentNode.insertBefore(storeStatus,selector.nextSibling);
 
