@@ -2772,7 +2772,7 @@ test('encrypted restore keeps the pre-restore revision and resumes only the veri
 });
 
 async function openRealRecoveryForm(page){
-  const seed=await openQuickInputPreview(page,{useRealBackupAfterMigration:true});
+  const seed=await openQuickInputPreview(page,{useRealBackupAfterMigration:true,connectQuick:false});
   await page.addScriptTag({url:'/insight_indexeddb_recovery_preview_v1.js'});
   await page.route('**/reopened-recovery-fixture',route=>route.fulfill({contentType:'text/html',body:
     '<!doctype html><meta charset="utf-8"><output></output><script src="/insight_indexeddb_storage_v1.js"></script>'+
@@ -4560,7 +4560,7 @@ for(const failure of ['readback abort','acknowledgement lost','tab closed during
 }
 
 async function openQuickInputPreview(page,{sameMunicipality=true,followMonthlyInputs=false,seedCounts=false,
-  seedHours=false,seedDailyClear=false,seedYearBoundary=false,seedManagement=false,manageStoresAndYears=false,seedCSV=false,seedBulk=false,useRealBackupAfterMigration=false}={}){
+  seedHours=false,seedDailyClear=false,seedYearBoundary=false,seedManagement=false,manageStoresAndYears=false,seedCSV=false,seedBulk=false,useRealBackupAfterMigration=false,connectQuick=true}={}){
   await routeMigrationPage(page);
   await page.goto('/Index.html');
   await waitForMigrationChecks(page);
@@ -4571,7 +4571,7 @@ async function openQuickInputPreview(page,{sameMunicipality=true,followMonthlyIn
     if(manageStoresAndYears)await page.waitForSelector('#insightSettingsYearSection',{state:'attached'});
     await page.addScriptTag({url:'/insight_indexeddb_sales_input_preview_v1.js'});
   }
-  return page.evaluate(async ({sameMunicipality,followMonthlyInputs,seedCounts,seedHours,seedDailyClear,seedYearBoundary,seedManagement,manageStoresAndYears,seedCSV,seedBulk,useRealBackupAfterMigration})=>{
+  return page.evaluate(async ({sameMunicipality,followMonthlyInputs,seedCounts,seedHours,seedDailyClear,seedYearBoundary,seedManagement,manageStoresAndYears,seedCSV,seedBulk,useRealBackupAfterMigration,connectQuick})=>{
     const year=String(Number(todayFY().fy)-1),month='6月',day=12;
     const iso=year+'-06-12',active=allStores.current,peer='fictional-quick-peer';
     store.data[year]=blankYearData(year);
@@ -4656,9 +4656,9 @@ async function openQuickInputPreview(page,{sameMunicipality=true,followMonthlyIn
       window.combinedPreview=await InsightIndexedDBSalesInputPreviewV1.connect('sales',{
         followInputScreens:true,followQuickInput:true,manageStoresAndYears
       });
-    }else window.quickPreview=await InsightIndexedDBQuickInputPreviewV1.connect();
+    }else if(connectQuick)window.quickPreview=await InsightIndexedDBQuickInputPreviewV1.connect();
     return {year,month,day,iso,active,peer,raw,category:HAIKI_CATS[0],countCategory:countCategory.id,otherCategory:otherCategory.id};
-  },{sameMunicipality,followMonthlyInputs,seedCounts,seedHours,seedDailyClear,seedYearBoundary,seedManagement,manageStoresAndYears,seedCSV,seedBulk,useRealBackupAfterMigration});
+  },{sameMunicipality,followMonthlyInputs,seedCounts,seedHours,seedDailyClear,seedYearBoundary,seedManagement,manageStoresAndYears,seedCSV,seedBulk,useRealBackupAfterMigration,connectQuick});
 }
 
 async function editQuickInput(page,category){
