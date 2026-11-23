@@ -9,10 +9,12 @@ test.beforeEach(async({page})=>{
   },{build:'20261123-indexeddb-preview-build-114',features:'80574b3d'});
   await page.route(/https:\/\/(www\.jma\.go\.jp|[^/]*api\.open-meteo\.com)\//,route=>route.abort());
 });
+// The fixture server uses HTTP; keep the rest of the shell's CSP in effect.
+const allowFixtureHttp=html=>html.replace(/;?\s*upgrade-insecure-requests/g,'');
 async function routeMigrationPage(page){
   await page.route('**/Index.html*',async route=>{
     const response=await route.fetch();
-    await route.fulfill({response,body:(await response.text()).replace(/;?\s*upgrade-insecure-requests/g,'')});
+    await route.fulfill({response,body:allowFixtureHttp(await response.text())});
   });
 }
 async function waitForMigrationChecks(page){
@@ -3258,7 +3260,8 @@ test('cached legacy shell runs with its origin unavailable and adopted startup s
       response.end(worker);
     }else if(entryAssets.has(url.pathname)){
       response.setHeader('Content-Type',url.pathname.endsWith('.js')?'application/javascript':'text/html');
-      response.end(entryAssets.get(url.pathname));
+      const asset=entryAssets.get(url.pathname);
+      response.end(url.pathname==='/Index.html'?allowFixtureHttp(asset.toString('utf8')):asset);
     }else if(url.pathname==='/legacy-pwa-fixture'){
       response.setHeader('Content-Type','text/html');
       response.end('<!doctype html><title>Fictional online migration page</title>');
@@ -3765,6 +3768,7 @@ for(const connectionFails of [false,true]){
 
 test('Draft Index starts IndexedDB on its isolated origin and rehearses migration, editing and recovery',async({page,context})=>{
   test.setTimeout(60000);
+  await routeMigrationPage(page);
   const origin='http://localhost:4173';
   const fixture=origin+'/Index.html';
   await page.goto(fixture);
