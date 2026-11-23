@@ -34,7 +34,8 @@
       }
       await Promise.all([
         './insight_indexeddb_quick_input_preview_v1.js',
-        './insight_indexeddb_sales_input_preview_v1.js'
+        './insight_indexeddb_sales_input_preview_v1.js',
+        './insight_indexeddb_recovery_preview_v1.js'
       ].map(loadScript));
       await root.InsightIndexedDBSalesInputPreviewV1.connect('sales',{
         followInputScreens:true,followQuickInput:true,manageStoresAndYears:true,

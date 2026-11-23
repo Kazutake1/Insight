@@ -3710,11 +3710,9 @@ test('isolated release rehearsal verifies the downloaded backup, migrates, edits
     if(new URL(route.request().url()).searchParams.has('isolated-migration-fixture')){
       const loader=body.match(/<script src="([^"]*insight_shell_loader_v1[^"]*)"><\/script>/);
       if(!loader)throw new Error('The isolated startup fixture could not find the shell loader');
-      body=body.replace('id="loading"','id="loading" data-loader="'+loader[1]+'"')
-        .replace(loader[0],[
+      body=body.replace(loader[0],[
           'insight_indexeddb_storage_v1.js',
-          'insight_indexeddb_migration_preview_v1.js',
-          'insight_indexeddb_recovery_preview_v1.js'
+          'insight_indexeddb_migration_preview_v1.js'
         ].map(path=>'<script src="./'+path+'"></script>').join('')+
           '<script src="./draft/insight_indexeddb_candidate_v1.js" data-loader="'+loader[1]+'"></script>');
     }
@@ -3802,7 +3800,8 @@ test('isolated release rehearsal verifies the downloaded backup, migrates, edits
   await expect(page.locator('#storeSel')).toHaveValue(seed.id);
   await expect(page.locator('#qi_売上')).toHaveValue('123');
 
-  await page.waitForFunction(()=>InsightIndexedDBCandidateV1.isAdopted()&&!document.body.inert);
+  await page.waitForFunction(()=>InsightIndexedDBCandidateV1.isAdopted()&&!document.body.inert&&
+    !!document.getElementById('insightIndexedDBBackupDialog'));
   await page.evaluate(()=>{window.confirm=()=>true;});
 
   await page.locator('#qi_売上').fill('321');
@@ -3838,7 +3837,8 @@ test('isolated release rehearsal verifies the downloaded backup, migrates, edits
   await settings.getByRole('button',{name:'この内容を復元する'}).click();
   await expect(page.locator('#qi_売上')).toHaveValue('123');
   await expect(page.locator('#storeSel')).toHaveValue(seed.id);
-  await page.waitForFunction(()=>InsightIndexedDBCandidateV1.isAdopted()&&!document.body.inert);
+  await page.waitForFunction(()=>InsightIndexedDBCandidateV1.isAdopted()&&!document.body.inert&&
+    !!document.getElementById('insightIndexedDBBackupDialog'));
   const readback=await committedInput(page);
   expect(readback.revision).toBe(3);
   expect(readback.snapshot.stores[seed.id].years).toEqual(JSON.parse(raw).stores[seed.id].years);
