@@ -2646,6 +2646,10 @@ test('encrypted restore keeps the pre-restore revision and resumes only the veri
       const before=await api.read();
       const candidate=structuredClone(before.snapshot);
       candidate.stores[seed.peer].name='架空の復元先名';
+      for(const shop of Object.values(candidate.stores)){
+        Object.assign(shop.weatherLocation,{latitude:35.1,longitude:136.8,timezone:'Asia/Tokyo'});
+        shop.data[seed.year][seed.month][seed.day-1].stockout='なし';
+      }
       const safetyFile=await backupFile(before.snapshot),file=await backupFile(candidate);
       const args={file,password,safetyFile,safetyPassword:password,legacyClientsClosed:true};
       const markerKey='insight_indexeddb_adoption_v1';
