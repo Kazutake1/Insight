@@ -1665,6 +1665,7 @@ test('event preview saves scoped records and shared presets across years on sepa
   const created=first.snapshot.stores[seed.active].events.at(-1);
   expect(created).toMatchObject({type:'special',scope:'store',startDate:start,endDate:end,snapshot:{title:'架空の年またぎ催事'}});
   local.push(created);
+  expected.eventManagement={version:1,presets:[],events:[],demandCategories:[]};
   expect(first).toEqual({revision:1,snapshot:expected});
 
   await page.evaluate(()=>{window.confirm=()=>true;});
@@ -1685,7 +1686,7 @@ test('event preview saves scoped records and shared presets across years on sepa
   const third=await committedInput(page);
   const preset=third.snapshot.eventManagement.presets[0];
   expect(preset.snapshot.sale.params.amount).toBe(50);
-  expected.eventManagement={version:1,presets:[preset],events:[]};
+  expected.eventManagement.presets.push(preset);
   expect(third).toEqual({revision:3,snapshot:expected});
   await presets.getByRole('button',{name:'閉じる',exact:true}).click();
   await editor.getByRole('button',{name:/50円引き/}).click();
@@ -1721,6 +1722,7 @@ test('event preview retains the editing dialog and previous version when readbac
     const event=JSON.parse(record.raw).stores[seed.active].events.at(-1);
     expect(event).toMatchObject({type:'nearby',scope:'store',snapshot:{title:'架空の近隣イベント',location:'架空の会場'}});
     expected.stores[seed.active].events=[...(expected.stores[seed.active].events??[]),event];
+    expected.eventManagement={version:1,presets:[],events:[],demandCategories:[]};
     expect(record.revision).toBe(1);
     expect(JSON.parse(record.raw)).toEqual(expected);
     expect(record.previous.raw).toBe(seed.raw);
@@ -3868,7 +3870,7 @@ async function openQuickInputPreview(page,{sameMunicipality=true,followMonthlyIn
       allStores.sharedWeather={...allStores.sharedWeather,[wxKey(year,month,day+1)]:'雨'};
       store.monthlyOps={[year]:{'6月':{laborK:14}}};
       store.events=[{id:'fictional-management-event',type:'nearby',scope:'store',startDate:iso,endDate:iso,
-        snapshot:{version:1,title:'架空の催事',location:'架空の会場'}}];
+        snapshot:{version:1,title:'架空の催事',note:'',location:'架空の会場'}}];
     }
     if(seedCSV){
       store.data[String(Number(year)-2)]={'1月':[{...blankRow(1),売上:55,storeMemo:'架空の既存実績'}]};
