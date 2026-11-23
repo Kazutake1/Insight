@@ -11,8 +11,8 @@ test.beforeEach(async({page})=>{
 });
 // The fixture server uses HTTP; keep the rest of the shell's CSP in effect.
 const allowFixtureHttp=html=>html.replace(/;?\s*upgrade-insecure-requests/g,'');
-async function routeMigrationPage(page){
-  await page.route('**/Index.html*',async route=>{
+async function routeMigrationPage(page,pattern='**/Index.html*'){
+  await page.route(pattern,async route=>{
     const response=await route.fetch();
     await route.fulfill({response,body:allowFixtureHttp(await response.text())});
   });
@@ -3766,12 +3766,18 @@ for(const connectionFails of [false,true]){
   });
 }
 
-test('Draft Index starts IndexedDB on its isolated origin and rehearses migration, editing and recovery',async({page,context})=>{
+const httpsTest=test.extend({
+  ignoreHTTPSErrors:true,
+  httpsInsight:async ({},use)=>require('./helpers/https-insight.cjs')(use)
+});
+httpsTest('Draft Index rehearses migration, editing and recovery over HTTPS',async({page,context,httpsInsight})=>{
   test.setTimeout(60000);
-  await routeMigrationPage(page);
-  const origin='http://localhost:4173';
-  const fixture=origin+'/Index.html';
+  await routeMigrationPage(page,'http://127.0.0.1:4173/Index.html*');
+  const fixture=httpsInsight+'/Index.html';
   await page.goto(fixture);
+  expect(await page.evaluate(()=>({protocol:location.protocol,secure:isSecureContext,
+    csp:document.querySelector('meta[http-equiv="Content-Security-Policy"]').content})))
+    .toMatchObject({protocol:'https:',secure:true,csp:expect.stringContaining('upgrade-insecure-requests')});
   await expect(page.getByRole('status')).toHaveText('保存状態を確認できないため、起動と保存を停止しています。');
   await expect(page.locator('#quickGrid')).toHaveCount(0);
   expect(await page.evaluate(()=>localStorage.getItem('insight_v11'))).toBeNull();
@@ -3893,10 +3899,16 @@ test('Draft Index starts IndexedDB on its isolated origin and rehearses migratio
   expect(readback.revision).toBe(3);
   expect(readback.snapshot.stores[seed.id].years).toEqual(JSON.parse(raw).stores[seed.id].years);
   expect(readback.snapshot.stores['fixture-peer'].data[seed.fy][seed.month][seed.day-1].売上).toBe(999);
-  const peer=await openStoreSwitchPeer(context,origin);
+  const peer=await openStoreSwitchPeer(context,httpsInsight);
   try{
     const record=await readStoreSwitchRecord(peer);
     expect(JSON.parse(record.previous.raw)).toEqual(beforeRestore.snapshot);
+    expect(await peer.evaluate(()=>localStorage.getItem('insight_v11'))).toBe(raw);
+    await peer.evaluate(()=>localStorage.setItem('insight_indexeddb_adoption_v1','{'));
+    await page.reload();
+    await expect(page.getByRole('status')).toHaveText('保存状態を確認できないため、起動と保存を停止しています。');
+    await expect(page.locator('#quickGrid')).toHaveCount(0);
+    expect(await readStoreSwitchRecord(peer)).toEqual(record);
     expect(await peer.evaluate(()=>localStorage.getItem('insight_v11'))).toBe(raw);
   }finally{await peer.close();}
 });
@@ -4756,8 +4768,8 @@ async function openStoreSwitchPeer(context,origin=''){
   }));
   await peer.goto(origin+'/store-switch-fixture');
   await peer.evaluate(()=>{window.SK='insight_v11';});
-  await peer.addScriptTag({url:'/insight_storage_v1.js'});
-  await peer.addScriptTag({url:'/insight_indexeddb_storage_v1.js'});
+  await peer.addScriptTag({url:origin+'/insight_storage_v1.js'});
+  await peer.addScriptTag({url:origin+'/insight_indexeddb_storage_v1.js'});
   return peer;
 }
 
