@@ -12,6 +12,46 @@
     return root.InsightIndexedDBStorageV1;
   }
 
+  function clearFutureWeather(snapshot,today){
+    let changed=false;
+    function isFuture(year,month,day){
+      if(!/^[1-9]\d{3}$/.test(year)||!Number.isInteger(day))return false;
+      const date=new Date(Number(year),month-1,day);
+      return date.getFullYear()===Number(year)&&date.getMonth()===month-1&&date.getDate()===day&&date>today;
+    }
+    for(const shop of Object.values(snapshot.stores)){
+      for(const [year,months] of Object.entries(shop.data??{})){
+        for(const [month,rows] of Object.entries(months??{})){
+          const match=/^(1[0-2]|[1-9])月$/.exec(month);
+          if(!match||!Array.isArray(rows))continue;
+          rows.forEach((row,index)=>{
+            if(!row||typeof row!=='object'||!isFuture(year,Number(match[1]),Number(row.d)||index+1))return;
+            if(row.weather){row.weather='';changed=true;}
+            for(const field of ['tempMaxC','tempMinC']){
+              if(Object.hasOwn(row,field)){delete row[field];changed=true;}
+            }
+          });
+        }
+      }
+    }
+    for(const key of Object.keys(snapshot.sharedWeather??{})){
+      const date=/^([1-9]\d{3})-(1[0-2]|[1-9])月-([1-9]\d?)$/.exec(key);
+      if(date&&isFuture(date[1],Number(date[2]),Number(date[3]))){
+        delete snapshot.sharedWeather[key];
+        changed=true;
+      }
+    }
+    return changed;
+  }
+
+  async function prepareAdoptedStartup(){
+    const active=await storage().read();
+    const candidate=structuredClone(active.snapshot);
+    const today=new Date();
+    today.setHours(0,0,0,0);
+    return clearFutureWeather(candidate,today)?storage().save(active.revision,candidate):active;
+  }
+
   async function start(container,loadLegacy,loadAdopted){
     container.textContent='保存状態を確認しています。';
     const diagnostic=await storage().diagnoseStartup();
@@ -20,7 +60,14 @@
       return;
     }
     if(diagnostic.reason==='indexeddb-adopted'&&typeof loadAdopted==='function'){
-      await loadAdopted();
+      let prepared;
+      try{prepared=await prepareAdoptedStartup();}
+      catch(_){
+        container.setAttribute('role','status');
+        container.textContent='起動時の保存を確認できないため、入力を停止しています。';
+        return;
+      }
+      await loadAdopted(prepared);
       return;
     }
     const message=diagnostic.reason==='indexeddb-adopted'

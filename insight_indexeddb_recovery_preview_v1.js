@@ -16,12 +16,15 @@
     form.append(wrapper);
   }
 
-  function mount(container,{mode='inspect'}={}){
+  function mount(container,{mode='inspect',onCommitted}={}){
     if(!['inspect','restore','resume'].includes(mode))throw new Error('Unknown recovery preview mode');
     const restoring=mode==='restore',resuming=mode==='resume';
+    const changesStorage=restoring||resuming;
+    if(changesStorage&&typeof onCommitted!=='function')throw new Error('Recovery requires an isolated restart handler');
+    let committed=false;
     const section=element('section');
     const title=element('h2',restoring?'暗号化バックアップから復元':resuming?'保存を再開':'暗号化バックアップの確認');
-    const note=element('p',restoring?'現在の確定版の暗号化バックアップと、復元する暗号化バックアップを用意してください。':
+    const note=element('p',restoring?'現在の確定版と復元対象の暗号化バックアップが必要です。復元前の確定版は直前版に残り、それ以前の直前版は置き換わります。':
       '保存を停止しています。バックアップの内容を確認できます。');
     const status=element('p');
     status.setAttribute('role','status');
@@ -36,8 +39,8 @@
     password.type='password';
     password.required=true;
     password.autocomplete='off';
-    field(fields,'暗号化バックアップ',file);
-    field(fields,'バックアップのパスワード',password);
+    field(fields,restoring?'復元する暗号化バックアップ':'暗号化バックアップ',file);
+    field(fields,restoring?'復元するバックアップのパスワード':'バックアップのパスワード',password);
     const safetyFile=file.cloneNode();
     const safetyPassword=password.cloneNode();
     if(restoring){
@@ -86,7 +89,7 @@
 
     form.addEventListener('submit',async event=>{
       event.preventDefault();
-      if(fields.disabled)return;
+      if(fields.disabled||committed)return;
       fields.disabled=true;
       let passphrase=password.value,safetyPassphrase=safetyPassword.value;
       password.value=safetyPassword.value='';
@@ -99,8 +102,14 @@
             ...request,safetyFile:safetyFile.files[0],safetyPassword:safetyPassphrase,
             confirm:info=>review({...info.target,revision:info.revision})
           }):await api.resumeRecovery({...request,confirm:info=>review({...info.backup,revision:info.revision})});
-          status.textContent=result.review==='cancelled'?'取り消しました。':
-            restoring?'復元した確定版を確認しました。':'保存を再開しました。';
+          if(result.review==='cancelled'){
+            status.textContent='取り消しました。';
+          }else{
+            committed=true;
+            status.textContent=restoring?'復元した確定版を確認しました。画面を読み直しています。':
+              '保存を再開しました。画面を読み直しています。';
+            await onCommitted(result.revision);
+          }
         }else{
           const result=await api.reviewMissingStorageBackup(file.files[0],passphrase,review);
           status.textContent=result.review==='confirmed'
@@ -108,17 +117,64 @@
             :'確認を取り消しました。保存は停止したままです。';
         }
       }catch(error){
-        status.textContent=error?.name==='InsightBackupValidationError'
+        if(committed)status.textContent='確定版を更新しました。画面を開き直してから入力を再開してください。';
+        else status.textContent=error?.name==='InsightBackupValidationError'
           ?error.message:'確認できませんでした。ファイル、パスワード、保存状態を確認してください。';
       }finally{
         passphrase=safetyPassphrase='';
         file.value=safetyFile.value='';
         closed.checked=false;
-        fields.disabled=false;
-        file.focus();
+        fields.disabled=committed;
+        if(!committed)file.focus();
       }
     });
   }
 
-  root.InsightIndexedDBRecoveryPreviewV1=Object.freeze({mount});
+  function mountExport(container){
+    const form=element('form');
+    const fields=element('fieldset');
+    fields.append(element('legend','確定版の暗号化バックアップ'));
+    const password=element('input'),repeat=element('input');
+    for(const input of [password,repeat]){
+      input.type='password';
+      input.required=true;
+      input.autocomplete='new-password';
+    }
+    field(fields,'バックアップ用パスワード',password);
+    field(fields,'パスワードの確認',repeat);
+    const submit=element('button','暗号化してダウンロード');
+    submit.type='submit';
+    const status=element('p');
+    status.setAttribute('role','status');
+    fields.append(submit);
+    form.append(fields,status);
+    container.append(form);
+    form.addEventListener('submit',async event=>{
+      event.preventDefault();
+      if(fields.disabled)return;
+      let passphrase=password.value;
+      const matches=passphrase===repeat.value;
+      password.value=repeat.value='';
+      if(!matches){
+        status.textContent='パスワードが一致しません。';
+        password.focus();
+        return;
+      }
+      fields.disabled=true;
+      status.textContent='確定版を確認しています。';
+      try{
+        const revision=await root.InsightIndexedDBStorageV1.downloadCommittedBackup(passphrase);
+        status.textContent='確定版 '+revision+' のバックアップをダウンロードしました。';
+      }catch(error){
+        status.textContent=error?.name==='InsightBackupValidationError'?error.message:
+          '確定版のバックアップをダウンロードできませんでした。';
+      }finally{
+        passphrase='';
+        fields.disabled=false;
+        password.focus();
+      }
+    });
+  }
+
+  root.InsightIndexedDBRecoveryPreviewV1=Object.freeze({mount,mountExport});
 })(globalThis);

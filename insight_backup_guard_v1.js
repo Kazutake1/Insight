@@ -649,8 +649,14 @@ async function readRestoreCandidate(file,password){
 async function inspectMissingStorageBackup(file,password){
   return (await readRestoreCandidate(file,password)).summary;
 }
+async function encodeCommittedBackup(snapshot,password){
+  var now=new Date(),data=window.InsightStorage.migrateSnapshot(snapshot);
+  var encrypted=await cryptoCodec().encrypt({backupInfo:buildBackupInfo(data,now),data:data},password);
+  return {encrypted:encrypted,filename:'Insight_'+backupStamp(now)+'.json'};
+}
 window.InsightMigrationBackupV1=Object.freeze({
   confirm:confirmMigrationBackup,assertReady:assertMigrationReady,verify:verifyMigrationBackup,
-  inspectMissingStorage:inspectMissingStorageBackup,readRestoreCandidate:readRestoreCandidate
+  inspectMissingStorage:inspectMissingStorageBackup,readRestoreCandidate:readRestoreCandidate,
+  encodeCommitted:encodeCommittedBackup,downloadEncrypted:downloadBackupPayload
 });
 })();

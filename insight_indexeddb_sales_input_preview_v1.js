@@ -341,10 +341,20 @@
     const eventDialogs=()=>management?Array.from(doc.querySelectorAll('dialog.ie-dialog[open]')):[];
     const yearControl='#addYearBtn,#ayInput,#ayAddBtn,#insightDeleteYearButton';
     const storeControl='#storeSel,#storeMenuBtn';
+    const budgetDialog=()=>management&&currentNav===screens.haiki.route&&doc.querySelector('#budgetModalBg.show');
+    let saveBudgetPreview;
     const storeActionControl='#storeMenu [data-indexeddb-store-action],#storeMenu #weatherLocationMenuItem';
     root.addEventListener('click',event=>{
       const item=event.target.closest?.(sidebarSelector);
       if(quick){
+        const budget=budgetDialog();
+        if(budget){
+          if(!blocked()&&budget.contains(event.target)&&!event.target.closest?.('#budgetSaveBtn'))return;
+          event.preventDefault();
+          event.stopImmediatePropagation();
+          if(!blocked()&&event.target.closest?.('#budgetSaveBtn'))void saveBudgetPreview();
+          return;
+        }
         const eventDialog=eventDialogs().at(-1);
         if(management&&!blocked()&&!yearDialog()&&!eventDialog&&!hourly?.dialog()?.open&&
           !root.InsightSalesCount.getCategoryDialog()?.open&&
@@ -405,10 +415,10 @@
     let navigationVersion=0;
     const gotoNav=root.gotoNav;
     root.gotoNav=function(destination){
-      if(followInputScreens&&(blocked()||yearDialog()||eventDialogs().length))return false;
+      if(followInputScreens&&(blocked()||yearDialog()||eventDialogs().length||budgetDialog()))return false;
       if(quick){
         if(hourly?.dialog()?.open||root.InsightSalesCount.getCategoryDialog()?.open||
-           (!isInputRoute(destination)&&!(management&&destination==='settings'))||
+           (!isInputRoute(destination)&&!(management&&(destination==='settings'||destination===1)))||
            destination===currentNav||!allowNavigation(screenQuestion))return false;
         const fromQuick=currentNav===0;
         const period=root.InsightPagePeriodSync;
@@ -424,7 +434,7 @@
         if(destination===0){
           connectedType=null;
           quick.onEnter();
-        }else if(destination==='settings'){
+        }else if(destination==='settings'||destination===1){
           connectedType=null;
         }else{
           const next=fromQuick?{year:daily.fy,month:daily.mIdx+1,day:daily.day,source:'daily'}:previous;
@@ -466,7 +476,7 @@
       async function switchStore(id){
         // The browser changes the select value before dispatching the change event.
         selector.value=state.storeId;
-        if(blocked()||yearDialog()||eventDialogs().length||id===state.storeId||!Object.hasOwn(state.committed.snapshot.stores,id))return false;
+        if(blocked()||yearDialog()||eventDialogs().length||budgetDialog()||id===state.storeId||!Object.hasOwn(state.committed.snapshot.stores,id))return false;
         if(currentNav!==screen.route){
           storeStatus.textContent='試験用の店舗切替は月次入力画面で行ってください。';
           return false;
@@ -543,7 +553,7 @@
       };
 
       function canOpenStoreMenu(){
-        return !blocked()&&!yearDialog()&&!eventDialogs().length&&(currentNav===0||currentNav==='settings'||currentNav===screen.route)&&
+        return !blocked()&&!yearDialog()&&!eventDialogs().length&&!budgetDialog()&&(currentNav===0||currentNav==='settings'||currentNav===screen.route)&&
           !hourly?.dialog()?.open;
       }
 
@@ -571,7 +581,7 @@
 
       function managementScope(){
         return JSON.stringify({
-          route:currentNav,storeId:allStores.current,editYear,editMonth,drafts,baseYear,cmpYear,
+          route:currentNav,storeId:allStores.current,editYear,editMonth,drafts,baseYear,cmpYear,selMonth,
           days:[root.salesSelDay,root.haikiSelDay,root.InsightDateContext?.getSelectedIso()],
           period:root.InsightPagePeriodSync?.getTarget(),
           quickWeather:currentNav===0?quickWeather:null,
@@ -675,6 +685,51 @@
       }
 
       if(management){
+        const monthlyOpsStatus=doc.createElement('p');
+        monthlyOpsStatus.setAttribute('role','status');
+        monthlyOpsStatus.id='insightMonthlyOpsPreviewStatus';
+        doc.getElementById('kpiRow').after(monthlyOpsStatus);
+        root.InsightMonthlyOps.connectIndexedDBPreview((year,month,edit,render)=>{
+          if(currentNav!==1||blocked()||!store.years.some(value=>String(value)===year)||!MONTHS.includes(month))return false;
+          return runManagement(managementScope(),candidate=>edit(candidate.stores[state.storeId]),render,monthlyOpsStatus,
+            ()=>String(baseYear)===year&&selMonth===month);
+        });
+        const budgetStatus=doc.createElement('p');
+        budgetStatus.setAttribute('role','status');
+        budgetStatus.id='insightBudgetPreviewStatus';
+        doc.getElementById('budgetEditRows').after(budgetStatus);
+        saveBudgetPreview=async ()=>{
+          const dialog=budgetDialog();
+          if(!dialog||blocked())return false;
+          const budget=getHaikiBudget();
+          const fields=new Map([...HAIKI_CATS,'total'].map(key=>[key,dialog.querySelector('[id="be_'+key+'"]')]));
+          const input=()=>Array.from(fields.values(),field=>field.value);
+          const values=input();
+          const numbers=values.map(value=>{
+            const text=value.replaceAll(',','').trim();
+            return text===''?0:/^\d+$/.test(text)?Number(text):NaN;
+          });
+          if(!numbers.every(Number.isSafeInteger)){
+            budgetStatus.textContent='予算は0以上の整数で入力してください。';
+            return false;
+          }
+          const cats=Object.fromEntries(HAIKI_CATS.map((key,index)=>[key,numbers[index]]));
+          const next={...budget,total:numbers.at(-1),cats:{...budget.cats,...cats}};
+          return runManagement(managementScope(),candidate=>{
+            candidate.stores[state.storeId].haikibudget=next;
+            return true;
+          },()=>{
+            root.closeBudgetModal();
+            root.renderHaikiForm(editYear.haiki,MONTHS.indexOf(editMonth.haiki),root.haikiSelDay);
+          },budgetStatus,()=>budgetDialog()===dialog&&input().every((value,index)=>value===values[index]));
+        };
+        const openBudget=root.openBudgetModal;
+        root.openBudgetModal=()=>{
+          if(blocked()||currentNav!==screens.haiki.route)return;
+          budgetStatus.textContent='';
+          openBudget();
+        };
+        root.saveBudget=saveBudgetPreview;
         root.InsightWeatherBulk.install();
         const bulkStatus=doc.getElementById('insightWeatherBulkStatus');
         root.InsightWeatherBulk.connectIndexedDBPreview({

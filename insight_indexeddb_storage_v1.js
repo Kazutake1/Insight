@@ -466,6 +466,19 @@
     });
   }
 
+  async function downloadCommittedBackup(password){
+    const before=await exclusive(activeEvidence);
+    const backup=root.InsightMigrationBackupV1;
+    const file=await backup.encodeCommitted(parse(before.record.raw),password);
+    return exclusive(async ()=>{
+      const after=await activeEvidence();
+      if(after.markerRaw!==before.markerRaw||JSON.stringify(after.record)!==JSON.stringify(before.record))
+        throw new Error('Backup data changed');
+      backup.downloadEncrypted(file.encrypted,file.filename);
+      return after.record.revision;
+    });
+  }
+
   async function historyOnlyEvidence(){
     const raw=root.localStorage.getItem(sourceKey);
     const history=await migrationHistory();
@@ -506,6 +519,6 @@
   }
 
   root.InsightIndexedDBStorageV1=Object.freeze({
-    migrate,read,save,diagnose,diagnoseStartup,checkMigrationEnvironment,reviewRecovery,reviewHistoryOnlyBackup,reviewMissingStorageBackup,restoreBackup,resumeRecovery
+    migrate,read,save,diagnose,diagnoseStartup,checkMigrationEnvironment,reviewRecovery,reviewHistoryOnlyBackup,reviewMissingStorageBackup,restoreBackup,resumeRecovery,downloadCommittedBackup
   });
 })(globalThis);
