@@ -1806,7 +1806,7 @@ test('event preview keeps a cancelled deletion and saves shared demand categorie
   await names.nth(0).fill('架空の惣菜');
   await add.click();
   await names.nth(1).fill('架空のお菓子');
-  await manager.getByRole('button',{name:'架空のお菓子を上へ移動'}).click();
+  await manager.locator('.ie-demand-favorite-row').nth(1).getByRole('button',{name:/を上へ移動$/}).click();
   await manager.getByRole('button',{name:'保存する'}).click();
   await expect(manager).toHaveCount(0);
   const current=await committedInput(page);
@@ -1866,7 +1866,7 @@ test('weather location saves only the selected store and preserves the prior rev
   const prior=await committedInput(page);
   await page.evaluate(()=>{window.previewWeatherQuery='';});
   await openPreviewLocation(page);
-  await expect.poll(async()=>(await committedInput(page)).revision).toBe(2);
+  await page.waitForFunction(()=>combinedPreview.getStatus().state==='IDLE_OBSERVED');
   delete expected.stores[seed.active].weatherLocation;
   expect(await committedInput(page)).toEqual({revision:2,snapshot:expected});
   const observer=await openStoreSwitchPeer(context);
@@ -1960,7 +1960,7 @@ test('explicit automatic weather fills only the draft and ignores manual changes
   const expected=baseline.snapshot;
   Object.assign(expected.stores[seed.active].data[seed.year][seed.month][seed.day-1],{weather:'雨',tempMaxC:27,tempMinC:13});
   expected.stores[seed.peer].data[seed.year][seed.month][seed.day-1].weather='雨';
-  expected.sharedWeather[seed.year+'-'+seed.month+'-'+seed.day]='雨';
+  expected.sharedWeather={...expected.sharedWeather,[seed.year+'-'+seed.month+'-'+seed.day]:'雨'};
   expect(await committedInput(page)).toEqual({revision:2,snapshot:expected});
   expect(await page.evaluate(()=>localStorage.getItem('insight_v11'))).toBe(seed.raw);
 });
@@ -4226,7 +4226,7 @@ function quickExpectedSnapshot(seed,sameMunicipality){
     delete peer.tempMinC;
   }
   expected.sharedWeather??={};
-  expected.sharedWeather[seed.year+'-'+seed.month+'-'+seed.day]='雨';
+  expected.sharedWeather={...expected.sharedWeather,[seed.year+'-'+seed.month+'-'+seed.day]:'雨'};
   return expected;
 }
 
