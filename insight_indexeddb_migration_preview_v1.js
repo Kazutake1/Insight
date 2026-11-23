@@ -95,6 +95,55 @@
     container.textContent=message;
   }
 
+  function selectVerifiedBackup(){
+    const dialog=element('dialog');
+    const title=element('h2','保存したバックアップの照合');
+    const hint=element('p','ダウンロードした暗号化ファイルを選び、作成時のパスワードを入力してください。');
+    const form=element('form');
+    const file=element('input');
+    file.type='file';
+    file.accept='.json,application/json';
+    file.required=true;
+    const fileLabel=element('label','保存した暗号化バックアップ');
+    fileLabel.append(file);
+    const password=element('input');
+    password.type='password';
+    password.autocomplete='off';
+    password.required=true;
+    const passLabel=element('label','バックアップ照合用パスワード');
+    passLabel.append(password);
+    const verify=element('button','照合して移行');
+    verify.type='submit';
+    const cancel=element('button','移行を取り消す');
+    cancel.type='button';
+    const fields=element('fieldset');
+    for(const label of [fileLabel,passLabel]){
+      const line=element('p');
+      line.append(label);
+      fields.append(line);
+    }
+    fields.append(verify,cancel);
+    form.append(fields);
+    dialog.append(title,hint,form);
+    dialog.setAttribute('aria-label',title.textContent);
+    root.document.body.append(dialog);
+    return new Promise(resolve=>{
+      function finish(result){
+        password.value='';
+        dialog.close();
+        dialog.remove();
+        resolve(result);
+      }
+      form.addEventListener('submit',event=>{
+        event.preventDefault();
+        finish({file:file.files[0],password:password.value});
+      },{once:true});
+      cancel.addEventListener('click',()=>finish(null),{once:true});
+      dialog.addEventListener('cancel',event=>{event.preventDefault();finish(null);},{once:true});
+      dialog.showModal();
+    });
+  }
+
   function mount(container){
     if(root.localStorage.getItem('insight_v11')===null)return;
     const section=element('section');
@@ -119,7 +168,7 @@
       checkbox.disabled=button.disabled=true;
       status.textContent='移行の準備を確認しています。';
       try{
-        await storage().migrate({legacyClientsClosed:true});
+        await storage().migrate({legacyClientsClosed:true,selectVerifiedBackup});
         root.location.reload();
       }catch(error){
         const diagnostic=await storage().diagnoseStartup();
@@ -129,7 +178,7 @@
         }
         status.textContent=error?.message==='Backup save was not confirmed'
           ?'バックアップの確認を取り消しました。'
-          :'移行を中止しました。編集中の操作と起動環境を確認してください。';
+          :'移行を中止しました。バックアップのファイルとパスワード、起動環境を確認してください。';
         checkbox.checked=false;
         checkbox.disabled=false;
         checkbox.focus();

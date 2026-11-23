@@ -3695,14 +3695,19 @@ test('migration pauses while a dialog, CSV import or weather fetch is pending',a
   });
 });
 
-test('isolated startup and migration button gate the real shell and encrypted backup',async({page})=>{
+test('isolated release rehearsal verifies the downloaded backup, migrates, edits and restores both stores',async({page,context})=>{
+  test.setTimeout(60000);
   await page.route('**/isolated-migration-start.js',route=>route.fulfill({
     contentType:'application/javascript',
     body:`const container=document.getElementById('loading');
-      InsightIndexedDBMigrationPreviewV1.start(container,()=>{
+      function loadShell(){
         const loader=document.createElement('script');
         loader.src=container.dataset.loader;
         document.body.append(loader);
+      }
+      InsightIndexedDBMigrationPreviewV1.start(container,loadShell,result=>{
+        window.__draftFixtureSnapshot=result.snapshot;
+        loadShell();
       });`
   }));
   await page.route('**/Index.html*',async route=>{
@@ -3721,6 +3726,13 @@ test('isolated startup and migration button gate the real shell and encrypted ba
     await route.fulfill({response,body});
   });
 
+  await page.route('**/insight_payload_core_v1.js*',async route=>{
+    const response=await route.fetch();
+    const source=await response.text();
+    const hooked=source.replace('let allStores=loadAll();','let allStores=window.__draftFixtureSnapshot ?? loadAll();');
+    if(hooked===source)throw new Error('Adopted fixture could not inject the verified snapshot');
+    await route.fulfill({response,body:hooked});
+  });
   const fixture='/Index.html?isolated-migration-fixture=1';
   await page.goto(fixture);
   await expect(page.getByRole('status')).toHaveText('保存状態を確認できないため、起動と保存を停止しています。');
@@ -3730,10 +3742,15 @@ test('isolated startup and migration button gate the real shell and encrypted ba
   // Create the fictional source with the normal storage format before entering the fixture.
   await page.goto('/Index.html');
   await waitForMigrationChecks(page);
-  const raw=await page.evaluate(()=>{
-    store.name='架空店舗';
-    return InsightStorage.writeSnapshot(allStores);
+  const seed=await page.evaluate(()=>{
+    store.name='架空店舗A';
+    const {fy,month,day}=todayFY();
+    Object.assign(store.data[fy][month][day-1],{売上:123,客数:10,weather:'晴'});
+    allStores.stores['fixture-peer']={...structuredClone(store),name:'架空店舗B'};
+    allStores.stores['fixture-peer'].data[fy][month][day-1].売上=999;
+    return {raw:InsightStorage.writeSnapshot(allStores),fy,month,day,id:allStores.current};
   });
+  const raw=seed.raw;
   await page.goto(fixture);
   await waitForMigrationChecks(page);
   await page.evaluate(()=>{
@@ -3765,22 +3782,92 @@ test('isolated startup and migration button gate the real shell and encrypted ba
   await expect(checkbox).not.toBeChecked();
   expect(await marker()).toBeNull();
 
-  const download=await start();
-  const file=JSON.parse(await fs.readFile(await download.path(),'utf8'));
-  expect(file.format).toBe('InsightEncryptedBackup');
+  const downloaded=async download=>({name:download.suggestedFilename(),mimeType:'application/json',
+    buffer:await fs.readFile(await download.path())});
+  const verifyDialog=page.getByRole('dialog',{name:'保存したバックアップの照合'});
+  const confirmSaved=()=>page.getByRole('button',{name:'保存したファイルを確認した',exact:true}).click();
+  const verify=verifyDialog.getByRole('button',{name:'照合して移行'});
+  async function selectFile(file,passphrase){
+    await verifyDialog.getByLabel('保存した暗号化バックアップ').setInputFiles(file);
+    await verifyDialog.getByLabel('バックアップ照合用パスワード').fill(passphrase);
+    await verify.click();
+  }
+  const wrongTry=await downloaded(await start());
+  await confirmSaved();
+  await expect(verifyDialog).toBeVisible();
+  await verify.click();
+  await expect(verifyDialog).toBeVisible();
   expect(await marker()).toBeNull();
-  await page.getByRole('button',{name:'保存したファイルを確認した',exact:true}).click();
-  await expect(page.getByRole('status')).toHaveText('IndexedDBにコピーを確認しました。保存を停止しています。');
-  await expect(page.locator('#quickGrid')).toHaveCount(0);
+  await selectFile(wrongTry,'Wrong123');
+  await expect(page.getByText('移行を中止しました。バックアップのファイルとパスワード、起動環境を確認してください。')).toBeVisible();
+  expect(await marker()).toBeNull();
+  expect(await page.evaluate(()=>InsightIndexedDBStorageV1.diagnoseStartup())).toEqual({state:'legacy'});
+
+  const file=await downloaded(await start());
+  expect(JSON.parse(file.buffer.toString()).format).toBe('InsightEncryptedBackup');
+  await confirmSaved();
+  await selectFile(file,password);
   await expect(button).toHaveCount(0);
+  await waitForMigrationChecks(page);
   expect(JSON.parse(await marker()).state).toBe('active');
-  expect(await page.evaluate(()=>localStorage.getItem('insight_v11'))).toBe(raw);
-  expect(await page.evaluate(()=>InsightIndexedDBStorageV1.read())).toEqual({
-    revision:0,snapshot:JSON.parse(raw)
+  expect(await committedInput(page)).toEqual({revision:0,snapshot:JSON.parse(raw)});
+  await expect(page.locator('#storeSel')).toHaveValue(seed.id);
+  await expect(page.locator('#qi_売上')).toHaveValue('123');
+
+  await page.waitForSelector('#insightSettingsYearSection',{state:'attached'});
+  for(const src of ['insight_indexeddb_quick_input_preview_v1.js','insight_indexeddb_sales_input_preview_v1.js',
+    'insight_indexeddb_recovery_preview_v1.js'])await page.addScriptTag({url:'/'+src});
+  await page.evaluate(async ()=>{
+    await InsightIndexedDBSalesInputPreviewV1.connect('sales',{
+      followInputScreens:true,followQuickInput:true,manageStoresAndYears:true,
+      recoverySettings:{restart:()=>location.reload()}
+    });
+    window.confirm=()=>true;
   });
-  await page.reload();
-  await expect(page.getByRole('status')).toHaveText('IndexedDBにコピーを確認しました。保存を停止しています。');
-  await expect(page.locator('#quickGrid')).toHaveCount(0);
+
+  await page.locator('#qi_売上').fill('321');
+  await page.locator('#quickSaveBtn').click();
+  await expect(page.getByText('今日の入力を保存しました。',{exact:true})).toBeVisible();
+  const edited=await committedInput(page);
+  expect(edited.revision).toBe(1);
+  expect(edited.snapshot.stores[seed.id].data[seed.fy][seed.month][seed.day-1].売上).toBe(321);
+  expect(edited.snapshot.stores['fixture-peer']).toEqual(JSON.parse(raw).stores['fixture-peer']);
+  await page.locator('#nav2').click();
+  await page.locator('#storeSel').selectOption('fixture-peer');
+  await expect(page.locator('#storeSel')).toHaveValue('fixture-peer');
+  const beforeRestore=await committedInput(page);
+  expect(beforeRestore.revision).toBe(2);
+  await page.locator('#navSettings').click();
+  await page.locator('#backupBtn').click();
+  const settings=page.locator('#insightIndexedDBBackupDialog');
+  await settings.getByLabel('バックアップ用パスワード').fill(password);
+  await settings.getByLabel('パスワードの確認').fill(password);
+  const [exported]=await Promise.all([page.waitForEvent('download'),
+    settings.getByRole('button',{name:'暗号化してダウンロード'}).click()]);
+  const safety=await downloaded(exported);
+  await expect(settings.getByRole('status')).toContainText('確定版 2');
+  await settings.getByRole('button',{name:'閉じる'}).click();
+  await page.locator('#restoreBtn').click();
+  await settings.getByLabel('復元する暗号化バックアップ',{exact:true}).setInputFiles(file);
+  await settings.getByLabel('現在の確定版の暗号化バックアップ',{exact:true}).setInputFiles(safety);
+  await settings.getByLabel('復元するバックアップのパスワード',{exact:true}).fill(password);
+  await settings.getByLabel('現在の確定版のパスワード',{exact:true}).fill(password);
+  await settings.getByLabel('旧版のInsightをすべて閉じました').check();
+  await settings.getByRole('button',{name:'内容を表示'}).click();
+  await expect(settings.getByText(/架空店舗A/)).toBeVisible();
+  await settings.getByRole('button',{name:'この内容を復元する'}).click();
+  await expect(page.locator('#qi_売上')).toHaveValue('123');
+  await expect(page.locator('#storeSel')).toHaveValue(seed.id);
+  const readback=await committedInput(page);
+  expect(readback.revision).toBe(3);
+  expect(readback.snapshot.stores[seed.id].years).toEqual(JSON.parse(raw).stores[seed.id].years);
+  expect(readback.snapshot.stores['fixture-peer'].data[seed.fy][seed.month][seed.day-1].売上).toBe(999);
+  const peer=await openStoreSwitchPeer(context);
+  try{
+    const record=await readStoreSwitchRecord(peer);
+    expect(JSON.parse(record.previous.raw)).toEqual(beforeRestore.snapshot);
+    expect(await peer.evaluate(()=>localStorage.getItem('insight_v11'))).toBe(raw);
+  }finally{await peer.close();}
 });
 
 test('isolated startup removes only future weather, and holds the screen on uncertain readback',async({page,context})=>{

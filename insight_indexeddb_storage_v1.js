@@ -197,7 +197,7 @@
   }
 
   // Called only from a user-driven migration flow.
-  async function migrate({legacyClientsClosed}={}){
+  async function migrate({legacyClientsClosed,selectVerifiedBackup}={}){
     if(legacyClientsClosed!==true)
       throw new Error('Migration environment requires review: legacy-client-confirmation-required');
     return exclusive(async ()=>{
@@ -210,6 +210,11 @@
       await requireMigrationEnvironment(legacyClientsClosed);
       root.InsightMigrationBackupV1.assertReady(raw);
       if(await root.InsightMigrationBackupV1.confirm(raw)!==true)throw new Error('Backup save was not confirmed');
+      if(selectVerifiedBackup){
+        const selected=await selectVerifiedBackup();
+        if(!(selected?.file instanceof root.Blob))throw new Error('Backup save was not confirmed');
+        await root.InsightMigrationBackupV1.verify(selected.file,selected.password,raw);
+      }
       await requireMigrationEnvironment(legacyClientsClosed);
       await requireFirstMigration();
       root.InsightMigrationBackupV1.assertReady(raw);
