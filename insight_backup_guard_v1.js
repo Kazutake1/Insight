@@ -628,19 +628,20 @@ async function decodeMigrationBackup(file,password){
   return decoded;
 }
 async function verifyMigrationBackup(file,password,sourceRaw){
-  var decoded=await decodeMigrationBackup(file,password);
+  var decoded=await decodeMigrationBackup(file instanceof Blob?await readEncryptedBackupFile(file):file,password);
   var storage=window.InsightStorage;
   if(storage.serialize(decoded.data)!==storage.serialize(JSON.parse(sourceRaw)))
     throw validationError('バックアップと移行元のデータが一致しません。');
   return {createdAt:decoded.info.createdAt,stores:backupStoreInfo(decoded.data)};
 }
-async function readRestoreCandidate(file,password){
+async function readEncryptedBackupFile(file){
   if(!(file instanceof Blob)||file.size>ENCRYPTED_FILE_LIMIT)
     throw validationError('21MiB以下の暗号化バックアップを選んでください。');
-  var encrypted;
-  try{encrypted=JSON.parse(await file.text());}
+  try{return JSON.parse(await file.text());}
   catch(_){throw validationError('バックアップファイルを読み込めませんでした。');}
-  var decoded=await decodeMigrationBackup(encrypted,password);
+}
+async function readRestoreCandidate(file,password){
+  var decoded=await decodeMigrationBackup(await readEncryptedBackupFile(file),password);
   var snapshot=normalizeBackup(decoded.data);
   runRestorePreflight(snapshot);
   return {snapshot,summary:{createdAt:decoded.info.createdAt,stores:backupStoreInfo(snapshot)}};
