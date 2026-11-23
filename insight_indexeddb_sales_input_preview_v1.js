@@ -360,8 +360,8 @@
         }
         const report=reportDialog();
         if(report||management&&event.target.closest?.('#insightReportOpen')){
-          if(!blocked()&&(report?report.contains(event.target):!yearDialog()&&!eventDialogs().length&&
-            !budgetDialog()&&!hourly?.dialog()?.open&&!root.InsightSalesCount.getCategoryDialog()?.open))return;
+          if(report?report.contains(event.target):!blocked()&&!yearDialog()&&!eventDialogs().length&&
+            !budgetDialog()&&!hourly?.dialog()?.open&&!root.InsightSalesCount.getCategoryDialog()?.open)return;
           event.preventDefault();
           event.stopImmediatePropagation();
           return;
@@ -377,7 +377,7 @@
         const eventDialog=eventDialogs().at(-1);
         if(management&&!blocked()&&!yearDialog()&&!eventDialog&&!hourly?.dialog()?.open&&
           !root.InsightSalesCount.getCategoryDialog()?.open&&
-          (event.target.closest?.('#insightThemeToggle,#darkModeBtn')||
+          (event.target.closest?.('#insightThemeToggle,#darkModeBtn,#aiAnalysisToggle,#aiAnalysisPanel')||
            event.target.closest?.('label')?.control?.id==='insightThemeToggle'))return;
         if(item){
           event.preventDefault();

@@ -3772,6 +3772,18 @@ const httpsTest=test.extend({
 });
 httpsTest('Draft Index rehearses migration, editing and recovery over HTTPS',async({page,context,httpsInsight})=>{
   test.setTimeout(60000);
+  await page.clock.setFixedTime(new Date('2026-11-23T03:00:00Z'));
+  await page.route('https://www.jma.go.jp/bosai/**',async route=>{
+    const url=route.request().url();
+    if(url.endsWith('/area.json'))return route.fulfill({json:{class20s:{23220:{name:'稲沢市',parent:'230011'}},
+      class15s:{230011:{parent:'230010'}},class10s:{230010:{name:'西部',parent:'230000'}},offices:{230000:{name:'愛知県'}}}});
+    if(url.endsWith('/amedastable.json'))return route.fulfill({json:{51106:{lat:[35,10],lon:[136,58]}}});
+    const times=Array.from({length:7},(_,i)=>'2026-11-'+(23+i)+'T00:00:00+09:00');
+    await route.fulfill({json:[{reportDatetime:'2026-11-23T11:00:00+09:00',timeSeries:[
+      {timeDefines:times,areas:[{area:{code:'230010',name:'西部'},weatherCodes:times.map(()=> '100'),pops:times.map(()=> '20')}]},
+      {timeDefines:times,areas:[{area:{code:'51106',name:'名古屋'},tempsMin:times.map(()=> '18'),tempsMax:times.map(()=> '28')}]}
+    ]}]});
+  });
   await routeMigrationPage(page,'http://127.0.0.1:4173/Index.html*');
   const fixture=httpsInsight+'/Index.html';
   await page.goto(fixture);
@@ -3790,6 +3802,7 @@ httpsTest('Draft Index rehearses migration, editing and recovery over HTTPS',asy
     store.name='架空店舗A';
     store.years.unshift('2020');
     store.data['2020']=blankYearData('2020');
+    store.weatherLocation={name:'稲沢市',admin1:'愛知県',latitude:35.25,longitude:136.8};
     const {fy,month,day}=todayFY();
     Object.assign(store.data[fy][month][day-1],{売上:123,客数:10,weather:'晴'});
     allStores.stores['fixture-peer']={...structuredClone(store),name:'架空店舗B'};
@@ -3929,7 +3942,12 @@ httpsTest('Draft Index rehearses migration, editing and recovery over HTTPS',asy
       await expect(page.locator('#storeSel')).toHaveValue(id);
       await expect(page.locator(screen)).toBeVisible();
       if(nav==='#nav0')await expect(page.locator('#qi_売上')).toHaveValue('999');
-      if(nav==='#navOrderForecast')expect(await page.evaluate(()=>InsightOrderForecast.getState().storeId)).toBe(id);
+      if(nav==='#navOrderForecast'){
+        expect(await page.evaluate(()=>InsightOrderForecast.getState().storeId)).toBe(id);
+        await expect(page.locator('#ofWeather .of-weather-card')).toHaveCount(7);
+        await page.getByRole('button',{name:'この納品日の比較用記録を保存'}).click();
+        await expect(page.getByText('比較用の記録を保存しました。',{exact:true})).toBeVisible();
+      }
       const previous=expected.snapshot;
       expected={revision:expected.revision+1,snapshot:{...previous,current:id}};
       expect(await committedInput(page)).toEqual(expected);
@@ -3941,7 +3959,16 @@ httpsTest('Draft Index rehearses migration, editing and recovery over HTTPS',asy
     await page.locator('#insightReportOpen').click();
     await expect(page.locator('#insightReportDialog')).toBeVisible();
     await expect(page.locator('#irp-store')).toHaveValue(expected.snapshot.current);
+    await page.locator('#irp-category').selectOption({index:1});
+    await page.locator('#insightReportGenerate').click();
+    await expect(page.locator('#insightReportText')).toContainText('架空店舗B');
+    await expect(page.locator('#insightReportText')).toContainText('999000円');
     await page.locator('#insightReportDialog').getByRole('button',{name:'閉じる'}).click();
+    await page.locator('#nav1').click();
+    await page.locator('#aiAnalysisToggle').click();
+    await expect(page.locator('body')).toHaveClass(/ai-analysis-open/);
+    await page.locator('#aiAnalysisToggle').click();
+    await expect(page.locator('body')).not.toHaveClass(/ai-analysis-open/);
 
     await peer.evaluate(()=>localStorage.setItem('insight_indexeddb_adoption_v1','{'));
     await page.reload();
