@@ -286,12 +286,12 @@ function backupStamp(now){
   var pad=function(n){return String(n).padStart(2,"0");};
   return pad(now.getFullYear()%100)+pad(now.getMonth()+1)+pad(now.getDate())+"_"+pad(now.getHours())+pad(now.getMinutes());
 }
-function downloadBackupPayload(payload,filename){
+function downloadBackupPayload(payload,filename,container=document.body){
   var blob=new Blob([JSON.stringify(payload,null,2)],{type:"application/json"});
   if(blob.size>ENCRYPTED_FILE_LIMIT)throw new Error('暗号化バックアップのサイズが大きすぎます。');
   var url=URL.createObjectURL(blob),a=document.createElement("a");
   try{
-    a.href=url;a.download=filename;document.body.appendChild(a);a.click();
+    a.href=url;a.download=filename;container.appendChild(a);a.click();
   }finally{
     if(a.parentNode)a.remove();
     setTimeout(function(){URL.revokeObjectURL(url);},1000);

@@ -466,7 +466,7 @@
     });
   }
 
-  async function downloadCommittedBackup(password){
+  async function downloadCommittedBackup(password,container){
     const before=await exclusive(activeEvidence);
     const backup=root.InsightMigrationBackupV1;
     const file=await backup.encodeCommitted(parse(before.record.raw),password);
@@ -474,7 +474,7 @@
       const after=await activeEvidence();
       if(after.markerRaw!==before.markerRaw||JSON.stringify(after.record)!==JSON.stringify(before.record))
         throw new Error('Backup data changed');
-      backup.downloadEncrypted(file.encrypted,file.filename);
+      backup.downloadEncrypted(file.encrypted,file.filename,container);
       return after.record.revision;
     });
   }

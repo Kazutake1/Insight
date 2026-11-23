@@ -163,7 +163,7 @@
       fields.disabled=true;
       status.textContent='確定版を確認しています。';
       try{
-        const revision=await root.InsightIndexedDBStorageV1.downloadCommittedBackup(passphrase);
+        const revision=await root.InsightIndexedDBStorageV1.downloadCommittedBackup(passphrase,form);
         status.textContent='確定版 '+revision+' のバックアップをダウンロードしました。';
       }catch(error){
         status.textContent=error?.name==='InsightBackupValidationError'?error.message:

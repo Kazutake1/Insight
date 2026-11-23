@@ -2985,10 +2985,14 @@ test('adopted settings opens only isolated backup controls and reloads after res
   await page.locator('#backupBtn').click();
   await dialog.getByLabel('バックアップ用パスワード').fill(password);
   await dialog.getByLabel('パスワードの確認').fill(password);
-  const download=page.waitForEvent('download');
-  await dialog.getByRole('button',{name:'暗号化してダウンロード'}).click();
-  const safety=await fs.readFile(await (await download).path(),'utf8');
-  await expect(dialog.getByRole('status')).toContainText('確定版 0');
+  const [download]=await Promise.all([
+    page.waitForEvent('download'),
+    (async ()=>{
+      await dialog.getByRole('button',{name:'暗号化してダウンロード'}).click();
+      await expect(dialog.getByRole('status')).toContainText('確定版 0');
+    })()
+  ]);
+  const safety=await fs.readFile(await download.path(),'utf8');
   await dialog.getByRole('button',{name:'閉じる'}).click();
   await expect(dialog).not.toBeVisible();
 
@@ -3843,7 +3847,7 @@ test('isolated startup removes only future weather, and holds the screen on unce
 
 test('adopted loader keeps editing closed with missing or corrupted adoption evidence',async({page})=>{
   const fixture='/adopted-evidence-guard-fixture';
-  await page.route('**'+fixture,route=>route.fulfill({contentType:'text/html',body:'<!doctype html><main></main>'}));
+  await page.route('**'+fixture,route=>route.fulfill({contentType:'text/html',body:'<!doctype html><meta charset="utf-8"><main></main>'}));
   await page.goto(fixture);
   for(const src of ['insight_indexeddb_storage_v1.js','insight_indexeddb_recovery_preview_v1.js',
     'insight_indexeddb_migration_preview_v1.js'])await page.addScriptTag({url:'/'+src});
