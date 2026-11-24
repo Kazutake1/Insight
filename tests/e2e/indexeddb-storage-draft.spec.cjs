@@ -4134,7 +4134,7 @@ httpsTest('Draft Index rehearses migration, editing and recovery at the release 
   }
   const absent={state:{state:'hold',reason:'storage-history-unknown'},legacy:null,marker:null};
   await previewBackup('Wrong123');
-  await expect(recovery.getByRole('status')).toContainText('復号できませんでした');
+  await expect(recovery.getByRole('status')).toHaveText('確認できませんでした。ファイル、パスワード、保存状態を確認してください。');
   expect(await recoveryState()).toEqual(absent);
   await previewBackup(password);
   await expect(recovery.getByText(/架空店舗B/)).toBeVisible();
