@@ -3960,7 +3960,7 @@ httpsTest('Draft Index rehearses migration, editing and recovery at the release 
   await page.locator('#navSettings').click();
   await capacity.tap();
   await expect(capacityResult).toHaveText('保存容量を計測できません。');
-  await expect(safetyToggle).toBeDisabled();
+  await expect(safetyToggle).toHaveCount(0);
   expect(await committedInput(page)).toEqual(beforeRestore);
   await page.locator('#backupBtn').tap();
   const settings=page.locator('#insightIndexedDBBackupDialog');
@@ -3973,7 +3973,9 @@ httpsTest('Draft Index rehearses migration, editing and recovery at the release 
   await settings.getByRole('button',{name:'閉じる'}).click();
   await page.locator('#restoreBtn').tap();
   await settings.getByLabel('復元する暗号化バックアップ',{exact:true}).setInputFiles(file);
-  await settings.getByLabel('現在の確定版の暗号化バックアップ',{exact:true}).setInputFiles(safety);
+  const restoreSafetyFile=settings.getByLabel('現在の確定版の暗号化バックアップ',{exact:true});
+  await expect(restoreSafetyFile).toHaveAttribute('required','');
+  await restoreSafetyFile.setInputFiles(safety);
   await settings.getByLabel('復元するバックアップのパスワード',{exact:true}).fill(password);
   await settings.getByLabel('現在の確定版のパスワード',{exact:true}).fill(password);
   await settings.getByLabel('旧版のInsightをすべて閉じました').check();

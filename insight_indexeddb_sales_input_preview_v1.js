@@ -739,8 +739,6 @@
             state.held=true;
             return recoverySettings.restart(revision);
           }});
-          const legacySafetyToggle=actions.querySelector('#insightRestoreSafetyBackup');
-          if(legacySafetyToggle)legacySafetyToggle.disabled=true;
           const warning=doc.createElement('p');
           warning.setAttribute('role','status');
           doc.getElementById('storeSel').after(warning);
