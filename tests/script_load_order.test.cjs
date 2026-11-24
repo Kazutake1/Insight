@@ -109,12 +109,19 @@ test('shell BUILDはIndex metaとboot scriptで一致する',()=>{
   assert.ok(index.includes('insight_shell_boot_v1.js?v='+build[1]));
 });
 
-test('旧動的scriptローダーはルートJSから除去されている',()=>{
+test('動的なscript挿入はshell loaderの復元専用処理に限定する',()=>{
   const files=fs.readdirSync(root).filter(name=>name.endsWith('.js'));
-  const offenders=[];
-  files.forEach(name=>{
-    const source=read(name);
-    if(/createElement\(\s*['"]script['"]\s*\)/.test(source))offenders.push(name);
+  const dynamicScript=/createElement\(\s*['"]script['"]\s*\)/g;
+  const loader=read('insight_shell_loader_v1.js');
+  const start=loader.indexOf('async function prepareRecovery(){');
+  const end=loader.indexOf('return window.InsightIndexedDBCandidateV1.start(',start);
+  assert.ok(start>=0&&end>start,'復元専用の読み込み処理がありません');
+  const recovery=loader.slice(start,end);
+  assert.equal(Array.from(recovery.matchAll(dynamicScript)).length,1);
+  assert.match(recovery,/script\.dataset\.insightRecoveryModel='true'/);
+  const offenders=files.filter(name=>{
+    const source=name==='insight_shell_loader_v1.js'?loader.slice(0,start)+loader.slice(end):read(name);
+    return Array.from(source.matchAll(dynamicScript)).length>0;
   });
   assert.deepEqual(offenders,[]);
 });
