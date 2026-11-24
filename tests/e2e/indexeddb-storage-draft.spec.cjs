@@ -3844,19 +3844,17 @@ httpsTest('Draft Index rehearses migration, editing and recovery at the release 
   await page.goto('/Index.html');
   await waitForMigrationChecks(page);
   expect(await page.evaluate(()=>typeof InsightIndexedDBCandidateV1)).toBe('undefined');
-  // Different key lengths make old and current values distinct even after rounding to MiB.
-  const peerId='fixture-peer-'+'x'.repeat(600);
-  const seed=await page.evaluate(peerId=>{
+  const seed=await page.evaluate(()=>{
     store.name='架空店舗A';
     store.years.unshift('2020');
     store.data['2020']=blankYearData('2020');
     store.weatherLocation={name:'稲沢市',admin1:'愛知県',latitude:35.25,longitude:136.8};
     const {fy,month,day}=todayFY();
     Object.assign(store.data[fy][month][day-1],{売上:123,客数:10,weather:'晴'});
-    allStores.stores[peerId]={...structuredClone(store),name:'架空店舗B'};
-    allStores.stores[peerId].data[fy][month][day-1].売上=999;
+    allStores.stores['fixture-peer']={...structuredClone(store),name:'架空店舗B'};
+    allStores.stores['fixture-peer'].data[fy][month][day-1].売上=999;
     return {raw:InsightStorage.writeSnapshot(allStores),fy,month,day,id:allStores.current};
-  },peerId);
+  });
   const raw=seed.raw;
   await page.goto(fixture);
   await expect(page.getByRole('status')).toHaveText('保存状態を確認できないため、起動と保存を停止しています。');
@@ -3953,12 +3951,25 @@ httpsTest('Draft Index rehearses migration, editing and recovery at the release 
   const edited=await committedInput(page);
   expect(edited.revision).toBe(1);
   expect(edited.snapshot.stores[seed.id].data[seed.fy][seed.month][seed.day-1].売上).toBe(321);
-  expect(edited.snapshot.stores[peerId]).toEqual(JSON.parse(raw).stores[peerId]);
+  expect(edited.snapshot.stores['fixture-peer']).toEqual(JSON.parse(raw).stores['fixture-peer']);
   await page.locator('#nav2').click();
-  await page.locator('#storeSel').selectOption(peerId);
-  await expect(page.locator('#storeSel')).toHaveValue(peerId);
+  await page.locator('#storeSel').selectOption('fixture-peer');
+  await expect(page.locator('#storeSel')).toHaveValue('fixture-peer');
+  expect((await committedInput(page)).revision).toBe(2);
+  // Populate a fictional historical year so the two sources differ after MiB rounding.
+  await page.evaluate(async id=>{
+    const api=InsightIndexedDBStorageV1;
+    const {revision,snapshot}=await api.read();
+    for(const month of Object.values(snapshot.stores[id].data['2020'])){
+      for(const day of month)day.売上=12345678;
+    }
+    await api.save(revision,snapshot);
+  },seed.id);
+  await page.reload();
+  await page.waitForFunction(()=>InsightIndexedDBCandidateV1.isAdopted()&&!document.body.inert&&
+    !!document.getElementById('insightIndexedDBBackupDialog'));
   const beforeRestore=await committedInput(page);
-  expect(beforeRestore.revision).toBe(2);
+  expect(beforeRestore.revision).toBe(3);
   await page.locator('#navSettings').click();
   const capacityBefore=await page.evaluate(()=>({
     legacy:localStorage.getItem('insight_v11'),
@@ -3988,7 +3999,7 @@ httpsTest('Draft Index rehearses migration, editing and recovery at the release 
   const [exported]=await Promise.all([page.waitForEvent('download'),
     settings.getByRole('button',{name:'暗号化してダウンロード'}).click()]);
   const safety=await downloaded(exported);
-  await expect(settings.getByRole('status')).toContainText('確定版 2');
+  await expect(settings.getByRole('status')).toContainText('確定版 3');
   await settings.getByRole('button',{name:'閉じる'}).click();
   await page.locator('#restoreBtn').tap();
   await settings.getByLabel('復元する暗号化バックアップ',{exact:true}).setInputFiles(file);
@@ -4006,9 +4017,9 @@ httpsTest('Draft Index rehearses migration, editing and recovery at the release 
   await page.waitForFunction(()=>InsightIndexedDBCandidateV1.isAdopted()&&!document.body.inert&&
     !!document.getElementById('insightIndexedDBBackupDialog'));
   const readback=await committedInput(page);
-  expect(readback.revision).toBe(3);
+  expect(readback.revision).toBe(4);
   expect(readback.snapshot.stores[seed.id].years).toEqual(JSON.parse(raw).stores[seed.id].years);
-  expect(readback.snapshot.stores[peerId].data[seed.fy][seed.month][seed.day-1].売上).toBe(999);
+  expect(readback.snapshot.stores['fixture-peer'].data[seed.fy][seed.month][seed.day-1].売上).toBe(999);
   const peer=await openStoreSwitchPeer(context,release);
   try{
     let record=await readStoreSwitchRecord(peer);
@@ -4017,7 +4028,7 @@ httpsTest('Draft Index rehearses migration, editing and recovery at the release 
 
     await page.locator('#qi_売上').fill('432');
     page.once('dialog',dialog=>dialog.dismiss());
-    await page.locator('#storeSel').selectOption(peerId);
+    await page.locator('#storeSel').selectOption('fixture-peer');
     await expect(page.locator('#qi_売上')).toHaveValue('432');
     await expect(page.locator('#storeSel')).toHaveValue(seed.id);
     expect(await readStoreSwitchRecord(peer)).toEqual(record);
@@ -4030,7 +4041,7 @@ httpsTest('Draft Index rehearses migration, editing and recovery at the release 
     ]){
       if(nav!=='#nav0')await page.locator(nav).click();
       await expect(page.locator(screen)).toBeVisible();
-      const id=expected.snapshot.current===seed.id?peerId:seed.id;
+      const id=expected.snapshot.current===seed.id?'fixture-peer':seed.id;
       page.once('dialog',dialog=>dialog.accept());
       await page.locator('#storeSel').selectOption(id);
       await expect(page.locator('#insightIndexedDBStoreStatus')).toHaveText('');
