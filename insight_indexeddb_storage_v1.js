@@ -8,7 +8,7 @@
   const recordKey='current';
   const storeName='snapshots';
   // Pin the version exercised by the Draft migration. It must be updated with the release that enables it.
-  const migrationBuild='20261124-indexeddb-preview-build-120';
+  const migrationBuild='20261124-indexeddb-step3-build-121';
   const migrationFeatures='6dc24fa1';
 
   function parse(raw){
@@ -543,14 +543,14 @@
   }
 
   async function restoreMissingStorage({file,password,confirm,legacyClientsClosed}){
-    await requireMigrationEnvironment(legacyClientsClosed);
+    await requireMigrationEnvironment(legacyClientsClosed,{requireManualMigration:true});
     await assertMissingStorage();
     const target=await root.InsightMigrationBackupV1.readRestoreCandidate(file,password);
     await assertMissingStorage();
     if(await confirm(target.summary)!==true)return {state:'hold',review:'cancelled'};
 
     return exclusive(async ()=>{
-      await requireMigrationEnvironment(legacyClientsClosed);
+      await requireMigrationEnvironment(legacyClientsClosed,{requireManualMigration:true});
       await requireFirstMigration();
       const raw=JSON.stringify(target.snapshot);
       parse(raw);

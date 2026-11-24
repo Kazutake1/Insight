@@ -88,7 +88,7 @@
         await loadShell();
         await waitForShell();
         if(verifiedSnapshot)throw new Error('The adopted snapshot was not initialized');
-      },{restart:()=>root.location.reload(),prepareRecovery}).catch(()=>halt('shell'));
+      },{restart:()=>root.location.reload(),prepareRecovery,allowMissingRestore:allowMigration}).catch(()=>halt('shell'));
     },
     isAdopted:()=>adopted,
     initializeAdopted(){

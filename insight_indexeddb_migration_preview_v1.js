@@ -52,7 +52,7 @@
     return clearFutureWeather(candidate,today)?storage().save(active.revision,candidate):active;
   }
 
-  async function start(container,loadLegacy,loadAdopted,{restart,prepareRecovery}={}){
+  async function start(container,loadLegacy,loadAdopted,{restart,prepareRecovery,allowMissingRestore=true}={}){
     container.textContent='保存状態を確認しています。';
     const diagnostic=await storage().diagnoseStartup();
     if(diagnostic.state==='legacy'){
@@ -88,7 +88,7 @@
           ['migration-copy-verified','prior-save-verified','save-verified','backup-restore-verified'].includes(checked.recovery)){
           if(await showRecovery('resume'))return;
         }
-      }else if(diagnostic.reason==='storage-history-unknown'){
+      }else if(diagnostic.reason==='storage-history-unknown'&&allowMissingRestore){
         if(await showRecovery(prepareRecovery?'missing':'inspect'))return;
       }
     }

@@ -6,7 +6,7 @@ test.beforeEach(async({page})=>{
     if(!location.pathname.endsWith('-fixture'))return;
     window.__INSIGHT_SHELL_VERSION__=build;
     window.__INSIGHT_FEATURE_SIGNATURE__=features;
-  },{build:'20261124-indexeddb-preview-build-120',features:'6dc24fa1'});
+  },{build:'20261124-indexeddb-step3-build-121',features:'6dc24fa1'});
   await page.route(/https:\/\/(www\.jma\.go\.jp|[^/]*api\.open-meteo\.com)\//,route=>route.abort());
 });
 // The fixture server uses HTTP; keep the rest of the shell's CSP in effect.
@@ -3100,7 +3100,7 @@ test('a fully restarted browser keeps the adopted revision and holds the legacy 
       const page=context.pages()[0]??await context.newPage();
       await page.goto(url);
       await page.evaluate(()=>{
-        window.__INSIGHT_SHELL_VERSION__='20261124-indexeddb-preview-build-120';
+        window.__INSIGHT_SHELL_VERSION__='20261124-indexeddb-step3-build-121';
         window.__INSIGHT_FEATURE_SIGNATURE__='6dc24fa1';
       });
       await page.addScriptTag({url:new URL('/insight_indexeddb_storage_v1.js',url).href});
@@ -3137,7 +3137,7 @@ async function openLegacyPwaFixture(page){
     contentType:'text/html',body:'<!doctype html><title>Fictional online migration page</title>'
   }));
   await page.route('**/tests/e2e/fixtures/Index.html?insight_migration_probe=*',route=>route.fulfill({
-    contentType:'text/html',body:'<!doctype html><meta name="insight-shell-version" content="20261124-indexeddb-preview-build-120">'
+    contentType:'text/html',body:'<!doctype html><meta name="insight-shell-version" content="20261124-indexeddb-step3-build-121">'
   }));
   await page.goto(legacyPwaFixture);
   await page.addScriptTag({url:'/insight_indexeddb_storage_v1.js'});
@@ -3362,7 +3362,7 @@ test('cached legacy shell runs with its origin unavailable and adopted startup s
 });
 
 test('migration enforces the pinned environment before and after backup confirmation',async({page})=>{
-  const fixture='/forced-migration-gate-fixture',build='20261124-indexeddb-preview-build-120';
+  const fixture='/forced-migration-gate-fixture',build='20261124-indexeddb-step3-build-121';
   await page.route('**'+fixture,route=>route.fulfill({
     contentType:'text/html',body:'<!doctype html><title>Fictional forced migration fixture</title>'
   }));
@@ -3819,16 +3819,26 @@ httpsTest('Draft Index rehearses migration, editing and recovery at the release 
     const path=url.pathname.slice('/Insight/'.length)||'Index.html';
     // Serve the Draft files from the test fixture and never contact GitHub Pages.
     const response=await route.fetch({url:httpsInsight+'/'+path+url.search,maxRedirects:0});
-    if(path!=='Index.html'||manualMigration)return route.fulfill({response});
-    await route.fulfill({response,body:(await response.text()).replace(' data-indexeddb-migration="manual"','')});
+    if(path!=='Index.html'||!manualMigration)return route.fulfill({response});
+    await route.fulfill({response,body:(await response.text()).replace(
+      'data-indexeddb-preview-host="localhost"','data-indexeddb-preview-host="localhost" data-indexeddb-migration="manual"')});
   });
   await page.goto(fixture);
   expect(await page.evaluate(()=>({origin:location.origin,protocol:location.protocol,secure:isSecureContext,
     csp:document.querySelector('meta[http-equiv="Content-Security-Policy"]').content})))
     .toMatchObject({origin:'https://kazutake1.github.io',protocol:'https:',secure:true,csp:expect.stringContaining('upgrade-insecure-requests')});
-  await expect(page.getByRole('heading',{name:'暗号化バックアップから復元'})).toBeVisible();
+  await expect(page.getByRole('status')).toHaveText('保存状態を確認できないため、起動と保存を停止しています。');
   await expect(page.locator('#quickGrid')).toHaveCount(0);
   expect(await page.evaluate(()=>localStorage.getItem('insight_v11'))).toBeNull();
+  const blockedRestore=await page.evaluate(async ()=>{
+    try{
+      await InsightIndexedDBStorageV1.restoreMissingStorage({legacyClientsClosed:true});
+      return null;
+    }catch(error){return error.message;}
+  });
+  expect(blockedRestore).toContain('manual-migration-disabled');
+  expect(await page.evaluate(()=>InsightIndexedDBStorageV1.diagnose()))
+    .toEqual({state:'hold',reason:'storage-history-unknown'});
 
   // Seed the isolated origin with the snapshot written by the existing app on the regular test origin.
   await page.goto('/Index.html');
@@ -3847,7 +3857,7 @@ httpsTest('Draft Index rehearses migration, editing and recovery at the release 
   });
   const raw=seed.raw;
   await page.goto(fixture);
-  await expect(page.getByRole('heading',{name:'暗号化バックアップから復元'})).toBeVisible();
+  await expect(page.getByRole('status')).toHaveText('保存状態を確認できないため、起動と保存を停止しています。');
   await page.evaluate(raw=>localStorage.setItem('insight_v11',raw),raw);
   await page.reload();
   await waitForMigrationChecks(page);
