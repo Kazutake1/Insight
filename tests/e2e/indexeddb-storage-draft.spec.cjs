@@ -6,7 +6,7 @@ test.beforeEach(async({page})=>{
     if(!location.pathname.endsWith('-fixture'))return;
     window.__INSIGHT_SHELL_VERSION__=build;
     window.__INSIGHT_FEATURE_SIGNATURE__=features;
-  },{build:'20261124-indexeddb-settings-build-123',features:'3a7e67c9'});
+  },{build:'20261124-indexeddb-settings-build-124',features:'649a0456'});
   await page.route(/https:\/\/(www\.jma\.go\.jp|[^/]*api\.open-meteo\.com)\//,route=>route.abort());
 });
 // The fixture server uses HTTP; keep the rest of the shell's CSP in effect.
@@ -3100,8 +3100,8 @@ test('a fully restarted browser keeps the adopted revision and holds the legacy 
       const page=context.pages()[0]??await context.newPage();
       await page.goto(url);
       await page.evaluate(()=>{
-        window.__INSIGHT_SHELL_VERSION__='20261124-indexeddb-settings-build-123';
-        window.__INSIGHT_FEATURE_SIGNATURE__='3a7e67c9';
+        window.__INSIGHT_SHELL_VERSION__='20261124-indexeddb-settings-build-124';
+        window.__INSIGHT_FEATURE_SIGNATURE__='649a0456';
       });
       await page.addScriptTag({url:new URL('/insight_indexeddb_storage_v1.js',url).href});
       return {context,page};
@@ -3137,7 +3137,7 @@ async function openLegacyPwaFixture(page){
     contentType:'text/html',body:'<!doctype html><title>Fictional online migration page</title>'
   }));
   await page.route('**/tests/e2e/fixtures/Index.html?insight_migration_probe=*',route=>route.fulfill({
-    contentType:'text/html',body:'<!doctype html><meta name="insight-shell-version" content="20261124-indexeddb-settings-build-123">'
+    contentType:'text/html',body:'<!doctype html><meta name="insight-shell-version" content="20261124-indexeddb-settings-build-124">'
   }));
   await page.goto(legacyPwaFixture);
   await page.addScriptTag({url:'/insight_indexeddb_storage_v1.js'});
@@ -3362,7 +3362,7 @@ test('cached legacy shell runs with its origin unavailable and adopted startup s
 });
 
 test('migration enforces the pinned environment before and after backup confirmation',async({page})=>{
-  const fixture='/forced-migration-gate-fixture',build='20261124-indexeddb-settings-build-123';
+  const fixture='/forced-migration-gate-fixture',build='20261124-indexeddb-settings-build-124';
   await page.route('**'+fixture,route=>route.fulfill({
     contentType:'text/html',body:'<!doctype html><title>Fictional forced migration fixture</title>'
   }));
@@ -3844,17 +3844,19 @@ httpsTest('Draft Index rehearses migration, editing and recovery at the release 
   await page.goto('/Index.html');
   await waitForMigrationChecks(page);
   expect(await page.evaluate(()=>typeof InsightIndexedDBCandidateV1)).toBe('undefined');
-  const seed=await page.evaluate(()=>{
+  // Different key lengths make old and current values distinct even after rounding to MiB.
+  const peerId='fixture-peer-'+'x'.repeat(600);
+  const seed=await page.evaluate(peerId=>{
     store.name='架空店舗A';
     store.years.unshift('2020');
     store.data['2020']=blankYearData('2020');
     store.weatherLocation={name:'稲沢市',admin1:'愛知県',latitude:35.25,longitude:136.8};
     const {fy,month,day}=todayFY();
     Object.assign(store.data[fy][month][day-1],{売上:123,客数:10,weather:'晴'});
-    allStores.stores['fixture-peer']={...structuredClone(store),name:'架空店舗B'};
-    allStores.stores['fixture-peer'].data[fy][month][day-1].売上=999;
+    allStores.stores[peerId]={...structuredClone(store),name:'架空店舗B'};
+    allStores.stores[peerId].data[fy][month][day-1].売上=999;
     return {raw:InsightStorage.writeSnapshot(allStores),fy,month,day,id:allStores.current};
-  });
+  },peerId);
   const raw=seed.raw;
   await page.goto(fixture);
   await expect(page.getByRole('status')).toHaveText('保存状態を確認できないため、起動と保存を停止しています。');
@@ -3951,15 +3953,32 @@ httpsTest('Draft Index rehearses migration, editing and recovery at the release 
   const edited=await committedInput(page);
   expect(edited.revision).toBe(1);
   expect(edited.snapshot.stores[seed.id].data[seed.fy][seed.month][seed.day-1].売上).toBe(321);
-  expect(edited.snapshot.stores['fixture-peer']).toEqual(JSON.parse(raw).stores['fixture-peer']);
+  expect(edited.snapshot.stores[peerId]).toEqual(JSON.parse(raw).stores[peerId]);
   await page.locator('#nav2').click();
-  await page.locator('#storeSel').selectOption('fixture-peer');
-  await expect(page.locator('#storeSel')).toHaveValue('fixture-peer');
+  await page.locator('#storeSel').selectOption(peerId);
+  await expect(page.locator('#storeSel')).toHaveValue(peerId);
   const beforeRestore=await committedInput(page);
   expect(beforeRestore.revision).toBe(2);
   await page.locator('#navSettings').click();
+  const capacityBefore=await page.evaluate(()=>({
+    legacy:localStorage.getItem('insight_v11'),
+    adoption:localStorage.getItem('insight_indexeddb_adoption_v1'),
+    settingsUnits:Object.keys(localStorage).filter(key=>key.startsWith('insight_')&&key!=='insight_v11')
+      .reduce((sum,key)=>sum+localStorage.getItem(key).length,0)
+  }));
+  const formatMiB=length=>(length*2/1048576).toFixed(3)+' MiB';
+  const committedLength=JSON.stringify(beforeRestore.snapshot).length;
+  expect(formatMiB(committedLength)).not.toBe(formatMiB(capacityBefore.legacy.length));
   await capacity.tap();
-  await expect(capacityResult).toHaveText('保存容量を計測できません。');
+  await expect(capacityResult.locator('div')).toHaveText([
+    '店舗データ（全店舗）：'+formatMiB(committedLength),
+    'その他のInsight設定：'+formatMiB(capacityBefore.settingsUnits),
+    '合計（概算）：'+formatMiB(committedLength+capacityBefore.settingsUnits)
+  ]);
+  expect(await page.evaluate(()=>({
+    legacy:localStorage.getItem('insight_v11'),
+    adoption:localStorage.getItem('insight_indexeddb_adoption_v1')
+  }))).toEqual({legacy:capacityBefore.legacy,adoption:capacityBefore.adoption});
   await expect(safetyToggle).toHaveCount(0);
   expect(await committedInput(page)).toEqual(beforeRestore);
   await page.locator('#backupBtn').tap();
@@ -3989,7 +4008,7 @@ httpsTest('Draft Index rehearses migration, editing and recovery at the release 
   const readback=await committedInput(page);
   expect(readback.revision).toBe(3);
   expect(readback.snapshot.stores[seed.id].years).toEqual(JSON.parse(raw).stores[seed.id].years);
-  expect(readback.snapshot.stores['fixture-peer'].data[seed.fy][seed.month][seed.day-1].売上).toBe(999);
+  expect(readback.snapshot.stores[peerId].data[seed.fy][seed.month][seed.day-1].売上).toBe(999);
   const peer=await openStoreSwitchPeer(context,release);
   try{
     let record=await readStoreSwitchRecord(peer);
@@ -3998,7 +4017,7 @@ httpsTest('Draft Index rehearses migration, editing and recovery at the release 
 
     await page.locator('#qi_売上').fill('432');
     page.once('dialog',dialog=>dialog.dismiss());
-    await page.locator('#storeSel').selectOption('fixture-peer');
+    await page.locator('#storeSel').selectOption(peerId);
     await expect(page.locator('#qi_売上')).toHaveValue('432');
     await expect(page.locator('#storeSel')).toHaveValue(seed.id);
     expect(await readStoreSwitchRecord(peer)).toEqual(record);
@@ -4011,7 +4030,7 @@ httpsTest('Draft Index rehearses migration, editing and recovery at the release 
     ]){
       if(nav!=='#nav0')await page.locator(nav).click();
       await expect(page.locator(screen)).toBeVisible();
-      const id=expected.snapshot.current===seed.id?'fixture-peer':seed.id;
+      const id=expected.snapshot.current===seed.id?peerId:seed.id;
       page.once('dialog',dialog=>dialog.accept());
       await page.locator('#storeSel').selectOption(id);
       await expect(page.locator('#insightIndexedDBStoreStatus')).toHaveText('');

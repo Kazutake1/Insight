@@ -18,8 +18,7 @@
 
   function addStyle(){ /* Static rules live in insight_payload_core_v1.css for CSP. */ }
 
-  function measureStorageUsage(storage){
-    var primary=storage.getItem('insight_v11');
+  function measureSettingsUnits(storage){
     var settingsUnits=0;
     var keyCount=storage.length;
     for(var i=0;i<keyCount;i++){
@@ -30,7 +29,7 @@
       if(value===null)throw new Error('Storage changed during measurement');
       settingsUnits+=value.length;
     }
-    return {primaryUnits:primary===null?null:primary.length,settingsUnits:settingsUnits};
+    return settingsUnits;
   }
 
   function addCapacityCheck(actions){
@@ -43,23 +42,32 @@
     result.id='insightStorageUsage';
     result.setAttribute('role','status');
     var note=doc.createElement('small');
-    note.textContent='文字数×2バイトの参考値です。端末の空き容量や保存可能量を示すものではありません。発注予測の比較用記録は集計対象外です。';
+    var adopted=root.InsightIndexedDBCandidateV1?.isAdopted()===true;
+    note.textContent=(adopted?'店舗データはIndexedDBの現在の確定版が対象です。':'')+
+      '文字数×2バイトの参考値です。端末の空き容量や保存可能量を示すものではありません。発注予測の比較用記録は集計対象外です。';
 
     function format(units){
       return (units*2/1048576).toFixed(3)+' MiB';
     }
-    button.addEventListener('click',function(){
-      if(root.InsightIndexedDBCandidateV1?.isAdopted()){
-        result.textContent='保存容量を計測できません。';
-        return;
-      }
+    var measuring=false;
+    button.addEventListener('click',async function(){
+      if(measuring)return;
+      measuring=true;
       try{
-        var usage=measureStorageUsage(root.localStorage);
-        var primary=usage.primaryUnits;
+        var storage=root.localStorage;
+        var raw;
+        if(adopted){
+          var committed=await root.InsightIndexedDBSalesInputPreviewV1.readCommittedView();
+          raw=root.InsightStorage.serialize(committed.snapshot);
+        }else{
+          raw=storage.getItem('insight_v11');
+        }
+        var primary=raw===null?null:raw.length;
+        var settingsUnits=measureSettingsUnits(storage);
         var labels=[
           '店舗データ（全店舗）：'+(primary===null?'未保存':format(primary)),
-          'その他のInsight設定：'+format(usage.settingsUnits),
-          '合計（概算）：'+format((primary===null?0:primary)+usage.settingsUnits)
+          'その他のInsight設定：'+format(settingsUnits),
+          '合計（概算）：'+format((primary===null?0:primary)+settingsUnits)
         ];
         result.replaceChildren();
         labels.forEach(function(label){
@@ -69,6 +77,8 @@
         });
       }catch(_){
         result.textContent='保存容量を計測できません。';
+      }finally{
+        measuring=false;
       }
     });
     actions.append(button,result,note);
