@@ -223,7 +223,7 @@
     function renderGroups(data){
       var area=doc.getElementById('srGroups');area.replaceChildren();
       if(!data.groups.length){area.append(el('div','選択した条件のセール実績はありません。','sr-empty'));return;}
-      data.groups.forEach(function(group,index){
+      data.groups.forEach(function(group){
         var section=el('section',undefined,'sr-group'),head=el('div',undefined,'sr-group-head'),title=el('h2',group.summary),statsRow=el('div',undefined,'sr-group-stats');
         [
           ['平均納品',fmt(group.averageDelivery,1)],
@@ -237,33 +237,18 @@
           if(notes.length>1)text=group.occurrences.filter(function(item){return item.note===note;}).map(periodLabel).join('、')+'\n'+note;
           heading.append(el('div',text,'sr-sale-note'));
         });
-        var rows=el('div',undefined,'sr-occurrence-grids'),category=selectedCategory();
-        rows.id='srGroupDetails'+index;rows.hidden=true;
-        var toggle=el('button','詳細を表示','sr-group-toggle');toggle.type='button';
-        toggle.setAttribute('aria-controls',rows.id);
-        toggle.setAttribute('aria-expanded','false');
-        toggle.onclick=function(){
-          var opening=rows.hidden;
-          if(opening&&!rows.dataset.ready){
-            // Build day cards only when the user opens this sale; no history is discarded.
-            group.occurrences.forEach(function(occurrence){
-              var grid=el('div',undefined,'sr-day-grid');
-              var resolver=root.InsightTripHistoryResolver,cache=new Map();
-              occurrence.days.forEach(function(day){
-                var decision=resolver.resolveDate(allStores,allStores.current,category.id,day.date,{monthCache:cache});
-                grid.append(root.InsightSalesCount.createReadOnlyDayCard(day.date,day.record,category,
-                  root.InsightSalesCount.wasteRecordAt(allStores,allStores.current,day.date,category.id),decision.mask));
-              });
-              rows.append(grid);
-            });
-            rows.dataset.ready='true';
-          }
-          rows.hidden=!opening;
-          toggle.setAttribute('aria-expanded',String(opening));
-          toggle.textContent=opening?'詳細を閉じる':'詳細を表示';
-        };
-        heading.append(toggle);
         head.append(heading,statsRow);
+        var rows=el('div',undefined,'sr-occurrence-grids'),category=selectedCategory();
+        group.occurrences.forEach(function(occurrence){
+          var grid=el('div',undefined,'sr-day-grid');
+          var resolver=root.InsightTripHistoryResolver,cache=new Map();
+          occurrence.days.forEach(function(day){
+            var decision=resolver.resolveDate(allStores,allStores.current,category.id,day.date,{monthCache:cache});
+            grid.append(root.InsightSalesCount.createReadOnlyDayCard(day.date,day.record,category,
+              root.InsightSalesCount.wasteRecordAt(allStores,allStores.current,day.date,category.id),decision.mask));
+          });
+          rows.append(grid);
+        });
         section.append(head,rows);area.append(section);
       });
     }

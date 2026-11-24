@@ -2,7 +2,7 @@ const {test,expect}=require('@playwright/test');
 require('./helpers/verified-chart.cjs')(test);
 test.use({viewport:{width:1194,height:834}});
 
-test('FICTIONAL all-period sale history shows twenty rows with scrolling and opens details on demand',async({page})=>{
+test('FICTIONAL all-period sale history shows twenty rows with scrolling and keeps details always visible',async({page})=>{
   await page.route('**/Index.html*',async route=>{
     const response=await route.fetch();
     await route.fulfill({response,body:(await response.text()).replace(/;?\s*upgrade-insecure-requests/g,'')});
@@ -36,8 +36,10 @@ test('FICTIONAL all-period sale history shows twenty rows with scrolling and ope
   expect(initial).toEqual({period:'12',events:27});
   await expect(page.locator('#pageSaleResults.show')).toBeVisible();
   await expect(page.locator('#srListBody tr')).toHaveCount(12);
-  await expect(page.locator('#srGroups .sr-group-toggle')).toHaveCount(2);
-  await expect(page.locator('#srGroups .sr-day-grid')).toHaveCount(0);
+  await expect(page.locator('#srGroups .sr-group-toggle')).toHaveCount(0);
+  await expect(page.locator('#srGroups .sr-day-grid')).toHaveCount(12);
+  await expect(page.locator('#srGroups .sc-day')).toHaveCount(12);
+  await expect(page.locator('#srGroups .sr-occurrence-grids').first()).toBeVisible();
 
   await page.locator('#srPeriodTabs button[data-period="all"]').click();
   await expect(page.locator('#srListBody tr')).toHaveCount(27);
@@ -71,20 +73,16 @@ test('FICTIONAL all-period sale history shows twenty rows with scrolling and ope
     return last.bottom<=area.bottom+2&&last.top>=area.top-2;
   })).toBe(true);
 
-  const first=page.locator('#srGroups .sr-group').first();
-  const second=page.locator('#srGroups .sr-group').nth(1);
-  await expect(first.locator('.sr-group-toggle')).toHaveAttribute('aria-expanded','false');
-  await expect(first.locator('.sr-occurrence-grids')).toBeHidden();
-  await expect(second.locator('.sr-occurrence-grids')).toBeHidden();
-  await first.locator('.sr-group-toggle').click();
-  await expect(first.locator('.sr-group-toggle')).toHaveAttribute('aria-expanded','true');
-  expect(await first.locator('.sr-day-grid').count()).toBeGreaterThan(0);
-  await expect(second.locator('.sr-day-grid')).toHaveCount(0);
-  await first.locator('.sr-group-toggle').click();
-  await expect(first.locator('.sr-occurrence-grids')).toBeHidden();
+  await expect(page.locator('#srGroups .sr-group')).toHaveCount(2);
+  await expect(page.locator('#srGroups .sr-group-toggle')).toHaveCount(0);
+  await expect(page.locator('#srGroups .sr-day-grid')).toHaveCount(27);
+  await expect(page.locator('#srGroups .sc-day')).toHaveCount(27);
+  await expect(page.locator('#srGroups .sr-occurrence-grids').first()).toBeVisible();
+  await expect(page.locator('#srGroups .sr-occurrence-grids').nth(1)).toBeVisible();
 
   await page.locator('#srPeriodTabs button[data-period="12"]').click();
   await expect(page.locator('#srListBody tr')).toHaveCount(12);
+  await expect(page.locator('#srGroups .sr-day-grid')).toHaveCount(12);
   await expect(scroller).not.toHaveAttribute('tabindex');
   expect(await scroller.evaluate(node=>node.style.maxHeight)).toBe('');
   expect(await page.evaluate(()=>localStorage.getItem('insight_v11')===window.__saleResultsOriginalRaw)).toBe(true);

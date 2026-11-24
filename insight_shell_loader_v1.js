@@ -57,7 +57,7 @@ var orderedFeatureLoads=[
   './insight_trip_inference_v1.js?v=20261011-month-infer-1',
   './insight_trip_overrides_v1.js?v=20261011-trip-manual-1',
   './insight_trip_history_resolver_v1.js?v=20261011-trip-averages-1',
-  './insight_sale_results_v1.js?v=20261118-sale-scroll20-1',
+  './insight_sale_results_v1.js?v=20261124-sale-details-1',
   './insight_page_title_layout_v1.js?v=20261002-title-align',
   './insight_page_period_sync_v1.js?v=20261001-route-order',
   './insight_sales_period_selector_v1.js?v=20261006-input-period-runtime-2',
@@ -147,7 +147,7 @@ async function start(){
   if(!workers||workers.controller||await workers.getRegistration(location.href))
     throw new Error('旧版のキャッシュ状態を確認できないため、起動と保存を停止しています。');
   await Promise.all([
-    import('./insight_indexeddb_storage_v1.js?v=20261124-indexeddb-settings-2'),
+    import('./insight_indexeddb_storage_v1.js?v=20261124-sale-details-1'),
     import('./insight_indexeddb_migration_preview_v1.js?v=20261124-indexeddb-step3-1'),
     import('./draft/insight_indexeddb_candidate_v1.js?v=20261124-indexeddb-settings-1')
   ]);
