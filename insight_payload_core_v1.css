@@ -1623,13 +1623,13 @@ body.ai-analysis-open #main{margin-right:0!important}
 .iwt-icon .iwx-weather-svg,.hdb-num .iwx-weather-svg,.kyaku-wx .iwx-weather-svg{width:1.1em;height:1.1em}
 
 /* Sales count card preview and print sheet */
-.sc-print-dialog{position:fixed;inset:0;margin:auto;width:min(780px,calc(100vw - 32px));max-height:88vh;overflow:auto;padding:20px;border:1px solid var(--border);border-radius:14px;background:var(--surface);color:var(--text)}
+.sc-print-dialog{position:fixed;inset:0;margin:auto;width:min(780px,calc(100vw - 32px));max-height:88vh;overflow:auto;padding:20px;border:1px solid var(--border);border-radius:14px;background:var(--surface);color:var(--text);font-size:13px}
 .sc-print-dialog::backdrop{background:#0006}
+.sc-print-dialog>h2{font-size:17px}
 .sc-print-fields{display:flex;flex-wrap:wrap;gap:12px;border:0;margin:16px 0}
 .sc-print-fields label{display:grid;gap:5px;min-width:0;font-size:13px}
-.sc-print-fields select{border:1px solid var(--border);border-radius:9px;background:var(--surface2);color:var(--text);padding:7px 10px;font:inherit}
+.sc-print-fields input,.sc-print-fields select,.sc-print-actions button{min-height:44px;border:1px solid var(--border);border-radius:9px;background:var(--surface2);color:var(--text);padding:7px 10px;font:inherit}
 .sc-print-actions{display:flex;flex-wrap:wrap;gap:8px}
-.sc-print-fields input,.sc-print-fields select,.sc-print-actions button{min-height:44px}
 .sc-print-status:not(:empty),.sc-print-preview:not(:empty){margin-top:14px}
 .sc-print-sheet{color:#111;background:#fff;padding:10px}
 .sc-print-sheet h2{font-size:18px;margin-bottom:4px}

@@ -735,7 +735,7 @@
       launch.type='button';
       page.querySelector('.sc-toolbar').append(launch);
 
-      var dialog=el('dialog',undefined,'sc-dialog sc-print-dialog');
+      var dialog=el('dialog',undefined,'sc-print-dialog');
       var heading=el('h2','納品・販売・廃棄カード');
       heading.id='scPrintHeading';
       dialog.setAttribute('aria-labelledby',heading.id);
@@ -762,7 +762,6 @@
       var previewArea=el('div',undefined,'sc-print-preview');
       form.append(fields,actions);
       dialog.append(heading,form,status,previewArea);
-      page.append(dialog);
 
       var storeId,preparing=false;
       var metrics=['納品','販売','廃棄'];
@@ -783,10 +782,19 @@
         }));
         category.value=state.categoryId;
         clearPreview();
+        page.append(dialog);
         dialog.showModal();
       };
-      close.onclick=function(){dialog.close();};
-      dialog.addEventListener('close',clearPreview);
+      function closeDialog(){
+        dialog.close();
+        dialog.remove();
+        clearPreview();
+      }
+      close.onclick=closeDialog;
+      dialog.addEventListener('cancel',function(event){
+        event.preventDefault();
+        closeDialog();
+      });
       fields.addEventListener('input',clearPreview);
       fields.addEventListener('change',clearPreview);
 

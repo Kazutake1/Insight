@@ -451,7 +451,11 @@ test('カード印刷は店舗と期間とカテゴリーを絞り込み保存�
   await expect(print).toBeDisabled();
   await preview.click();
   await expect(dialog.getByRole('status')).toHaveText('選択した期間に保存済みのカードはありません。');
+  await from.fill('');
   await dialog.getByRole('button',{name:'閉じる'}).click();
   await expect(draft).toHaveValue('99');
   expect(await page.evaluate(()=>localStorage.getItem('insight_v11'))).toBe(raw);
+  await page.locator('#scSave').click();
+  await expect(page.locator('#scSave')).toBeDisabled();
+  await expect(draft).toHaveValue('99');
 });
