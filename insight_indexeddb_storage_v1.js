@@ -8,8 +8,8 @@
   const recordKey='current';
   const storeName='snapshots';
   // Pin the version exercised by the Draft migration. It must be updated with the release that enables it.
-  const migrationBuild='20261124-indexeddb-preview-build-119';
-  const migrationFeatures='19105870';
+  const migrationBuild='20261124-indexeddb-preview-build-120';
+  const migrationFeatures='6dc24fa1';
 
   function parse(raw){
     const snapshot=JSON.parse(raw);
@@ -122,9 +122,14 @@
       throw new Error('Migration history requires review');
   }
 
+  function sourceMatches(record){
+    const expected=record.sourceRaw;
+    return expected===root.localStorage.getItem(sourceKey)&&
+      (typeof expected==='string'||(expected===null&&!hasOlderSource()));
+  }
+
   function validateRecord(record,id){
-    if(!record||record.id!==id||typeof record.sourceRaw!=='string'||
-       record.sourceRaw!==root.localStorage.getItem(sourceKey)||
+    if(!record||record.id!==id||!sourceMatches(record)||
        !Number.isSafeInteger(record.revision)||record.revision<0){
       throw new Error('Insight data requires recovery');
     }
@@ -148,8 +153,7 @@
   function checkActiveSource(record,adopted,markerRaw){
     if(root.localStorage.getItem(markerKey)!==markerRaw)
       throw new Error('IndexedDB adoption state changed');
-    if(record?.id===adopted.id&&typeof record.sourceRaw==='string'&&
-       root.localStorage.getItem(sourceKey)!==record.sourceRaw){
+    if(record?.id===adopted.id&&!sourceMatches(record)){
       writeMarker('source-conflict',adopted.id);
       throw new Error('Legacy Insight storage changed; IndexedDB writes are on hold');
     }
@@ -308,8 +312,12 @@
   // Older markers without an operation ID carry no evidence of a save.
   async function inspectHeldRecord(adopted,record){
     if(adopted.state==='preparing'){
-      return record.revision===0&&record.raw===record.sourceRaw&&record.previous===null?
-        'migration-copy-verified':'unverified';
+      if(record.revision!==0||record.previous!==null)return 'unverified';
+      if(record.sourceRaw===null){
+        return adopted.operation?.recoveryDigest===await digest(record.raw)?
+          'backup-restore-verified':'unverified';
+      }
+      return record.raw===record.sourceRaw?'migration-copy-verified':'unverified';
     }
     const operation=adopted.operation;
     if(!operation||typeof operation.id!=='string'||!Number.isSafeInteger(operation.expectedRevision)||
@@ -417,7 +425,7 @@
     await requireHistory(adopted.id);
     if(JSON.stringify(reread)!==frozenRecord||
        root.localStorage.getItem(markerKey)!==markerRaw||
-       root.localStorage.getItem(sourceKey)!==record.sourceRaw){
+       !sourceMatches(record)){
       throw new Error('Recovery data changed');
     }
     const snapshot=parse(record.raw);
@@ -525,7 +533,45 @@
     return {state:'hold',review:'confirmed'};
   }
 
+  async function restoreMissingStorage({file,password,confirm,legacyClientsClosed}){
+    await requireMigrationEnvironment(legacyClientsClosed);
+    await assertMissingStorage();
+    const target=await root.InsightMigrationBackupV1.readRestoreCandidate(file,password);
+    await assertMissingStorage();
+    if(await confirm(target.summary)!==true)return {state:'hold',review:'cancelled'};
+
+    return exclusive(async ()=>{
+      await requireMigrationEnvironment(legacyClientsClosed);
+      await requireFirstMigration();
+      const raw=JSON.stringify(target.snapshot);
+      parse(raw);
+      const initial={id:root.crypto.randomUUID(),sourceRaw:null,raw,revision:0,previous:null};
+      const recoveryDigest=await digest(raw);
+      function requireUnchanged(markerRaw){
+        if(root.localStorage.getItem(markerKey)!==markerRaw||!sourceMatches(initial))
+          throw new Error('Recovery data changed');
+      }
+      requireUnchanged(null);
+      await recordMigrationAttempt(initial.id);
+      requireUnchanged(null);
+      writeMarker('preparing',initial.id,{recoveryDigest});
+      const preparing=root.localStorage.getItem(markerKey);
+      await transact('readwrite',(record,records)=>{
+        requireUnchanged(preparing);
+        if(record)throw new Error('Existing recovery data requires review');
+        records.add(initial,recordKey);
+      },true);
+      const saved=await readRecord();
+      await requireHistory(initial.id);
+      verify(saved,initial);
+      requireUnchanged(preparing);
+      if(JSON.stringify(saved)!==JSON.stringify(initial))throw new Error('Recovery could not be verified');
+      writeMarker('active',initial.id);
+      return {revision:0};
+    });
+  }
+
   root.InsightIndexedDBStorageV1=Object.freeze({
-    migrate,read,save,diagnose,diagnoseStartup,checkMigrationEnvironment,reviewRecovery,reviewHistoryOnlyBackup,reviewMissingStorageBackup,restoreBackup,resumeRecovery,downloadCommittedBackup
+    migrate,read,save,diagnose,diagnoseStartup,checkMigrationEnvironment,reviewRecovery,reviewHistoryOnlyBackup,reviewMissingStorageBackup,restoreMissingStorage,restoreBackup,resumeRecovery,downloadCommittedBackup
   });
 })(globalThis);

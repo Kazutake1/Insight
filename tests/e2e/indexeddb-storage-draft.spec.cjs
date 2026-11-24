@@ -6,7 +6,7 @@ test.beforeEach(async({page})=>{
     if(!location.pathname.endsWith('-fixture'))return;
     window.__INSIGHT_SHELL_VERSION__=build;
     window.__INSIGHT_FEATURE_SIGNATURE__=features;
-  },{build:'20261124-indexeddb-preview-build-119',features:'19105870'});
+  },{build:'20261124-indexeddb-preview-build-120',features:'6dc24fa1'});
   await page.route(/https:\/\/(www\.jma\.go\.jp|[^/]*api\.open-meteo\.com)\//,route=>route.abort());
 });
 // The fixture server uses HTTP; keep the rest of the shell's CSP in effect.
@@ -3100,8 +3100,8 @@ test('a fully restarted browser keeps the adopted revision and holds the legacy 
       const page=context.pages()[0]??await context.newPage();
       await page.goto(url);
       await page.evaluate(()=>{
-        window.__INSIGHT_SHELL_VERSION__='20261124-indexeddb-preview-build-119';
-        window.__INSIGHT_FEATURE_SIGNATURE__='19105870';
+        window.__INSIGHT_SHELL_VERSION__='20261124-indexeddb-preview-build-120';
+        window.__INSIGHT_FEATURE_SIGNATURE__='6dc24fa1';
       });
       await page.addScriptTag({url:new URL('/insight_indexeddb_storage_v1.js',url).href});
       return {context,page};
@@ -3137,7 +3137,7 @@ async function openLegacyPwaFixture(page){
     contentType:'text/html',body:'<!doctype html><title>Fictional online migration page</title>'
   }));
   await page.route('**/tests/e2e/fixtures/Index.html?insight_migration_probe=*',route=>route.fulfill({
-    contentType:'text/html',body:'<!doctype html><meta name="insight-shell-version" content="20261124-indexeddb-preview-build-119">'
+    contentType:'text/html',body:'<!doctype html><meta name="insight-shell-version" content="20261124-indexeddb-preview-build-120">'
   }));
   await page.goto(legacyPwaFixture);
   await page.addScriptTag({url:'/insight_indexeddb_storage_v1.js'});
@@ -3362,7 +3362,7 @@ test('cached legacy shell runs with its origin unavailable and adopted startup s
 });
 
 test('migration enforces the pinned environment before and after backup confirmation',async({page})=>{
-  const fixture='/forced-migration-gate-fixture',build='20261124-indexeddb-preview-build-119';
+  const fixture='/forced-migration-gate-fixture',build='20261124-indexeddb-preview-build-120';
   await page.route('**'+fixture,route=>route.fulfill({
     contentType:'text/html',body:'<!doctype html><title>Fictional forced migration fixture</title>'
   }));
@@ -3753,7 +3753,7 @@ for(const connectionFails of [false,true]){
       window.InsightHourlyCustomers={connectIndexedDBPreview(){}};
       window.shellReadyState=document.readyState;
       window.lateSnapshot=InsightIndexedDBCandidateV1.initializeAdopted();`}));
-    await page.route(/\/insight_indexeddb_(quick_input|sales_input|recovery)_preview_v1\.js\?v=20261124-indexeddb-preview-6$/,route=>route.fulfill({
+    await page.route(/\/insight_indexeddb_(quick_input|sales_input|recovery)_preview_v1\.js\?v=20261124-indexeddb-preview-7$/,route=>route.fulfill({
       contentType:'application/javascript',
       body:new URL(route.request().url()).pathname.endsWith('/insight_indexeddb_sales_input_preview_v1.js')
         ?`window.InsightIndexedDBSalesInputPreviewV1={async connect(){
@@ -3826,7 +3826,7 @@ httpsTest('Draft Index rehearses migration, editing and recovery at the release 
   expect(await page.evaluate(()=>({origin:location.origin,protocol:location.protocol,secure:isSecureContext,
     csp:document.querySelector('meta[http-equiv="Content-Security-Policy"]').content})))
     .toMatchObject({origin:'https://kazutake1.github.io',protocol:'https:',secure:true,csp:expect.stringContaining('upgrade-insecure-requests')});
-  await expect(page.getByRole('status')).toHaveText('保存状態を確認できないため、起動と保存を停止しています。');
+  await expect(page.getByRole('heading',{name:'暗号化バックアップから復元'})).toBeVisible();
   await expect(page.locator('#quickGrid')).toHaveCount(0);
   expect(await page.evaluate(()=>localStorage.getItem('insight_v11'))).toBeNull();
 
@@ -3847,7 +3847,7 @@ httpsTest('Draft Index rehearses migration, editing and recovery at the release 
   });
   const raw=seed.raw;
   await page.goto(fixture);
-  await expect(page.getByRole('status')).toHaveText('保存状態を確認できないため、起動と保存を停止しています。');
+  await expect(page.getByRole('heading',{name:'暗号化バックアップから復元'})).toBeVisible();
   await page.evaluate(raw=>localStorage.setItem('insight_v11',raw),raw);
   await page.reload();
   await waitForMigrationChecks(page);
@@ -4116,6 +4116,53 @@ httpsTest('Draft Index rehearses migration, editing and recovery at the release 
       expect(await peer.evaluate(()=>localStorage.getItem('insight_v11'))).toBe(raw);
     }
   }finally{await peer.close();}
+
+  // A separate HTTPS origin has no legacy data, migration history or adopted copy.
+  await page.goto(httpsInsight+'/Index.html');
+  const recovery=page.locator('#loading');
+  await expect(recovery.getByRole('heading',{name:'暗号化バックアップから復元'})).toBeVisible();
+  const confirmRestore=recovery.getByRole('button',{name:'この内容を復元する'});
+  async function previewBackup(passphrase){
+    await recovery.getByLabel('暗号化バックアップ',{exact:true}).setInputFiles(safety);
+    await recovery.getByLabel('バックアップのパスワード').fill(passphrase);
+    await recovery.getByLabel('旧版のInsightをすべて閉じました').check();
+    await recovery.getByRole('button',{name:'内容を表示'}).click();
+  }
+  function recoveryState(){
+    return page.evaluate(async ()=>({state:await InsightIndexedDBStorageV1.diagnose(),
+      legacy:localStorage.getItem('insight_v11'),marker:localStorage.getItem('insight_indexeddb_adoption_v1')}));
+  }
+  const absent={state:{state:'hold',reason:'storage-history-unknown'},legacy:null,marker:null};
+  await previewBackup('Wrong123');
+  await expect(recovery.getByRole('status')).toContainText('復号できませんでした');
+  expect(await recoveryState()).toEqual(absent);
+  await previewBackup(password);
+  await expect(recovery.getByText(/架空店舗B/)).toBeVisible();
+  await recovery.getByRole('button',{name:'取り消す',exact:true}).click();
+  await expect(recovery.getByRole('status')).toHaveText('取り消しました。');
+  expect(await recoveryState()).toEqual(absent);
+  await previewBackup(password);
+  await expect(confirmRestore).toBeVisible();
+  await page.evaluate(raw=>localStorage.setItem('insight_v11',raw),raw);
+  await confirmRestore.click();
+  await expect(recovery.getByRole('status')).toContainText('確認できませんでした');
+  expect(await page.evaluate(()=>({legacy:localStorage.getItem('insight_v11'),
+    marker:localStorage.getItem('insight_indexeddb_adoption_v1')}))).toEqual({legacy:raw,marker:null});
+  await page.evaluate(()=>localStorage.removeItem('insight_v11'));
+  await previewBackup(password);
+  await confirmRestore.click();
+  await page.waitForFunction(()=>window.InsightIndexedDBCandidateV1?.isAdopted()&&!document.body.inert&&
+    !!document.getElementById('insightIndexedDBBackupDialog'));
+  expect(await committedInput(page)).toEqual({revision:0,snapshot:beforeRestore.snapshot});
+  expect(await page.evaluate(()=>localStorage.getItem('insight_v11'))).toBeNull();
+  await expect(page.locator('#qi_売上')).toHaveValue('999');
+  await page.locator('#qi_売上').fill('876');
+  await page.locator('#quickSaveBtn').click();
+  await expect(page.getByText('今日の入力を保存しました。',{exact:true})).toBeVisible();
+  await page.reload();
+  await expect(page.locator('#qi_売上')).toHaveValue('876');
+  await page.waitForFunction(()=>window.InsightIndexedDBCandidateV1?.isAdopted()&&!document.body.inert);
+  expect(await page.evaluate(()=>localStorage.getItem('insight_v11'))).toBeNull();
 });
 
 test('isolated startup removes only future weather, and holds the screen on uncertain readback',async({page,context})=>{

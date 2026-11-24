@@ -239,6 +239,7 @@
   if(typeof module!=='undefined'&&module.exports)module.exports=model;
   if(!root.document)return;
   root.InsightEvents=model;
+  if(root.document.currentScript?.dataset?.insightRecoveryModel==="true")return;
 
   function init(){
     if(root.__insightEventsV1)return;

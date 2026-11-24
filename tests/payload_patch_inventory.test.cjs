@@ -27,9 +27,9 @@ test('Index shellはinline script/styleを持たず外部assetへ分離する',(
   const boot=read('insight_shell_boot_v1.js');
   const loader=read('insight_shell_loader_v1.js');
   const css=read('insight_shell_v1.css');
-  assert.match(index,/insight_shell_boot_v1\.js\?v=20261124-indexeddb-preview-build-119/);
-  assert.match(index,/insight_shell_loader_v1\.js\?v=20261124-indexeddb-preview-6/);
-  assert.match(index,/insight_shell_v1\.css\?v=20261124-indexeddb-preview-build-119/);
+  assert.match(index,/insight_shell_boot_v1\.js\?v=20261124-indexeddb-preview-build-120/);
+  assert.match(index,/insight_shell_loader_v1\.js\?v=20261124-indexeddb-preview-7/);
+  assert.match(index,/insight_shell_v1\.css\?v=20261124-indexeddb-preview-build-120/);
   assert.doesNotMatch(index,/<script(?![^>]*\bsrc=)[^>]*>/i);
   assert.doesNotMatch(index,/<style\b/i);
   assert.doesNotMatch(index,/script-src[^;]*'unsafe-inline'/);
@@ -39,7 +39,7 @@ test('Index shellはinline script/styleを持たず外部assetへ分離する',(
   assert.match(boot,/fetch\('\.\/Index\.html\?insight_probe='/);
   assert.match(loader,/fetch\('\.\/insight_shell_loader_v1\.js\?insight_manifest_probe='/);
   assert.match(loader,/document\.open\(\);document\.write\(html\);document\.close\(\)/);
-  assert.match(loader,/fetch\('\.\/insight_payload_source_v1\.html\?v=20261124-indexeddb-preview-6'/);
+  assert.match(loader,/fetch\('\.\/insight_payload_source_v1\.html\?v=20261124-indexeddb-preview-7'/);
   assert.doesNotMatch(index+loader,/pako|insight_payload_v1_part0/);
   assert.match(css,/#loading\{/);
 });
@@ -52,7 +52,7 @@ test('canonical payloadはinline script/styleを持たず外部assetを順序固
   const readability=read('insight_readability_v1.js');
   const css=read('insight_payload_core_v1.css');
   assert.match(payload,/insight_payload_core_v1\.css\?v=20261118-sale-scroll20-1/);
-  assert.match(payload,/insight_payload_core_v1\.js\?v=20261124-indexeddb-preview-6/);
+  assert.match(payload,/insight_payload_core_v1\.js\?v=20261124-indexeddb-preview-7/);
   assert.doesNotMatch(core,/label\.style\.color/);
   assert.doesNotMatch(core,/msg\.style\.display/);
   assert.doesNotMatch(core,/badge\.style\.display/);
@@ -188,8 +188,8 @@ test('canonical payloadはinline script/styleを持たず外部assetを順序固
 
 test('トップページはキャッシュ抑止とシェル・機能manifestの自己更新を持つ',()=>{
   const index=readShell();
-  assert.match(index,/insight-shell-version" content="20261124-indexeddb-preview-build-119/);
-  assert.match(index,/var BUILD="20261124-indexeddb-preview-build-119"/);
+  assert.match(index,/insight-shell-version" content="20261124-indexeddb-preview-build-120/);
+  assert.match(index,/var BUILD="20261124-indexeddb-preview-build-120"/);
   assert.match(index,/Shell rule: bump BUILD whenever the loader/);
   assert.match(index,/Cache-Control" content="no-cache, no-store, must-revalidate/);
   assert.match(index,/insight_probe=/);
@@ -516,7 +516,7 @@ test('分析AIの対象年月をサイドバー切替後も固定し各ページ
   assert.ok(!tripInference.includes('localStorage.setItem')&&!tripInference.includes('InsightStorage.writeSnapshot')&&!tripInference.includes('persist('));
   assert.doesNotThrow(()=>new vm.Script(tripInference),'trip inference module should parse as JavaScript');
   assert.match(index,/insight_analysis_period_lock_v1\.js\?v=20261001-sync-owner/);
-  assert.match(index,/insight_sales_count_v1\.js\?v=20261123-indexeddb-parity-1/);
+  assert.match(index,/insight_sales_count_v1\.js\?v=20261124-indexeddb-preview-7/);
   assert.match(index,/insight_numeric_caret_v1\.js\?v=20261018-caret-end-1/);
   assert.match(presentation,/aiAnalysisTarget/);
   assert.match(css,/\.ai-workspace-period-label\{display:none!important\}/);
@@ -823,7 +823,7 @@ test('保存データ健全性チェックは読み取り専用で不整合を�
   const index=readShell();
   const health=read('insight_data_health_v1.js');
   const css=read('insight_payload_core_v1.css');
-  assert.match(index,/insight_data_health_v1\.js\?v=20261011-trip-manual-1/);
+  assert.match(index,/insight_data_health_v1\.js\?v=20261124-indexeddb-preview-7/);
   assert.ok(index.indexOf('insight_backup_guard_v1.js')<index.indexOf('insight_data_health_v1.js'));
   assert.match(health,/function check\(snapshot,eventValidator\)/);
   assert.match(health,/function checkEventRecords\(snapshot,issues,eventValidator\)/);
@@ -886,7 +886,7 @@ test('今日の入力は未登録年度の日付移動前に正式年度追加�
   const index=readShell();
   const quick=read('insight_quick_date_nav_v1.js');
   const css=read('insight_payload_core_v1.css');
-  assert.match(index,/insight_quick_date_nav_v1\.js\?v=20261124-indexeddb-preview-6/);
+  assert.match(index,/insight_quick_date_nav_v1\.js\?v=20261124-indexeddb-preview-7/);
   assert.match(quick,/function ensureRegisteredYear\(/);
   assert.match(quick,/InsightYearManager/);
   assert.match(quick,/年度を追加してこの日付を入力しますか/);
@@ -941,7 +941,7 @@ test('イベント実績は過去開催・日付カード・時間帯グラフ�
   const index=readShell();
   const eventResults=read('insight_event_results_v1.js');
   const events=read('insight_events_v1.js');
-  assert.match(index,/insight_events_v1\.js\?v=20261018-caret-end-1/);
+  assert.match(index,/insight_events_v1\.js\?v=20261124-indexeddb-preview-7/);
   assert.match(index,/insight_event_results_v1\.js\?v=20261015-event-scroll-1/);
   assert.ok(index.indexOf('insight_analysis_context_v1.js')<index.indexOf('insight_event_results_v1.js'));
   assert.ok(index.indexOf('insight_event_results_v1.js')<index.indexOf('insight_daily_anomaly_v1.js'));
@@ -1056,7 +1056,7 @@ test('セール実績ページは販売数入力直後に読み込み同一日�
   const index=readShell();
   const saleResults=read('insight_sale_results_v1.js');
   const sales=read('insight_sales_count_v1.js');
-  assert.match(index,/insight_sales_count_v1\.js\?v=20261123-indexeddb-parity-1/);
+  assert.match(index,/insight_sales_count_v1\.js\?v=20261124-indexeddb-preview-7/);
   assert.match(index,/insight_sale_results_v1\.js\?v=20261118-sale-scroll20-1/);
   assert.ok(index.indexOf('insight_sales_count_v1.js')<index.indexOf('insight_sale_results_v1.js'));
   assert.ok(index.indexOf('insight_sale_results_v1.js')<index.indexOf('insight_page_period_sync_v1.js'));
@@ -1248,7 +1248,7 @@ test('販売数カテゴリーの対象便設定を全関連層で共有する',
   const analysis=read('insight_analysis_context_v1.js');
   const saleResults=read('insight_sale_results_v1.js');
   const pageAI=read('insight_ai_page_comments_v1.js');
-  assert.match(index,/insight_sales_count_v1\.js\?v=20261123-indexeddb-parity-1/);
+  assert.match(index,/insight_sales_count_v1\.js\?v=20261124-indexeddb-preview-7/);
   assert.match(index,/insight_sale_results_v1\.js\?v=20261118-sale-scroll20-1/);
   assert.match(index,/insight_analysis_context_v1\.js\?v=20261004-special-demand/);
   assert.match(index,/insight_ai_page_comments_v1\.js\?v=20261001-decision-analysis/);

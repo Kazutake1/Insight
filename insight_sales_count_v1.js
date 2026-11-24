@@ -194,6 +194,7 @@
   if(typeof module!=='undefined'&&module.exports)module.exports=model;
   if(!root.document)return;
   root.InsightSalesCount=model;
+  if(root.document.currentScript?.dataset?.insightRecoveryModel==="true")return;
 
   function init(){
     if(root.__insightSalesCountV1)return;root.__insightSalesCountV1=true;ensure(allStores);initForecastOperationObserver();

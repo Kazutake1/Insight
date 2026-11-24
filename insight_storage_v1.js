@@ -27,8 +27,9 @@
       conflict:reportConflict||externalChangeSeen||root.localStorage.getItem(storageKey())!==lastSavedRaw});
   }
 
+  var recoveryModel=root.document?.currentScript?.dataset?.insightRecoveryModel==="true";
   function storageKey(){
-    var key=(typeof SK!=='undefined'&&SK)?SK:root.SK;
+    var key=(typeof SK!=='undefined'&&SK)?SK:root.SK??(recoveryModel?'insight_v11':undefined);
     if(typeof key!=='string'||!key)throw new Error('Insight storage key is unavailable.');
     return key;
   }

@@ -17,14 +17,16 @@
   }
 
   function mount(container,{mode='inspect',onCommitted}={}){
-    if(!['inspect','restore','resume'].includes(mode))throw new Error('Unknown recovery preview mode');
+    if(!['inspect','restore','resume','missing'].includes(mode))throw new Error('Unknown recovery preview mode');
     const restoring=mode==='restore',resuming=mode==='resume';
-    const changesStorage=restoring||resuming;
+    const missing=mode==='missing';
+    const changesStorage=restoring||resuming||missing;
     if(changesStorage&&typeof onCommitted!=='function')throw new Error('Recovery requires an isolated restart handler');
     let committed=false;
     const section=element('section');
-    const title=element('h2',restoring?'暗号化バックアップから復元':resuming?'保存を再開':'暗号化バックアップの確認');
+    const title=element('h2',restoring||missing?'暗号化バックアップから復元':resuming?'保存を再開':'暗号化バックアップの確認');
     const note=element('p',restoring?'現在の確定版と復元対象の暗号化バックアップが必要です。復元前の確定版は直前版に残り、それ以前の直前版は置き換わります。':
+      missing?'端末上の保存記録を確認できません。使うバックアップの店舗・年度・作成日時を確認してください。':
       '保存を停止しています。バックアップの内容を確認できます。');
     const status=element('p');
     status.setAttribute('role','status');
@@ -50,7 +52,7 @@
     const closed=element('input');
     closed.type='checkbox';
     closed.required=true;
-    if(restoring||resuming)field(fields,'旧版のInsightをすべて閉じました',closed);
+    if(changesStorage)field(fields,'旧版のInsightをすべて閉じました',closed);
     const submit=element('button','内容を表示');
     submit.type='submit';
     fields.append(submit);
@@ -68,7 +70,7 @@
       for(const store of info.stores){
         list.append(element('li',store.name+'（'+store.years.join('、')+'年度）'));
       }
-      const approve=element('button',restoring?'この内容を復元する':resuming?'この版で保存を再開する':'確認済みにする');
+      const approve=element('button',restoring||missing?'この内容を復元する':resuming?'この版で保存を再開する':'確認済みにする');
       const cancel=element('button','取り消す');
       approve.type=cancel.type='button';
       summary.replaceChildren(heading,element('p','作成日時 '+timestamp),list);
@@ -96,17 +98,18 @@
       status.textContent='バックアップを確認中です。';
       try{
         const api=root.InsightIndexedDBStorageV1;
-        if(restoring||resuming){
+        if(changesStorage){
           const request={file:file.files[0],password:passphrase,legacyClientsClosed:closed.checked};
           const result=restoring?await api.restoreBackup({
             ...request,safetyFile:safetyFile.files[0],safetyPassword:safetyPassphrase,
             confirm:info=>review({...info.target,revision:info.revision})
-          }):await api.resumeRecovery({...request,confirm:info=>review({...info.backup,revision:info.revision})});
+          }):missing?await api.restoreMissingStorage({...request,confirm:review}):
+            await api.resumeRecovery({...request,confirm:info=>review({...info.backup,revision:info.revision})});
           if(result.review==='cancelled'){
             status.textContent='取り消しました。';
           }else{
             committed=true;
-            status.textContent=restoring?'復元した確定版を確認しました。画面を読み直しています。':
+            status.textContent=restoring||missing?'復元した確定版を確認しました。画面を読み直しています。':
               '保存を再開しました。画面を読み直しています。';
             await onCommitted(result.revision);
           }

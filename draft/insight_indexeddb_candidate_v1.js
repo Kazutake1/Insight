@@ -2,7 +2,7 @@
 (function(root){
   'use strict';
   const document=root.document;
-  const version='20261124-indexeddb-preview-6';
+  const version='20261124-indexeddb-preview-7';
   let adopted=false;
   let verifiedSnapshot=null;
 
@@ -42,7 +42,7 @@
       stage='storage-connection';
       await root.InsightIndexedDBSalesInputPreviewV1.connect('sales',{
         followInputScreens:true,followQuickInput:true,manageStoresAndYears:true,
-        recoverySettings:{restart:()=>root.location.reload()}
+        recoverySettings:{restart:()=>root.location.reload(),prepareRecovery}
       });
       document.body.inert=false;
     }catch(error){
@@ -75,7 +75,7 @@
   }
 
   root.InsightIndexedDBCandidateV1=Object.freeze({
-    start(container,loadShell,{allowMigration=false}={}){
+    start(container,loadShell,{allowMigration=false,prepareRecovery}={}){
       return root.InsightIndexedDBMigrationPreviewV1.start(container,async ()=>{
         await loadShell();
         if(allowMigration){

@@ -52,7 +52,7 @@
     return clearFutureWeather(candidate,today)?storage().save(active.revision,candidate):active;
   }
 
-  async function start(container,loadLegacy,loadAdopted,{restart}={}){
+  async function start(container,loadLegacy,loadAdopted,{restart,prepareRecovery}={}){
     container.textContent='保存状態を確認しています。';
     const diagnostic=await storage().diagnoseStartup();
     if(diagnostic.state==='legacy'){
@@ -70,22 +70,26 @@
       await loadAdopted(prepared,typeof restart==='function'?{restart}:undefined);
       return;
     }
-    if(typeof restart==='function'&&root.InsightIndexedDBRecoveryPreviewV1){
-      const preview=root.InsightIndexedDBRecoveryPreviewV1;
+    if(typeof restart==='function'){
+      const showRecovery=async mode=>{
+        if(prepareRecovery)await prepareRecovery();
+        const preview=root.InsightIndexedDBRecoveryPreviewV1;
+        if(!preview)return false;
+        container.removeAttribute('role');
+        container.replaceChildren();
+        preview.mount(container,{mode,onCommitted:restart});
+        return true;
+      };
       if(diagnostic.reason==='writing'||diagnostic.reason==='preparing'){
         let checked;
         try{checked=await storage().diagnose({verifyInterrupted:true});}
         catch(_){/* Leave startup held when the operation cannot be inspected. */}
         if(checked?.reason===diagnostic.reason&&
-          ['migration-copy-verified','prior-save-verified','save-verified'].includes(checked.recovery)){
-          container.replaceChildren();
-          preview.mount(container,{mode:'resume',onCommitted:restart});
-          return;
+          ['migration-copy-verified','prior-save-verified','save-verified','backup-restore-verified'].includes(checked.recovery)){
+          if(await showRecovery('resume'))return;
         }
       }else if(diagnostic.reason==='storage-history-unknown'){
-        container.replaceChildren();
-        preview.mount(container);
-        return;
+        if(await showRecovery(prepareRecovery?'missing':'inspect'))return;
       }
     }
     const message=diagnostic.reason==='indexeddb-adopted'
