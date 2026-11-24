@@ -452,7 +452,16 @@
   async function resumeRecovery({file,password,confirm,legacyClientsClosed}){
     await requireMigrationEnvironment(legacyClientsClosed);
     const before=await exclusive(recoveryEvidence);
-    const backup=await root.InsightMigrationBackupV1.verify(file,password,before.record.raw);
+    const codec=root.InsightMigrationBackupV1;
+    let backup;
+    if(before.review.outcome==='backup-restore-verified'){
+      const target=await codec.readRestoreCandidate(file,password);
+      if(JSON.stringify(target.snapshot)!==before.record.raw)
+        throw new Error('The backup does not match the prepared recovery');
+      backup=target.summary;
+    }else{
+      backup=await codec.verify(file,password,before.record.raw);
+    }
     if(await confirm({...before.review,backup})!==true)return {state:'hold',review:'cancelled'};
     return exclusive(async ()=>{
       await requireMigrationEnvironment(legacyClientsClosed);

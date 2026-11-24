@@ -42,7 +42,7 @@
       stage='storage-connection';
       await root.InsightIndexedDBSalesInputPreviewV1.connect('sales',{
         followInputScreens:true,followQuickInput:true,manageStoresAndYears:true,
-        recoverySettings:{restart:()=>root.location.reload(),prepareRecovery}
+        recoverySettings:{restart:()=>root.location.reload()}
       });
       document.body.inert=false;
     }catch(error){
@@ -88,7 +88,7 @@
         await loadShell();
         await waitForShell();
         if(verifiedSnapshot)throw new Error('The adopted snapshot was not initialized');
-      },{restart:()=>root.location.reload()}).catch(()=>halt('shell'));
+      },{restart:()=>root.location.reload(),prepareRecovery}).catch(()=>halt('shell'));
     },
     isAdopted:()=>adopted,
     initializeAdopted(){
