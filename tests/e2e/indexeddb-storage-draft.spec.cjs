@@ -6,7 +6,7 @@ test.beforeEach(async({page})=>{
     if(!location.pathname.endsWith('-fixture'))return;
     window.__INSIGHT_SHELL_VERSION__=build;
     window.__INSIGHT_FEATURE_SIGNATURE__=features;
-  },{build:'20261124-sale-details-build-126',features:'6ff55ba4'});
+  },{build:'20261125-weather-actions-build-127',features:'6ff55ba4'});
   await page.route(/https:\/\/(www\.jma\.go\.jp|[^/]*api\.open-meteo\.com)\//,route=>route.abort());
 });
 // The fixture server uses HTTP; keep the rest of the shell's CSP in effect.
@@ -3104,7 +3104,7 @@ test('a fully restarted browser keeps the adopted revision and holds the legacy 
       const page=context.pages()[0]??await context.newPage();
       await page.goto(url);
       await page.evaluate(()=>{
-        window.__INSIGHT_SHELL_VERSION__='20261124-sale-details-build-126';
+        window.__INSIGHT_SHELL_VERSION__='20261125-weather-actions-build-127';
         window.__INSIGHT_FEATURE_SIGNATURE__='6ff55ba4';
       });
       await page.addScriptTag({url:new URL('/insight_indexeddb_storage_v1.js',url).href});
@@ -3141,7 +3141,7 @@ async function openLegacyPwaFixture(page){
     contentType:'text/html',body:'<!doctype html><title>Fictional online migration page</title>'
   }));
   await page.route('**/tests/e2e/fixtures/Index.html?insight_migration_probe=*',route=>route.fulfill({
-    contentType:'text/html',body:'<!doctype html><meta name="insight-shell-version" content="20261124-sale-details-build-126">'
+    contentType:'text/html',body:'<!doctype html><meta name="insight-shell-version" content="20261125-weather-actions-build-127">'
   }));
   await page.goto(legacyPwaFixture);
   await page.addScriptTag({url:'/insight_indexeddb_storage_v1.js'});
@@ -3366,7 +3366,7 @@ test('cached legacy shell runs with its origin unavailable and adopted startup s
 });
 
 test('migration enforces the pinned environment before and after backup confirmation',async({page})=>{
-  const fixture='/forced-migration-gate-fixture',build='20261124-sale-details-build-126';
+  const fixture='/forced-migration-gate-fixture',build='20261125-weather-actions-build-127';
   await page.route('**'+fixture,route=>route.fulfill({
     contentType:'text/html',body:'<!doctype html><title>Fictional forced migration fixture</title>'
   }));
@@ -3757,7 +3757,7 @@ for(const connectionFails of [false,true]){
       window.InsightHourlyCustomers={connectIndexedDBPreview(){}};
       window.shellReadyState=document.readyState;
       window.lateSnapshot=InsightIndexedDBCandidateV1.initializeAdopted();`}));
-    await page.route(/\/insight_indexeddb_(quick_input|sales_input|recovery)_preview_v1\.js\?v=20261124-store-switch-1$/,route=>route.fulfill({
+    await page.route(/\/insight_indexeddb_(quick_input|sales_input|recovery)_preview_v1\.js\?v=20261125-weather-actions-1$/,route=>route.fulfill({
       contentType:'application/javascript',
       body:new URL(route.request().url()).pathname.endsWith('/insight_indexeddb_sales_input_preview_v1.js')
         ?`window.InsightIndexedDBSalesInputPreviewV1={async connect(){
@@ -4067,6 +4067,46 @@ httpsTest('Draft Index rehearses migration, editing and recovery at the release 
       expect(JSON.parse(record.previous.raw)).toEqual(previous);
       expect(await peer.evaluate(()=>localStorage.getItem('insight_v11'))).toBe(raw);
     }
+    const analysisRequests=[];
+    const watchAnalysisRequest=request=>{
+      if(new URL(request.url()).origin!==new URL(release).origin)analysisRequests.push(request.url());
+    };
+    page.on('request',watchAnalysisRequest);
+    const diagnostics=page.locator('#insightWeatherSalesDiagnosticsOverlay');
+    const trends=page.locator('#insightWeatherSalesViewOverlay');
+    await page.locator('#insightWeatherSalesDiagnosticsButton').tap();
+    await expect(diagnostics).toBeVisible();
+    await page.evaluate(()=>{
+      document.getElementById('insightWeatherSalesViewButton').click();
+      gotoNav(1);
+      switchStore(allStores.current==='fixture-peer'?
+        Object.keys(allStores.stores).find(id=>id!=='fixture-peer'):'fixture-peer');
+    });
+    await expect(trends).toBeHidden();
+    await expect(page.locator('#pageSettings')).toBeVisible();
+    await expect(page.locator('#storeSel')).toHaveValue(expected.snapshot.current);
+    await diagnostics.getByRole('button',{name:'閉じる'}).tap();
+    await expect(diagnostics).toBeHidden();
+    await page.locator('#insightWeatherSalesDiagnosticsButton').tap();
+    await diagnostics.tap({position:{x:3,y:3}});
+    await expect(diagnostics).toBeHidden();
+
+    await page.locator('#insightWeatherSalesViewButton').tap();
+    await expect(trends).toBeVisible();
+    await page.locator('#iwsvDays').selectOption('168');
+    await expect(trends.locator('.iwsv-period')).toContainText('168日');
+    await page.locator('#iwsvStore').selectOption('fixture-peer');
+    await expect(page.locator('#iwsvStore')).toHaveValue('fixture-peer');
+    await page.locator('#iwsvCategory').selectOption({index:1});
+    await page.locator('#iwsvTrip').selectOption('2');
+    await expect(page.locator('#iwsvTrip')).toHaveValue('2');
+    await trends.getByRole('button',{name:'閉じる'}).tap();
+    await expect(trends).toBeHidden();
+    page.off('request',watchAnalysisRequest);
+    expect(analysisRequests).toEqual([]);
+    expect(await readStoreSwitchRecord(peer)).toEqual(record);
+    expect(await page.evaluate(()=>localStorage.getItem('insight_v11'))).toBe(raw);
+
     await page.locator('#insightDataHealthButton').click();
     await expect(page.locator('#insightDataHealthDialog')).toBeVisible();
     await page.locator('#insightDataHealthClose').click();
