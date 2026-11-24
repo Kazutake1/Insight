@@ -1621,3 +1621,35 @@ body.ai-analysis-open #main{margin-right:0!important}
 .iwx-weather-svg{display:inline-block;width:1.25em;height:1.25em;vertical-align:-.18em;flex-shrink:0;color:currentColor;pointer-events:none}
 .qwc-icon .iwx-weather-svg,.qwc-option-icon .iwx-weather-svg{width:1.45em;height:1.45em}
 .iwt-icon .iwx-weather-svg,.hdb-num .iwx-weather-svg,.kyaku-wx .iwx-weather-svg{width:1.1em;height:1.1em}
+
+/* Sales count card preview and print sheet */
+.sc-print-dialog{position:fixed;inset:0;margin:auto;width:min(780px,calc(100vw - 32px));max-height:88vh;overflow:auto;padding:20px;border:1px solid var(--border);border-radius:14px;background:var(--surface);color:var(--text)}
+.sc-print-dialog::backdrop{background:#0006}
+.sc-print-fields{display:flex;flex-wrap:wrap;gap:12px;border:0;margin:16px 0}
+.sc-print-fields label{display:grid;gap:5px;min-width:0;font-size:13px}
+.sc-print-fields select{border:1px solid var(--border);border-radius:9px;background:var(--surface2);color:var(--text);padding:7px 10px;font:inherit}
+.sc-print-actions{display:flex;flex-wrap:wrap;gap:8px}
+.sc-print-actions button{min-height:38px}
+.sc-print-status:not(:empty),.sc-print-preview:not(:empty){margin-top:14px}
+.sc-print-sheet{color:#111;background:#fff;padding:10px}
+.sc-print-sheet h2{font-size:18px;margin-bottom:4px}
+.sc-print-sheet p{font-size:13px;line-height:1.45}
+.sc-print-sheet .sc-print-key{font-size:11px;margin-top:4px}
+.sc-print-row{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px;margin-top:8px}
+.sc-print-sheet .sc-day{min-width:0;min-height:0;height:auto;padding:8px;border:1px solid #aaa;border-radius:5px;background:#fff;color:#111;box-shadow:none}
+.sc-print-sheet .sc-day-num,.sc-print-sheet .sc-col-head,.sc-print-sheet .sc-totals b{color:#111}
+.sc-print-sheet .sc-col-head,.sc-print-sheet .sc-trip{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:3px}
+.sc-print-sheet .sc-print-label,.sc-print-sheet .sc-print-value{border:1px solid #ccc;border-radius:3px;padding:3px 1px;font-size:11px;line-height:1.2;text-align:center;overflow-wrap:anywhere}
+.sc-print-sheet .sc-totals{font-size:11px;gap:3px}
+.sc-print-sheet .sc-totals b{overflow-wrap:anywhere}
+.sc-print-sheet .sc-totals b span{display:block;font-size:10px}
+.sc-print-sheet .sc-readonly-waste .sc-total-waste.has-val{color:#111!important}
+#scPrintSheet{display:none}
+@media(max-width:640px){.sc-print-preview .sc-print-row{grid-template-columns:minmax(0,1fr)}}
+@page insightSalesCards{size:A4 portrait;margin:10mm}
+@media print{
+  html:has(body.sc-printing-cards),body.sc-printing-cards{height:auto;overflow:visible;background:#fff}
+  body.sc-printing-cards>*:not(#scPrintSheet){display:none!important}
+  body.sc-printing-cards>#scPrintSheet{display:block;page:insightSalesCards;padding:0}
+  #scPrintSheet .sc-print-row{break-inside:avoid;page-break-inside:avoid}
+}
