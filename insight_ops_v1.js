@@ -1,7 +1,9 @@
 (function(){
+  var previewSave=null;
   function ensureMonthlyOps(year,month){
     var y=String(year!=null?year:(baseYear||""));
     var m=month||selMonth;
+    if(previewSave)return store.monthlyOps?.[y]?.[m]||{};
     if(!store.monthlyOps)store.monthlyOps={};
     if(!store.monthlyOps[y])store.monthlyOps[y]={};
     if(!store.monthlyOps[y][m])store.monthlyOps[y][m]={laborCostYen:0,grossMarginRate:0};
@@ -119,39 +121,52 @@
     row.appendChild(createMonthlyKpiCard("grossMargin","粗利率",gm?gm.toFixed(1)+'<span class="kpi-unit">%</span>':'—',gmCmp,prevLabel));
   }
 
+  function promptMonthlyOpsChange(type,year,month,entry){
+    if(type!=='labor'&&type!=='grossMargin')return null;
+    var labor=type==='labor',key=labor?'laborCostYen':'grossMarginRate',label=labor?'人件費':'粗利率';
+    var current=Number(entry[key])||0;
+    var heading=year+'年 '+month+'の'+label;
+    var entered=window.prompt(heading+'（'+(labor?'円':'%')+'）を入力してください。\n削除する場合は入力欄を空にして「OK」を押してください。',current?String(current):'');
+    if(entered===null)return null;
+    if(String(entered).trim()===''){
+      if(!current||!window.confirm(heading+'データを削除します。\nこの操作は元に戻せません。よろしいですか？'))return null;
+      return {key:key,remove:true};
+    }
+    var value=labor?parseInt(String(entered).replace(/[,，\s]/g,''),10):
+      parseFloat(String(entered).replace(/[%％\s]/g,''));
+    if(!Number.isFinite(value)||value<0||(!labor&&value>100)){
+      window.alert(labor?'人件費は0以上の数字で入力してください。':'粗利率は0〜100の数字で入力してください。');
+      return null;
+    }
+    return {key:key,value:value};
+  }
+
+  function applyMonthlyOpsChange(entry,change){
+    if(change.remove)delete entry[change.key];
+    else entry[change.key]=change.value;
+  }
+
+  window.InsightMonthlyOps={
+    get:ensureMonthlyOps,
+    connectIndexedDBPreview:function(save){previewSave=save;}
+  };
   window.editMonthlyOpsKpi=function(type){
-    var d=ensureMonthlyOps(baseYear,selMonth);
-    if(type==="labor"){
-      var current=Number(d.laborCostYen)||0;
-      var entered=window.prompt(baseYear+'年 '+selMonth+'の人件費（円）を入力してください。\n削除する場合は入力欄を空にして「OK」を押してください。',current?String(current):'');
-      if(entered===null)return;
-      if(String(entered).trim()===''){
-        if(!current)return;
-        if(!window.confirm(baseYear+'年 '+selMonth+'の人件費データを削除します。\nこの操作は元に戻せません。よろしいですか？'))return;
-        delete d.laborCostYen;
-        persist();
-        renderMonthlyOpsKpis();
-        return;
-      }
-      var labor=parseInt(String(entered).replace(/[,，\s]/g,''),10);
-      if(!Number.isFinite(labor)||labor<0){window.alert('人件費は0以上の数字で入力してください。');return;}
-      d.laborCostYen=labor;
-    }else if(type==="grossMargin"){
-      var currentRate=Number(d.grossMarginRate)||0;
-      var enteredRate=window.prompt(baseYear+'年 '+selMonth+'の粗利率（%）を入力してください。\n削除する場合は入力欄を空にして「OK」を押してください。',currentRate?String(currentRate):'');
-      if(enteredRate===null)return;
-      if(String(enteredRate).trim()===''){
-        if(!currentRate)return;
-        if(!window.confirm(baseYear+'年 '+selMonth+'の粗利率データを削除します。\nこの操作は元に戻せません。よろしいですか？'))return;
-        delete d.grossMarginRate;
-        persist();
-        renderMonthlyOpsKpis();
-        return;
-      }
-      var gm=parseFloat(String(enteredRate).replace(/[%％\s]/g,''));
-      if(!Number.isFinite(gm)||gm<0||gm>100){window.alert('粗利率は0〜100の数字で入力してください。');return;}
-      d.grossMarginRate=gm;
-    }else{return;}
+    var entry=ensureMonthlyOps(baseYear,selMonth);
+    if(previewSave){
+      var year=String(baseYear),month=selMonth;
+      return previewSave(year,month,function(shop){
+        var change=promptMonthlyOpsChange(type,year,month,entry);
+        if(!change)return false;
+        shop.monthlyOps??={};
+        shop.monthlyOps[year]??={};
+        shop.monthlyOps[year][month]??={laborCostYen:0,grossMarginRate:0};
+        applyMonthlyOpsChange(shop.monthlyOps[year][month],change);
+        return true;
+      },renderMonthlyOpsKpis);
+    }
+    var change=promptMonthlyOpsChange(type,baseYear,selMonth,entry);
+    if(!change)return;
+    applyMonthlyOpsChange(entry,change);
     persist();
     renderMonthlyOpsKpis();
   };

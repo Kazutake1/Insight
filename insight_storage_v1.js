@@ -27,8 +27,9 @@
       conflict:reportConflict||externalChangeSeen||root.localStorage.getItem(storageKey())!==lastSavedRaw});
   }
 
+  var recoveryModel=root.document?.currentScript?.dataset?.insightRecoveryModel==="true";
   function storageKey(){
-    var key=(typeof SK!=='undefined'&&SK)?SK:root.SK;
+    var key=(typeof SK!=='undefined'&&SK)?SK:root.SK??(recoveryModel?'insight_v11':undefined);
     if(typeof key!=='string'||!key)throw new Error('Insight storage key is unavailable.');
     return key;
   }
@@ -38,6 +39,16 @@
   // silently acknowledge another tab's changes while the live UI still holds old data.
   var lastSavedRaw=root.localStorage.getItem(storageKey());
   var externalChangeSeen=false;
+  var adoptionMarkerKey='insight_indexeddb_adoption_v1';
+  var migrationSeen=root.localStorage.getItem(adoptionMarkerKey)!==null;
+
+  function assertLegacyWritesAllowed(){
+    if(!migrationSeen)migrationSeen=root.localStorage.getItem(adoptionMarkerKey)!==null;
+    if(!migrationSeen)return;
+    var error=new Error('保存方式の移行記録が見つかったため、この画面での保存を停止しました。未保存の入力を控え、Insightの保存状態を確認してください。');
+    error.name='InsightStorageConflictError';
+    throw error;
+  }
   // In-memory latch for an indeterminate restore result. Reload is the only reset.
   var restoreSnapshotWritesHeld=false;
   function holdSnapshotWrites(){restoreSnapshotWritesHeld=true;return true;}
@@ -50,6 +61,8 @@
   }
   if(typeof root.addEventListener==='function'){
     root.addEventListener('storage',function(event){
+      if(event&&event.key===adoptionMarkerKey&&(event.oldValue!==null||event.newValue!==null))
+        migrationSeen=true;
       if(event&&(event.key===null||event.key===storageKey())&&event.newValue!==lastSavedRaw)
         externalChangeSeen=true;
       if(event&&(event.key===null||event.key===storageKey())){
@@ -103,6 +116,7 @@
     return withReportUpdate(function(){
     var serialized=serialize(snapshot);
     assertNotStale();
+    assertLegacyWritesAllowed();
     root.localStorage.setItem(storageKey(),serialized);
     // Update the observed baseline only after a successful write.
     lastSavedRaw=serialized;
@@ -135,6 +149,7 @@
 
   function persistCurrent(snapshot){
     return withReportUpdate(function(){
+    assertLegacyWritesAllowed();
     var target=snapshot;
     if(target===undefined){
       try{if(typeof allStores!=='undefined')target=allStores;}catch(_){}
@@ -149,6 +164,7 @@
 
   function transaction(source,mutate,validate,apply){
     return withReportUpdate(function(){
+    assertLegacyWritesAllowed();
     if(typeof mutate!=='function')throw new Error('Storage transaction mutate callback is required.');
     var next=migrateSnapshot(source);
     mutate(next);

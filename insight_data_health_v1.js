@@ -185,10 +185,11 @@
     };
   }
 
-  var model={check:check,validDate:validDate,expectedDays:expectedDays};
+  var model={check:check,validDate:validDate,expectedDays:expectedDays,
+    monthNames:Object.freeze(MONTH_NAMES.slice()),monthLengths:Object.freeze([31,28,31,30,31,30,31,31,30,31,30,31])};
   if(typeof module!=='undefined'&&module.exports)module.exports=model;
   root.InsightDataHealth=model;
-  if(!root.document)return;
+  if(!root.document||root.document.currentScript?.dataset?.insightRecoveryModel==="true")return;
 
   var button=null,overlay=null,lastReport=null;
   function snapshot(){try{return typeof allStores!=='undefined'?allStores:null;}catch(_){return null;}}

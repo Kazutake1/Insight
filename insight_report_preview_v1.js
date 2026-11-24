@@ -350,8 +350,22 @@
   }
   function shift(iso,n){return new Date(Date.parse(iso+'T12:00:00Z')+n*86400000).toISOString().slice(0,10);}
   function key(){return typeof SK!=='undefined'?SK:root.SK;}
-  function saved(){return root.localStorage.getItem(key());}
+  var adoptedSource=null,sourceRequest=0;
+  function usesIndexedDB(){return root.InsightIndexedDBCandidateV1?.isAdopted()===true;}
+  async function refreshSource(){
+    var token=++sourceRequest;
+    adoptedSource=null;
+    var source=await root.InsightIndexedDBSalesInputPreviewV1.readCommittedView();
+    if(token!==sourceRequest||!source)return false;
+    adoptedSource={revision:source.revision,raw:root.InsightStorage.serialize(source.snapshot)};
+    return true;
+  }
+  function saved(){return usesIndexedDB()?adoptedSource?.raw:root.localStorage.getItem(key());}
   function storageState(){
+    if(usesIndexedDB()){
+      if(!adoptedSource)throw Error('report_storage_unavailable');
+      return adoptedSource;
+    }
     if(!root.InsightStorage||typeof root.InsightStorage.reportState!=='function')throw Error('report_storage_unavailable');
     var s=root.InsightStorage.reportState();
     if(s.pending||s.held||s.conflict)throw Error('report_storage_unstable');
@@ -370,7 +384,7 @@
     if(heading)heading.textContent='';
     if(message&&dialog&&dialog.open)message.textContent=text||'内容が変わりました。条件を確認して生成し直してください。';
   }
-  function clearHost(){detailText='';if(host)host.close();host=null;tickets.clear();if(body)body.textContent='';if(heading)heading.textContent='';}
+  function clearHost(){sourceRequest++;adoptedSource=null;detailText='';if(host)host.close();host=null;tickets.clear();if(body)body.textContent='';if(heading)heading.textContent='';}
   function addField(id,label,type){
     var wrap=node('label',undefined,'irp-field'),title=node('span',label),input=node(type==='select'?'select':'input');
     input.id='irp-'+id;input.name=id;if(type!=='select')input.type=type;
@@ -407,9 +421,10 @@
       category_id:fields.category.value,as_of:day(),comparison_confirmed:false,
       request_id:id,data_revision:'saved-revision-'+s.revision});
   }
-  function generate(){
+  async function generate(){
     invalidate('生成しています。');
     try{
+      if(usesIndexedDB()&&!(await refreshSource()))return;
       storageState();
       if(!host||!form.reportValidity())throw Error('report_conditions_required');
       var id='preview-'+(++sequence),captured=request(id),capturedRaw=null;
@@ -433,9 +448,11 @@
       invalidate('報告を生成できません。店舗・期間・カテゴリーと保存状態を確認してください。保存失敗や別タブ更新後は、未保存の入力を控えてから再読み込みしてください。');
     }finally{paint();}
   }
-  function open(){
+  async function open(){
     clearHost();
+    if(!dialog.open)dialog.showModal();
     try{
+      if(usesIndexedDB()&&!(await refreshSource()))return;
       storageState();catalog();
       var today=day();
       fields.start.value=today;fields.end.value=today;
@@ -443,9 +460,9 @@
       fields.quantityDay.value=today;fields.quantityStart.value=shift(today,-28);fields.quantityEnd.value=shift(today,-1);
       message.textContent='店舗・期間・カテゴリーを確認して生成してください。未保存の入力は含みません。';
     }catch(_){clearHost();message.textContent='保存済みのデータを確認できません。保存状態を確認し、必要なら未保存の入力を控えてから再読み込みしてください。';}
-    if(!dialog.open)dialog.showModal();
   }
   function onStorageUpdate(event){
+    sourceRequest++;adoptedSource=null;
     if(!host)return;
     try{
       if(event.phase==='begin')tickets.set(event.ticket,host.beginUpdate('storage'));

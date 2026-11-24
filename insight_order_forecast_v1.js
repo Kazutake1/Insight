@@ -241,7 +241,10 @@
       try{
         var issued=Date.now(),delivery=state.delivery,storage=root.InsightStorage;
         if(autoDelivery&&delivery!==defaultDelivery(new Date(issued)))throw new Error('納品日を表示し直してください。');
-        var snapshot=storage.readSnapshot(),store=snapshot&&snapshot.stores[state.storeId];
+        var adopted=root.InsightIndexedDBCandidateV1?.isAdopted();
+        var committed=adopted&&await root.InsightIndexedDBSalesInputPreviewV1.readCommittedView();
+        var snapshot=adopted?committed?.snapshot:storage.readSnapshot(),store=snapshot&&snapshot.stores[state.storeId];
+        if(adopted&&currentNav!=='orderForecast')throw new Error('発注予測を開き直してください。');
         var available=snapshot&&snapshot.salesCountManagement&&snapshot.salesCountManagement.categories||[];
         var category=available.find(function(item){return item.id===state.categoryId&&!item.hidden;});
         if(!store||!category)throw new Error('保存済みの店舗・カテゴリーを選択してください。');
@@ -258,6 +261,12 @@
         capture.sourceDigest=Array.from(new Uint8Array(digest),function(byte){
           return byte.toString(16).padStart(2,'0');
         }).join('');
+        if(adopted){
+          var latest=await root.InsightIndexedDBSalesInputPreviewV1.readCommittedView();
+          if(latest?.revision!==committed.revision||currentNav!=='orderForecast'||
+            state.storeId!==capture.storeId||state.categoryId!==category.id||state.delivery!==delivery)
+            throw new Error('対象の保存データが変わりました。発注予測を開き直してください。');
+        }
         var result=await saveCapture(root.indexedDB,capture);
         captureStatus.textContent=result==='scope'?'最初に記録した店舗・カテゴリーを選択してください。':
           result==='legacy'?'保存元を確認できない旧記録があります。この記録の評価は保留です。':
@@ -312,7 +321,7 @@
         {snapshot:allStores,storeId:state.storeId,resolver:root.InsightTripHistoryResolver});data.previousYear.forEach(function(item){doc.getElementById('ofYearCards').append(dayCard(item,category));});data.weeks.forEach(function(item){doc.getElementById('ofWeekCards').append(dayCard(item,category));});var averageCard=sales.createAverageCard('6週平均',data.deliveryAverage,data.salesAverage,null,category,data.averageMask),spacer=el('div',undefined,'sc-history-weather of-average-weather-spacer');spacer.setAttribute('aria-hidden','true');spacer.append(el('span','—'));averageCard.querySelector('.sc-day-title').after(spacer);doc.getElementById('ofWeekCards').append(averageCard);data.recent.forEach(function(item){doc.getElementById('ofRecentCards').append(dayCard(item,category));});doc.getElementById('ofRecentEmpty').textContent=data.recent.length?'':'対象期間の実績はありません。';}else doc.getElementById('ofRecentEmpty').textContent='表示するカテゴリーがありません。';weather();}
     async function load(force){var token=++request;loading=true;error='';weather();try{var location=dataStore().weatherLocation,locationKey=JSON.stringify(location||null),result=await client.load(location,force);if(token!==request)return;forecast=result;forecastLocation=locationKey;}catch(e){if(token!==request)return;error=(e&&e.message||'天気予報を取得できませんでした。')+(forecast?'（前回取得分を表示）':'');}finally{if(token===request){loading=false;render();}}}
 doc.getElementById('ofCategory').onchange=function(e){state.categoryId=e.target.value;render();};doc.getElementById('ofDelivery').onchange=function(e){if(!isoDate(e.target.value)||e.target.value<'1900-01-01'||e.target.value>'9998-12-31'){e.target.value=state.delivery;return;}autoDelivery=false;state.delivery=e.target.value;render();};doc.getElementById('ofRefresh').onclick=function(){load(true);};
-    var originalGoto=root.gotoNav;root.gotoNav=function(target){if(target==='orderForecast'){originalGoto.apply(this,arguments);if(currentNav!==target)return;state.storeId=allStores.current;doc.querySelectorAll('.nav-btn').forEach(function(n){n.classList.remove('active');});doc.querySelectorAll('.page').forEach(function(n){n.classList.remove('show');});nav.classList.add('active');page.classList.add('show');render();load(false);return;}var result=originalGoto.apply(this,arguments);if(currentNav!=='orderForecast'){nav.classList.remove('active');page.classList.remove('show');}return result;};
+    var originalGoto=root.gotoNav;root.gotoNav=function(target){if(target==='orderForecast'){originalGoto.apply(this,arguments);if(currentNav!==target)return;if(state.storeId!==allStores.current){forecast=null;forecastLocation=null;}state.storeId=allStores.current;doc.querySelectorAll('.nav-btn').forEach(function(n){n.classList.remove('active');});doc.querySelectorAll('.page').forEach(function(n){n.classList.remove('show');});nav.classList.add('active');page.classList.add('show');render();load(false);return;}var result=originalGoto.apply(this,arguments);if(currentNav!=='orderForecast'){nav.classList.remove('active');page.classList.remove('show');}return result;};
     var originalSwitch=root.switchStore;root.switchStore=function(id){if(currentNav!=='orderForecast')return originalSwitch.apply(this,arguments);if(!allStores.stores[id]){doc.getElementById('storeSel').value=allStores.current;return;}var view=currentNav;currentNav=1;try{originalSwitch.apply(this,arguments);}finally{currentNav=view;}state.storeId=allStores.current;forecast=null;render();load(false);};
     model.getState=function(){return Object.assign({},state);};model.render=render;
   }

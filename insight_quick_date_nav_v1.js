@@ -11,6 +11,10 @@
 
   var selectedStore=allStores.current;
   var dirty=false;
+  function hasUnsavedInput(){
+    return window.InsightIndexedDBQuickInputPreviewV1?.getStatus()?.hasUnsavedInput??dirty;
+  }
+  window.InsightQuickDateNavV1=Object.freeze({hasUnsavedInput:hasUnsavedInput});
   var week=['日','月','火','水','木','金','土'];
   function selectedDate(){return dateContext.getSelectedDate();}
   function todaySelected(){return dateContext.isToday();}
@@ -35,8 +39,19 @@
   }
   function selectDate(date,preserveDatePicker){
     if(!date||typeof date.getTime!=='function'||!Number.isFinite(date.getTime())||dateContext.iso(date)===dateContext.getSelectedIso())return;
-    if(dirty&&!window.confirm('未保存の入力があります。\n保存せずに別の日付へ移動しますか？'))return;
+    var management=window.InsightIndexedDBSalesInputPreviewV1,year=String(date.getFullYear());
+    if(management?.managesYears()&&!dateContext.isFuture(date)&&!window.InsightYearManager.isCurrentRegistered(year)){
+      // The date picker stores its proposed value before it dispatches change.
+      if(preserveDatePicker)document.getElementById('iqdDateInput').value=dateContext.getSelectedIso();
+      void management.promoteForPeriod(year,0,'この日付',()=>applySelectedDate(date,preserveDatePicker));
+      return;
+    }
+    if(window.InsightIndexedDBQuickInputPreviewV1?.allowDateChange(date)===false)return;
+    if(hasUnsavedInput()&&!window.confirm('未保存の入力があります。\n保存せずに別の日付へ移動しますか？'))return;
     if(!ensureRegisteredYear(date))return;
+    applySelectedDate(date,preserveDatePicker);
+  }
+  function applySelectedDate(date,preserveDatePicker){
     dateContext.setSelectedDate(date);
     quickEditDay=dateContext.getSelectedInfo().day;
     if(preserveDatePicker){
@@ -47,6 +62,7 @@
     }else window.renderQuickNav();
     window.renderQuickPage();
     dirty=false;
+    window.InsightIndexedDBQuickInputPreviewV1?.dateChanged();
   }
   window.renderQuickNav=function(){
     var date=selectedDate();
@@ -79,7 +95,7 @@
     document.getElementById('todayBadge').textContent='今日';
     window.renderQuickNav();
     window.renderQuickPage();
-    if(todaySelected()){
+    if(!window.InsightIndexedDBCandidateV1?.isAdopted()&&todaySelected()){
       var t=todayFY(),row=store.data[t.fy]&&store.data[t.fy][t.month]&&store.data[t.fy][t.month][t.day-1];
       if(!row||!row.weather)fetchWeather();
     }
@@ -90,7 +106,9 @@
     if(event.target&&event.target.closest&&event.target.closest('.wx-btn,#autoWxBtn'))dirty=true;
   });
   if(window.InsightHooks){
-    window.InsightHooks.on('quick:save:after','quick-date-clear-dirty',function(){dirty=false;},30);
+    function clearDirty(){dirty=false;}
+    window.InsightHooks.on('quick:save:after','quick-date-clear-dirty',clearDirty,30);
+    window.InsightHooks.on('quick:preview:committed','quick-date-clear-dirty',clearDirty,30);
   }
 
   // STEP4 GATE-3: selected-date Quick clear only; no app-wide authorization.

@@ -94,7 +94,7 @@ test('機能スクリプトの読み込み順はshell loaderのmanifestで明示
 
 test('Indexはshell loaderを外部scriptとして読み込む',()=>{
   const index=read('Index.html');
-  assert.match(index,/insight_shell_loader_v1\.js\?v=20261118-sale-scroll20-1/);
+  assert.match(index,/insight_shell_loader_v1\.js\?v=20261124-indexeddb-step3-1/);
   assert.doesNotMatch(index,/var orderedFeatureLoads=/);
   assert.match(read('insight_shell_loader_v1.js'),/var orderedFeatureLoads=/);
 });
@@ -109,12 +109,19 @@ test('shell BUILDはIndex metaとboot scriptで一致する',()=>{
   assert.ok(index.includes('insight_shell_boot_v1.js?v='+build[1]));
 });
 
-test('旧動的scriptローダーはルートJSから除去されている',()=>{
+test('動的なscript挿入はshell loaderの復元専用処理に限定する',()=>{
   const files=fs.readdirSync(root).filter(name=>name.endsWith('.js'));
-  const offenders=[];
-  files.forEach(name=>{
-    const source=read(name);
-    if(/createElement\(\s*['"]script['"]\s*\)/.test(source))offenders.push(name);
+  const dynamicScript=/createElement\(\s*['"]script['"]\s*\)/g;
+  const loader=read('insight_shell_loader_v1.js');
+  const start=loader.indexOf('async function prepareRecovery(){');
+  const end=loader.indexOf('return window.InsightIndexedDBCandidateV1.start(',start);
+  assert.ok(start>=0&&end>start,'復元専用の読み込み処理がありません');
+  const recovery=loader.slice(start,end);
+  assert.equal(Array.from(recovery.matchAll(dynamicScript)).length,1);
+  assert.match(recovery,/script\.dataset\.insightRecoveryModel='true'/);
+  const offenders=files.filter(name=>{
+    const source=name==='insight_shell_loader_v1.js'?loader.slice(0,start)+loader.slice(end):read(name);
+    return Array.from(source.matchAll(dynamicScript)).length>0;
   });
   assert.deepEqual(offenders,[]);
 });
@@ -175,7 +182,7 @@ test('廃棄分析の既存コンパクト表示スタイルは維持する',()=
 test('非圧縮payload読込はbootstrap文字列パッチと展開処理に依存しない',()=>{
   const index=shellSource();
   assert.doesNotMatch(index,/insight_bootstrap_patches_v1\.js|InsightBootstrapPatches/);
-  assert.match(index,/fetch\('\.\/insight_payload_source_v1\.html\?v=20261113-daily-bar-payload-1'/);
+  assert.match(index,/fetch\('\.\/insight_payload_source_v1\.html\?v=20261124-indexeddb-preview-7'/);
   assert.doesNotMatch(index,/Promise\.all\(files\.map|pako\.ungzip|atob\(b64\)/);
   assert.match(index,/orderedFeatureLoads/);
 });

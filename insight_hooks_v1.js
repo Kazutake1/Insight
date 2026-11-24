@@ -44,8 +44,9 @@
   // Registered Quick save only. Hooks loads before the observer factory, so initialize lazily.
   var quickSaveObserver=null,quickSaveFault=false,quickSaveActive=0,quickSaveInitClosed=false;
   var quickSaveScope='quick-save-core-and-sync-after-hooks-only';
+  var quickSaveAsyncObserved=false;
   function quickSaveStatus(){
-    var scope=quickSaveScope;
+    var scope=quickSaveAsyncObserved?'quick-save-including-indexeddb-preview':quickSaveScope;
     if(quickSaveFault)return Object.freeze({scope:scope,state:'HELD',activeCount:null,epoch:null});
     if(!quickSaveObserver)return Object.freeze({scope:scope,state:'UNAVAILABLE',activeCount:null,epoch:null});
     try{
@@ -76,7 +77,8 @@
       if(initial.state!=='IDLE_OBSERVED'||initial.activeCount!==0)quickSaveFault=true;
     }catch(_){quickSaveFault=true;}
   }
-  function observeQuickSave(action,context){
+  function observeQuickSave(action,context,asyncPreview){
+    if(asyncPreview)quickSaveAsyncObserved=true;
     initQuickSaveObserver();
     // A factory appearing during an unobserved save must not report that save IDLE.
     quickSaveInitClosed=true;
@@ -92,18 +94,27 @@
         }
       }catch(_){quickSaveFault=true;}
     }
+    function finish(outcome){
+      if(!registered)return;
+      try{if(ref.end(token,outcome)!==true)quickSaveFault=true;}
+      catch(_){quickSaveFault=true;}
+      quickSaveActive--;
+      if(!quickSaveFault)quickSaveStatus();
+    }
+    if(asyncPreview){
+      return Promise.resolve().then(action).then(function(value){
+        finish(value==='completed'||value==='cancelled_before_mutation'?value:'unknown');
+        return value;
+      },function(error){
+        finish('unknown');
+        throw error;
+      });
+    }
     try{
       var result=action();
       if(context.cancel!==true&&context.state.quickSaveObservationFailed!==true)outcome='completed';
       return result;
-    }finally{
-      if(registered){
-        try{if(ref.end(token,outcome)!==true)quickSaveFault=true;}
-        catch(_){quickSaveFault=true;}
-        quickSaveActive--;
-        if(!quickSaveFault)quickSaveStatus();
-      }
-    }
+    }finally{finish(outcome);}
   }
   // Exposes state only, never business data or permission decisions.
   root.InsightQuickSaveObserverV0=Object.freeze({getStatus:function(){initQuickSaveObserver();return quickSaveStatus();}});
@@ -113,8 +124,9 @@
   // This observer cannot authorize model input or assert whole-application cleanliness.
   var inputSaveObserver=null,inputSaveFault=false,inputSaveActive=0,inputSaveInitClosed=false;
   var inputSaveScope='input-month-save-core-and-sync-after-hooks-only';
+  var inputSaveAsyncObserved=false;
   function inputSaveStatus(){
-    var scope=inputSaveScope;
+    var scope=inputSaveAsyncObserved?'input-month-save-including-indexeddb-preview':inputSaveScope;
     if(inputSaveFault)return Object.freeze({scope:scope,state:'HELD',activeCount:null,epoch:null});
     if(!inputSaveObserver)return Object.freeze({scope:scope,state:'UNAVAILABLE',activeCount:null,epoch:null});
     try{
@@ -145,7 +157,8 @@
       if(initial.state!=='IDLE_OBSERVED'||initial.activeCount!==0)inputSaveFault=true;
     }catch(_){inputSaveFault=true;}
   }
-  function observeInputSave(action,context){
+  function observeInputSave(action,context,asyncPreview){
+    if(asyncPreview)inputSaveAsyncObserved=true;
     initInputSaveObserver();
     // Do not retroactively mark an unobserved save IDLE if the factory appears later.
     inputSaveInitClosed=true;
@@ -161,18 +174,27 @@
         }
       }catch(_){inputSaveFault=true;}
     }
+    function finish(outcome){
+      if(!registered)return;
+      try{if(ref.end(token,outcome)!==true)inputSaveFault=true;}
+      catch(_){inputSaveFault=true;}
+      inputSaveActive--;
+      if(!inputSaveFault)inputSaveStatus();
+    }
+    if(asyncPreview){
+      return Promise.resolve().then(action).then(function(value){
+        finish(value==='completed'||value==='cancelled_before_mutation'?value:'unknown');
+        return value;
+      },function(error){
+        finish('unknown');
+        throw error;
+      });
+    }
     try{
       var result=action();
       if(context.cancel!==true)outcome='completed';
       return result;
-    }finally{
-      if(registered){
-        try{if(ref.end(token,outcome)!==true)inputSaveFault=true;}
-        catch(_){inputSaveFault=true;}
-        inputSaveActive--;
-        if(!inputSaveFault)inputSaveStatus();
-      }
-    }
+    }finally{finish(outcome);}
   }
   root.InsightInputSaveObserverV0=Object.freeze({getStatus:function(){initInputSaveObserver();return inputSaveStatus();}});
 
@@ -188,6 +210,11 @@
         var context={name:functionName,thisArg:self,args:args,state:{},cancel:false,result:undefined};
         if(beforeEvent)emit(beforeEvent,context);
         if(context.cancel){
+          if(functionName==='saveQuick'&&typeof context.runIndexedDBPreview==='function')
+            return observeQuickSave(context.runIndexedDBPreview,context,true);
+          if(functionName==='saveInput'&&['sales','kyaku','haiki'].indexOf(context.args[0])>=0&&
+             typeof context.runIndexedDBPreview==='function')
+            return observeInputSave(context.runIndexedDBPreview,context,true);
           if(afterEvent&&context.afterOnCancel)emit(afterEvent,context);
           return context.result;
         }

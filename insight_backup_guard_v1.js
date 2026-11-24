@@ -1,4 +1,11 @@
 (function(){
+var validationOnly=typeof document!=="undefined"&&document.currentScript?.dataset?.insightRecoveryModel==="true";
+var BACKUP_FORMAT="InsightBackup",BACKUP_FORMAT_VERSION=2;
+var ENCRYPTED_FILE_LIMIT=21*1024*1024;
+if(validationOnly){
+  window.InsightMigrationBackupV1=Object.freeze({readRestoreCandidate:readRestoreCandidate,verify:verifyMigrationBackup});
+  return;
+}
 var entrypoints=window.InsightBackupEntrypointsV1;
 if(!entrypoints||entrypoints.version!==1||typeof entrypoints.register!=="function"){
   // A new guard paired with an old core must fail closed as well.  This is a
@@ -48,9 +55,11 @@ if(!entrypoints||entrypoints.version!==1||typeof entrypoints.register!=="functio
 function isPlainObject(v){return !!v&&typeof v==="object"&&!Array.isArray(v);}
 function validYear(v){return /^\d{4}$/.test(String(v));}
 function nonNegativeNumber(v,label){if(v===undefined||v===null||v==="")return 0;var n=Number(v);if(!Number.isFinite(n)||n<0)throw new Error(label+" が不正です");return n;}
-function expectedDays(year,monthIndex){var y=Number(year);if(monthIndex===1&&y%4===0&&(y%100!==0||y%400===0))return 29;return DAYS_IN_MONTH[monthIndex];}
+function expectedDays(year,monthIndex){
+  var y=Number(year);if(monthIndex===1&&y%4===0&&(y%100!==0||y%400===0))return 29;
+  return (validationOnly?window.InsightDataHealth.monthLengths:DAYS_IN_MONTH)[monthIndex];
+}
 function validSalesCountDate(value){var match=/^(\d{4})-(\d{2})-(\d{2})$/.exec(value);if(!match)return false;var year=Number(match[1]),month=Number(match[2]),day=Number(match[3]),date=new Date(Date.UTC(year,month-1,day));return date.getUTCFullYear()===year&&date.getUTCMonth()===month-1&&date.getUTCDate()===day;}
-var BACKUP_FORMAT="InsightBackup",BACKUP_FORMAT_VERSION=2;
 function validationError(message){var error=new Error(message);error.name="InsightBackupValidationError";return error;}
 function currentStorageKey(){try{if(typeof SK!=="undefined"&&SK)return String(SK);}catch(_){}return "insight_v11";}
 function sameStrings(a,b){if(!Array.isArray(a)||!Array.isArray(b))return false;var x=a.map(String).slice().sort(),y=b.map(String).slice().sort();return x.length===y.length&&x.every(function(v,i){return v===y[i];});}
@@ -167,7 +176,7 @@ function shouldCreatePreRestoreBackup(){
 // A single FileReader may own the restore path at a time; no snapshot/schema changes.
 var restoreFileReaderActive=null;
 var backupOperationActive=false;
-var PLAIN_FILE_LIMIT=20*1024*1024,ENCRYPTED_FILE_LIMIT=21*1024*1024;
+var PLAIN_FILE_LIMIT=20*1024*1024;
 var DOWNLOAD_KEY='insight_backup_download_v1',CONFIRMED_KEY='insight_backup_confirmed_v1';
 function cryptoCodec(){
   if(!window.isSecureContext||!window.crypto||!window.crypto.subtle||!window.InsightBackupCryptoV1||!window.InsightBackupPasswordV1)
@@ -286,12 +295,12 @@ function backupStamp(now){
   var pad=function(n){return String(n).padStart(2,"0");};
   return pad(now.getFullYear()%100)+pad(now.getMonth()+1)+pad(now.getDate())+"_"+pad(now.getHours())+pad(now.getMinutes());
 }
-function downloadBackupPayload(payload,filename){
+function downloadBackupPayload(payload,filename,container=document.body){
   var blob=new Blob([JSON.stringify(payload,null,2)],{type:"application/json"});
   if(blob.size>ENCRYPTED_FILE_LIMIT)throw new Error('暗号化バックアップのサイズが大きすぎます。');
   var url=URL.createObjectURL(blob),a=document.createElement("a");
   try{
-    a.href=url;a.download=filename;document.body.appendChild(a);a.click();
+    a.href=url;a.download=filename;container.appendChild(a);a.click();
   }finally{
     if(a.parentNode)a.remove();
     setTimeout(function(){URL.revokeObjectURL(url);},1000);
@@ -350,7 +359,11 @@ function countWasteRecords(snapshot){
   return count;
 }
 function normalizeBackup(raw){
-  var next;if(isPlainObject(raw)&&isPlainObject(raw.stores)&&typeof raw.current==="string"){next=raw;}else if(isPlainObject(raw)&&Array.isArray(raw.years)&&isPlainObject(raw.data)){next=migrateOldData(raw);}else{throw new Error("バックアップ形式が正しくありません");}
+  // Before the app opens, the standalone recovery page has no live store or legacy UI.
+  var months=validationOnly?window.InsightDataHealth.monthNames:MONTHS;
+  var wasteCategories=validationOnly
+    ?["米飯","調理パン","麺類・その他","デリカテッセン","スイーツ","FF","その他デイリー","パン・ペストリー"]:HAIKI_CATS;
+  var next;if(isPlainObject(raw)&&isPlainObject(raw.stores)&&typeof raw.current==="string"){next=raw;}else if(!validationOnly&&isPlainObject(raw)&&Array.isArray(raw.years)&&isPlainObject(raw.data)){next=migrateOldData(raw);}else{throw new Error("バックアップ形式が正しくありません");}
   if(!window.InsightStorage)throw new Error("保存機能を初期化できませんでした");
   next=window.InsightStorage.migrateSnapshot(next);
   if(next.schemaVersion!==window.InsightStorage.CURRENT_SCHEMA_VERSION)throw new Error("バックアップのデータ形式に対応していません");
@@ -365,13 +378,13 @@ function normalizeBackup(raw){
     st.years=years;if(!isPlainObject(st.data))throw new Error("日別データが不正です");
     years.forEach(function(y){
       var yd=st.data[y];if(!isPlainObject(yd))throw new Error(y+"年のデータがありません");
-      MONTHS.forEach(function(m,mi){
+      months.forEach(function(m,mi){
         var rows=yd[m];if(!Array.isArray(rows)||rows.length!==expectedDays(y,mi))throw new Error(y+"年"+m+"の日別データ件数が不正です");
         rows.forEach(function(row,ri){
           if(!isPlainObject(row))throw new Error(y+"年"+m+(ri+1)+"日のデータが不正です");
           if(row.d!==undefined&&Number(row.d)!==ri+1)throw new Error(y+"年"+m+(ri+1)+"日の日付情報が不正です");row.d=String(ri+1);
           ["売上","客数","買上点数","廃棄金額"].forEach(function(k){row[k]=nonNegativeNumber(row[k],k);});
-          if(row.haiki===undefined){row.haiki=blankHaiki();}else{if(!isPlainObject(row.haiki))throw new Error("廃棄内訳が不正です");HAIKI_CATS.forEach(function(c){row.haiki[c]=nonNegativeNumber(row.haiki[c],c);});}
+          if(row.haiki===undefined){row.haiki=Object.fromEntries(wasteCategories.map(function(category){return [category,0];}));}else{if(!isPlainObject(row.haiki))throw new Error("廃棄内訳が不正です");wasteCategories.forEach(function(c){row.haiki[c]=nonNegativeNumber(row.haiki[c],c);});}
           if(row.weather===undefined)row.weather="";else if(typeof row.weather!=="string")throw new Error("天気データが不正です");
           if(row.storeMemo!==undefined&&typeof row.storeMemo!=="string")throw new Error("店舗メモが不正です");
           if(row.stockout!==undefined&&["なし","少ない","多い"].indexOf(row.stockout)<0)throw new Error("欠品データが不正です");
@@ -380,9 +393,9 @@ function normalizeBackup(raw){
     });
     if(st.monthlyOps!==undefined){
       if(!isPlainObject(st.monthlyOps))throw new Error("月次データが不正です");
-      Object.keys(st.monthlyOps).forEach(function(y){if(!validYear(y)||!isPlainObject(st.monthlyOps[y]))throw new Error("月次年度データが不正です");Object.keys(st.monthlyOps[y]).forEach(function(m){if(MONTHS.indexOf(m)<0||!isPlainObject(st.monthlyOps[y][m]))throw new Error("月次データが不正です");var op=st.monthlyOps[y][m];op.laborCostYen=nonNegativeNumber(op.laborCostYen,"人件費");op.grossMarginRate=nonNegativeNumber(op.grossMarginRate,"粗利率");if(op.grossMarginRate>100)throw new Error("粗利率が不正です");});});
+      Object.keys(st.monthlyOps).forEach(function(y){if(!validYear(y)||!isPlainObject(st.monthlyOps[y]))throw new Error("月次年度データが不正です");Object.keys(st.monthlyOps[y]).forEach(function(m){if(months.indexOf(m)<0||!isPlainObject(st.monthlyOps[y][m]))throw new Error("月次データが不正です");var op=st.monthlyOps[y][m];op.laborCostYen=nonNegativeNumber(op.laborCostYen,"人件費");op.grossMarginRate=nonNegativeNumber(op.grossMarginRate,"粗利率");if(op.grossMarginRate>100)throw new Error("粗利率が不正です");});});
     }
-    if(st.haikibudget!==undefined){if(!isPlainObject(st.haikibudget)||!isPlainObject(st.haikibudget.cats))throw new Error("廃棄予算が不正です");st.haikibudget.total=nonNegativeNumber(st.haikibudget.total,"廃棄予算");HAIKI_CATS.forEach(function(c){st.haikibudget.cats[c]=nonNegativeNumber(st.haikibudget.cats[c],c+"予算");});}
+    if(st.haikibudget!==undefined){if(!isPlainObject(st.haikibudget)||!isPlainObject(st.haikibudget.cats))throw new Error("廃棄予算が不正です");st.haikibudget.total=nonNegativeNumber(st.haikibudget.total,"廃棄予算");wasteCategories.forEach(function(c){st.haikibudget.cats[c]=nonNegativeNumber(st.haikibudget.cats[c],c+"予算");});}
     if(st.weatherLocation!==undefined){
       var wl=st.weatherLocation;
       if(!isPlainObject(wl)||typeof wl.name!=="string"||!wl.name.trim())throw new Error("天気地点設定が不正です");
@@ -449,29 +462,72 @@ function rollbackPreRestoreSnapshot(){
   if(window.InsightStorage.serialize(restored)!==window.InsightStorage.serialize(preRestoreMemorySnapshot))throw new Error("復元前データの再保存結果が一致しません。");
   return restored;
 }
+async function downloadConfirmedBackup(snapshot,title,filename,operation,state,now){
+  var payload={backupInfo:buildBackupInfo(snapshot,now),data:snapshot};
+  var password=await backupPassword(title,true,operation);
+  var encrypted;
+  try{
+    backupBusy('バックアップを暗号化中',operation);
+    encrypted=await cryptoCodec().encrypt(payload,password);
+  }finally{password=null;}
+  ensureBackupContinuing(operation,state);
+  downloadBackupPayload(encrypted,filename);
+  await confirmBackupDownload(filename,'normal',operation,state);
+}
 async function encryptedBackupData(){
   if(backupOperationActive||restoreFileReaderActive){alert('別のバックアップ・復元処理が進行中です。');return;}
   backupOperationActive=true;
-  var operation={cancelled:false},password=null;
+  var operation={cancelled:false};
   try{
     cryptoCodec();
     var state=captureBackupState();
-    if(!window.InsightStorage)throw new Error("保存機能を初期化できませんでした");
     var snapshot=window.InsightStorage.migrateSnapshot(allStores),now=new Date();
-    var payload={backupInfo:buildBackupInfo(snapshot,now),data:snapshot};
-    var stamp=backupStamp(now);
-    var filename="Insight_"+stamp+".json";
-    password=await backupPassword('バックアップ用パスワード',true,operation);
-    backupBusy('バックアップを暗号化中',operation);
-    var encrypted=await cryptoCodec().encrypt(payload,password);password=null;
-    ensureBackupContinuing(operation,state);
-    downloadBackupPayload(encrypted,filename);
-    await confirmBackupDownload(filename,'normal',operation,state);
+    await downloadConfirmedBackup(snapshot,'バックアップ用パスワード','Insight_'+backupStamp(now)+'.json',operation,state,now);
     showToast("📥 保存したファイルの確認を記録しました（ご本人の申告）","#15803d","#f0fdf4");
   }catch(err){
     if(err&&err.name==='InsightBackupCancelled')return;
     alert("バックアップ処理を完了できませんでした。\n"+String(err&&err.message?err.message:err));
-  }finally{password=null;backupOperationActive=false;if(window.InsightBackupPasswordV1)window.InsightBackupPasswordV1.close();}
+  }finally{backupOperationActive=false;if(window.InsightBackupPasswordV1)window.InsightBackupPasswordV1.close();}
+}
+function assertMigrationReady(raw){
+  if(backupOperationActive||restoreFileReaderActive)
+    throw new Error('別のバックアップ・復元処理が進行中です。');
+  var weather=window.InsightWeatherTemperatureAuto,location=window.InsightWeatherLocation;
+  var bulk=window.InsightWeatherBulk?.getWeatherBulkOperationStatus();
+  if(typeof window.hasPendingCSVImport!=='function'||typeof weather?.hasPendingFetch!=='function'||
+     typeof location?.hasPendingSearch!=='function'||!bulk)
+    throw new Error('処理中の操作を確認できないため、移行を中止しました。');
+  if(window.hasPendingCSVImport()||weather.hasPendingFetch()||location.hasPendingSearch()||
+     bulk.state==='ACTIVE'||bulk.state==='HELD'||window.InsightStorage.snapshotWritesHeld()||
+     document.querySelector('dialog[open],#modalBg.show,#budgetModalBg.show,#ayInput,#storeMenu.is-open')){
+    throw new Error('編集中または処理中の操作があるため、移行を中止しました。');
+  }
+  var quick=window.InsightQuickDateNavV1,salesCount=window.InsightSalesCount,dayInput=window.InsightInputDayNav;
+  if(typeof quick?.hasUnsavedInput!=='function'||typeof salesCount?.hasUnsavedInput!=='function'||
+     typeof dayInput?.hasUnsavedInput!=='function')
+    throw new Error('未保存の入力を確認できないため、移行を中止しました。');
+  var state=captureBackupState();
+  if(quick.hasUnsavedInput()||salesCount.hasUnsavedInput()||dayInput.hasUnsavedInput()||
+     state.saved!==raw||state.live!==window.InsightStorage.serialize(JSON.parse(raw))){
+    throw new Error('未保存の入力または保存データの変更があるため、移行を中止しました。');
+  }
+}
+// The isolated migration draft is the only caller. Use the exact captured
+// source as input to the existing backup schema migration and confirmation UI.
+async function confirmMigrationBackup(raw){
+  assertMigrationReady(raw);
+  backupOperationActive=true;
+  var operation={cancelled:false};
+  try{
+    cryptoCodec();
+    var state=captureBackupState();
+    var snapshot=window.InsightStorage.migrateSnapshot(JSON.parse(raw)),now=new Date();
+    await downloadConfirmedBackup(snapshot,'移行前バックアップ用パスワード','Insight_'+backupStamp(now)+'.json',operation,state,now);
+    return true;
+  }catch(err){
+    if(err&&err.name==='InsightBackupCancelled')return false;
+    throw err;
+  }finally{backupOperationActive=false;if(window.InsightBackupPasswordV1)window.InsightBackupPasswordV1.close();}
 }
 function encryptedRestoreData(e){
   var file=e.target.files[0];if(!file)return;
@@ -578,4 +634,43 @@ function encryptedRestoreData(e){
 }
 if(entrypoints.register({version:1,backup:encryptedBackupData,restore:encryptedRestoreData})!==true)
   throw new Error("Encrypted backup entry points could not be registered safely");
+async function decodeMigrationBackup(file,password){
+  var decoded=parseBackupEnvelope(await cryptoCodec().decrypt(file,password));
+  if(decoded.legacy)throw validationError('バックアップの店舗・年度情報を確認できません。');
+  validateBackupInfo(decoded.info,decoded.data);
+  return decoded;
+}
+async function verifyMigrationBackup(file,password,sourceRaw){
+  var decoded=await decodeMigrationBackup(file instanceof Blob?await readEncryptedBackupFile(file):file,password);
+  var storage=window.InsightStorage;
+  if(storage.serialize(decoded.data)!==storage.serialize(JSON.parse(sourceRaw)))
+    throw validationError('バックアップと移行元のデータが一致しません。');
+  return {createdAt:decoded.info.createdAt,stores:backupStoreInfo(decoded.data)};
+}
+async function readEncryptedBackupFile(file){
+  if(!(file instanceof Blob)||file.size>ENCRYPTED_FILE_LIMIT)
+    throw validationError('21MiB以下の暗号化バックアップを選んでください。');
+  try{return JSON.parse(await file.text());}
+  catch(_){throw validationError('バックアップファイルを読み込めませんでした。');}
+}
+async function readRestoreCandidate(file,password){
+  var decoded=await decodeMigrationBackup(await readEncryptedBackupFile(file),password);
+  var snapshot=normalizeBackup(decoded.data);
+  if(validationOnly)window.InsightSalesCount.ensure(snapshot);
+  runRestorePreflight(snapshot);
+  return {snapshot,summary:{createdAt:decoded.info.createdAt,stores:backupStoreInfo(snapshot)}};
+}
+async function inspectMissingStorageBackup(file,password){
+  return (await readRestoreCandidate(file,password)).summary;
+}
+async function encodeCommittedBackup(snapshot,password){
+  var now=new Date(),data=window.InsightStorage.migrateSnapshot(snapshot);
+  var encrypted=await cryptoCodec().encrypt({backupInfo:buildBackupInfo(data,now),data:data},password);
+  return {encrypted:encrypted,filename:'Insight_'+backupStamp(now)+'.json'};
+}
+window.InsightMigrationBackupV1=Object.freeze({
+  confirm:confirmMigrationBackup,assertReady:assertMigrationReady,verify:verifyMigrationBackup,
+  inspectMissingStorage:inspectMissingStorageBackup,readRestoreCandidate:readRestoreCandidate,
+  encodeCommitted:encodeCommittedBackup,downloadEncrypted:downloadBackupPayload
+});
 })();

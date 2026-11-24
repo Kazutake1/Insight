@@ -162,7 +162,7 @@
   // It must never be interpreted as an app-wide clean or model authorization signal.
   // The observer must never suppress, retry, replace the exception from, or
   // change the return value of the pre-existing business callback.
-  function observeForecastOperation(kind,operation){
+  function observeForecastOperation(kind,operation,asyncPreview){
     var observer=forecastOperationObserver,ticket=null,outcome='unknown',registered=false;
     if(observer&&!forecastOperationFault){
       try{
@@ -176,23 +176,30 @@
         }
       }catch(_){forecastOperationFault=true;}
     }
-    try{return operation(function(result){outcome=result;});}
-    finally{
-      if(registered){
-        try{if(observer.end(ticket,outcome)!==true)forecastOperationFault=true;}
-        catch(_){forecastOperationFault=true;}
-        forecastOperationActive-=1;
-        if(!forecastOperationFault)observedOperationStatus();
-      }
+    function finish(){
+      if(!registered)return;
+      try{if(observer.end(ticket,outcome)!==true)forecastOperationFault=true;}
+      catch(_){forecastOperationFault=true;}
+      forecastOperationActive-=1;
+      if(!forecastOperationFault)observedOperationStatus();
     }
+    function mark(result){outcome=result;}
+    if(asyncPreview){
+      try{return Promise.resolve(operation(mark)).finally(finish);}
+      catch(error){finish();throw error;}
+    }
+    try{return operation(mark);}
+    finally{finish();}
   }
   if(typeof module!=='undefined'&&module.exports)module.exports=model;
   if(!root.document)return;
   root.InsightSalesCount=model;
+  if(root.document.currentScript?.dataset?.insightRecoveryModel==="true")return;
 
   function init(){
     if(root.__insightSalesCountV1)return;root.__insightSalesCountV1=true;ensure(allStores);initForecastOperationObserver();
     var doc=root.document,state={year:String(new Date().getFullYear()),month:new Date().getMonth()+1,categoryId:null,draft:{},wasteDraft:{},wasteTouched:{},dirty:false};
+    var preview=null,categoryDialog=null,categoryDraftChanged=null;
     function el(tag,text,cls){var n=doc.createElement(tag);if(text!==undefined)n.textContent=text;if(cls)n.className=cls;return n;}
     function pad(v){return String(v).padStart(2,'0');}
     function monthPrefix(){return state.year+'-'+pad(state.month);}
@@ -203,30 +210,105 @@
     function setDirty(v){state.dirty=!!v;var mark=doc.getElementById('scDirty'),save=doc.getElementById('scSave');if(mark){mark.textContent=v?'未保存の変更があります':'保存済み';mark.className='sc-status '+(v?'dirty':'saved');}if(save)save.disabled=!v;}
     function confirmLeave(){return !state.dirty||confirm('販売数入力に未保存の変更があります。\n保存せずに移動しますか？');}
     function yearRegistered(year){return !!(store&&Array.isArray(store.years)&&/^\d{4}$/.test(String(year))&&store.years.some(function(value){return String(value)===String(year);}));}
-    function ensureRegisteredYear(year){var y=String(year);if(yearRegistered(y))return true;if(!root.InsightYearManager||typeof root.InsightYearManager.promoteCurrent!=='function'){alert('この年度を追加する機能を使用できません。');return false;}if(!confirm(y+'年度はダッシュボードに登録されていません。\n年度を追加して販売数を入力しますか？\n\n既にある過去データは保持したまま、未入力日を正常な空データで補完します。'))return false;try{root.InsightYearManager.promoteCurrent(y);store=allStores.stores[allStores.current];if(typeof renderYearPills==='function')renderYearPills();if(typeof showToast==='function')showToast('✓ '+y+'年度を追加しました','#15803d','#f0fdf4');return true;}catch(error){alert('年度を追加できませんでした。\n'+(error&&error.message?error.message:error));return false;}}
+    function ensureRegisteredYear(year){var y=String(year);if(yearRegistered(y))return true;if(preview)return false;if(!root.InsightYearManager||typeof root.InsightYearManager.promoteCurrent!=='function'){alert('この年度を追加する機能を使用できません。');return false;}if(!confirm(y+'年度はダッシュボードに登録されていません。\n年度を追加して販売数を入力しますか？\n\n既にある過去データは保持したまま、未入力日を正常な空データで補完します。'))return false;try{root.InsightYearManager.promoteCurrent(y);store=allStores.stores[allStores.current];if(typeof renderYearPills==='function')renderYearPills();if(typeof showToast==='function')showToast('✓ '+y+'年度を追加しました','#15803d','#f0fdf4');return true;}catch(error){alert('年度を追加できませんでした。\n'+(error&&error.message?error.message:error));return false;}}
     function readMonth(){state.draft={};var prefix=monthPrefix(),data=store.salesCounts||{};Object.keys(data).forEach(function(date){if(date.slice(0,7)===prefix&&data[date][state.categoryId])state.draft[date]=normalizeRecord(data[date][state.categoryId]);});var waste=store.wasteCounts||{};state.wasteDraft={};state.wasteTouched={};Object.keys(waste).forEach(function(date){if(date.slice(0,7)===prefix&&waste[date][state.categoryId])state.wasteDraft[date]=normalizeWasteRecord(waste[date][state.categoryId]);});setDirty(false);}
     function record(date){return state.draft[date]||(state.draft[date]=emptyRecord());}
     function total(r,key,mask){mask=Array.isArray(mask)&&mask.length===3?mask:activeTrips(selectedCategory());var indexes=[0,1,2].filter(function(i){return mask[i]!==false;});var values=indexes.map(function(i){return r.trips[i][key];});return values.every(function(v){return v===null;})?null:values.reduce(function(sum,v){return sum+(v===null?0:v);},0);}
     function fmt(v){return v===null?'—':Number(v).toFixed(1).replace(/\.0$/,'');}
     function persistTransaction(next){if(!root.InsightStorage)throw new Error('保存機能を初期化できませんでした。');validate(next);root.InsightStorage.writeSnapshot(next);allStores.salesCountManagement=next.salesCountManagement;Object.keys(next.stores).forEach(function(id){allStores.stores[id].salesCounts=next.stores[id].salesCounts;if(Object.prototype.hasOwnProperty.call(next.stores[id],'wasteCounts'))allStores.stores[id].wasteCounts=next.stores[id].wasteCounts;});store=allStores.stores[allStores.current];}
-    function save(){
-      return observeForecastOperation('sales_count_save',function(markOutcome){
-      if(!ensureRegisteredYear(state.year))return;
-      var invalid=doc.querySelector('#pageSalesCount input:invalid');if(invalid){invalid.reportValidity();invalid.focus();return;}
-      var mask=activeTrips(selectedCategory()),large=[];Object.keys(state.draft).forEach(function(date){state.draft[date].trips.forEach(function(t,i){if(mask[i]===false)return;['delivery','sales'].forEach(function(k){if(t[k]>=1000)large.push(date+' '+(i+1)+'便 '+(k==='delivery'?'納品':'販売')+' '+t[k]);});});});
-      Object.keys(state.wasteTouched).forEach(function(date){var rec=state.wasteDraft[date];if(!rec)return;rec.trips.forEach(function(v,i){if(v!==null&&v>=1000)large.push(date+' '+(i+1)+'便 廃棄 '+v);});});if(large.length&&!confirm('4桁以上の入力があります。内容を確認して保存しますか？\n\n'+large.slice(0,8).join('\n')+(large.length>8?'\nほか '+(large.length-8)+'件':'')))return;
-      try{var next=copy(allStores);ensure(next);var nextStore=next.stores[allStores.current],prefix=monthPrefix();Object.keys(nextStore.salesCounts).forEach(function(date){if(date.slice(0,7)===prefix&&nextStore.salesCounts[date][state.categoryId]){delete nextStore.salesCounts[date][state.categoryId];if(!Object.keys(nextStore.salesCounts[date]).length)delete nextStore.salesCounts[date];}});Object.keys(state.draft).forEach(function(date){var r=normalizeRecord(state.draft[date]);if(r.trips.some(function(t){return t.delivery!==null||t.sales!==null;})){if(!nextStore.salesCounts[date])nextStore.salesCounts[date]={};nextStore.salesCounts[date][state.categoryId]=r;}});if(Object.keys(state.wasteTouched).length){var savedWaste=nextStore.wasteCounts||{};Object.keys(state.wasteTouched).forEach(function(date){var rec=normalizeWasteRecord(state.wasteDraft[date]);if(rec.trips.some(function(v){return v!==null;})){if(!savedWaste[date])savedWaste[date]={};savedWaste[date][state.categoryId]=rec;}else if(savedWaste[date]){delete savedWaste[date][state.categoryId];if(!Object.keys(savedWaste[date]).length)delete savedWaste[date];}});nextStore.wasteCounts=savedWaste;}persistTransaction(next);state.wasteTouched={};setDirty(false);showToast('✓ 販売数を保存しました','#15803d','#f0fdf4');renderAnalysis();markOutcome('completed');}catch(e){markOutcome('failed');alert('販売数を保存できませんでした。\n'+e.message);}
+    function applyCountDraft(next,storeId,prefix,categoryId,draft,wasteDraft,wasteTouched){
+      var nextStore=next.stores[storeId],counts=nextStore.salesCounts;
+      Object.keys(counts).forEach(function(date){
+        if(date.slice(0,7)!==prefix||!counts[date][categoryId])return;
+        delete counts[date][categoryId];
+        if(!Object.keys(counts[date]).length)delete counts[date];
       });
+      Object.keys(draft).forEach(function(date){
+        if(date.slice(0,7)!==prefix)throw new Error('販売数の対象月が一致しません。');
+        var row=normalizeRecord(draft[date]);
+        if(!row.trips.some(function(trip){return trip.delivery!==null||trip.sales!==null;}))return;
+        if(!counts[date])counts[date]={};
+        counts[date][categoryId]=row;
+      });
+      if(!Object.keys(wasteTouched).length)return;
+      var savedWaste=nextStore.wasteCounts||{};
+      Object.keys(wasteTouched).forEach(function(date){
+        if(date.slice(0,7)!==prefix)throw new Error('廃棄数の対象月が一致しません。');
+        var row=normalizeWasteRecord(wasteDraft[date]);
+        if(row.trips.some(function(value){return value!==null;})){
+          if(!savedWaste[date])savedWaste[date]={};
+          savedWaste[date][categoryId]=row;
+        }else if(savedWaste[date]){
+          delete savedWaste[date][categoryId];
+          if(!Object.keys(savedWaste[date]).length)delete savedWaste[date];
+        }
+      });
+      nextStore.wasteCounts=savedWaste;
+    }
+    function finishSave(){
+      state.wasteTouched={};setDirty(false);
+      showToast('✓ 販売数を保存しました','#15803d','#f0fdf4');renderAnalysis();
+    }
+    function draftFingerprint(){
+      return JSON.stringify([state.draft,state.wasteDraft,state.wasteTouched]);
+    }
+    function savePreview(markOutcome,target){
+      var storeId=target.storeId,prefix=target.prefix,categoryId=target.categoryId;
+      var captured=target.draft,values=JSON.parse(captured);
+      var button=doc.getElementById('scSave'),label=doc.getElementById('scDirty');
+      var commit=preview.prepareSave({
+        storeId:storeId,year:target.year,
+        unchanged:function(){
+          return monthPrefix()===prefix&&state.categoryId===categoryId&&state.dirty&&
+            draftFingerprint()===captured&&!doc.querySelector('#pageSalesCount input:invalid');
+        },
+        apply:function(next){
+          applyCountDraft(next,storeId,prefix,categoryId,values[0],values[1],values[2]);
+          validate(next);
+        }
+      });
+      if(!commit){markOutcome('cancelled_before_mutation');return;}
+      button.disabled=true;label.textContent='保存を確認しています。';
+      return commit().then(function(saved){
+        if(saved){finishSave();markOutcome('completed');}
+        else{label.textContent='保存結果を確認できないため、追加の保存を停止しました。';markOutcome('unknown');}
+      });
+    }
+    function save(){
+      if(preview&&(!preview.canEdit()||categoryDialog?.open||!state.dirty))return;
+      return observeForecastOperation('sales_count_save',function(markOutcome){
+      if(!ensureRegisteredYear(state.year)){if(preview)markOutcome('cancelled_before_mutation');return;}
+      var invalid=doc.querySelector('#pageSalesCount input:invalid');if(invalid){invalid.reportValidity();invalid.focus();if(preview)markOutcome('cancelled_before_mutation');return;}
+      var target=preview?{
+        storeId:allStores.current,year:state.year,prefix:monthPrefix(),categoryId:state.categoryId,draft:draftFingerprint()
+      }:null;
+      var mask=activeTrips(selectedCategory()),large=[];Object.keys(state.draft).forEach(function(date){state.draft[date].trips.forEach(function(t,i){if(mask[i]===false)return;['delivery','sales'].forEach(function(k){if(t[k]>=1000)large.push(date+' '+(i+1)+'便 '+(k==='delivery'?'納品':'販売')+' '+t[k]);});});});
+      Object.keys(state.wasteTouched).forEach(function(date){var rec=state.wasteDraft[date];if(!rec)return;rec.trips.forEach(function(v,i){if(v!==null&&v>=1000)large.push(date+' '+(i+1)+'便 廃棄 '+v);});});if(large.length&&!confirm('4桁以上の入力があります。内容を確認して保存しますか？\n\n'+large.slice(0,8).join('\n')+(large.length>8?'\nほか '+(large.length-8)+'件':''))){if(preview)markOutcome('cancelled_before_mutation');return;}
+      if(preview)return savePreview(markOutcome,target);
+      try{
+        var next=copy(allStores);ensure(next);
+        applyCountDraft(next,allStores.current,monthPrefix(),state.categoryId,state.draft,state.wasteDraft,state.wasteTouched);
+        persistTransaction(next);finishSave();markOutcome('completed');
+      }catch(e){markOutcome('failed');alert('販売数を保存できませんでした。\n'+e.message);}
+      },!!preview);
     }
     function notifyPeriodChange(){
       try{root.dispatchEvent(new CustomEvent('insight:sales-count-period-change',{detail:{year:state.year,month:state.month}}));}catch(_){}
     }
-    function setPeriod(year,month){
+    function setPeriod(year,month,confirmed){
+      if(preview&&(!preview.canEdit()||categoryDialog?.open))return false;
       var y=Number(year),m=Number(month);
       if(!Number.isInteger(y)||y<1000||!Number.isInteger(m)||m<1||m>12)return false;
       // A no-op route sync only displays the period; it must not attempt year registration.
       if(String(y)===state.year&&m===state.month)return true;
-      if(!confirmLeave())return false;
+      if(preview&&!yearRegistered(y)){
+        var management=root.InsightIndexedDBSalesInputPreviewV1;
+        if(management?.managesYears()){
+          void management.promoteForPeriod(y,'salesCounts','販売数',()=>setPeriod(y,m,true));
+        }
+        return false;
+      }
+      if(!confirmed&&!confirmLeave())return false;
       // Observe the outermost period change: year promotion can persist before
       // readMonth/render finish. Unknown early exits remain HELD, never CLEAN.
       return observeForecastOperation('sales_period_change',function(markOutcome){
@@ -236,7 +318,7 @@
       });
     }
     function changePeriod(delta){var d=new Date(Number(state.year),state.month-1+delta,1);setPeriod(d.getFullYear(),d.getMonth()+1);}
-    function changeCategory(id){if(id===state.categoryId)return;if(!confirmLeave()){doc.getElementById('scCategory').value=state.categoryId;return;}state.categoryId=id;readMonth();render();}
+    function changeCategory(id){if(preview&&(!preview.canEdit()||categoryDialog?.open)){doc.getElementById('scCategory').value=state.categoryId;return;}if(id===state.categoryId)return;if(!confirmLeave()){doc.getElementById('scCategory').value=state.categoryId;return;}state.categoryId=id;readMonth();render();}
     function normalizeEditableCountInput(input){
       // Only strip redundant leading zeroes from complete, safe non-negative integers.
       // Keep blank/invalid/intermediate input intact for the existing validation flow.
@@ -405,6 +487,7 @@
     function analysisData(){var saleRows=[],normal=[],saleWeekdays=new Set(),days=daysInMonth(),storeId=allStores.current,st=allStores.stores[storeId];if(!st)return {sales:saleRows,normal:normal};for(var d=1;d<=days;d++){var date=monthPrefix()+'-'+pad(d),evs=eventsFor(storeId,date),r=st.salesCounts&&st.salesCounts[date]&&st.salesCounts[date][state.categoryId]?normalizeRecord(st.salesCounts[date][state.categoryId]):null;if(evs.length){saleWeekdays.add(new Date(date+'T12:00:00').getDay());evs.forEach(function(e){saleRows.push({date:date,store:st.name,event:e,record:r||emptyRecord()});});}}for(var n=1;n<=days;n++){var normalDate=monthPrefix()+'-'+pad(n),wd=new Date(normalDate+'T12:00:00').getDay();if(saleWeekdays.has(wd)&&eventsFor(storeId,normalDate).length===0){var normalRecord=st.salesCounts&&st.salesCounts[normalDate]&&st.salesCounts[normalDate][state.categoryId];if(normalRecord)normal.push(normalizeRecord(normalRecord));}}return {sales:saleRows,normal:normal};}
 
     function reloadFromStore(){
+      if(preview&&(!preview.canEdit()||categoryDialog?.open||state.dirty))return false;
       ensure(allStores);
       store=allStores.stores[allStores.current];
       if(!store)return false;
@@ -417,14 +500,28 @@
     }
 
     // Read-only snapshot for automatic AI comments; reuse the page's calculations.
+    model.connectIndexedDBPreview=function(adapter){
+      if(preview)throw new Error('Sales count preview is already active');
+      preview=adapter;
+    };
     model.getPeriod=function(){return {year:state.year,month:state.month};};
-    model.setPeriod=function(year,month){return setPeriod(year,month);};
+    model.setPeriod=function(year,month,confirmed){
+      return setPeriod(year,month,confirmed&&preview&&root.InsightIndexedDBSalesInputPreviewV1?.managesYears());
+    };
     model.reloadFromStore=reloadFromStore;
+    model.getDraftSignature=function(){return JSON.stringify([state.year,state.month,state.categoryId,state.draft,state.wasteDraft,state.wasteTouched]);};
+    model.refreshCommittedStore=function(){
+      if(!preview)throw new Error('No committed sales-count session');
+      store=allStores.stores[allStores.current];
+      readMonth();render();
+    };
     model.confirmLeave=confirmLeave;
     model.createReadOnlyDayCard=createReadOnlyDayCard;
     model.createHistoricalWeatherRow=createHistoricalWeatherRow;
     model.createAverageCard=createAverageCard;
 
+    model.hasUnsavedInput=function(){return state.dirty||!!categoryDraftChanged?.();};
+    model.getCategoryDialog=function(){return categoryDialog;};
     model.getAnalysisContext=function(){
       var data=analysisData(),records=Object.keys(state.draft).sort().map(function(date){
         var r=state.draft[date],mask=activeTrips(selectedCategory());
@@ -502,7 +599,101 @@
       a.append(grid);
     }
     function render(){var title=doc.getElementById('scPeriod');title.textContent=state.year+'年 '+state.month+'月';var sel=doc.getElementById('scCategory');sel.replaceChildren();activeCategories().forEach(function(c){var o=el('option',c.name);o.value=c.id;sel.append(o);});if(!selectedCategory()||selectedCategory().hidden)state.categoryId=activeCategories()[0]&&activeCategories()[0].id;sel.value=state.categoryId||'';renderCalendar();renderAverages();renderAnalysis();}
-    function manageCategories(){var d=el('dialog',undefined,'sc-dialog'),draft=copy(categories());draft.forEach(function(c){c.activeTrips=activeTrips(c);});d.innerHTML='<header><h2>カテゴリー管理</h2><button type="button">閉じる</button></header><div class="sc-category-list"></div><div class="sc-dialog-actions"><button type="button" data-add>＋ カテゴリーを追加</button><button type="button" class="primary" data-save>保存する</button></div>';doc.body.append(d);var list=d.querySelector('.sc-category-list');d.querySelector('header button').onclick=function(){d.close();};function moveWithinGroup(items,position,delta){var target=items[position+delta];if(!target)return;var currentIndex=items[position].index,targetIndex=target.index,x=draft[currentIndex];draft[currentIndex]=draft[targetIndex];draft[targetIndex]=x;draw();}function drawGroup(hidden){var items=draft.map(function(c,index){return {category:c,index:index};}).filter(function(item){return item.category.hidden===hidden;}),group=el('section',undefined,'sc-category-group '+(hidden?'is-hidden':'is-visible')),heading=el('h3',(hidden?'非表示':'表示中')+'（'+items.length+'件）');group.append(heading);items.forEach(function(item,position){var c=item.category,row=el('div',undefined,'sc-category-row '+(hidden?'is-hidden':'is-visible')),input=el('input');input.value=c.name;input.setAttribute('aria-label','カテゴリー名');input.oninput=function(){c.name=input.value.trim();};var trips=el('div',undefined,'sc-category-trips');trips.append(el('span','対象便','sc-category-trips-label'));[0,1,2].forEach(function(trip){var label=el('label'),check=el('input');check.type='checkbox';check.checked=c.activeTrips[trip]!==false;check.setAttribute('aria-label',c.name+' '+(trip+1)+'便を対象にする');check.onchange=function(){c.activeTrips[trip]=check.checked;};label.append(check,el('span',(trip+1)+'便'));trips.append(label);});var stateText=el('span',(hidden?'○ ':'● ')+(hidden?'非表示':'表示中'),'sc-category-state '+(hidden?'is-hidden':'is-visible'));var toggle=el('button',hidden?'再表示する':'非表示にする','sc-category-toggle');toggle.type='button';toggle.onclick=function(){c.hidden=!c.hidden;draw();};var up=el('button','↑','sc-category-move'),down=el('button','↓','sc-category-move');up.type=down.type='button';up.setAttribute('aria-label',c.name+'を上へ移動');down.setAttribute('aria-label',c.name+'を下へ移動');up.disabled=position===0;down.disabled=position===items.length-1;up.onclick=function(){moveWithinGroup(items,position,-1);};down.onclick=function(){moveWithinGroup(items,position,1);};row.append(input,trips,stateText,toggle,up,down);group.append(row);});list.append(group);}function draw(){list.replaceChildren();drawGroup(false);drawGroup(true);}d.querySelector('[data-add]').onclick=function(){draft.push({id:'cat_'+Date.now().toString(36)+'_'+Math.random().toString(36).slice(2,7),name:'新しいカテゴリー',hidden:false,aliases:[],activeTrips:[true,true,true]});draw();};d.querySelector('[data-save]').onclick=function(){return observeForecastOperation('sales_category_save',function(markOutcome){try{if(!draft.length||!draft.some(function(c){return !c.hidden;}))throw new Error('表示するカテゴリーを1件以上残してください');var names=new Set();draft.forEach(function(c){if(!c.name)throw new Error('カテゴリー名を入力してください');if(!Array.isArray(c.activeTrips)||!c.activeTrips.some(Boolean))throw new Error(c.name+'は対象便を1つ以上選択してください');if(names.has(c.name))throw new Error('同じカテゴリー名は使用できません');names.add(c.name);var old=categories().find(function(x){return x.id===c.id;});if(old&&old.name!==c.name){c.aliases=Array.from(new Set((c.aliases||[]).filter(function(name){return name!==c.name;}).concat([old.name])));}});var labels=new Set();draft.forEach(function(c){[c.name].concat(c.aliases||[]).forEach(function(name){if(labels.has(name))throw new Error('現在名または過去名と重複するカテゴリー名は使用できません');labels.add(name);});});var previousCategoryId=state.categoryId,previousDraft=state.draft,previousWasteDraft=state.wasteDraft,previousWasteTouched=state.wasteTouched,wasDirty=state.dirty,nextCategory=draft.find(function(c){return c.id===previousCategoryId&&!c.hidden;});var nextCategoryId=nextCategory?previousCategoryId:draft.find(function(c){return !c.hidden;}).id;if(wasDirty&&nextCategoryId!==previousCategoryId&&!confirm('販売数入力に未保存の変更があります。\n保存せずにカテゴリーを切り替えますか？'))return;var next=copy(allStores);ensure(next);next.salesCountManagement.categories=draft;persistTransaction(next);state.categoryId=nextCategoryId;if(nextCategoryId===previousCategoryId){state.draft=previousDraft;state.wasteDraft=previousWasteDraft;state.wasteTouched=previousWasteTouched;render();setDirty(wasDirty);}else{readMonth();render();}d.close();showToast('✓ カテゴリーを保存しました','#15803d','#f0fdf4');markOutcome('completed');}catch(e){markOutcome('failed');alert(e.message);}});};d.addEventListener('close',function(){d.remove();});draw();d.showModal();}
+    function manageCategories(){var d=el('dialog',undefined,'sc-dialog'),draft=copy(categories());draft.forEach(function(c){c.activeTrips=activeTrips(c);});d.innerHTML='<header><h2>カテゴリー管理</h2><button type="button">閉じる</button></header><div class="sc-category-list"></div><div class="sc-dialog-actions"><button type="button" data-add>＋ カテゴリーを追加</button><button type="button" class="primary" data-save>保存する</button></div>';doc.body.append(d);
+      var list=d.querySelector('.sc-category-list'),saveButton=d.querySelector('[data-save]'),feedback=el('span');
+      if(preview){
+        categoryDialog=d;
+        var initial=JSON.stringify(draft);
+        categoryDraftChanged=function(){return JSON.stringify(draft)!==initial;};
+        feedback.setAttribute('role','status');
+        d.querySelector('.sc-dialog-actions').prepend(feedback);
+        d.addEventListener('cancel',function(event){if(!preview.canEdit())event.preventDefault();});
+      }
+      d.querySelector('header button').onclick=function(){if(!preview||preview.canEdit())d.close();};function moveWithinGroup(items,position,delta){var target=items[position+delta];if(!target)return;var currentIndex=items[position].index,targetIndex=target.index,x=draft[currentIndex];draft[currentIndex]=draft[targetIndex];draft[targetIndex]=x;draw();}function drawGroup(hidden){var items=draft.map(function(c,index){return {category:c,index:index};}).filter(function(item){return item.category.hidden===hidden;}),group=el('section',undefined,'sc-category-group '+(hidden?'is-hidden':'is-visible')),heading=el('h3',(hidden?'非表示':'表示中')+'（'+items.length+'件）');group.append(heading);items.forEach(function(item,position){var c=item.category,row=el('div',undefined,'sc-category-row '+(hidden?'is-hidden':'is-visible')),input=el('input');input.value=c.name;input.setAttribute('aria-label','カテゴリー名');input.oninput=function(){c.name=input.value.trim();};var trips=el('div',undefined,'sc-category-trips');trips.append(el('span','対象便','sc-category-trips-label'));[0,1,2].forEach(function(trip){var label=el('label'),check=el('input');check.type='checkbox';check.checked=c.activeTrips[trip]!==false;check.setAttribute('aria-label',c.name+' '+(trip+1)+'便を対象にする');check.onchange=function(){c.activeTrips[trip]=check.checked;};label.append(check,el('span',(trip+1)+'便'));trips.append(label);});var stateText=el('span',(hidden?'○ ':'● ')+(hidden?'非表示':'表示中'),'sc-category-state '+(hidden?'is-hidden':'is-visible'));var toggle=el('button',hidden?'再表示する':'非表示にする','sc-category-toggle');toggle.type='button';toggle.onclick=function(){c.hidden=!c.hidden;draw();};var up=el('button','↑','sc-category-move'),down=el('button','↓','sc-category-move');up.type=down.type='button';up.setAttribute('aria-label',c.name+'を上へ移動');down.setAttribute('aria-label',c.name+'を下へ移動');up.disabled=position===0;down.disabled=position===items.length-1;up.onclick=function(){moveWithinGroup(items,position,-1);};down.onclick=function(){moveWithinGroup(items,position,1);};row.append(input,trips,stateText,toggle,up,down);group.append(row);});list.append(group);}function draw(){list.replaceChildren();drawGroup(false);drawGroup(true);}d.querySelector('[data-add]').onclick=function(){draft.push({id:'cat_'+Date.now().toString(36)+'_'+Math.random().toString(36).slice(2,7),name:'新しいカテゴリー',hidden:false,aliases:[],activeTrips:[true,true,true]});draw();};saveButton.onclick=function(){
+        if(preview&&!preview.canEdit())return;
+        return observeForecastOperation('sales_category_save',function(markOutcome){
+          var updated,nextCategoryId;
+          var previousCategoryId=state.categoryId,wasDirty=state.dirty;
+          var storeId=allStores.current,year=state.year,prefix=monthPrefix();
+          var captured=JSON.stringify(draft),countDraft=draftFingerprint();
+          try{
+            updated=copy(draft);
+            if(!updated.some(function(c){return !c.hidden;}))throw new Error('表示するカテゴリーを1件以上残してください');
+            var names=new Set(),labels=new Set();
+            updated.forEach(function(c){
+              if(!c.name)throw new Error('カテゴリー名を入力してください');
+              if(!Array.isArray(c.activeTrips)||!c.activeTrips.some(Boolean))
+                throw new Error(c.name+'は対象便を1つ以上選択してください');
+              if(names.has(c.name))throw new Error('同じカテゴリー名は使用できません');
+              names.add(c.name);
+              var old=categories().find(function(x){return x.id===c.id;});
+              if(old&&old.name!==c.name)c.aliases=Array.from(new Set(
+                (c.aliases||[]).filter(function(name){return name!==c.name;}).concat([old.name])));
+            });
+            updated.forEach(function(c){
+              [c.name].concat(c.aliases||[]).forEach(function(name){
+                if(labels.has(name))throw new Error('現在名または過去名と重複するカテゴリー名は使用できません');
+                labels.add(name);
+              });
+            });
+            var next=copy(allStores);
+            ensure(next);
+            next.salesCountManagement.categories=updated;
+            validate(next);
+            var selected=updated.find(function(c){return c.id===previousCategoryId&&!c.hidden;});
+            nextCategoryId=(selected||updated.find(function(c){return !c.hidden;})).id;
+            if(wasDirty&&nextCategoryId!==previousCategoryId&&
+               !confirm('販売数入力に未保存の変更があります。\n保存せずにカテゴリーを切り替えますか？')){
+              if(preview)markOutcome('cancelled_before_mutation');
+              return;
+            }
+            if(!preview){
+              persistTransaction(next);
+              finish();
+              return;
+            }
+          }catch(e){
+            markOutcome(preview?'cancelled_before_mutation':'failed');
+            if(preview)feedback.textContent=e.message;else alert(e.message);
+            return;
+          }
+          function finish(){
+            state.categoryId=nextCategoryId;
+            if(nextCategoryId!==previousCategoryId)readMonth();
+            render();
+            if(nextCategoryId===previousCategoryId)setDirty(wasDirty);
+            d.close();
+            showToast('✓ カテゴリーを保存しました','#15803d','#f0fdf4');
+            markOutcome('completed');
+          }
+          var commit=preview.prepareSave({
+            storeId:storeId,year:year,
+            unchanged:function(){
+              return d.open&&monthPrefix()===prefix&&state.categoryId===previousCategoryId&&state.dirty===wasDirty&&
+                JSON.stringify(draft)===captured&&draftFingerprint()===countDraft;
+            },
+            apply:function(candidate){candidate.salesCountManagement.categories=updated;validate(candidate);}
+          });
+          if(!commit){markOutcome('cancelled_before_mutation');return;}
+          saveButton.disabled=true;
+          d.inert=true;
+          feedback.textContent='保存を確認しています。';
+          return commit().then(function(saved){
+            if(saved)finish();
+            else{
+              feedback.textContent='保存結果を確認できないため、追加の保存を停止しました。';
+              markOutcome('unknown');
+            }
+          }).finally(function(){d.inert=false;saveButton.disabled=!preview.canEdit();});
+        },!!preview);
+      };
+      d.addEventListener('close',function(){
+        if(categoryDialog===d){categoryDialog=null;categoryDraftChanged=null;}
+        d.remove();
+      });
+      draw();
+      d.showModal();
+    }
     // iPad home-screen PWAs can retain a stale touch viewport when a numeric keyboard closes.
     // Let the viewport settle before opening category management after a sales-count edit.
     var lastCountInputBlurAt=0,categoryDialogOpening=false;
@@ -529,7 +720,7 @@
       poll();
     }
     function openCategoryManager(){
-      if(categoryDialogOpening)return;
+      if(categoryDialogOpening||categoryDialog?.open||(preview&&!preview.canEdit()))return;
       blurSalesCountInput();
       if(Date.now()-lastCountInputBlurAt>2000){manageCategories();return;}
       categoryDialogOpening=true;
@@ -548,7 +739,7 @@
       manageButton.onclick=openCategoryManager;}
     buildPage();
     if(!activeCategories().length)categories()[0].hidden=false;state.categoryId=activeCategories()[0].id;readMonth();render();
-    var originalGoto=root.gotoNav;root.gotoNav=function(i){if(i==='salesCounts'){if(currentNav==='salesCounts')return;doc.querySelectorAll('.nav-btn').forEach(function(n){n.classList.remove('active');});doc.querySelectorAll('.page').forEach(function(n){n.classList.remove('show');});doc.getElementById('navSalesCount').classList.add('active');doc.getElementById('pageSalesCount').classList.add('show');currentNav='salesCounts';ensure(allStores);store=allStores.stores[allStores.current];readMonth();render();return;}if(currentNav==='salesCounts'&&!confirmLeave())return;doc.getElementById('navSalesCount').classList.remove('active');doc.getElementById('pageSalesCount').classList.remove('show');return originalGoto(i);};
+    var originalGoto=root.gotoNav;root.gotoNav=function(i){if(i==='salesCounts'){if(currentNav==='salesCounts')return;doc.querySelectorAll('.nav-btn').forEach(function(n){n.classList.remove('active');});doc.querySelectorAll('.page').forEach(function(n){n.classList.remove('show');});doc.getElementById('navSalesCount').classList.add('active');doc.getElementById('pageSalesCount').classList.add('show');currentNav='salesCounts';if(!preview)ensure(allStores);store=allStores.stores[allStores.current];readMonth();render();return;}if(currentNav==='salesCounts'){if(!preview&&!confirmLeave())return;if(preview)setDirty(false);}doc.getElementById('navSalesCount').classList.remove('active');doc.getElementById('pageSalesCount').classList.remove('show');return originalGoto(i);};
     var originalSwitch=root.switchStore;root.switchStore=function(id){if(currentNav!=='salesCounts')return originalSwitch(id);if(!allStores.stores[id]||!confirmLeave()){doc.getElementById('storeSel').value=allStores.current;return;}allStores.current=id;store=allStores.stores[id];baseYear=store.years[store.years.length-1];cmpYear=store.years.length>1?store.years[store.years.length-2]:null;editYear={sales:baseYear,kyaku:baseYear,haiki:baseYear};var t=todayFY();editMonth={sales:t.month,kyaku:t.month,haiki:t.month};applySharedWeatherToStore(store);persist();renderStoreSel();updateMissingBadge();doc.getElementById('storeMenu').classList.add('hidden');ensure(allStores);readMonth();render();};
     root.addEventListener('beforeunload',function(e){if(!state.dirty)return;e.preventDefault();e.returnValue='';});
   }

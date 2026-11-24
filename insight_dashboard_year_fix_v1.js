@@ -41,39 +41,45 @@
       var oldBase=typeof baseYear!=='undefined'?baseYear:null;
       var oldCompare=typeof cmpYear!=='undefined'?cmpYear:null;
       try{
-        var result=window.InsightYearManager.removeCurrent(chosen);
-        var remaining=result.remaining||[];
-        var resolved=window.InsightYearManager.resolveSelection(remaining,oldBase,oldCompare);
-        if(typeof baseYear!=='undefined')baseYear=typeof oldBase==='number'?Number(resolved.baseYear):resolved.baseYear;
-        if(typeof cmpYear!=='undefined')cmpYear=resolved.compareYear==null?null:(typeof oldCompare==='number'?Number(resolved.compareYear):resolved.compareYear);
-        if(typeof editYear!=='undefined'&&editYear){
-          ['sales','kyaku','haiki'].forEach(function(type){
-            if(editYear[type]==null||remaining.indexOf(String(editYear[type]))<0){
-              editYear[type]=typeof editYear[type]==='number'?Number(resolved.baseYear):resolved.baseYear;
-            }
-          });
-        }
-        if(window.InsightDateContext&&typeof window.InsightDateContext.getSelectedInfo==='function'){
-          var info=window.InsightDateContext.getSelectedInfo();
-          if(info&&String(info.fy)===chosen&&resolved.baseYear!=null){
-            var last=new Date(Number(resolved.baseYear),info.mIdx+1,0).getDate();
-            var nextDate=new Date(0);
-            nextDate.setFullYear(Number(resolved.baseYear),info.mIdx,Math.min(info.day,last));
-            nextDate.setHours(0,0,0,0);
-            window.InsightDateContext.setSelectedDate(nextDate);
+        var preview=window.InsightIndexedDBSalesInputPreviewV1?.deleteYear;
+        function finish(result){
+          if(!result)return;
+          var remaining=result.remaining||[];
+          var resolved=window.InsightYearManager.resolveSelection(remaining,oldBase,oldCompare);
+          if(typeof baseYear!=='undefined')baseYear=typeof oldBase==='number'?Number(resolved.baseYear):resolved.baseYear;
+          if(typeof cmpYear!=='undefined')cmpYear=resolved.compareYear==null?null:(typeof oldCompare==='number'?Number(resolved.compareYear):resolved.compareYear);
+          if(typeof editYear!=='undefined'&&editYear){
+            ['sales','kyaku','haiki'].forEach(function(type){
+              if(editYear[type]==null||remaining.indexOf(String(editYear[type]))<0){
+                editYear[type]=typeof editYear[type]==='number'?Number(resolved.baseYear):resolved.baseYear;
+              }
+            });
           }
+          if(window.InsightDateContext&&typeof window.InsightDateContext.getSelectedInfo==='function'){
+            var info=window.InsightDateContext.getSelectedInfo();
+            if(info&&String(info.fy)===chosen&&resolved.baseYear!=null){
+              var last=new Date(Number(resolved.baseYear),info.mIdx+1,0).getDate();
+              var nextDate=new Date(0);
+              nextDate.setFullYear(Number(resolved.baseYear),info.mIdx,Math.min(info.day,last));
+              nextDate.setHours(0,0,0,0);
+              window.InsightDateContext.setSelectedDate(nextDate);
+            }
+          }
+          closeDialog();
+          if(typeof renderYearPills==='function')renderYearPills();
+          if(typeof currentNav!=='undefined'&&currentNav===1&&typeof refreshDash==='function')refreshDash();
+          else if(typeof currentNav!=='undefined'&&currentNav>1&&typeof initInputPage==='function'){
+            var type=['','','sales','kyaku','haiki'][currentNav];if(type)initInputPage(type);
+          }
+          if(window.InsightPagePeriodSync&&typeof window.InsightPagePeriodSync.reconcileCurrentStore==='function'){
+            window.InsightPagePeriodSync.reconcileCurrentStore();
+          }
+          if(typeof showToast==='function')showToast('✓ '+chosen+'年度を削除しました','#b42318','#fef2f2');
+          if(deleteButton)deleteButton.disabled=years().length<=1;
         }
-        closeDialog();
-        if(typeof renderYearPills==='function')renderYearPills();
-        if(typeof currentNav!=='undefined'&&currentNav===1&&typeof refreshDash==='function')refreshDash();
-        else if(typeof currentNav!=='undefined'&&currentNav>1&&typeof initInputPage==='function'){
-          var type=['','','sales','kyaku','haiki'][currentNav];if(type)initInputPage(type);
-        }
-        if(window.InsightPagePeriodSync&&typeof window.InsightPagePeriodSync.reconcileCurrentStore==='function'){
-          window.InsightPagePeriodSync.reconcileCurrentStore();
-        }
-        if(typeof showToast==='function')showToast('✓ '+chosen+'年度を削除しました','#b42318','#fef2f2');
-        if(deleteButton)deleteButton.disabled=years().length<=1;
+        if(preview&&window.InsightIndexedDBSalesInputPreviewV1.managesYears()){
+          void preview(chosen,()=>!overlay.hidden&&select.value===chosen,finish);
+        }else finish(window.InsightYearManager.removeCurrent(chosen));
       }catch(error){
         alert('年度を削除できませんでした。\n'+(error&&error.message?error.message:error));
       }
@@ -85,6 +91,8 @@
     list.forEach(function(y){var opt=document.createElement('option');opt.value=String(y);opt.textContent=String(y)+'年度';select.appendChild(opt);});
     if(typeof baseYear!=='undefined'&&list.some(function(y){return String(y)===String(baseYear);}))select.value=String(baseYear);
     question.textContent=select.value+'年度を削除しますがよろしいですか？';
+    if(window.InsightIndexedDBSalesInputPreviewV1?.managesYears()&&
+       !window.InsightIndexedDBSalesInputPreviewV1.beginYearDeletion())return;
     overlay.hidden=false;select.focus();
   }
   function ensureButton(){

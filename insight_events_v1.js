@@ -239,23 +239,29 @@
   if(typeof module!=='undefined'&&module.exports)module.exports=model;
   if(!root.document)return;
   root.InsightEvents=model;
+  if(root.document.currentScript?.dataset?.insightRecoveryModel==="true")return;
 
   function init(){
     if(root.__insightEventsV1)return;
     root.__insightEventsV1=true;
-    var doc=root.document,activeDialog=null;
+    var doc=root.document,activeDialog=null,preview=null;
     function el(tag,text,cls){var n=doc.createElement(tag);if(text!==undefined)n.textContent=text;if(cls)n.className=cls;return n;}
     function button(text,fn){var b=el('button',text);b.type='button';b.onclick=fn;return b;}
     function selectedDate(){return root.InsightDateContext&&typeof root.InsightDateContext.getSelectedIso==='function'?root.InsightDateContext.getSelectedIso():'';}
-    function transaction(fn){
+    function transaction(fn,after,approve){
+      if(preview){
+        void preview.save(function(next){fn(next);validate(next);},function(){render();if(after)after();},approve);
+        return;
+      }
       try{
+        if(approve&&!approve())return;
         if(!root.InsightStorage)throw new Error('保存機能を初期化できませんでした。');
         root.InsightStorage.transaction(allStores,fn,validate,function(next){
           if(next.eventManagement!==undefined)allStores.eventManagement=next.eventManagement;
           Object.keys(next.stores).forEach(function(key){if(next.stores[key].events!==undefined)allStores.stores[key].events=next.stores[key].events;});
         });
-        render();return true;
-      }catch(e){alert('イベントを保存できませんでした。\n'+e.message+'\n入力済みデータは変更していません。');return false;}
+        render();if(after)after();
+      }catch(e){alert('イベントを保存できませんでした。\n'+e.message+'\n入力済みデータは変更していません。');}
     }
 
     function dialog(title){
@@ -322,9 +328,9 @@
               requireValue(!seen.has(category.name),'同じカテゴリー名は登録できません。');seen.add(category.name);
               requireValue(!shared.some(function(c){return c.name===category.name;}),'販売数入力に同じカテゴリー名があります：'+category.name);
             });
-            if(transaction(function(next){mutableDemandCategories(next).splice(0,mutableDemandCategories(next).length,...copy(draft));})){
+            transaction(function(next){mutableDemandCategories(next).splice(0,mutableDemandCategories(next).length,...copy(draft));},function(){
               d.close();if(onSaved)onSaved();
-            }
+            });
           }catch(err){alert(err.message);}
         });save.className='ie-primary';
         actions.append(button('キャンセル',function(){d.close();}),save);body.append(actions);
@@ -637,8 +643,8 @@
         var edit=button('編集',function(){openEvent(e);});edit.className='ie-edit';edit.setAttribute('aria-label',desc+'を編集');
         chip.append(el('small',TYPES[e.type]||e.type),details,el('small',e.scope==='global'?'全店舗':'この店舗'));
         var remove=button('×',function(){
-          if(!confirm(desc+'\n'+e.startDate+' 〜 '+e.endDate+'\n'+(e.scope==='global'?'全店舗':'この店舗')+'の開催記録を期間全体から削除します。過去の日付の表示も消えます。\nよろしいですか？'))return;
-          transaction(function(next){var target=e.scope==='global'?next.eventManagement:next.stores[allStores.current];target.events=target.events.filter(function(v){return v.id!==e.id;});});
+          transaction(function(next){var target=e.scope==='global'?next.eventManagement:next.stores[next.current];target.events=target.events.filter(function(v){return v.id!==e.id;});},null,
+            function(){return confirm(desc+'\n'+e.startDate+' 〜 '+e.endDate+'\n'+(e.scope==='global'?'全店舗':'この店舗')+'の開催記録を期間全体から削除します。過去の日付の表示も消えます。\nよろしいですか？');});
         });remove.setAttribute('aria-label',desc+'を削除');
         if(e.snapshot.note){
           var noteRow=el('div',undefined,'ie-note-row');noteRow.append(el('span','補足：'+e.snapshot.note,'ie-note'),edit,remove);chip.append(noteRow);
@@ -678,16 +684,17 @@
           if(editing)e.id=source.id;
           if(presetId)e.presetId=presetId;
           else if(editing&&source.presetId&&type.value===source.type)e.presetId=source.presetId;
-          if(e.type==='special'){
-            var duplicate=findDuplicateSpecial(allStores,storeId,e,editing?source.id:null);
-            if(duplicate&&!confirm('同じ店舗に同じ催事名・同じ期間の登録があります。\n\n'+e.snapshot.title+'\n'+e.startDate+' 〜 '+e.endDate+'\n\n重複して登録しますか？'))return;
+          function approve(){
+            if(e.type==='special'){
+              var duplicate=findDuplicateSpecial(allStores,storeId,e,editing?source.id:null);
+              if(duplicate&&!confirm('同じ店舗に同じ催事名・同じ期間の登録があります。\n\n'+e.snapshot.title+'\n'+e.startDate+' 〜 '+e.endDate+'\n\n重複して登録しますか？'))return false;
+            }
+            return !editing||confirm('登録済みイベントを変更します。\n期間中の表示や関連する比較にも変更内容が反映されます。よろしいですか？');
           }
-          if(editing){
-            if(!confirm('登録済みイベントを変更します。\n期間中の表示や関連する比較にも変更内容が反映されます。よろしいですか？'))return;
-            if(transaction(function(next){appendDemandFavorites(next,pendingFavorites);syncDemandPreset(next,e);replaceRegisteredEvent(next,e);}))d.close();
-          }else{
-            if(transaction(function(next){appendDemandFavorites(next,pendingFavorites);syncDemandPreset(next,e);add(next,storeId,e);}))d.close();
-          }
+          transaction(function(next){
+            appendDemandFavorites(next,pendingFavorites);syncDemandPreset(next,e);
+            if(editing)replaceRegisteredEvent(next,e);else add(next,storeId,e);
+          },function(){d.close();},approve);
         }catch(err){alert(err.message);}
       }
       function draw(){
@@ -739,23 +746,22 @@
         var actions=el('div',undefined,'ie-actions'),saveButton=el('button','保存する','ie-primary');saveButton.type='submit';actions.append(button('戻る',draw),saveButton);form.append(actions);
         form.onsubmit=function(e){e.preventDefault();try{
           var snapshot=read(),pendingFavorites=takeDemandFavorites(snapshot);
-          if(p&&!confirm('よく使うイベントを変更します.登録済みの開催記録は変更されません。よろしいですか？'))return;
-          if(transaction(function(next){
+          transaction(function(next){
             appendDemandFavorites(next,pendingFavorites);
             var items=mutableNearbyPresets(next),duplicate=items.find(function(item){return item.id!==(p&&p.id)&&item.snapshot.title.trim()===snapshot.title.trim()&&item.snapshot.location.trim()===snapshot.location.trim();});
             requireValue(!duplicate,'同じイベント名・場所が「よく使うイベント」に登録されています。');
             if(p){var item=items.find(function(v){return v.id===p.id;});requireValue(!!item,'対象が見つかりません。');item.snapshot=copy(snapshot);}
             else items.push({id:id(),snapshot:copy(snapshot)});
-          }))draw();
+          },draw,function(){return !p||confirm('よく使うイベントを変更します.登録済みの開催記録は変更されません。よろしいですか？');});
         }catch(err){alert(err.message);}};
       }
       function draw(){
         body.replaceChildren();body.append(el('p','全店舗共通です。変更・削除しても登録済みのイベントは変更されません。','ie-muted'),button('＋よく使うイベントを追加',function(){editor(null);}));
         var items=nearbyPresets(allStores);items.forEach(function(p,index){
           var row=el('div',undefined,'ie-preset-row'),actions=el('div');row.append(el('span',p.snapshot.title+'（'+p.snapshot.location.split(/\r?\n/).join('・')+'）'));
-          function move(delta){if(transaction(function(next){var a=mutableNearbyPresets(next);var item=a.splice(index,1)[0];a.splice(index+delta,0,item);}))draw();}
+          function move(delta){transaction(function(next){var a=mutableNearbyPresets(next);var item=a.splice(index,1)[0];a.splice(index+delta,0,item);},draw);}
           var up=button('↑',function(){move(-1);}),down=button('↓',function(){move(1);});up.disabled=index===0;down.disabled=index===items.length-1;up.setAttribute('aria-label','上へ移動');down.setAttribute('aria-label','下へ移動');
-          actions.append(button('編集',function(){editor(p);}),button('削除',function(){if(!confirm(p.snapshot.title+'\nよく使うイベントから削除します。登録済みのイベントは残ります。よろしいですか？'))return;if(transaction(function(next){var a=mutableNearbyPresets(next);var at=a.findIndex(function(v){return v.id===p.id;});if(at>=0)a.splice(at,1);})){draw();}}),up,down);row.append(actions);body.append(row);
+          actions.append(button('編集',function(){editor(p);}),button('削除',function(){transaction(function(next){var a=mutableNearbyPresets(next);var at=a.findIndex(function(v){return v.id===p.id;});if(at>=0)a.splice(at,1);},draw,function(){return confirm(p.snapshot.title+'\nよく使うイベントから削除します。登録済みのイベントは残ります。よろしいですか？');});}),up,down);row.append(actions);body.append(row);
         });
       }
       draw();
@@ -767,23 +773,22 @@
         var actions=el('div',undefined,'ie-actions'),saveButton=el('button','保存する','ie-primary');saveButton.type='submit';actions.append(button('戻る',draw),saveButton);form.append(actions);
         form.onsubmit=function(e){e.preventDefault();try{
           var snapshot=read(),pendingFavorites=takeDemandFavorites(snapshot);
-          if(p&&!confirm('よく使う催事を変更します.登録済みの開催記録は変更されません。よろしいですか？'))return;
-          if(transaction(function(next){
+          transaction(function(next){
             appendDemandFavorites(next,pendingFavorites);
             var items=mutableSpecialPresets(next),duplicate=items.find(function(item){return item.id!==(p&&p.id)&&item.snapshot.title.trim()===snapshot.title.trim();});
             requireValue(!duplicate,'同じ催事名が「よく使う催事」に登録されています。');
             if(p){var item=items.find(function(v){return v.id===p.id;});requireValue(!!item,'対象が見つかりません。');item.snapshot=copy(snapshot);}
             else items.push({id:id(),snapshot:copy(snapshot)});
-          }))draw();
+          },draw,function(){return !p||confirm('よく使う催事を変更します.登録済みの開催記録は変更されません。よろしいですか？');});
         }catch(err){alert(err.message);}};
       }
       function draw(){
         body.replaceChildren();body.append(el('p','全店舗共通です。変更・削除しても登録済みの催事は変更されません。','ie-muted'),button('＋よく使う催事を追加',function(){editor(null);}));
         var items=specialPresets(allStores);items.forEach(function(p,index){
           var row=el('div',undefined,'ie-preset-row'),actions=el('div');row.append(el('span',p.snapshot.title));
-          function move(delta){if(transaction(function(next){var a=mutableSpecialPresets(next);var item=a.splice(index,1)[0];a.splice(index+delta,0,item);}))draw();}
+          function move(delta){transaction(function(next){var a=mutableSpecialPresets(next);var item=a.splice(index,1)[0];a.splice(index+delta,0,item);},draw);}
           var up=button('↑',function(){move(-1);}),down=button('↓',function(){move(1);});up.disabled=index===0;down.disabled=index===items.length-1;up.setAttribute('aria-label','上へ移動');down.setAttribute('aria-label','下へ移動');
-          actions.append(button('編集',function(){editor(p);}),button('削除',function(){if(!confirm(p.snapshot.title+'\nよく使う催事から削除します。登録済みの催事は残ります。よろしいですか？'))return;if(transaction(function(next){var a=mutableSpecialPresets(next);var at=a.findIndex(function(v){return v.id===p.id;});if(at>=0)a.splice(at,1);})){draw();}}),up,down);row.append(actions);body.append(row);
+          actions.append(button('編集',function(){editor(p);}),button('削除',function(){transaction(function(next){var a=mutableSpecialPresets(next);var at=a.findIndex(function(v){return v.id===p.id;});if(at>=0)a.splice(at,1);},draw,function(){return confirm(p.snapshot.title+'\nよく使う催事から削除します。登録済みの催事は残ります。よろしいですか？');});}),up,down);row.append(actions);body.append(row);
         });
       }
       draw();
@@ -795,17 +800,16 @@
         var actions=el('div',undefined,'ie-actions'),save=el('button','保存する','ie-primary');save.type='submit';actions.append(button('戻る',draw),save);form.append(actions);
         form.onsubmit=function(e){e.preventDefault();try{
           var snapshot=read();
-          if(p&&!confirm('よく使うセールを変更します。登録済みの開催記録は変更されません。よろしいですか？'))return;
-          if(transaction(function(next){var m=management(next);if(p){var item=m.presets.find(function(v){return v.id===p.id;});requireValue(!!item,'対象が見つかりません。');item.snapshot=copy(snapshot);}else m.presets.push({id:id(),snapshot:copy(snapshot)});}))draw();
+          transaction(function(next){var m=management(next);if(p){var item=m.presets.find(function(v){return v.id===p.id;});requireValue(!!item,'対象が見つかりません。');item.snapshot=copy(snapshot);}else m.presets.push({id:id(),snapshot:copy(snapshot)});},draw,function(){return !p||confirm('よく使うセールを変更します。登録済みの開催記録は変更されません。よろしいですか？');});
         }catch(err){alert(err.message);}};
       }
       function draw(){
         body.replaceChildren();body.append(el('p','全店舗共通です。変更・削除しても開催済みの内容は変わりません。','ie-muted'),button('＋よく使うセールを追加',function(){editor(null);}));
         var items=presets(allStores);items.forEach(function(p,index){
           var row=el('div',undefined,'ie-preset-row'),actions=el('div');row.append(el('span',summary(p.snapshot)));
-          function move(delta){if(transaction(function(next){var a=management(next).presets;var item=a.splice(index,1)[0];a.splice(index+delta,0,item);}))draw();}
+          function move(delta){transaction(function(next){var a=management(next).presets;var item=a.splice(index,1)[0];a.splice(index+delta,0,item);},draw);}
           var up=button('↑',function(){move(-1);}),down=button('↓',function(){move(1);});up.disabled=index===0;down.disabled=index===items.length-1;up.setAttribute('aria-label','上へ移動');down.setAttribute('aria-label','下へ移動');
-          actions.append(button('編集',function(){editor(p);}),button('削除',function(){if(!confirm(summary(p.snapshot)+'\nよく使うセールから削除します。開催記録は残ります。よろしいですか？'))return;if(transaction(function(next){next.eventManagement.presets=next.eventManagement.presets.filter(function(v){return v.id!==p.id;});}))draw();}),up,down);row.append(actions);body.append(row);
+          actions.append(button('編集',function(){editor(p);}),button('削除',function(){transaction(function(next){next.eventManagement.presets=next.eventManagement.presets.filter(function(v){return v.id!==p.id;});},draw,function(){return confirm(summary(p.snapshot)+'\nよく使うセールから削除します。開催記録は残ります。よろしいですか？');});}),up,down);row.append(actions);body.append(row);
         });
       }
       draw();
@@ -822,6 +826,10 @@
     }
     model.getForDate=function(date,storeId){return list(allStores,storeId||allStores.current,date);};
     model.getForPeriod=function(start,end,storeId){return list(allStores,storeId||allStores.current,start,end);};
+    model.connectIndexedDBPreview=function(adapter){
+      if(preview)throw new Error('The event preview is already connected');
+      preview=adapter;
+    };
     if(root.ManagementOpsAnalysis){
       var oldGet=root.ManagementOpsAnalysis.getCurrent;
       root.ManagementOpsAnalysis.getCurrent=function(){var a=oldGet.apply(this,arguments);a.events=contextEvents();return a;};

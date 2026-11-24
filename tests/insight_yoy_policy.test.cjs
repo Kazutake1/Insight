@@ -98,7 +98,7 @@ test('全JS・Index内スクリプト・展開後スクリプトに構文エラ�
   const scripts=html=>Array.from(html.matchAll(/<script\b(?:[^>"']|"[^"]*"|'[^']*')*>([\s\S]*?)<\/script>/gi),m=>m[1]);
   for(const s of scripts(payload))new vm.Script(s);
   let expanded;
-  const context={Chart:function Chart(){},
+  const context={Chart:function Chart(){},location:{origin:'http://127.0.0.1:4173'},
     fetch:async url=>({ok:true,text:async()=>read(url.split('?')[0].replace('./',''))}),document:{body:{},open(){},write:s=>expanded=s,close(){}}};
   context.window=context;context.globalThis=context;
   vm.runInNewContext(read('insight_shell_boot_v1.js'),context);

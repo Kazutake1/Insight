@@ -120,20 +120,23 @@ function wxKey(year,mName,day){return`${year}-${mName}-${day}`;}
 function getSharedWeather(year,mName,day){
   return(allStores.sharedWeather||{})[wxKey(year,mName,day)]||"";
 }
-function setSharedWeather(year,mName,day,wx){
-  if(!allStores.sharedWeather)allStores.sharedWeather={};
-  allStores.sharedWeather[wxKey(year,mName,day)]=wx;
+function updateSharedWeather(snapshot,year,mName,day,wx){
+  if(!snapshot.sharedWeather)snapshot.sharedWeather={};
+  snapshot.sharedWeather[wxKey(year,mName,day)]=wx;
   // 全店舗の同じ日付に反映
-  Object.values(allStores.stores).forEach(st=>{
+  Object.values(snapshot.stores).forEach(st=>{
     const rows=st.data?.[year]?.[mName];
     if(!rows)return;
     const ri=parseInt(day)-1;
     if(rows[ri])rows[ri].weather=wx;
   });
+}
+function setSharedWeather(year,mName,day,wx){
+  updateSharedWeather(allStores,year,mName,day,wx);
   persist();
 }
-function applySharedWeatherToStore(st){
-  const sw=allStores.sharedWeather||{};
+function applySharedWeatherToStore(st,snapshot=allStores){
+  const sw=snapshot.sharedWeather||{};
   Object.entries(sw).forEach(([key,wx])=>{
     const [year,mName,day]=key.split('-');
     if(!mName||!day)return;
@@ -521,7 +524,9 @@ function sampleYearData(factor){
 
 
 /* ══ State ══ */
-let allStores=loadAll();  // 新旧どちらの形式でも初期値取得
+let allStores=window.InsightIndexedDBCandidateV1?.isAdopted()
+  ?window.InsightIndexedDBCandidateV1.initializeAdopted()
+  :loadAll();  // 新旧どちらの形式でも初期値取得
 // 旧形式（単店舗）を多店舗形式に変換
 if(!allStores.stores){
   const sid="store_1";
@@ -565,6 +570,13 @@ function renderStoreSel(){
 
 function switchStore(id){
   if(!allStores.stores[id])return;
+  renderStoreSelection(id,()=>{
+    applySharedWeatherToStore(store);
+    persist();
+  });
+}
+
+function renderStoreSelection(id,beforeRender,skipPage=false){
   allStores.current=id;
   store=allStores.stores[id];
   baseYear=store.years[store.years.length-1];
@@ -572,18 +584,18 @@ function switchStore(id){
   editYear={sales:baseYear,kyaku:baseYear,haiki:baseYear};
   const t=todayFY();
   editMonth={sales:t.month,kyaku:t.month,haiki:t.month};
-  // 共有天気を新店舗に適用
-  applySharedWeatherToStore(store);
-  persist();
+  if(beforeRender)beforeRender();
   renderStoreSel();
-  if(currentNav===0)initQuickPage();
-  else if(currentNav===1)refreshDash();
-  else initInputPage(["","","sales","kyaku","haiki"][currentNav]);
+  if(!skipPage){
+    if(currentNav===0)initQuickPage();
+    else if(currentNav===1)refreshDash();
+    else initInputPage(["","","sales","kyaku","haiki"][currentNav]);
+  }
   updateMissingBadge();
   document.getElementById("storeMenu").classList.remove("is-open");
 }
 
-function showStoreMenu(){
+function showStoreMenu(previewAction){
   const menu=document.getElementById("storeMenu");
   if(menu.classList.contains("is-open")){menu.classList.remove("is-open");return;}
   menu.innerHTML="";
@@ -591,8 +603,10 @@ function showStoreMenu(){
   // 店舗名変更
   const rename=document.createElement("button");
   rename.className="store-menu-item";
+  if(typeof previewAction==="function")rename.dataset.indexeddbStoreAction="";
   rename.innerHTML=`<span>✏️</span> 店舗名を変更`;
   rename.onclick=()=>{
+    if(typeof previewAction==="function")return previewAction("rename");
     const cur=allStores.stores[allStores.current];
     const name=prompt("店舗名を入力してください",cur.name);
     if(name&&name.trim()){
@@ -605,8 +619,10 @@ function showStoreMenu(){
   // 新しい店舗を追加
   const add=document.createElement("button");
   add.className="store-menu-item";
+  if(typeof previewAction==="function")add.dataset.indexeddbStoreAction="";
   add.innerHTML=`<span>＋</span> 新しい店舗を追加`;
   add.onclick=()=>{
+    if(typeof previewAction==="function")return previewAction("add");
     const name=prompt("新しい店舗名を入力してください","店舗2");
     if(name&&name.trim()){
       const id=genStoreId();
@@ -626,8 +642,10 @@ function showStoreMenu(){
     // この店舗を削除
     const del=document.createElement("button");
     del.className="store-menu-item danger";
+    if(typeof previewAction==="function")del.dataset.indexeddbStoreAction="";
     del.innerHTML=`<span>🗑</span> この店舗を削除`;
     del.onclick=()=>{
+      if(typeof previewAction==="function")return previewAction("delete");
       const cur=allStores.stores[allStores.current];
       if(!confirm(`「${cur.name}」を削除します。\nこの店舗のデータはすべて消えます。よろしいですか？`)){
         menu.classList.remove("is-open");return;
@@ -688,7 +706,7 @@ function initQuickPage(){
   renderQuickNav();
   renderQuickPage();
   // 今日のページを開いたとき、天気が未設定なら自動取得
-  if(quickEditDay===todayInfo.day){
+  if(!window.InsightIndexedDBCandidateV1?.isAdopted()&&quickEditDay===todayInfo.day){
     const fy=todayInfo.fy,month=todayInfo.month;
     const row=store.data[fy]?.[month]?.[quickEditDay-1];
     if(!row||!row.weather){
@@ -867,6 +885,21 @@ async function fetchWeather(){
   }
 }
 
+function readQuickValues(itemsValue=document.getElementById("qi_買上点数")?.value){
+  const haiki={};
+  let waste=0;
+  HAIKI_CATS.forEach(category=>{
+    haiki[category]=fromComma(document.getElementById(`qi_h_${category}`)?.value)||0;
+    waste+=haiki[category];
+  });
+  return {
+    売上:fromComma(document.getElementById("qi_売上")?.value)||0,
+    客数:Number(document.getElementById("qi_客数")?.value)||0,
+    買上点数:parseFloat(itemsValue)||0,
+    haiki,廃棄金額:waste,weather:quickWeather
+  };
+}
+
 function saveQuick(){
   const fy=todayInfo.fy,month=todayInfo.month;
   if(!store.data[fy])store.data[fy]=blankYearData(fy);
@@ -874,16 +907,7 @@ function saveQuick(){
   const rows=store.data[fy][month];
   const ri=quickEditDay-1;
   if(!rows[ri])rows[ri]=blankRow(quickEditDay);
-  const r=rows[ri];
-  r.売上=fromComma(document.getElementById("qi_売上")?.value)||0;
-  r.客数=Number(document.getElementById("qi_客数")?.value)||0;
-  r.買上点数=parseFloat(document.getElementById("qi_買上点数")?.value)||0;
-  const h={};let total=0;
-  HAIKI_CATS.forEach(c=>{
-    h[c]=fromComma(document.getElementById(`qi_h_${c}`)?.value)||0;
-    total+=h[c];
-  });
-  r.haiki=h;r.廃棄金額=total;r.weather=quickWeather;
+  Object.assign(rows[ri],readQuickValues());
   setSharedWeather(fy,month,quickEditDay,quickWeather);
   persist();
   // Flash feedback
@@ -1424,6 +1448,9 @@ function initInputPage(type){
 function getHaikiBudget(){
   // store.haikibudget = {total:0, cats:{カテゴリ名:0, ...}}
   if(!store.haikibudget){
+    if(window.InsightIndexedDBCandidateV1?.isAdopted()||window.InsightIndexedDBSalesInputPreviewV1?.managesYears?.()){
+      return {total:0,cats:blankHaiki()};
+    }
     store.haikibudget={total:0,cats:{}};
     HAIKI_CATS.forEach(c=>{store.haikibudget.cats[c]=0;});
   }
@@ -2545,113 +2572,150 @@ window.addEventListener('storage',function(event){
     value:Object.freeze({version:1,register:register,status:function(){return registered?"ready":"pending";}})});
 })(window);
 
+const activeCSVReaders=new Set();
+function hasPendingCSVImport(){return activeCSVReaders.size>0;}
+function parseInsightCSV(text,strict=false){
+  const lines=text.split('\n').map(l=>l.trim()).filter(l=>l);
+  if(lines.length<2)throw new Error('データがありません');
+
+  // ヘッダー行を確認
+  const header=lines[0].split(',').map(h=>h.trim());
+  const dateIdx=header.findIndex(h=>h.includes('日付')||h.toLowerCase()==='date');
+  const salesIdx=header.findIndex(h=>h.includes('売上')&&!h.includes('廃棄'));
+  const kyakuIdx=header.findIndex(h=>h.includes('客数'));
+  const tensuIdx=header.findIndex(h=>h.includes('買上')||h.includes('点数'));
+  const haikiTotalIdx=header.findIndex(h=>h.includes('廃棄金額')||h.includes('廃棄合計'));
+  // 廃棄カテゴリ列のインデックス（サブカテゴリのエイリアスも対応）
+  const haikiCatIdx={};
+  const haikiAliases={
+    'FF':['FF','FFおでん','FFフライヤー','FFフライヤーその他'],
+    'その他デイリー':['その他デイリー','牛乳','乳飲料','牛乳・乳飲料','生活デイリー'],
+  };
+  HAIKI_CATS.forEach(c=>{
+    const aliases=haikiAliases[c]||[c];
+    const idx=header.findIndex(h=>aliases.some(a=>h===a||h.includes(a)));
+    if(idx>=0)haikiCatIdx[c]=idx;
+  });
+  // サブカテゴリが複数列ある場合（FFおでん列とFFフライヤー列が別々など）
+  const haikiSubCols={};
+  header.forEach((h,i)=>{
+    if(h.includes('FFおでん')||h.includes('FFフライヤー'))
+      (haikiSubCols['FF']=haikiSubCols['FF']||[]).push(i);
+    if(h.includes('牛乳')||h.includes('乳飲料')||h.includes('生活デイリー'))
+      (haikiSubCols['その他デイリー']=haikiSubCols['その他デイリー']||[]).push(i);
+  });
+  if(dateIdx<0)throw new Error('「日付」列が見つかりません');
+  if(strict&&[salesIdx,kyakuIdx,tensuIdx,haikiTotalIdx,...Object.values(haikiCatIdx)].every(i=>i<0))
+    throw new Error('取り込み対象の列が見つかりません');
+
+  function valueAt(cols,index,decimal=false){
+    if(index<0)return null;
+    const value=String(cols[index]??'').replace(/,/g,'');
+    if(!strict)return (decimal?parseFloat(value):parseInt(value))||0;
+    if(!value)return 0;
+    const shape=decimal?/^[+-]?(?:\d+(?:\.\d*)?|\.\d+)$/:/^[+-]?\d+$/;
+    const numeric=Number(value);
+    if(!shape.test(value)||numeric<0||!(decimal?Number.isFinite(numeric):Number.isSafeInteger(numeric)))
+      throw new Error('取り込めない数値があります');
+    return numeric;
+  }
+
+  // データ行を解析
+  const rows=[];
+  let skipped=0;
+  for(let i=1;i<lines.length;i++){
+    const cols=lines[i].split(',').map(c=>c.trim());
+    if(strict&&(cols.length!==header.length||lines[i].includes('"')))
+      throw new Error('列数が見出しと一致しないか、対応していない引用符があります');
+    const dateStr=cols[dateIdx]||'';
+    const m=dateStr.match(/(\d{4})[-\/](\d{1,2})[-\/](\d{1,2})/);
+    if(!m){skipped++;continue;}
+    const year=m[1],month=parseInt(m[2]),day=parseInt(m[3]);
+    const mName=MONTHS[month-1];
+    if(!mName||(strict&&(!/^\d{4}[-\/]\d{1,2}[-\/]\d{1,2}$/.test(dateStr)||
+      Number(year)<1000||day<1||day>new Date(Number(year),month,0).getDate()))){skipped++;continue;}
+    // 廃棄カテゴリ（サブカテゴリは合算）
+    const haiki={};
+    HAIKI_CATS.forEach(c=>{
+      let val=0;
+      if(haikiSubCols[c]&&haikiSubCols[c].length>1){
+        // 複数のサブカテゴリ列を合算
+        haikiSubCols[c].forEach(i=>{val+=valueAt(cols,i);});
+      }else if(haikiCatIdx[c]!==undefined){
+        val=valueAt(cols,haikiCatIdx[c]);
+      }
+      if(strict&&!Number.isSafeInteger(val))throw new Error('廃棄の内訳が範囲を超えています');
+      if(val>0)haiki[c]=val;
+    });
+    const row={
+      year,mName,day,
+      sales:valueAt(cols,salesIdx),
+      kyaku:valueAt(cols,kyakuIdx),
+      tensu:valueAt(cols,tensuIdx,true),
+      haikiTotal:valueAt(cols,haikiTotalIdx),
+      haiki:Object.keys(haiki).length>0?haiki:null,
+    };
+    if(strict&&!row.haiki&&![row.sales,row.kyaku,row.tensu,row.haikiTotal].some(value=>value>0)){
+      skipped++;
+      continue;
+    }
+    rows.push(row);
+  }
+  if(rows.length===0)throw new Error('有効なデータ行がありません');
+  const years=[...new Set(rows.map(r=>r.year))].sort();
+  return {rows,skipped,years,hasHaiki:rows.some(r=>r.haiki||r.haikiTotal>0)};
+}
+
+function applyInsightCSV(target,{rows,years},prepareYear){
+  // 年度が存在しない場合は作成
+  years.forEach(y=>{
+    if(prepareYear){
+      prepareYear(y);
+    }else if(!target.years.includes(y)){
+      target.years.push(y);target.years.sort();
+      target.data[y]=blankYearData(y);
+    }
+  });
+
+  // データを書き込む
+  let imported=0;
+  rows.forEach(({year,mName,day,sales,kyaku,tensu,haikiTotal,haiki})=>{
+    if(!target.data[year])target.data[year]=blankYearData(year);
+    if(!target.data[year][mName])return;
+    const ri=day-1;
+    if(ri<0||ri>=target.data[year][mName].length)return;
+    const row=target.data[year][mName][ri];
+    if(sales!==null&&sales>0)row.売上=sales;
+    if(kyaku!==null&&kyaku>0)row.客数=kyaku;
+    if(tensu!==null&&tensu>0)row.買上点数=tensu;
+    if(haikiTotal!==null&&haikiTotal>0)row.廃棄金額=haikiTotal;
+    if(haiki){
+      if(!row.haiki)row.haiki=blankHaiki();
+      HAIKI_CATS.forEach(c=>{if(haiki[c]>0)row.haiki[c]=haiki[c];});
+      // 廃棄合計を自動計算
+      row.廃棄金額=HAIKI_CATS.reduce((s,c)=>s+(row.haiki[c]||0),0);
+      if(prepareYear&&!Number.isSafeInteger(row.廃棄金額))throw new Error('廃棄金額が範囲を超えています');
+    }
+    imported++;
+  });
+  return imported;
+}
+
 function importCSV(e){
   const file=e.target.files[0];
   if(!file){return;}
   const reader=new FileReader();
+  activeCSVReaders.add(reader);
+  reader.onloadend=()=>activeCSVReaders.delete(reader);
   reader.onload=ev=>{
     try{
-      const lines=ev.target.result.split('\n').map(l=>l.trim()).filter(l=>l);
-      if(lines.length<2)throw new Error('データがありません');
-
-      // ヘッダー行を確認
-      const header=lines[0].split(',').map(h=>h.trim());
-      const dateIdx=header.findIndex(h=>h.includes('日付')||h.toLowerCase()==='date');
-      const salesIdx=header.findIndex(h=>h.includes('売上')&&!h.includes('廃棄'));
-      const kyakuIdx=header.findIndex(h=>h.includes('客数'));
-      const tensuIdx=header.findIndex(h=>h.includes('買上')||h.includes('点数'));
-      const haikiTotalIdx=header.findIndex(h=>h.includes('廃棄金額')||h.includes('廃棄合計'));
-      // 廃棄カテゴリ列のインデックス（サブカテゴリのエイリアスも対応）
-      const haikiCatIdx={};
-      const haikiAliases={
-        'FF':['FF','FFおでん','FFフライヤー','FFフライヤーその他'],
-        'その他デイリー':['その他デイリー','牛乳','乳飲料','牛乳・乳飲料','生活デイリー'],
-      };
-      HAIKI_CATS.forEach(c=>{
-        const aliases=haikiAliases[c]||[c];
-        const idx=header.findIndex(h=>aliases.some(a=>h===a||h.includes(a)));
-        if(idx>=0)haikiCatIdx[c]=idx;
-      });
-      // サブカテゴリが複数列ある場合（FFおでん列とFFフライヤー列が別々など）
-      const haikiSubCols={};
-      header.forEach((h,i)=>{
-        if(h.includes('FFおでん')||h.includes('FFフライヤー'))
-          (haikiSubCols['FF']=haikiSubCols['FF']||[]).push(i);
-        if(h.includes('牛乳')||h.includes('乳飲料')||h.includes('生活デイリー'))
-          (haikiSubCols['その他デイリー']=haikiSubCols['その他デイリー']||[]).push(i);
-      });
-      if(dateIdx<0)throw new Error('「日付」列が見つかりません');
-
-      // データ行を解析
-      const rows=[];
-      let skipped=0;
-      for(let i=1;i<lines.length;i++){
-        const cols=lines[i].split(',').map(c=>c.trim());
-        const dateStr=cols[dateIdx]||'';
-        const m=dateStr.match(/(\d{4})[-\/](\d{1,2})[-\/](\d{1,2})/);
-        if(!m){skipped++;continue;}
-        const year=m[1],month=parseInt(m[2]),day=parseInt(m[3]);
-        const mName=MONTHS[month-1];
-        if(!mName){skipped++;continue;}
-        // 廃棄カテゴリ（サブカテゴリは合算）
-        const haiki={};
-        HAIKI_CATS.forEach(c=>{
-          let val=0;
-          if(haikiSubCols[c]&&haikiSubCols[c].length>1){
-            // 複数のサブカテゴリ列を合算
-            haikiSubCols[c].forEach(i=>{val+=parseInt(String(cols[i]||'0').replace(/,/g,''))||0;});
-          }else if(haikiCatIdx[c]!==undefined){
-            val=parseInt(String(cols[haikiCatIdx[c]]||'0').replace(/,/g,''))||0;
-          }
-          if(val>0)haiki[c]=val;
-        });
-        rows.push({
-          year,mName,day,
-          sales:salesIdx>=0?parseInt(String(cols[salesIdx]).replace(/,/g,''))||0:null,
-          kyaku:kyakuIdx>=0?parseInt(String(cols[kyakuIdx]).replace(/,/g,''))||0:null,
-          tensu:tensuIdx>=0?parseFloat(String(cols[tensuIdx]).replace(/,/g,''))||0:null,
-          haikiTotal:haikiTotalIdx>=0?parseInt(String(cols[haikiTotalIdx]).replace(/,/g,''))||0:null,
-          haiki:Object.keys(haiki).length>0?haiki:null,
-        });
-      }
-      if(rows.length===0)throw new Error('有効なデータ行がありません');
-
-      // 確認ダイアログ
-      const years=[...new Set(rows.map(r=>r.year))].sort();
-      const hasHaiki=rows.some(r=>r.haiki||r.haikiTotal>0);
+      const parsed=parseInsightCSV(ev.target.result);
+      const {rows,years,hasHaiki,skipped}=parsed;
       if(!confirm(`${file.name}\n\n${rows.length}件のデータを取り込みます。\n対象年度: ${years.join(', ')}\n含むデータ: 売上・客数・買上点数${hasHaiki?'・廃棄':''}\n\n既存データは上書きされます。よろしいですか？`)){
         e.target.value='';return;
       }
 
-      // 年度が存在しない場合は作成
-      years.forEach(y=>{
-        if(!store.years.includes(y)){
-          store.years.push(y);store.years.sort();
-          store.data[y]=blankYearData(y);
-        }
-      });
-
-      // データを書き込む
-      let imported=0;
-      rows.forEach(({year,mName,day,sales,kyaku,tensu,haikiTotal,haiki})=>{
-        if(!store.data[year])store.data[year]=blankYearData(year);
-        if(!store.data[year][mName])return;
-        const ri=day-1;
-        if(ri<0||ri>=store.data[year][mName].length)return;
-        const row=store.data[year][mName][ri];
-        if(sales!==null&&sales>0)row.売上=sales;
-        if(kyaku!==null&&kyaku>0)row.客数=kyaku;
-        if(tensu!==null&&tensu>0)row.買上点数=tensu;
-        if(haikiTotal!==null&&haikiTotal>0)row.廃棄金額=haikiTotal;
-        if(haiki){
-          if(!row.haiki)row.haiki=blankHaiki();
-          HAIKI_CATS.forEach(c=>{if(haiki[c]>0)row.haiki[c]=haiki[c];});
-          // 廃棄合計を自動計算
-          row.廃棄金額=HAIKI_CATS.reduce((s,c)=>s+(row.haiki[c]||0),0);
-        }
-        imported++;
-      });
-
+      const imported=applyInsightCSV(store,parsed);
       persist();
       baseYear=store.years[store.years.length-1];
       editYear={sales:baseYear,kyaku:baseYear,haiki:baseYear};
@@ -2663,7 +2727,8 @@ function importCSV(e){
     }
     e.target.value='';
   };
-  reader.readAsText(file,'UTF-8');
+  try{reader.readAsText(file,'UTF-8');}
+  catch(error){activeCSVReaders.delete(reader);throw error;}
 }
 
 /* ══ ① 入力漏れの可視化 ══ */

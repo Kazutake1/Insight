@@ -92,7 +92,11 @@ test('旧天気相関グループは現行画面で未使用のためbootstrap�
 });
 
 test('feature manifestの主要構造モジュールは一意かつ依存順に並ぶ',()=>{
-  const index=read('insight_shell_loader_v1.js');
+  const loader=read('insight_shell_loader_v1.js');
+  const start=loader.indexOf('var orderedFeatureLoads=[');
+  const end=loader.indexOf('];',start);
+  assert.ok(start>=0&&end>start,'orderedFeatureLoads manifestがありません');
+  const manifest=loader.slice(start,end);
   const ordered=[
     'insight_yoy_policy_v1.js',
     'insight_date_context_v1.js',
@@ -120,9 +124,9 @@ test('feature manifestの主要構造モジュールは一意かつ依存順に�
   ];
   let last=-1;
   ordered.forEach(name=>{
-    const first=index.indexOf(name);
+    const first=manifest.indexOf(name);
     assert.ok(first>last,name+' の依存順が不正です');
-    assert.equal(index.indexOf(name,first+1),-1,name+' が重複しています');
+    assert.equal(manifest.indexOf(name,first+1),-1,name+' が重複しています');
     last=first;
   });
 });
