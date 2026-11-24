@@ -49,6 +49,10 @@
       return (units*2/1048576).toFixed(3)+' MiB';
     }
     button.addEventListener('click',function(){
+      if(root.InsightIndexedDBCandidateV1?.isAdopted()){
+        result.textContent='保存容量を計測できません。';
+        return;
+      }
       try{
         var usage=measureStorageUsage(root.localStorage);
         var primary=usage.primaryUnits;

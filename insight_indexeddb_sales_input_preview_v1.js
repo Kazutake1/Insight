@@ -410,8 +410,8 @@
         }
         if(management&&(yearOverlay||currentNav==='settings')){
           const recoveryAction=recoveryDialog&&event.target.closest?.('#backupBtn,#restoreBtn');
-          if(!blocked()&&(yearOverlay?yearOverlay.contains(event.target):recoveryAction||
-
+          const capacityAction=event.target.closest?.('#insightSettingsDataActions button[aria-controls="insightStorageUsage"]');
+          if(!blocked()&&(yearOverlay?yearOverlay.contains(event.target):recoveryAction||capacityAction||
             event.target.closest?.(yearControl+','+storeControl+','+storeActionControl+',#insightDataHealthButton,#csvImportBtn,#csvImportFile,#insightWeatherBulkStart,#insightWeatherBulkCancel')))return;
           event.preventDefault();
           event.stopImmediatePropagation();
@@ -554,7 +554,7 @@
           state.storeId=id;
           allStores=JSON.parse(JSON.stringify(result.snapshot));
           renderCommittedStore(period);
-          storeStatus.textContent='店舗を切り替えました。';
+          storeStatus.textContent='';
           return true;
         }catch(_){
           state.held=true;
@@ -739,6 +739,8 @@
             state.held=true;
             return recoverySettings.restart(revision);
           }});
+          const legacySafetyToggle=actions.querySelector('#insightRestoreSafetyBackup');
+          if(legacySafetyToggle)legacySafetyToggle.disabled=true;
           const warning=doc.createElement('p');
           warning.setAttribute('role','status');
           doc.getElementById('storeSel').after(warning);

@@ -6,7 +6,7 @@ test.beforeEach(async({page})=>{
     if(!location.pathname.endsWith('-fixture'))return;
     window.__INSIGHT_SHELL_VERSION__=build;
     window.__INSIGHT_FEATURE_SIGNATURE__=features;
-  },{build:'20261124-indexeddb-step4-build-122',features:'6dc24fa1'});
+  },{build:'20261124-indexeddb-settings-build-123',features:'3a7e67c9'});
   await page.route(/https:\/\/(www\.jma\.go\.jp|[^/]*api\.open-meteo\.com)\//,route=>route.abort());
 });
 // The fixture server uses HTTP; keep the rest of the shell's CSP in effect.
@@ -217,7 +217,7 @@ test('combined input session shares four saves and guards both destinations and 
 
   await page.evaluate(()=>{approveCombinedNavigation=true;});
   await page.locator('#storeSel').selectOption(seed.peer);
-  await expect(page.locator('#storeSel + [role=status]')).toHaveText('店舗を切り替えました。');
+  await expect(page.locator('#storeSel + [role=status]')).toHaveText('');
   expected.current=seed.peer;
   expect(await committedInput(page)).toEqual({revision:5,snapshot:expected});
   await page.locator('#nav0').click();
@@ -1911,7 +1911,7 @@ test('a delayed location search cannot update a different store',async({page})=>
   await page.waitForFunction(()=>typeof window.finishPreviewLocation==='function');
   await page.locator('#nav2').click();
   await page.locator('#storeSel').selectOption(seed.peer);
-  await expect(page.locator('#storeSel + [role=status]')).toHaveText('店舗を切り替えました。');
+  await expect(page.locator('#storeSel + [role=status]')).toHaveText('');
   const switched=await committedInput(page);
   expect(switched.revision).toBe(1);
   await page.evaluate(()=>finishPreviewLocation());
@@ -3100,8 +3100,8 @@ test('a fully restarted browser keeps the adopted revision and holds the legacy 
       const page=context.pages()[0]??await context.newPage();
       await page.goto(url);
       await page.evaluate(()=>{
-        window.__INSIGHT_SHELL_VERSION__='20261124-indexeddb-step4-build-122';
-        window.__INSIGHT_FEATURE_SIGNATURE__='6dc24fa1';
+        window.__INSIGHT_SHELL_VERSION__='20261124-indexeddb-settings-build-123';
+        window.__INSIGHT_FEATURE_SIGNATURE__='3a7e67c9';
       });
       await page.addScriptTag({url:new URL('/insight_indexeddb_storage_v1.js',url).href});
       return {context,page};
@@ -3137,7 +3137,7 @@ async function openLegacyPwaFixture(page){
     contentType:'text/html',body:'<!doctype html><title>Fictional online migration page</title>'
   }));
   await page.route('**/tests/e2e/fixtures/Index.html?insight_migration_probe=*',route=>route.fulfill({
-    contentType:'text/html',body:'<!doctype html><meta name="insight-shell-version" content="20261124-indexeddb-step4-build-122">'
+    contentType:'text/html',body:'<!doctype html><meta name="insight-shell-version" content="20261124-indexeddb-settings-build-123">'
   }));
   await page.goto(legacyPwaFixture);
   await page.addScriptTag({url:'/insight_indexeddb_storage_v1.js'});
@@ -3362,7 +3362,7 @@ test('cached legacy shell runs with its origin unavailable and adopted startup s
 });
 
 test('migration enforces the pinned environment before and after backup confirmation',async({page})=>{
-  const fixture='/forced-migration-gate-fixture',build='20261124-indexeddb-step4-build-122';
+  const fixture='/forced-migration-gate-fixture',build='20261124-indexeddb-settings-build-123';
   await page.route('**'+fixture,route=>route.fulfill({
     contentType:'text/html',body:'<!doctype html><title>Fictional forced migration fixture</title>'
   }));
@@ -3753,7 +3753,7 @@ for(const connectionFails of [false,true]){
       window.InsightHourlyCustomers={connectIndexedDBPreview(){}};
       window.shellReadyState=document.readyState;
       window.lateSnapshot=InsightIndexedDBCandidateV1.initializeAdopted();`}));
-    await page.route(/\/insight_indexeddb_(quick_input|sales_input|recovery)_preview_v1\.js\?v=20261124-indexeddb-preview-7$/,route=>route.fulfill({
+    await page.route(/\/insight_indexeddb_(quick_input|sales_input|recovery)_preview_v1\.js\?v=20261124-indexeddb-settings-1$/,route=>route.fulfill({
       contentType:'application/javascript',
       body:new URL(route.request().url()).pathname.endsWith('/insight_indexeddb_sales_input_preview_v1.js')
         ?`window.InsightIndexedDBSalesInputPreviewV1={async connect(){
@@ -3794,6 +3794,7 @@ for(const connectionFails of [false,true]){
 
 const httpsTest=test.extend({
   ignoreHTTPSErrors:true,
+  hasTouch:true,
   httpsInsight:async ({},use)=>require('./helpers/https-insight.cjs')(use)
 });
 httpsTest('Draft Index rehearses migration, editing and recovery at the release HTTPS URL',async({page,context,httpsInsight})=>{
@@ -3869,6 +3870,13 @@ httpsTest('Draft Index rehearses migration, editing and recovery at the release 
   await expect(page.locator('#qi_売上')).toHaveValue('123');
   await page.locator('#navSettings').click();
   await expect(button).toHaveCount(0);
+  const capacity=page.getByRole('button',{name:'保存容量を確認'});
+  const capacityResult=page.locator('#insightStorageUsage');
+  const safetyToggle=page.locator('#insightRestoreSafetyBackup');
+  await capacity.tap();
+  await expect(capacityResult).toContainText('店舗データ（全店舗）：');
+  await page.locator('label').filter({has:safetyToggle}).tap();
+  await expect(safetyToggle).toBeChecked();
   const migrationEnvironment=await page.evaluate(()=>InsightIndexedDBStorageV1.checkMigrationEnvironment({
     expectedBuild:window.__INSIGHT_SHELL_VERSION__,expectedFeatures:window.__INSIGHT_FEATURE_SIGNATURE__,
     legacyClientsClosed:true,requireManualMigration:true
@@ -3950,7 +3958,11 @@ httpsTest('Draft Index rehearses migration, editing and recovery at the release 
   const beforeRestore=await committedInput(page);
   expect(beforeRestore.revision).toBe(2);
   await page.locator('#navSettings').click();
-  await page.locator('#backupBtn').click();
+  await capacity.tap();
+  await expect(capacityResult).toHaveText('保存容量を計測できません。');
+  await expect(safetyToggle).toBeDisabled();
+  expect(await committedInput(page)).toEqual(beforeRestore);
+  await page.locator('#backupBtn').tap();
   const settings=page.locator('#insightIndexedDBBackupDialog');
   await settings.getByLabel('バックアップ用パスワード').fill(password);
   await settings.getByLabel('パスワードの確認').fill(password);
@@ -3959,7 +3971,7 @@ httpsTest('Draft Index rehearses migration, editing and recovery at the release 
   const safety=await downloaded(exported);
   await expect(settings.getByRole('status')).toContainText('確定版 2');
   await settings.getByRole('button',{name:'閉じる'}).click();
-  await page.locator('#restoreBtn').click();
+  await page.locator('#restoreBtn').tap();
   await settings.getByLabel('復元する暗号化バックアップ',{exact:true}).setInputFiles(file);
   await settings.getByLabel('現在の確定版の暗号化バックアップ',{exact:true}).setInputFiles(safety);
   await settings.getByLabel('復元するバックアップのパスワード',{exact:true}).fill(password);
@@ -4000,7 +4012,7 @@ httpsTest('Draft Index rehearses migration, editing and recovery at the release 
       const id=expected.snapshot.current===seed.id?'fixture-peer':seed.id;
       page.once('dialog',dialog=>dialog.accept());
       await page.locator('#storeSel').selectOption(id);
-      await expect(page.locator('#insightIndexedDBStoreStatus')).toHaveText('店舗を切り替えました。');
+      await expect(page.locator('#insightIndexedDBStoreStatus')).toHaveText('');
       await expect(page.locator('#storeSel')).toHaveValue(id);
       await expect(page.locator(screen)).toBeVisible();
       if(nav==='#nav0')await expect(page.locator('#qi_売上')).toHaveValue('999');
@@ -4960,7 +4972,7 @@ test('isolated store selection keeps drafts on cancellation and changes the save
     .toEqual({state:'ACTIVE',hasUnsavedInput:true});
   await page.evaluate(()=>resumeStoreSwitch());
   await expect(selector).toHaveValue(peer);
-  await expect(page.locator('#storeSel + [role=status]')).toHaveText('店舗を切り替えました。');
+  await expect(page.locator('#storeSel + [role=status]')).toHaveText('');
   expect(await page.evaluate(()=>storeDecisions.length)).toBe(2);
   const expected=JSON.parse(seed.raw);
   expected.current=peer;
