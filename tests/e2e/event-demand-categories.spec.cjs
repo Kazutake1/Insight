@@ -126,7 +126,6 @@ test('過去便の推定・手動確定はセール実績と単日／複数日�
     return {storeId,categoryId:category.id,saved:localStorage.getItem('insight_v11')};
   });
   await page.locator('#navSaleResults').click();
-  await page.locator('#srGroups .sr-group-toggle').first().click();
   const saleCard=page.locator('#srGroups .sc-day').filter({has:page.locator('.sc-day-num')}).first();
   await expect.poll(()=>saleCard.locator('.sc-delivery-row input').evaluateAll(inputs=>inputs.map(i=>i.value))).toEqual(['0','20','／']);
   await expect.poll(()=>saleCard.locator('.sc-sales-row input').evaluateAll(inputs=>inputs.map(i=>i.value))).toEqual(['0','18','／']);
@@ -139,7 +138,6 @@ test('過去便の推定・手動確定はセール実績と単日／複数日�
     }};
     InsightSaleResults.render();
   },setup);
-  await page.locator('#srGroups .sr-group-toggle').first().click();
   await expect.poll(()=>saleCard.locator('.sc-sales-row input').evaluateAll(inputs=>inputs.map(i=>i.value))).toEqual(['0','18','']);
   await expect(saleCard.locator('.sc-total-sales')).toHaveText('—');
   await expect(page.locator('#srGroups .sr-stat').nth(1).locator('strong')).toHaveText('—');
@@ -148,7 +146,6 @@ test('過去便の推定・手動確定はセール実績と単日／複数日�
     allStores.stores[storeId].tripHistoryOverrides.categories[categoryId]['2026-09']['3']='inactive';
     InsightSaleResults.render();
   },setup);
-  await page.locator('#srGroups .sr-group-toggle').first().click();
   await expect.poll(()=>saleCard.locator('.sc-sales-row input').evaluateAll(inputs=>inputs.map(i=>i.value))).toEqual(['0','18','／']);
   await expect(saleCard.locator('.sc-total-sales')).toHaveText('18');
 

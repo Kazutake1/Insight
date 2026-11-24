@@ -359,10 +359,10 @@ test('トップページは外部shellと機能manifestの最新版確認をno-s
     fetch('/insight_payload_source_v1.html?e2e-shell-check=1',{cache:'no-store'}).then(r=>r.text())
   ]));
   const [source,boot,loader,payload]=sources;
-  expect(source).toContain('name="insight-shell-version" content="20261124-store-switch-build-125"');
-  expect(source).toContain('insight_shell_boot_v1.js?v=20261124-store-switch-build-125');
-  expect(source).toContain('insight_shell_loader_v1.js?v=20261124-store-switch-1');
-  expect(source).toContain('insight_shell_v1.css?v=20261124-store-switch-build-125');
+  expect(source).toContain('name="insight-shell-version" content="20261124-sale-details-build-126"');
+  expect(source).toContain('insight_shell_boot_v1.js?v=20261124-sale-details-build-126');
+  expect(source).toContain('insight_shell_loader_v1.js?v=20261124-sale-details-1');
+  expect(source).toContain('insight_shell_v1.css?v=20261124-sale-details-build-126');
   expect(source).not.toMatch(/<script(?![^>]*\bsrc=)[^>]*>/i);
   expect(source).not.toMatch(/<style\b/i);
   expect(source).not.toMatch(/script-src[^;]*'unsafe-inline'/);
@@ -376,7 +376,7 @@ test('トップページは外部shellと機能manifestの最新版確認をno-s
   expect(source).toContain('https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js');
   expect(source).toContain('integrity="sha512-CQBWl4fJHWbryGE+Pc7UAxWMUMNMWzWxF4SQo9CgkJIN1kx6djDQZjh3Y8SZ1d+6I+1zze6Z7kHXO7q3UyZAWw=="');
   expect(loader).not.toContain('stripPayloadChartScript');
-  expect(payload).toContain('insight_payload_core_v1.css?v=20261118-sale-scroll20-1');
+  expect(payload).toContain('insight_payload_core_v1.css?v=20261124-sale-details-1');
   expect(payload).toContain('insight_payload_core_v1.js?v=20261124-indexeddb-preview-7');
   expect(payload).toContain('insight_payload_ai_legacy_v1.js?v=20261020-ai-panel-smooth-1');
   expect(payload).toContain('insight_payload_bindings_v1.js?v=20261030-step4-gate3-ab-1');
@@ -1929,10 +1929,7 @@ test('セール実績は内容別に表示し開催回ごとに行を分けて7�
   await expect(page.locator('.sr-group-stats')).not.toContainText('開催日数');
   const statGridColumns=await page.locator('.sr-group-stats').evaluate(el=>getComputedStyle(el).gridTemplateColumns.split(' ').length);
   expect(statGridColumns).toBe(3);
-  await expect(page.locator('.sr-group .sr-day-grid')).toHaveCount(0);
-  await expect(page.locator('.sr-group-toggle')).toHaveAttribute('aria-expanded','false');
-  await page.locator('.sr-group-toggle').click();
-  await expect(page.locator('.sr-group-toggle')).toHaveAttribute('aria-expanded','true');
+  await expect(page.locator('.sr-group-toggle')).toHaveCount(0);
   await expect(page.locator('.sr-group .sr-day-grid')).toHaveCount(2);
   await expect(page.locator('.sr-group .sr-day-grid').nth(0).locator('.sc-day')).toHaveCount(8);
   await expect(page.locator('.sr-group .sr-day-grid').nth(1).locator('.sc-day')).toHaveCount(3);
