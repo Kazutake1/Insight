@@ -3955,12 +3955,41 @@ httpsTest('Draft Index rehearses migration, editing and recovery at the release 
   await page.locator('#navSalesCount').click();
   await page.getByRole('button',{name:'カードを印刷'}).click();
   const printDialog=page.getByRole('dialog',{name:'納品・販売・廃棄カード'});
+  const originalViewport=page.viewportSize();
+  await page.setViewportSize({width:1194,height:834});
+  const originalDark=await page.evaluate(()=>document.documentElement.classList.contains('dark'));
+  const checkPrintLayout=async ()=>{
+    for(const dark of [false,true]){
+      await page.evaluate(value=>document.documentElement.classList.toggle('dark',value),dark);
+      const layout=await printDialog.evaluate(dialog=>{
+        const bounds=dialog.getBoundingClientRect(),fields=dialog.querySelector('.sc-print-fields');
+        const actions=dialog.querySelector('.sc-print-actions'),style=getComputedStyle(dialog);
+        const labels=Array.from(fields.querySelectorAll('label'),node=>node.getBoundingClientRect());
+        const controls=[...dialog.querySelectorAll('input,select,button')];
+        return {
+          offset:Math.max(Math.abs(bounds.left+bounds.width/2-innerWidth/2),
+            Math.abs(bounds.top+bounds.height/2-innerHeight/2)),
+          fits:bounds.width<innerWidth&&bounds.height<innerHeight&&dialog.scrollWidth===dialog.clientWidth,
+          spacing:labels.slice(1).every((label,i)=>label.left-labels[i].right>=8)&&
+            actions.getBoundingClientRect().top-fields.getBoundingClientRect().bottom>=8,
+          touch:controls.every(node=>node.getBoundingClientRect().height>=44),
+          readable:style.color!==style.backgroundColor
+        };
+      });
+      expect(layout.offset).toBeLessThanOrEqual(1);
+      expect(layout).toMatchObject({fits:true,spacing:true,touch:true,readable:true});
+    }
+  };
+  await checkPrintLayout();
   await printDialog.getByLabel('開始日').fill('2026-11-23');
   await printDialog.getByLabel('終了日').fill('2026-11-23');
   await printDialog.getByLabel('カテゴリー').selectOption('cat_onigiri');
   await printDialog.getByRole('button',{name:'プレビュー'}).click();
   await expect(printDialog.locator('.sc-delivery-row .sc-print-value').first()).toHaveText('12');
   await expect(printDialog.locator('.sc-sales-row .sc-print-value').first()).toHaveText('9');
+  await checkPrintLayout();
+  await page.evaluate(value=>document.documentElement.classList.toggle('dark',value),originalDark);
+  await page.setViewportSize(originalViewport);
   await printDialog.getByRole('button',{name:'閉じる'}).click();
   expect(await committedInput(page)).toEqual({revision:0,snapshot:JSON.parse(raw)});
   await page.locator('#nav0').click();
