@@ -149,7 +149,7 @@ async function start(){
   await Promise.all([
     import('./insight_indexeddb_storage_v1.js?v=20261124-sale-details-1'),
     import('./insight_indexeddb_migration_preview_v1.js?v=20261124-indexeddb-step3-1'),
-    import('./draft/insight_indexeddb_candidate_v1.js?v=20261124-indexeddb-settings-1')
+    import('./draft/insight_indexeddb_candidate_v1.js?v=20261124-store-switch-1')
   ]);
   async function prepareRecovery(){
     const modules=['insight_storage_v1.js','insight_events_v1.js','insight_trip_overrides_v1.js','insight_sales_count_v1.js',

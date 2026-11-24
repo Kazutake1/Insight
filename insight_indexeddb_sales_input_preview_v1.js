@@ -542,7 +542,7 @@
         selector.disabled=true;
         if(button)button.disabled=true;
         doc.body.inert=true;
-        storeStatus.textContent='店舗の切替を確認しています。';
+        storeStatus.textContent='';
         try{
           const result=await api.save(state.committed.revision,candidate);
           if(currentNav!==route||allStores.current!==state.storeId||

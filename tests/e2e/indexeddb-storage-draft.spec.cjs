@@ -217,7 +217,9 @@ test('combined input session shares four saves and guards both destinations and 
 
   await page.evaluate(()=>{approveCombinedNavigation=true;});
   await page.locator('#storeSel').selectOption(seed.peer);
-  await expect(page.locator('#storeSel + [role=status]')).toHaveText('');
+  await expect(page.locator('#storeSel')).toBeEnabled();
+  await expect(page.locator('#storeSel')).toHaveValue(seed.peer);
+  await expect(page.locator('#storeSel + [role=status]')).toBeEmpty();
   expected.current=seed.peer;
   expect(await committedInput(page)).toEqual({revision:5,snapshot:expected});
   await page.locator('#nav0').click();
@@ -1911,7 +1913,9 @@ test('a delayed location search cannot update a different store',async({page})=>
   await page.waitForFunction(()=>typeof window.finishPreviewLocation==='function');
   await page.locator('#nav2').click();
   await page.locator('#storeSel').selectOption(seed.peer);
-  await expect(page.locator('#storeSel + [role=status]')).toHaveText('');
+  await expect(page.locator('#storeSel')).toBeEnabled();
+  await expect(page.locator('#storeSel')).toHaveValue(seed.peer);
+  await expect(page.locator('#storeSel + [role=status]')).toBeEmpty();
   const switched=await committedInput(page);
   expect(switched.revision).toBe(1);
   await page.evaluate(()=>finishPreviewLocation());
@@ -3753,7 +3757,7 @@ for(const connectionFails of [false,true]){
       window.InsightHourlyCustomers={connectIndexedDBPreview(){}};
       window.shellReadyState=document.readyState;
       window.lateSnapshot=InsightIndexedDBCandidateV1.initializeAdopted();`}));
-    await page.route(/\/insight_indexeddb_(quick_input|sales_input|recovery)_preview_v1\.js\?v=20261124-indexeddb-settings-1$/,route=>route.fulfill({
+    await page.route(/\/insight_indexeddb_(quick_input|sales_input|recovery)_preview_v1\.js\?v=20261124-store-switch-1$/,route=>route.fulfill({
       contentType:'application/javascript',
       body:new URL(route.request().url()).pathname.endsWith('/insight_indexeddb_sales_input_preview_v1.js')
         ?`window.InsightIndexedDBSalesInputPreviewV1={async connect(){
@@ -4044,8 +4048,9 @@ httpsTest('Draft Index rehearses migration, editing and recovery at the release 
       const id=expected.snapshot.current===seed.id?'fixture-peer':seed.id;
       page.once('dialog',dialog=>dialog.accept());
       await page.locator('#storeSel').selectOption(id);
-      await expect(page.locator('#insightIndexedDBStoreStatus')).toHaveText('');
+      await expect(page.locator('#storeSel')).toBeEnabled();
       await expect(page.locator('#storeSel')).toHaveValue(id);
+      await expect(page.locator('#insightIndexedDBStoreStatus')).toBeEmpty();
       await expect(page.locator(screen)).toBeVisible();
       if(nav==='#nav0')await expect(page.locator('#qi_売上')).toHaveValue('999');
       if(nav==='#navOrderForecast'){
@@ -5003,8 +5008,9 @@ test('isolated store selection keeps drafts on cancellation and changes the save
   expect(await page.evaluate(()=>fixtureSalesPreview.getStatus()))
     .toEqual({state:'ACTIVE',hasUnsavedInput:true});
   await page.evaluate(()=>resumeStoreSwitch());
+  await expect(selector).toBeEnabled();
   await expect(selector).toHaveValue(peer);
-  await expect(page.locator('#storeSel + [role=status]')).toHaveText('');
+  await expect(page.locator('#storeSel + [role=status]')).toBeEmpty();
   expect(await page.evaluate(()=>storeDecisions.length)).toBe(2);
   const expected=JSON.parse(seed.raw);
   expected.current=peer;
@@ -5198,7 +5204,8 @@ for(const failure of ['readback abort','acknowledgement lost','tab closed during
       await selector.selectOption('fictional-second-shop');
       if(failure==='tab closed during readback'){
         await page.waitForFunction(()=>window.storeReadbackPaused===true);
-        await expect(page.locator('#storeSel + [role=status]')).toHaveText('店舗の切替を確認しています。');
+        await expect(page.locator('#storeSel + [role=status]')).toBeEmpty();
+        await expect(selector).toBeDisabled();
         expect(await page.evaluate(()=>fixtureSalesPreview.getStatus()))
           .toEqual({state:'ACTIVE',hasUnsavedInput:true});
       }else{
