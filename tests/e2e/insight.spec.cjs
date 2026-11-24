@@ -359,10 +359,10 @@ test('トップページは外部shellと機能manifestの最新版確認をno-s
     fetch('/insight_payload_source_v1.html?e2e-shell-check=1',{cache:'no-store'}).then(r=>r.text())
   ]));
   const [source,boot,loader,payload]=sources;
-  expect(source).toContain('name="insight-shell-version" content="20261124-sale-details-build-126"');
-  expect(source).toContain('insight_shell_boot_v1.js?v=20261124-sale-details-build-126');
-  expect(source).toContain('insight_shell_loader_v1.js?v=20261124-sale-details-1');
-  expect(source).toContain('insight_shell_v1.css?v=20261124-sale-details-build-126');
+  expect(source).toContain('name="insight-shell-version" content="20261125-weather-actions-build-127"');
+  expect(source).toContain('insight_shell_boot_v1.js?v=20261125-weather-actions-build-127');
+  expect(source).toContain('insight_shell_loader_v1.js?v=20261125-weather-actions-1');
+  expect(source).toContain('insight_shell_v1.css?v=20261125-weather-actions-build-127');
   expect(source).not.toMatch(/<script(?![^>]*\bsrc=)[^>]*>/i);
   expect(source).not.toMatch(/<style\b/i);
   expect(source).not.toMatch(/script-src[^;]*'unsafe-inline'/);

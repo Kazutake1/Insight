@@ -339,6 +339,8 @@
     const sidebarSelector=Object.keys(routes).map(id=>'#'+id).join(',');
     const reportDialog=()=>management&&doc.querySelector('#insightReportDialog[open]');
     const healthOverlay=()=>management&&doc.querySelector('#insightDataHealthOverlay:not([hidden])');
+    const weatherAnalysisOverlay=()=>management&&doc.querySelector(
+      '#insightWeatherSalesDiagnosticsOverlay:not([hidden]),#insightWeatherSalesViewOverlay:not([hidden])');
     let approved=null;
     const screenQuestion='保存せずに画面を移動しますか？';
     const isInputRoute=route=>route===0||route==='salesCounts'||Object.values(screens).some(screen=>screen.route===route);
@@ -364,6 +366,13 @@
         const health=healthOverlay();
         if(health){
           if(health.contains(event.target))return;
+          event.preventDefault();
+          event.stopImmediatePropagation();
+          return;
+        }
+        const weatherAnalysis=weatherAnalysisOverlay();
+        if(weatherAnalysis){
+          if(!blocked()&&weatherAnalysis.contains(event.target))return;
           event.preventDefault();
           event.stopImmediatePropagation();
           return;
@@ -411,7 +420,9 @@
         if(management&&(yearOverlay||currentNav==='settings')){
           const recoveryAction=recoveryDialog&&event.target.closest?.('#backupBtn,#restoreBtn');
           const capacityAction=event.target.closest?.('#insightSettingsDataActions button[aria-controls="insightStorageUsage"]');
-          if(!blocked()&&(yearOverlay?yearOverlay.contains(event.target):recoveryAction||capacityAction||
+          const weatherAnalysisAction=!hourly?.dialog()?.open&&!root.InsightSalesCount.getCategoryDialog()?.open&&
+            event.target.closest?.('#insightWeatherSalesDiagnosticsButton,#insightWeatherSalesViewButton');
+          if(!blocked()&&(yearOverlay?yearOverlay.contains(event.target):recoveryAction||capacityAction||weatherAnalysisAction||
             event.target.closest?.(yearControl+','+storeControl+','+storeActionControl+',#insightDataHealthButton,#csvImportBtn,#csvImportFile,#insightWeatherBulkStart,#insightWeatherBulkCancel')))return;
           event.preventDefault();
           event.stopImmediatePropagation();
@@ -446,7 +457,7 @@
     let navigationVersion=0;
     const gotoNav=root.gotoNav;
     root.gotoNav=function(destination){
-      if(followInputScreens&&(blocked()||yearDialog()||eventDialogs().length||budgetDialog()||recoveryDialog?.open||reportDialog()||healthOverlay()))return false;
+      if(followInputScreens&&(blocked()||yearDialog()||eventDialogs().length||budgetDialog()||recoveryDialog?.open||reportDialog()||healthOverlay()||weatherAnalysisOverlay()))return false;
       if(quick){
         if(hourly?.dialog()?.open||root.InsightSalesCount.getCategoryDialog()?.open||
            (!isInputRoute(destination)&&!(management&&isManagedRoute(destination)))||
@@ -512,7 +523,7 @@
         if(blocked()||yearDialog()||eventDialogs().length||budgetDialog()||recoveryDialog?.open||id===state.storeId||!Object.hasOwn(state.committed.snapshot.stores,id))return false;
         const route=currentNav;
         const monthly=route===screen.route;
-        if(reportDialog()||healthOverlay()||hourly?.dialog()?.open||root.InsightSalesCount.getCategoryDialog()?.open)return false;
+        if(reportDialog()||healthOverlay()||weatherAnalysisOverlay()||hourly?.dialog()?.open||root.InsightSalesCount.getCategoryDialog()?.open)return false;
         if(!monthly&&!management){
           storeStatus.textContent='試験用の店舗切替は月次入力画面で行ってください。';
           return false;
@@ -606,7 +617,7 @@
 
       function canOpenStoreMenu(){
         return isManagedRoute(currentNav)&&!blocked()&&!yearDialog()&&!eventDialogs().length&&
-          !budgetDialog()&&!recoveryDialog?.open&&!reportDialog()&&!healthOverlay()&&!hourly?.dialog()?.open&&
+          !budgetDialog()&&!recoveryDialog?.open&&!reportDialog()&&!healthOverlay()&&!weatherAnalysisOverlay()&&!hourly?.dialog()?.open&&
           !root.InsightSalesCount.getCategoryDialog()?.open&&!doc.querySelector('#ofEventDialog[open]');
       }
 
