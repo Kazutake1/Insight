@@ -6,7 +6,7 @@ test.beforeEach(async({page})=>{
     if(!location.pathname.endsWith('-fixture'))return;
     window.__INSIGHT_SHELL_VERSION__=build;
     window.__INSIGHT_FEATURE_SIGNATURE__=features;
-  },{build:'20261124-indexeddb-step3-build-121',features:'6dc24fa1'});
+  },{build:'20261124-indexeddb-step4-build-122',features:'6dc24fa1'});
   await page.route(/https:\/\/(www\.jma\.go\.jp|[^/]*api\.open-meteo\.com)\//,route=>route.abort());
 });
 // The fixture server uses HTTP; keep the rest of the shell's CSP in effect.
@@ -3100,7 +3100,7 @@ test('a fully restarted browser keeps the adopted revision and holds the legacy 
       const page=context.pages()[0]??await context.newPage();
       await page.goto(url);
       await page.evaluate(()=>{
-        window.__INSIGHT_SHELL_VERSION__='20261124-indexeddb-step3-build-121';
+        window.__INSIGHT_SHELL_VERSION__='20261124-indexeddb-step4-build-122';
         window.__INSIGHT_FEATURE_SIGNATURE__='6dc24fa1';
       });
       await page.addScriptTag({url:new URL('/insight_indexeddb_storage_v1.js',url).href});
@@ -3137,7 +3137,7 @@ async function openLegacyPwaFixture(page){
     contentType:'text/html',body:'<!doctype html><title>Fictional online migration page</title>'
   }));
   await page.route('**/tests/e2e/fixtures/Index.html?insight_migration_probe=*',route=>route.fulfill({
-    contentType:'text/html',body:'<!doctype html><meta name="insight-shell-version" content="20261124-indexeddb-step3-build-121">'
+    contentType:'text/html',body:'<!doctype html><meta name="insight-shell-version" content="20261124-indexeddb-step4-build-122">'
   }));
   await page.goto(legacyPwaFixture);
   await page.addScriptTag({url:'/insight_indexeddb_storage_v1.js'});
@@ -3362,7 +3362,7 @@ test('cached legacy shell runs with its origin unavailable and adopted startup s
 });
 
 test('migration enforces the pinned environment before and after backup confirmation',async({page})=>{
-  const fixture='/forced-migration-gate-fixture',build='20261124-indexeddb-step3-build-121';
+  const fixture='/forced-migration-gate-fixture',build='20261124-indexeddb-step4-build-122';
   await page.route('**'+fixture,route=>route.fulfill({
     contentType:'text/html',body:'<!doctype html><title>Fictional forced migration fixture</title>'
   }));
@@ -3819,9 +3819,8 @@ httpsTest('Draft Index rehearses migration, editing and recovery at the release 
     const path=url.pathname.slice('/Insight/'.length)||'Index.html';
     // Serve the Draft files from the test fixture and never contact GitHub Pages.
     const response=await route.fetch({url:httpsInsight+'/'+path+url.search,maxRedirects:0});
-    if(path!=='Index.html'||!manualMigration)return route.fulfill({response});
-    await route.fulfill({response,body:(await response.text()).replace(
-      'data-indexeddb-preview-host="localhost"','data-indexeddb-preview-host="localhost" data-indexeddb-migration="manual"')});
+    if(path!=='Index.html'||manualMigration)return route.fulfill({response});
+    await route.fulfill({response,body:(await response.text()).replace(' data-indexeddb-migration="manual"','')});
   });
   await page.goto(fixture);
   expect(await page.evaluate(()=>({origin:location.origin,protocol:location.protocol,secure:isSecureContext,
