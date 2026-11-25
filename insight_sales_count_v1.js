@@ -379,10 +379,11 @@
         year=Number(parts[0]),month=Number(parts[1]),day=Number(parts[2]),
         wd=new Date(year,month-1,day).getDay(),
         holiday=typeof isHoliday==='function'&&isHoliday(year,month,day),red=wd===0||holiday,
+        saturdayBlue=wd===6&&!(source?.forPrint&&holiday),
         withWaste=arguments.length>=4,
-        card=el('div',undefined,'sc-day '+(wd===6?'sat-card':red?'sun-card':'')+(withWaste?' sc-readonly-waste':''));
+        card=el('div',undefined,'sc-day '+(saturdayBlue?'sat-card':red?'sun-card':'')+(withWaste?' sc-readonly-waste':''));
       var head=el('div',undefined,'sc-day-title'),
-        num=el('strong',month+'/'+day+'（'+WEEKDAYS[wd]+'）','sc-day-num '+(wd===6?'sat':red?'sun':''));
+        num=el('strong',month+'/'+day+'（'+WEEKDAYS[wd]+'）','sc-day-num '+(saturdayBlue?'sat':red?'sun':''));
       head.append(num,holiday?el('small','祝日'):el('span'));
       card.append(head,createHistoricalWeatherRow(date,source?.storeId,source?.snapshot));
       var labels=el('div',undefined,'sc-col-head');
@@ -840,7 +841,7 @@
 
       function printableCard(snapshot,item,date,counts,waste,monthCache){
         var decision=root.InsightTripHistoryResolver.resolveDate(snapshot,storeId,item.id,date,{monthCache:monthCache});
-        var card=createReadOnlyDayCard(date,counts,item,waste,decision.mask,{snapshot:snapshot,storeId:storeId});
+        var card=createReadOnlyDayCard(date,counts,item,waste,decision.mask,{snapshot:snapshot,storeId:storeId,forPrint:true});
         var day=card.querySelector('.sc-day-num');
         day.textContent=date.slice(0,4)+'/'+day.textContent;
         card.querySelectorAll('.sc-trip').forEach(function(row,index){
