@@ -545,12 +545,17 @@ test('カード印刷は店舗と期間とカテゴリーを絞り込み保存�
       const name=getComputedStyle(sheet).getPropertyValue('page');
       const style=[...document.styleSheets].find(item=>item.href?.includes('/insight_payload_core_v1.css?'));
       const pageRule=[...style.cssRules].find(rule=>rule.type===CSSRule.PAGE_RULE&&rule.selectorText===name);
+      const headers=[...sheet.querySelector('.sc-col-head').children];
+      const values=[...sheet.querySelector('.sc-delivery-row').querySelectorAll('.sc-print-value')];
       const number=sheet.querySelector('.sc-delivery-row .sc-print-value');
       const digitRange=document.createRange();
       digitRange.selectNodeContents(number);
       return {
         name,size:pageRule?.style.getPropertyValue('size'),margin:pageRule?.style.getPropertyValue('margin'),
         columns:getComputedStyle(rows[0]).gridTemplateColumns.split(' ').length,
+        tripLabels:headers.map(header=>header.textContent),
+        aligned:headers.length===values.length&&headers.every((header,index)=>
+          Math.abs(header.getBoundingClientRect().left-values[index].getBoundingClientRect().left)<1),
         categoryStarts:sections.map(section=>getComputedStyle(section).breakBefore),
         keepRows:rows.every(row=>getComputedStyle(row).breakInside==='avoid'),
         keepHeadings:[...sheet.querySelectorAll('.sc-print-start')].every(group=>
@@ -560,7 +565,8 @@ test('カード印刷は店舗と期間とカテゴリーを絞り込み保存�
       };
     });
     expect(printLayout).toMatchObject({
-      name:pageName,size,margin:'10mm',columns:5,categoryStarts:['auto','auto'],keepRows:true,keepHeadings:true,wrapped:false,fits:true
+      name:pageName,size,margin:'10mm',columns:5,categoryStarts:['auto','auto'],keepRows:true,keepHeadings:true,
+      tripLabels:['1便','2便','3便'],aligned:true,wrapped:false,fits:true
     });
     await expect(page.locator('#app')).toBeHidden();
     await checkPDFPages(1);

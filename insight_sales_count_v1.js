@@ -843,7 +843,6 @@
         var card=createReadOnlyDayCard(date,counts,item,waste,decision.mask,{snapshot:snapshot,storeId:storeId});
         var day=card.querySelector('.sc-day-num');
         day.textContent=date.slice(0,4)+'/'+day.textContent;
-        card.querySelector('.sc-col-head').prepend(el('span','区分'));
         card.querySelectorAll('.sc-trip').forEach(function(row,index){
           row.prepend(el('span',metrics[index],'sc-print-label'));
           row.querySelectorAll('input').forEach(function(input){

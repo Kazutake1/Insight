@@ -3994,6 +3994,8 @@ httpsTest('Draft Index rehearses migration, editing and recovery at the release 
   await expect(printSheet).toHaveClass(/sc-print-b5/);
   await expect(printSheet.locator('.sc-print-start > h2')).toHaveText(['架空店舗A ／ おにぎり','架空店舗A ／ サンドイッチ']);
   await expect(printSheet.locator('.sc-day-num')).toHaveText([/^2026\/11\/23/,/^2026\/11\/23/]);
+  await expect(printSheet.locator('.sc-col-head').first().locator('span')).toHaveText(['1便','2便','3便']);
+  expect(await printSheet.locator('.sc-col-head span').first().evaluate(span=>getComputedStyle(span).gridColumnStart)).toBe('2');
   expect(await printSheet.locator('.sc-print-row').evaluateAll(rows=>
     rows.map(row=>getComputedStyle(row).gridTemplateColumns.split(' ').length))).toEqual([5,5]);
   await expect(printSheet.locator('.sc-print-category').nth(1).locator('.sc-delivery-row .sc-print-value').first()).toHaveText('6');
