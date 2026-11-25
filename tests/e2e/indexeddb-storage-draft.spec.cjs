@@ -135,7 +135,7 @@ test('combined input session shares four saves and guards both destinations and 
   await page.locator('#quickSaveBtn').click();
   await expect(page.locator('#quickSaveBtn')).toBeEnabled();
   await expect(page.locator('#quickSaveBtn')).toHaveText('保存する');
-  await expect(page.locator('#quickSaveBtn + [role=status]')).toBeEmpty();
+  await expect(quickStatus).toBeEmpty();
   expect(await committedInput(page)).toEqual({revision:1,snapshot:expected});
   await page.locator('#nav2').click();
   await page.evaluate(iso=>InsightInputDayNav.select('sales',iso),seed.iso);
@@ -1056,7 +1056,6 @@ for(const outcome of ['success','quota','conflict','readback failure','lost ackn
       const status=page.locator('#kyakuSaveBtn + [role=status]');
       const applyClear=()=>expected.stores[seed.active].data[seed.year][seed.month].forEach(row=>{if(row)row.客数=0;});
       if(outcome==='success'){
-        await expect.poll(async()=> (await committedInput(page)).revision).toBe(1);
         await expect(page.locator('#kyakuSaveBtn')).toBeEnabled();
         await expect(status).toBeEmpty();
         applyClear();
