@@ -6,7 +6,7 @@ test.beforeEach(async({page})=>{
     if(!location.pathname.endsWith('-fixture'))return;
     window.__INSIGHT_SHELL_VERSION__=build;
     window.__INSIGHT_FEATURE_SIGNATURE__=features;
-  },{build:'20261125-sales-cards-print-build-128',features:'6becf157'});
+  },{build:'20261125-sales-cards-print-build-129',features:'800397a6'});
   await page.route(/https:\/\/(www\.jma\.go\.jp|[^/]*api\.open-meteo\.com)\//,route=>route.abort());
 });
 // The fixture server uses HTTP; keep the rest of the shell's CSP in effect.
@@ -3104,8 +3104,8 @@ test('a fully restarted browser keeps the adopted revision and holds the legacy 
       const page=context.pages()[0]??await context.newPage();
       await page.goto(url);
       await page.evaluate(()=>{
-        window.__INSIGHT_SHELL_VERSION__='20261125-sales-cards-print-build-128';
-        window.__INSIGHT_FEATURE_SIGNATURE__='6becf157';
+        window.__INSIGHT_SHELL_VERSION__='20261125-sales-cards-print-build-129';
+        window.__INSIGHT_FEATURE_SIGNATURE__='800397a6';
       });
       await page.addScriptTag({url:new URL('/insight_indexeddb_storage_v1.js',url).href});
       return {context,page};
@@ -3141,7 +3141,7 @@ async function openLegacyPwaFixture(page){
     contentType:'text/html',body:'<!doctype html><title>Fictional online migration page</title>'
   }));
   await page.route('**/tests/e2e/fixtures/Index.html?insight_migration_probe=*',route=>route.fulfill({
-    contentType:'text/html',body:'<!doctype html><meta name="insight-shell-version" content="20261125-sales-cards-print-build-128">'
+    contentType:'text/html',body:'<!doctype html><meta name="insight-shell-version" content="20261125-sales-cards-print-build-129">'
   }));
   await page.goto(legacyPwaFixture);
   await page.addScriptTag({url:'/insight_indexeddb_storage_v1.js'});
@@ -3366,7 +3366,7 @@ test('cached legacy shell runs with its origin unavailable and adopted startup s
 });
 
 test('migration enforces the pinned environment before and after backup confirmation',async({page})=>{
-  const fixture='/forced-migration-gate-fixture',build='20261125-sales-cards-print-build-128';
+  const fixture='/forced-migration-gate-fixture',build='20261125-sales-cards-print-build-129';
   await page.route('**'+fixture,route=>route.fulfill({
     contentType:'text/html',body:'<!doctype html><title>Fictional forced migration fixture</title>'
   }));
@@ -3855,9 +3855,10 @@ httpsTest('Draft Index rehearses migration, editing and recovery at the release 
     store.weatherLocation={name:'稲沢市',admin1:'愛知県',latitude:35.25,longitude:136.8};
     const {fy,month,day}=todayFY();
     Object.assign(store.data[fy][month][day-1],{売上:123,客数:10,weather:'晴'});
-    store.salesCounts={'2026-11-23':{cat_onigiri:{
-      trips:[{delivery:12,sales:9},{delivery:null,sales:null},{delivery:null,sales:null}]
-    }}};
+    store.salesCounts={'2026-11-23':{
+      cat_onigiri:{trips:[{delivery:12,sales:9},{delivery:null,sales:null},{delivery:null,sales:null}]},
+      cat_sandwich:{trips:[{delivery:6,sales:3},{delivery:null,sales:null},{delivery:null,sales:null}]}
+    }};
     allStores.stores['fixture-peer']={...structuredClone(store),name:'架空店舗B'};
     allStores.stores['fixture-peer'].data[fy][month][day-1].売上=999;
     return {raw:InsightStorage.writeSnapshot(allStores),fy,month,day,id:allStores.current};
@@ -3964,14 +3965,16 @@ httpsTest('Draft Index rehearses migration, editing and recovery at the release 
       const layout=await printDialog.evaluate(dialog=>{
         const bounds=dialog.getBoundingClientRect(),fields=dialog.querySelector('.sc-print-fields');
         const actions=dialog.querySelector('.sc-print-actions'),style=getComputedStyle(dialog);
+        const categories=dialog.querySelector('.sc-print-categories');
         const labels=Array.from(fields.querySelectorAll('label'),node=>node.getBoundingClientRect());
-        const controls=[...dialog.querySelectorAll('input,select,button')];
+        const controls=[...dialog.querySelectorAll('.sc-print-fields input,select,button,.sc-print-category-options label')];
         return {
           offset:Math.max(Math.abs(bounds.left+bounds.width/2-innerWidth/2),
             Math.abs(bounds.top+bounds.height/2-innerHeight/2)),
           fits:bounds.width<innerWidth&&bounds.height<innerHeight&&dialog.scrollWidth===dialog.clientWidth,
           spacing:labels.slice(1).every((label,i)=>label.left-labels[i].right>=8)&&
-            actions.getBoundingClientRect().top-fields.getBoundingClientRect().bottom>=8,
+            categories.getBoundingClientRect().top-fields.getBoundingClientRect().bottom>=8&&
+            actions.getBoundingClientRect().top-categories.getBoundingClientRect().bottom>=8,
           touch:controls.every(node=>node.getBoundingClientRect().height>=44),
           readable:style.color!==style.backgroundColor
         };
@@ -3983,8 +3986,17 @@ httpsTest('Draft Index rehearses migration, editing and recovery at the release 
   await checkPrintLayout();
   await printDialog.getByLabel('開始日').fill('2026-11-23');
   await printDialog.getByLabel('終了日').fill('2026-11-23');
-  await printDialog.getByLabel('カテゴリー').selectOption('cat_onigiri');
+  await expect(printDialog.getByRole('checkbox',{name:'おにぎり'})).toBeChecked();
+  await printDialog.getByRole('checkbox',{name:'サンドイッチ'}).check();
+  await printDialog.getByLabel('用紙').selectOption('b5');
   await printDialog.getByRole('button',{name:'プレビュー'}).click();
+  const printSheet=printDialog.locator('.sc-print-sheet');
+  await expect(printSheet).toHaveClass(/sc-print-b5/);
+  await expect(printSheet.locator('.sc-print-category > :not(.sc-print-row)')).toHaveText(['架空店舗A ／ おにぎり','架空店舗A ／ サンドイッチ']);
+  await expect(printSheet.locator('.sc-day-num')).toHaveText([/^2026\/11\/23/,/^2026\/11\/23/]);
+  expect(await printSheet.locator('.sc-print-row').evaluateAll(rows=>
+    rows.map(row=>getComputedStyle(row).gridTemplateColumns.split(' ').length))).toEqual([5,5]);
+  await expect(printSheet.locator('.sc-print-category').nth(1).locator('.sc-delivery-row .sc-print-value').first()).toHaveText('6');
   await expect(printDialog.locator('.sc-delivery-row .sc-print-value').first()).toHaveText('12');
   await expect(printDialog.locator('.sc-sales-row .sc-print-value').first()).toHaveText('9');
   await checkPrintLayout();

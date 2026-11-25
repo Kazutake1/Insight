@@ -404,7 +404,11 @@ test('カード印刷は店舗と期間とカテゴリーを絞り込み保存�
     store.name='架空店舗A';
     store.salesCounts={
       '2026-01-30':{cat_onigiri:record(66)},
-      '2026-01-31':{cat_onigiri:record(12),cat_sandwich:record(77)}
+      '2026-01-31':{cat_onigiri:record(1234),cat_sandwich:record(77)},
+      '2026-02-02':{cat_onigiri:record(21),cat_noodles:record(55)},
+      '2026-02-03':{cat_onigiri:record(22)},
+      '2026-02-04':{cat_onigiri:record(23)},
+      '2026-02-05':{cat_onigiri:record(24)}
     };
     store.wasteCounts={'2026-02-01':{cat_onigiri:{trips:[0,null,null]}}};
     allStores.stores['fixture-peer']={...structuredClone(store),name:'架空店舗B',
@@ -417,37 +421,114 @@ test('カード印刷は店舗と期間とカテゴリーを絞り込み保存�
   await draft.fill('99');
   await page.getByRole('button',{name:'カードを印刷'}).click();
   const dialog=page.getByRole('dialog',{name:'納品・販売・廃棄カード'});
-  const from=dialog.getByLabel('開始日'),to=dialog.getByLabel('終了日'),category=dialog.getByLabel('カテゴリー');
+  const from=dialog.getByLabel('開始日'),to=dialog.getByLabel('終了日'),paper=dialog.getByLabel('用紙');
+  const onigiri=dialog.getByRole('checkbox',{name:'おにぎり'});
+  const sandwich=dialog.getByRole('checkbox',{name:'サンドイッチ'});
+  const noodles=dialog.getByRole('checkbox',{name:'麺類'});
   const preview=dialog.getByRole('button',{name:'プレビュー'}),print=dialog.getByRole('button',{name:'印刷',exact:true});
+  await expect(paper).toHaveValue('a4');
+  await expect(onigiri).toBeChecked();
+  await expect(sandwich).not.toBeChecked();
+  await expect(dialog.getByText('1件選択',{exact:true})).toBeVisible();
+  await dialog.getByRole('button',{name:'全選択'}).click();
+  await expect(dialog.getByText('3件選択',{exact:true})).toBeVisible();
+  await expect(dialog.getByRole('checkbox',{checked:true})).toHaveCount(3);
+  await dialog.getByRole('button',{name:'全解除'}).click();
+  await expect(dialog.getByText('0件選択',{exact:true})).toBeVisible();
+  await expect(preview).toBeDisabled();
+  await expect(print).toBeDisabled();
+  await onigiri.check();
   await from.fill('2026-01-31');
   await to.fill('2026-01-30');
   await preview.click();
   await expect(dialog.getByRole('status')).toHaveText('終了日を開始日以降に設定してください。');
   await expect(print).toBeDisabled();
 
-  await to.fill('2026-02-01');
-  await category.selectOption('cat_onigiri');
+  await to.fill('2026-02-05');
   await preview.click();
   const sheet=dialog.locator('.sc-print-sheet'),cards=sheet.locator('.sc-day');
-  await expect(sheet).toContainText('架空店舗A ／ おにぎり');
-  await expect(cards.locator('.sc-day-num')).toHaveText([/^2026\/1\/31/,/^2026\/2\/1/]);
-  await expect(cards.nth(0).locator('.sc-delivery-row .sc-print-value').first()).toHaveText('12');
+  await expect(sheet.locator('.sc-print-category > :not(.sc-print-row)')).toHaveText(['架空店舗A ／ おにぎり']);
+  await expect(cards.locator('.sc-day-num')).toHaveText([
+    /^2026\/1\/31/,/^2026\/2\/1/,/^2026\/2\/2/,/^2026\/2\/3/,/^2026\/2\/4/,/^2026\/2\/5/
+  ]);
+  const rows=sheet.locator('.sc-print-row');
+  await expect(rows.first().locator('.sc-day')).toHaveCount(5);
+  await expect(rows.last().locator('.sc-day')).toHaveCount(1);
+  expect(await rows.first().evaluate(row=>getComputedStyle(row).gridTemplateColumns.split(' ').length)).toBe(5);
+  await expect(cards.nth(0).locator('.sc-delivery-row .sc-print-value').first()).toHaveText('1234');
   await expect(cards.nth(0).locator('.sc-sales-row .sc-print-value').first()).toHaveText('0');
   await expect(cards.nth(1).locator('.sc-waste-row .sc-print-value').first()).toHaveText('0');
-  await expect(sheet).not.toContainText(/66|77|88|99/);
+  await expect(sheet).not.toContainText(/55|66|77|88|99/);
+  await sandwich.check();
+  await expect(print).toBeDisabled();
+  await expect(sheet).toHaveCount(0);
+  await preview.click();
+  const sections=sheet.locator('.sc-print-category');
+  await expect(sections.locator('h2')).toHaveText(['架空店舗A ／ おにぎり','架空店舗A ／ サンドイッチ']);
+  await expect(sections.nth(0).locator('.sc-day')).toHaveCount(6);
+  await expect(sections.nth(1).locator('.sc-day-num')).toHaveText(/^2026\/1\/31/);
+  await expect(sections.nth(1).locator('.sc-delivery-row .sc-print-value').first()).toHaveText('77');
+  await expect(sections.nth(1)).not.toContainText('1234');
 
   await page.evaluate(()=>{window.print=()=>{window.fixturePrintCalled=true;};});
-  await print.click();
-  expect(await page.evaluate(()=>window.fixturePrintCalled)).toBe(true);
-  await page.emulateMedia({media:'print'});
-  await expect(page.locator('#scPrintSheet .sc-day')).toHaveCount(2);
-  await expect(page.locator('#scPrintSheet')).toBeVisible();
-  await expect(page.locator('#app')).toBeHidden();
-  await page.evaluate(()=>window.dispatchEvent(new Event('afterprint')));
-  await expect(page.locator('#scPrintSheet')).toHaveCount(0);
-  await page.emulateMedia({media:'screen'});
+  const originalViewport=page.viewportSize();
+  const a4PreviewWidth=await sheet.evaluate(node=>node.getBoundingClientRect().width);
+  for(const {value,width,pageName,size} of [
+    {value:'a4',width:718,pageName:'insightSalesCards',size:/^a4 portrait$/i},
+    {value:'b5',width:612,pageName:'insightSalesCardsB5',size:/^182mm 257mm$/i}
+  ]){
+    if(value==='b5'){
+      await paper.selectOption(value);
+      await expect(print).toBeDisabled();
+      await preview.click();
+      const b5PreviewWidth=await sheet.evaluate(node=>node.getBoundingClientRect().width);
+      expect(b5PreviewWidth).toBeLessThan(a4PreviewWidth);
+      expect(await rows.first().evaluate(row=>getComputedStyle(row).gridTemplateColumns.split(' ').length)).toBe(5);
+    }
+    await print.click();
+    expect(await page.evaluate(()=>window.fixturePrintCalled)).toBe(true);
+    // A4 and JIS B5 with 10mm side margins, in CSS pixels.
+    await page.setViewportSize({width,height:1046});
+    await page.emulateMedia({media:'print'});
+    const printed=page.locator('#scPrintSheet');
+    await expect(printed.locator('.sc-day')).toHaveCount(7);
+    await expect(printed).toBeVisible();
+    const printLayout=await printed.evaluate(sheet=>{
+      const rows=[...sheet.querySelectorAll('.sc-print-row')];
+      const sections=[...sheet.querySelectorAll('.sc-print-category')];
+      const name=getComputedStyle(sheet).getPropertyValue('page');
+      const style=[...document.styleSheets].find(item=>item.href?.includes('/insight_payload_core_v1.css?'));
+      const pageRule=[...style.cssRules].find(rule=>rule.type===CSSRule.PAGE_RULE&&rule.selectorText===name);
+      const number=sheet.querySelector('.sc-delivery-row .sc-print-value');
+      const digitRange=document.createRange();
+      digitRange.selectNodeContents(number);
+      return {
+        name,size:pageRule?.style.getPropertyValue('size'),margin:pageRule?.style.getPropertyValue('margin'),
+        columns:getComputedStyle(rows[0]).gridTemplateColumns.split(' ').length,
+        categoryStarts:sections.map(section=>getComputedStyle(section).breakBefore),
+        keepRows:rows.every(row=>getComputedStyle(row).breakInside==='avoid'),
+        wrapped:digitRange.getClientRects().length!==1,
+        fits:sheet.scrollWidth<=sheet.clientWidth
+      };
+    });
+    expect(printLayout).toMatchObject({
+      name:pageName,size,margin:'10mm',columns:5,categoryStarts:['auto','page'],keepRows:true,wrapped:false,fits:true
+    });
+    await expect(page.locator('#app')).toBeHidden();
+    await page.evaluate(()=>{window.fixturePrintCalled=false;window.dispatchEvent(new Event('afterprint'));});
+    await expect(printed).toHaveCount(0);
+    await page.emulateMedia({media:'screen'});
+    await page.setViewportSize(originalViewport);
+  }
 
-  await category.selectOption('cat_noodles');
+  // Contiguous print groups omit selected categories with no cards in the period.
+  await to.fill('2026-02-01');
+  await noodles.check();
+  await preview.click();
+  await expect(sections.locator('h2')).toHaveText(['架空店舗A ／ おにぎり','架空店舗A ／ サンドイッチ']);
+  await expect(dialog.getByRole('status')).toHaveText('保存済みのカードがあるカテゴリーを表示しています。');
+  await from.fill('2026-02-06');
+  await to.fill('2026-02-06');
   await expect(print).toBeDisabled();
   await preview.click();
   await expect(dialog.getByRole('status')).toHaveText('選択した期間に保存済みのカードはありません。');
