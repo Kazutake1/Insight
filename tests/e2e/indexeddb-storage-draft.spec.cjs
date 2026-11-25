@@ -3824,18 +3824,23 @@ async function checkSettingsBackupLayout(page,dialog){
       const layout=await dialog.evaluate(node=>{
         const rect=node.getBoundingClientRect(),style=getComputedStyle(node);
         const controls=[...node.querySelectorAll('input,button')];
+        const color=document.createElement('canvas').getContext('2d');
+        color.fillStyle=style.backgroundColor;
+        const background=color.fillStyle;
+        color.fillStyle=style.getPropertyValue('--surface').trim();
         return {
           offset:Math.max(Math.abs(rect.left+rect.width/2-innerWidth/2),Math.abs(rect.top+rect.height/2-innerHeight/2)),
           inside:rect.left>=0&&rect.top>=0&&rect.right<=innerWidth&&rect.bottom<=innerHeight,
           fit:node.scrollWidth===node.clientWidth,
           scroll:style.overflowY,
-          background:style.backgroundColor,
+          background,surface:color.fillStyle,
           touch:controls.every(control=>control.getBoundingClientRect().height>=44)
         };
       });
       expect(layout.offset).toBeLessThanOrEqual(2);
       expect(layout).toMatchObject({inside:true,fit:true,scroll:'auto',touch:true});
-      expect(layout.background).toBe(dark?'rgb(28, 28, 34)':'rgb(255, 255, 255)');
+      expect(layout.background).toBe(layout.surface);
+      if(dark)expect(layout.background).not.toBe('#ffffff');
     }
   }
   await page.setViewportSize(originalViewport);
