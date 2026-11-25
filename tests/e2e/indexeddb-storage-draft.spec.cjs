@@ -6,7 +6,7 @@ test.beforeEach(async({page})=>{
     if(!location.pathname.endsWith('-fixture'))return;
     window.__INSIGHT_SHELL_VERSION__=build;
     window.__INSIGHT_FEATURE_SIGNATURE__=features;
-  },{build:'20261125-prediction-health-build-131',features:'c1a11fbd'});
+  },{build:'20261125-input-backup-build-132',features:'77aa1e50'});
   await page.route(/https:\/\/(www\.jma\.go\.jp|[^/]*api\.open-meteo\.com)\//,route=>route.abort());
 });
 // The fixture server uses HTTP; keep the rest of the shell's CSP in effect.
@@ -3118,8 +3118,8 @@ test('a fully restarted browser keeps the adopted revision and holds the legacy 
       const page=context.pages()[0]??await context.newPage();
       await page.goto(url);
       await page.evaluate(()=>{
-        window.__INSIGHT_SHELL_VERSION__='20261125-prediction-health-build-131';
-        window.__INSIGHT_FEATURE_SIGNATURE__='c1a11fbd';
+        window.__INSIGHT_SHELL_VERSION__='20261125-input-backup-build-132';
+        window.__INSIGHT_FEATURE_SIGNATURE__='77aa1e50';
       });
       await page.addScriptTag({url:new URL('/insight_indexeddb_storage_v1.js',url).href});
       return {context,page};
@@ -3155,7 +3155,7 @@ async function openLegacyPwaFixture(page){
     contentType:'text/html',body:'<!doctype html><title>Fictional online migration page</title>'
   }));
   await page.route('**/tests/e2e/fixtures/Index.html?insight_migration_probe=*',route=>route.fulfill({
-    contentType:'text/html',body:'<!doctype html><meta name="insight-shell-version" content="20261125-prediction-health-build-131">'
+    contentType:'text/html',body:'<!doctype html><meta name="insight-shell-version" content="20261125-input-backup-build-132">'
   }));
   await page.goto(legacyPwaFixture);
   await page.addScriptTag({url:'/insight_indexeddb_storage_v1.js'});
@@ -3380,7 +3380,7 @@ test('cached legacy shell runs with its origin unavailable and adopted startup s
 });
 
 test('migration enforces the pinned environment before and after backup confirmation',async({page})=>{
-  const fixture='/forced-migration-gate-fixture',build='20261125-prediction-health-build-131';
+  const fixture='/forced-migration-gate-fixture',build='20261125-input-backup-build-132';
   await page.route('**'+fixture,route=>route.fulfill({
     contentType:'text/html',body:'<!doctype html><title>Fictional forced migration fixture</title>'
   }));
@@ -3771,7 +3771,7 @@ for(const connectionFails of [false,true]){
       window.InsightHourlyCustomers={connectIndexedDBPreview(){}};
       window.shellReadyState=document.readyState;
       window.lateSnapshot=InsightIndexedDBCandidateV1.initializeAdopted();`}));
-    await page.route(/\/insight_indexeddb_(quick_input|sales_input|recovery)_preview_v1\.js\?v=20261125-prediction-health-1$/,route=>route.fulfill({
+    await page.route(/\/insight_indexeddb_(quick_input|sales_input|recovery)_preview_v1\.js\?v=20261125-input-backup-1$/,route=>route.fulfill({
       contentType:'application/javascript',
       body:new URL(route.request().url()).pathname.endsWith('/insight_indexeddb_sales_input_preview_v1.js')
         ?`window.InsightIndexedDBSalesInputPreviewV1={async connect(){
@@ -3815,6 +3815,34 @@ const httpsTest=test.extend({
   hasTouch:true,
   httpsInsight:async ({},use)=>require('./helpers/https-insight.cjs')(use)
 });
+async function checkSettingsBackupLayout(page,dialog){
+  const originalViewport=page.viewportSize();
+  const originalDark=await page.evaluate(()=>document.documentElement.classList.contains('dark'));
+  for(const viewport of [{width:1194,height:834},{width:834,height:1194},{width:390,height:320}]){
+    await page.setViewportSize(viewport);
+    for(const dark of [false,true]){
+      await page.evaluate(value=>document.documentElement.classList.toggle('dark',value),dark);
+      const layout=await dialog.evaluate(node=>{
+        const rect=node.getBoundingClientRect(),style=getComputedStyle(node);
+        const controls=[...node.querySelectorAll('input,button')];
+        return {
+          offset:Math.max(Math.abs(rect.left+rect.width/2-innerWidth/2),Math.abs(rect.top+rect.height/2-innerHeight/2)),
+          inside:rect.left>=0&&rect.top>=0&&rect.right<=innerWidth&&rect.bottom<=innerHeight,
+          fit:node.scrollWidth===node.clientWidth,
+          scroll:style.overflowY,
+          background:style.backgroundColor,
+          touch:controls.every(control=>control.getBoundingClientRect().height>=44)
+        };
+      });
+      expect(layout.offset).toBeLessThanOrEqual(2);
+      expect(layout).toMatchObject({inside:true,fit:true,scroll:'auto',touch:true});
+      expect(layout.background).toBe(dark?'rgb(28, 28, 34)':'rgb(255, 255, 255)');
+    }
+  }
+  await page.setViewportSize(originalViewport);
+  await page.evaluate(value=>document.documentElement.classList.toggle('dark',value),originalDark);
+}
+
 httpsTest('Draft Index rehearses migration, editing and recovery at the release HTTPS URL',async({page,context,httpsInsight})=>{
   test.setTimeout(90000);
   await page.clock.setFixedTime(new Date('2026-11-23T03:00:00Z'));
@@ -3878,6 +3906,14 @@ httpsTest('Draft Index rehearses migration, editing and recovery at the release 
     return {raw:InsightStorage.writeSnapshot(allStores),fy,month,day,id:allStores.current};
   });
   const raw=seed.raw;
+  await page.locator('#navSettings').click();
+  await page.locator('#backupBtn').tap();
+  const legacyBackup=page.getByRole('dialog',{name:'バックアップ用パスワード'});
+  await expect(legacyBackup).toBeVisible();
+  await checkSettingsBackupLayout(page,legacyBackup);
+  await page.keyboard.press('Escape');
+  await expect(legacyBackup).toBeHidden();
+  expect(await page.evaluate(()=>localStorage.getItem('insight_v11'))).toBe(raw);
   await page.goto(fixture);
   await expect(page.getByRole('status')).toHaveText('保存状態を確認できないため、起動と保存を停止しています。');
   await page.evaluate(raw=>localStorage.setItem('insight_v11',raw),raw);
@@ -4072,6 +4108,13 @@ httpsTest('Draft Index rehearses migration, editing and recovery at the release 
   expect(await committedInput(page)).toEqual(beforeRestore);
   await page.locator('#backupBtn').tap();
   const settings=page.locator('#insightIndexedDBBackupDialog');
+  await expect(settings).toBeVisible();
+  await checkSettingsBackupLayout(page,settings);
+  await settings.getByLabel('バックアップ用パスワード').fill(password);
+  await settings.getByLabel('パスワードの確認').fill('Mismatch123');
+  await settings.getByRole('button',{name:'暗号化してダウンロード'}).click();
+  await expect(settings.getByRole('status')).toHaveText('パスワードが一致しません。');
+  expect(await committedInput(page)).toEqual(beforeRestore);
   await settings.getByLabel('バックアップ用パスワード').fill(password);
   await settings.getByLabel('パスワードの確認').fill(password);
   const [exported]=await Promise.all([page.waitForEvent('download'),
@@ -4080,6 +4123,7 @@ httpsTest('Draft Index rehearses migration, editing and recovery at the release 
   await expect(settings.getByRole('status')).toContainText('確定版 3');
   await settings.getByRole('button',{name:'閉じる'}).click();
   await page.locator('#restoreBtn').tap();
+  await expect(settings).not.toHaveClass(/insight-backup-export/);
   await settings.getByLabel('復元する暗号化バックアップ',{exact:true}).setInputFiles(file);
   const restoreSafetyFile=settings.getByLabel('現在の確定版の暗号化バックアップ',{exact:true});
   await expect(restoreSafetyFile).toHaveAttribute('required','');

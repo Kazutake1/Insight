@@ -203,7 +203,7 @@ function ensureBackupContinuing(operation,state){
   if(operation.cancelled)throw cancelledBackup();
   assertBackupState(state);
 }
-function backupBusy(message,operation){window.InsightBackupPasswordV1.busy(message,function(){operation.cancelled=true;});}
+function backupBusy(message,operation){window.InsightBackupPasswordV1.busy(message,function(){operation.cancelled=true;},operation.settingsBackup);}
 async function confirmBackupDownload(filename,kind,operation,state){
   var bytes=new Uint8Array(16);window.crypto.getRandomValues(bytes);
   var id=Array.from(bytes,function(n){return n.toString(16).padStart(2,'0');}).join('');
@@ -211,7 +211,7 @@ async function confirmBackupDownload(filename,kind,operation,state){
   var raw=JSON.stringify(record);
   window.InsightStorage.writeMetadata(DOWNLOAD_KEY,raw);
   if(typeof updateBackupDaysLabel==='function')updateBackupDaysLabel();
-  if(await window.InsightBackupPasswordV1.confirmSaved({filename:filename,kind:kind})!==true)throw cancelledBackup();
+  if(await window.InsightBackupPasswordV1.confirmSaved({filename:filename,kind:kind,settingsBackup:operation.settingsBackup})!==true)throw cancelledBackup();
   ensureBackupContinuing(operation,state);
   // Another tab may have initiated a newer download while this modal waited.
   // Never confirm its file, or replace an existing confirmation on its behalf.
@@ -222,7 +222,7 @@ async function confirmBackupDownload(filename,kind,operation,state){
 }
 async function backupPassword(title,confirmPassword,operation){
   cryptoCodec();
-  var password=await window.InsightBackupPasswordV1.request({title:title,confirm:confirmPassword});
+  var password=await window.InsightBackupPasswordV1.request({title:title,confirm:confirmPassword,settingsBackup:operation.settingsBackup});
   if(password===null||operation.cancelled)throw cancelledBackup();
   return password;
 }
@@ -477,7 +477,7 @@ async function downloadConfirmedBackup(snapshot,title,filename,operation,state,n
 async function encryptedBackupData(){
   if(backupOperationActive||restoreFileReaderActive){alert('別のバックアップ・復元処理が進行中です。');return;}
   backupOperationActive=true;
-  var operation={cancelled:false};
+  var operation={cancelled:false,settingsBackup:true};
   try{
     cryptoCodec();
     var state=captureBackupState();
