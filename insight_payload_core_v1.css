@@ -1642,6 +1642,10 @@ body.ai-analysis-open #main{margin-right:0!important}
 .sc-print-row{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:6px;margin-top:8px}
 .sc-print-sheet .sc-day{min-width:0;min-height:0;height:auto;padding:5px;border:1px solid #aaa;border-radius:5px;background:#fff;color:#111;box-shadow:none}
 .sc-print-sheet .sc-day-num,.sc-print-sheet .sc-col-head,.sc-print-sheet .sc-totals b{color:#111}
+.sc-print-sheet .sc-day.sat-card{--sc-print-day-color:#1d4ed8}
+.sc-print-sheet .sc-day.sun-card{--sc-print-day-color:#b91c1c}
+.sc-print-sheet .sc-day:is(.sat-card,.sun-card){border-color:var(--sc-print-day-color)}
+.sc-print-sheet .sc-day:is(.sat-card,.sun-card) .sc-day-title :is(.sc-day-num,small){color:var(--sc-print-day-color)}
 .sc-print-sheet .sc-day-title{flex-wrap:wrap;gap:2px}
 .sc-print-sheet .sc-day-num{font-size:11px;white-space:nowrap}
 .sc-print-sheet .sc-day-title small{font-size:9px;white-space:nowrap}

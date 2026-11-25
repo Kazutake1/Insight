@@ -52,7 +52,7 @@ var orderedFeatureLoads=[
   './insight_weather_temperature_auto_v1.js?v=20261020-weather-fetch-stale-guard-1',
   './insight_weather_location_v1.js?v=20261030-step4-gate3-ab-1',
   './insight_input_weather_temp_v1.js?v=20261019-input-temperature-trunc-1',
-  './insight_sales_count_v1.js?v=20261125-input-backup-1',
+  './insight_sales_count_v1.js?v=20261125-print-weekday-1',
   './insight_numeric_caret_v1.js?v=20261018-caret-end-1',
   './insight_trip_inference_v1.js?v=20261011-month-infer-1',
   './insight_trip_overrides_v1.js?v=20261011-trip-manual-1',
@@ -104,7 +104,7 @@ function featureSignature(entries){
 var currentFeatureSignature=featureSignature(orderedFeatureLoads);
 window.__INSIGHT_FEATURE_SIGNATURE__=currentFeatureSignature;
 function loadShell(){
-return fetch('./insight_payload_source_v1.html?v=20261125-input-backup-1',{cache:'no-store'}).then(function(r){if(!r.ok)throw new Error('Insight payload の取得に失敗しました ('+r.status+')');return r.text();}).then(function(html){
+return fetch('./insight_payload_source_v1.html?v=20261125-print-weekday-1',{cache:'no-store'}).then(function(r){if(!r.ok)throw new Error('Insight payload の取得に失敗しました ('+r.status+')');return r.text();}).then(function(html){
 if(html.indexOf('<!DOCTYPE html>')!==0&&html.indexOf('<!doctype html>')!==0)throw new Error('HTMLデータの検証に失敗しました');
 // STEP5 complete: payload source is self-contained; feature modules are inserted before document.write().
 
@@ -147,7 +147,7 @@ async function start(){
   if(!workers||workers.controller||await workers.getRegistration(location.href))
     throw new Error('旧版のキャッシュ状態を確認できないため、起動と保存を停止しています。');
   await Promise.all([
-    import('./insight_indexeddb_storage_v1.js?v=20261125-input-backup-1'),
+    import('./insight_indexeddb_storage_v1.js?v=20261125-print-weekday-1'),
     import('./insight_indexeddb_migration_preview_v1.js?v=20261124-indexeddb-step3-1'),
     import('./draft/insight_indexeddb_candidate_v1.js?v=20261125-input-backup-1')
   ]);

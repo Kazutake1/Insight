@@ -1,4 +1,5 @@
 const {test,expect}=require('@playwright/test');
+const {inflateSync}=require('node:zlib');
 
 test('販売数入力の納品・販売・廃棄欄は先頭のゼロを除去し保存後も数値を維持する',async({page})=>{
   const errors=[];
@@ -403,6 +404,7 @@ test('カード印刷は店舗と期間とカテゴリーを絞り込み保存�
     const record=n=>({trips:[{delivery:n,sales:0},{delivery:null,sales:null},{delivery:null,sales:null}]});
     store.name='架空店舗A';
     store.salesCounts={
+      '2021-03-20':{cat_onigiri:record(31)},
       '2026-01-30':{cat_onigiri:record(66)},
       '2026-01-31':{cat_onigiri:record(1234),cat_sandwich:record(77)},
       '2026-02-02':{cat_onigiri:record(21),cat_noodles:record(55)},
@@ -477,6 +479,21 @@ test('カード印刷は店舗と期間とカテゴリーを絞り込み保存�
   await page.evaluate(()=>{window.print=()=>{window.fixturePrintCalled=true;};});
   const originalViewport=page.viewportSize();
   const printed=page.locator('#scPrintSheet');
+  async function checkCardColors(container,expected){
+    const days=await container.locator('.sc-day').evaluateAll(cards=>Object.fromEntries(cards.map(card=>{
+      const title=card.querySelector('.sc-day-num');
+      const style=getComputedStyle(card);
+      return [title.textContent.split('（')[0],[
+        getComputedStyle(title).color,...['Top','Right','Bottom','Left'].map(side=>style['border'+side+'Color']),
+        style.backgroundColor,getComputedStyle(card.querySelector('.sc-print-value')).color
+      ]];
+    })));
+    for(const [date,ink,border] of expected){
+      expect(days[date],date).toEqual([ink,border,border,border,border,'rgb(255, 255, 255)','rgb(17, 17, 17)']);
+    }
+  }
+  const blue='rgb(29, 78, 216)',red='rgb(185, 28, 28)';
+  const shortColors=[['2026/1/31',blue,blue],['2026/2/1',red,red],['2026/2/2','rgb(17, 17, 17)','rgb(170, 170, 170)']];
   async function checkPDFPages(pageCount){
     // Link annotations locate the actual printed positions without depending on font encoding.
     // These markers are added to the isolated print copy only.
@@ -499,6 +516,16 @@ test('カード印刷は店舗と期間とカテゴリーを絞り込み保存�
     const pdf=(await page.pdf({preferCSSPageSize:true})).toString('latin1');
     const objects=new Map([...pdf.matchAll(/\b(\d+) 0 obj\s+([\s\S]*?)\s+endobj/g)].map(match=>[match[1],match[2]]));
     const pages=[...objects.values()].filter(object=>/\/Type\s*\/Page\b/.test(object));
+    const inks=new Set();
+    for(const object of objects.values()){
+      const compressed=object.match(/\/Filter\s*\/FlateDecode[^]*?stream\r?\n([^]*?)\r?\nendstream/);
+      if(!compressed)continue;
+      const operators=inflateSync(Buffer.from(compressed[1],'latin1')).toString('latin1');
+      for(const [,r,g,b] of operators.matchAll(/([\d.]+) ([\d.]+) ([\d.]+) (?:rg|RG)\b/g)){
+        inks.add([r,g,b].map(channel=>Math.round(Number(channel)*255)).join(','));
+      }
+    }
+    expect([...inks]).toEqual(expect.arrayContaining(['29,78,216','185,28,28']));
     if(pageCount===1)expect(pages).toHaveLength(1);
     else expect(pages.length).toBeGreaterThan(1);
     const markerPages=new Map();
@@ -532,6 +559,11 @@ test('カード印刷は店舗と期間とカテゴリーを絞り込み保存�
       expect(b5PreviewWidth).toBeLessThan(a4PreviewWidth);
       expect(await rows.first().evaluate(row=>getComputedStyle(row).gridTemplateColumns.split(' ').length)).toBe(5);
     }
+    for(const dark of [false,true]){
+      await page.evaluate(value=>document.documentElement.classList.toggle('dark',value),dark);
+      await checkCardColors(sheet,shortColors);
+    }
+    await page.evaluate(()=>document.documentElement.classList.remove('dark'));
     await print.click();
     expect(await page.evaluate(()=>window.fixturePrintCalled)).toBe(true);
     // A4 and JIS B5 with 10mm side margins, in CSS pixels.
@@ -569,6 +601,7 @@ test('カード印刷は店舗と期間とカテゴリーを絞り込み保存�
       tripLabels:['1便','2便','3便'],aligned:true,wrapped:false,fits:true
     });
     await expect(page.locator('#app')).toBeHidden();
+    await checkCardColors(printed,shortColors);
     await checkPDFPages(1);
     await page.evaluate(()=>{window.fixturePrintCalled=false;window.dispatchEvent(new Event('afterprint'));});
     await expect(printed).toHaveCount(0);
@@ -576,6 +609,7 @@ test('カード印刷は店舗と期間とカテゴリーを絞り込み保存�
     await page.setViewportSize(originalViewport);
   }
 
+  await from.fill('2021-03-20');
   await to.fill('2026-04-20');
   for(const value of ['a4','b5']){
     await paper.selectOption(value);
@@ -583,6 +617,7 @@ test('カード印刷は店舗と期間とカテゴリーを絞り込み保存�
     await print.click();
     await page.emulateMedia({media:'print'});
     await expect(printed).toBeVisible();
+    await checkCardColors(printed,[['2021/3/20',red,red],['2026/2/11',red,red]]);
     await checkPDFPages();
     await page.evaluate(()=>window.dispatchEvent(new Event('afterprint')));
     await expect(printed).toHaveCount(0);
@@ -590,6 +625,7 @@ test('カード印刷は店舗と期間とカテゴリーを絞り込み保存�
   }
 
   // Contiguous print groups omit selected categories with no cards in the period.
+  await from.fill('2026-01-31');
   await to.fill('2026-02-01');
   await noodles.check();
   await preview.click();
