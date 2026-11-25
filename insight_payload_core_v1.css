@@ -1632,20 +1632,19 @@ body.ai-analysis-open #main{margin-right:0!important}
 .sc-print-actions{display:flex;flex-wrap:wrap;gap:8px}
 .sc-print-status:not(:empty),.sc-print-preview:not(:empty){margin-top:14px}
 .sc-print-sheet{color:#111;background:#fff;padding:10px}
-.sc-print-sheet h2{font-size:18px;margin-bottom:4px}
-.sc-print-sheet p{font-size:13px;line-height:1.45}
-.sc-print-sheet .sc-print-key{font-size:11px;margin-top:4px}
-.sc-print-row{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px;margin-top:8px}
-.sc-print-sheet .sc-day{min-width:0;min-height:0;height:auto;padding:8px;border:1px solid #aaa;border-radius:5px;background:#fff;color:#111;box-shadow:none}
+.sc-print-sheet h2{font-size:15px;line-height:1.4}
+.sc-print-row{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:6px;margin-top:8px}
+.sc-print-sheet .sc-day{min-width:0;min-height:0;height:auto;padding:5px;border:1px solid #aaa;border-radius:5px;background:#fff;color:#111;box-shadow:none}
 .sc-print-sheet .sc-day-num,.sc-print-sheet .sc-col-head,.sc-print-sheet .sc-totals b{color:#111}
-.sc-print-sheet .sc-col-head,.sc-print-sheet .sc-trip{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:3px}
-.sc-print-sheet .sc-print-label,.sc-print-sheet .sc-print-value{border:1px solid #ccc;border-radius:3px;padding:3px 1px;font-size:11px;line-height:1.2;text-align:center;overflow-wrap:anywhere}
+.sc-print-sheet .sc-day-num{font-size:12px}
+.sc-print-sheet .sc-col-head,.sc-print-sheet .sc-trip{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:2px}
+.sc-print-sheet .sc-print-label,.sc-print-sheet .sc-print-value{border:1px solid #ccc;border-radius:3px;padding:3px 1px;font-size:10px;line-height:1.2;text-align:center;overflow-wrap:anywhere}
 .sc-print-sheet .sc-totals{font-size:11px;gap:3px}
-.sc-print-sheet .sc-totals b{overflow-wrap:anywhere}
+.sc-print-sheet .sc-totals b{font-size:12px;overflow-wrap:anywhere}
 .sc-print-sheet .sc-totals b span{display:block;font-size:10px}
 .sc-print-sheet .sc-day.sc-readonly-waste .sc-total-waste.has-val{color:#111!important}
 #scPrintSheet{display:none}
-@media(max-width:640px){.sc-print-preview .sc-print-row{grid-template-columns:minmax(0,1fr)}}
+@media screen and (max-width:640px){.sc-print-preview .sc-print-row{grid-template-columns:minmax(0,1fr)}}
 @page insightSalesCards{size:A4 portrait;margin:10mm}
 @media print{
   html:has(body.sc-printing-cards),body.sc-printing-cards{height:auto;overflow:visible;background:#fff}

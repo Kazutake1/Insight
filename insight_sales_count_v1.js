@@ -853,11 +853,10 @@
             return;
           }
           var sheet=el('section',undefined,'sc-print-sheet');
-          sheet.append(el('h2','納品・販売・廃棄'),el('p',source.name+' ／ '+item.name),
-            el('p',from+' ～ '+to),el('p','— 未入力　／ 対象外　ー 対象便未確認　※ 一部未入力','sc-print-key'));
+          sheet.append(el('h2',source.name+' ／ '+item.name));
           var monthCache=new Map(),row;
           dates.forEach(function(date,index){
-            if(index%3===0){row=el('div',undefined,'sc-print-row');sheet.append(row);}
+            if(index%5===0){row=el('div',undefined,'sc-print-row');sheet.append(row);}
             row.append(printableCard(snapshot,item,date,counts[date]?.[item.id],wastes[date]?.[item.id],monthCache));
           });
           previewArea.append(sheet);

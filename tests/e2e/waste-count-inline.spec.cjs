@@ -404,7 +404,11 @@ test('カード印刷は店舗と期間とカテゴリーを絞り込み保存�
     store.name='架空店舗A';
     store.salesCounts={
       '2026-01-30':{cat_onigiri:record(66)},
-      '2026-01-31':{cat_onigiri:record(12),cat_sandwich:record(77)}
+      '2026-01-31':{cat_onigiri:record(1234),cat_sandwich:record(77)},
+      '2026-02-02':{cat_onigiri:record(21)},
+      '2026-02-03':{cat_onigiri:record(22)},
+      '2026-02-04':{cat_onigiri:record(23)},
+      '2026-02-05':{cat_onigiri:record(24)}
     };
     store.wasteCounts={'2026-02-01':{cat_onigiri:{trips:[0,null,null]}}};
     allStores.stores['fixture-peer']={...structuredClone(store),name:'架空店舗B',
@@ -425,13 +429,19 @@ test('カード印刷は店舗と期間とカテゴリーを絞り込み保存�
   await expect(dialog.getByRole('status')).toHaveText('終了日を開始日以降に設定してください。');
   await expect(print).toBeDisabled();
 
-  await to.fill('2026-02-01');
+  await to.fill('2026-02-05');
   await category.selectOption('cat_onigiri');
   await preview.click();
   const sheet=dialog.locator('.sc-print-sheet'),cards=sheet.locator('.sc-day');
-  await expect(sheet).toContainText('架空店舗A ／ おにぎり');
-  await expect(cards.locator('.sc-day-num')).toHaveText([/^2026\/1\/31/,/^2026\/2\/1/]);
-  await expect(cards.nth(0).locator('.sc-delivery-row .sc-print-value').first()).toHaveText('12');
+  await expect(sheet.locator(':scope > :not(.sc-print-row)')).toHaveText(['架空店舗A ／ おにぎり']);
+  await expect(cards.locator('.sc-day-num')).toHaveText([
+    /^2026\/1\/31/,/^2026\/2\/1/,/^2026\/2\/2/,/^2026\/2\/3/,/^2026\/2\/4/,/^2026\/2\/5/
+  ]);
+  const rows=sheet.locator('.sc-print-row');
+  await expect(rows.first().locator('.sc-day')).toHaveCount(5);
+  await expect(rows.last().locator('.sc-day')).toHaveCount(1);
+  expect(await rows.first().evaluate(row=>getComputedStyle(row).gridTemplateColumns.split(' ').length)).toBe(5);
+  await expect(cards.nth(0).locator('.sc-delivery-row .sc-print-value').first()).toHaveText('1234');
   await expect(cards.nth(0).locator('.sc-sales-row .sc-print-value').first()).toHaveText('0');
   await expect(cards.nth(1).locator('.sc-waste-row .sc-print-value').first()).toHaveText('0');
   await expect(sheet).not.toContainText(/66|77|88|99/);
@@ -439,13 +449,37 @@ test('カード印刷は店舗と期間とカテゴリーを絞り込み保存�
   await page.evaluate(()=>{window.print=()=>{window.fixturePrintCalled=true;};});
   await print.click();
   expect(await page.evaluate(()=>window.fixturePrintCalled)).toBe(true);
+  const originalViewport=page.viewportSize();
+  // A4 (210mm) minus 10mm margins on each side is approximately 718 CSS pixels.
+  await page.setViewportSize({width:718,height:1046});
   await page.emulateMedia({media:'print'});
-  await expect(page.locator('#scPrintSheet .sc-day')).toHaveCount(2);
-  await expect(page.locator('#scPrintSheet')).toBeVisible();
+  const printed=page.locator('#scPrintSheet');
+  await expect(printed.locator('.sc-day')).toHaveCount(6);
+  await expect(printed).toBeVisible();
+  const printLayout=await printed.evaluate(sheet=>{
+    const rows=[...sheet.querySelectorAll('.sc-print-row')];
+    const pageRule=[...document.styleSheets].flatMap(style=>[...style.cssRules])
+      .find(rule=>rule.selectorText==='insightSalesCards'&&rule.type===CSSRule.PAGE_RULE);
+    const number=sheet.querySelector('.sc-delivery-row .sc-print-value');
+    const digitRange=document.createRange();
+    digitRange.selectNodeContents(number);
+    return {
+      size:pageRule?.style.getPropertyValue('size'),
+      margin:pageRule?.style.getPropertyValue('margin'),
+      columns:getComputedStyle(rows[0]).gridTemplateColumns.split(' ').length,
+      keepRows:rows.every(row=>getComputedStyle(row).breakInside==='avoid'),
+      wrapped:digitRange.getClientRects().length!==1,
+      fits:sheet.scrollWidth<=sheet.clientWidth
+    };
+  });
+  expect(printLayout).toMatchObject({
+    size:/^a4 portrait$/i,margin:'10mm',columns:5,keepRows:true,wrapped:false,fits:true
+  });
   await expect(page.locator('#app')).toBeHidden();
   await page.evaluate(()=>window.dispatchEvent(new Event('afterprint')));
   await expect(page.locator('#scPrintSheet')).toHaveCount(0);
   await page.emulateMedia({media:'screen'});
+  await page.setViewportSize(originalViewport);
 
   await category.selectOption('cat_noodles');
   await expect(print).toBeDisabled();

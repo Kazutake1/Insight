@@ -6,7 +6,7 @@ test.beforeEach(async({page})=>{
     if(!location.pathname.endsWith('-fixture'))return;
     window.__INSIGHT_SHELL_VERSION__=build;
     window.__INSIGHT_FEATURE_SIGNATURE__=features;
-  },{build:'20261125-sales-cards-print-build-128',features:'6becf157'});
+  },{build:'20261125-sales-cards-print-build-129',features:'800397a6'});
   await page.route(/https:\/\/(www\.jma\.go\.jp|[^/]*api\.open-meteo\.com)\//,route=>route.abort());
 });
 // The fixture server uses HTTP; keep the rest of the shell's CSP in effect.
@@ -3104,8 +3104,8 @@ test('a fully restarted browser keeps the adopted revision and holds the legacy 
       const page=context.pages()[0]??await context.newPage();
       await page.goto(url);
       await page.evaluate(()=>{
-        window.__INSIGHT_SHELL_VERSION__='20261125-sales-cards-print-build-128';
-        window.__INSIGHT_FEATURE_SIGNATURE__='6becf157';
+        window.__INSIGHT_SHELL_VERSION__='20261125-sales-cards-print-build-129';
+        window.__INSIGHT_FEATURE_SIGNATURE__='800397a6';
       });
       await page.addScriptTag({url:new URL('/insight_indexeddb_storage_v1.js',url).href});
       return {context,page};
@@ -3141,7 +3141,7 @@ async function openLegacyPwaFixture(page){
     contentType:'text/html',body:'<!doctype html><title>Fictional online migration page</title>'
   }));
   await page.route('**/tests/e2e/fixtures/Index.html?insight_migration_probe=*',route=>route.fulfill({
-    contentType:'text/html',body:'<!doctype html><meta name="insight-shell-version" content="20261125-sales-cards-print-build-128">'
+    contentType:'text/html',body:'<!doctype html><meta name="insight-shell-version" content="20261125-sales-cards-print-build-129">'
   }));
   await page.goto(legacyPwaFixture);
   await page.addScriptTag({url:'/insight_indexeddb_storage_v1.js'});
@@ -3366,7 +3366,7 @@ test('cached legacy shell runs with its origin unavailable and adopted startup s
 });
 
 test('migration enforces the pinned environment before and after backup confirmation',async({page})=>{
-  const fixture='/forced-migration-gate-fixture',build='20261125-sales-cards-print-build-128';
+  const fixture='/forced-migration-gate-fixture',build='20261125-sales-cards-print-build-129';
   await page.route('**'+fixture,route=>route.fulfill({
     contentType:'text/html',body:'<!doctype html><title>Fictional forced migration fixture</title>'
   }));
@@ -3985,6 +3985,11 @@ httpsTest('Draft Index rehearses migration, editing and recovery at the release 
   await printDialog.getByLabel('終了日').fill('2026-11-23');
   await printDialog.getByLabel('カテゴリー').selectOption('cat_onigiri');
   await printDialog.getByRole('button',{name:'プレビュー'}).click();
+  const printSheet=printDialog.locator('.sc-print-sheet');
+  await expect(printSheet.locator(':scope > :not(.sc-print-row)')).toHaveText(['架空店舗A ／ おにぎり']);
+  await expect(printSheet.locator('.sc-day-num')).toHaveText(/^2026\/11\/23/);
+  expect(await printSheet.locator('.sc-print-row').evaluate(row=>
+    getComputedStyle(row).gridTemplateColumns.split(' ').length)).toBe(5);
   await expect(printDialog.locator('.sc-delivery-row .sc-print-value').first()).toHaveText('12');
   await expect(printDialog.locator('.sc-sales-row .sc-print-value').first()).toHaveText('9');
   await checkPrintLayout();
