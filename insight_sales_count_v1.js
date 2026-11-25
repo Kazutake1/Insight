@@ -739,10 +739,16 @@
       var heading=el('h2','納品・販売・廃棄カード');
       heading.id='scPrintHeading';
       dialog.setAttribute('aria-labelledby',heading.id);
-      var form=el('form'),fields=el('fieldset',undefined,'sc-print-fields');
-      var start=el('input'),end=el('input'),category=el('select');
+      var form=el('form'),controls=el('fieldset',undefined,'sc-print-controls');
+      var fields=el('div',undefined,'sc-print-fields');
+      var start=el('input'),end=el('input'),paper=el('select');
       start.type=end.type='date';
-      start.required=end.required=category.required=true;
+      start.required=end.required=true;
+      [['a4','A4'],['b5','B5（JIS）']].forEach(function(size){
+        var option=el('option',size[1]);
+        option.value=size[0];
+        paper.append(option);
+      });
       function field(label,control){
         var wrapper=el('label',label);
         wrapper.append(control);
@@ -750,7 +756,16 @@
       }
       field('開始日',start);
       field('終了日',end);
-      field('カテゴリー',category);
+      field('用紙',paper);
+      var categoryGroup=el('fieldset',undefined,'sc-print-categories');
+      var categoryTools=el('div',undefined,'sc-print-category-tools');
+      var selectAll=el('button','全選択'),selectNone=el('button','全解除'),selectedCount=el('span');
+      selectAll.type=selectNone.type='button';
+      selectedCount.setAttribute('aria-live','polite');
+      categoryTools.append(selectAll,selectNone,selectedCount);
+      var categoryOptions=el('div',undefined,'sc-print-category-options');
+      categoryGroup.append(el('legend','カテゴリー'),categoryTools,categoryOptions);
+      controls.append(fields,categoryGroup);
       var actions=el('div',undefined,'sc-print-actions');
       var prepare=el('button','プレビュー'),print=el('button','印刷'),close=el('button','閉じる');
       prepare.type='submit';
@@ -760,7 +775,7 @@
       var status=el('p',undefined,'sc-print-status');
       status.setAttribute('role','status');
       var previewArea=el('div',undefined,'sc-print-preview');
-      form.append(fields,actions);
+      form.append(controls,actions);
       dialog.append(heading,form,status,previewArea);
 
       var storeId,preparing=false;
@@ -770,17 +785,39 @@
         status.textContent='';
         print.disabled=true;
       }
+      function selectedCategories(){
+        return new Set(Array.from(categoryOptions.querySelectorAll('input:checked'),function(input){return input.value;}));
+      }
+      function updateSelection(){
+        var count=selectedCategories().size;
+        var text=count+'件選択';
+        if(selectedCount.textContent!==text)selectedCount.textContent=text;
+        selectAll.disabled=count===categoryOptions.childElementCount;
+        selectNone.disabled=count===0;
+        prepare.disabled=preparing||count===0;
+      }
+      function setAllCategories(checked){
+        categoryOptions.querySelectorAll('input').forEach(function(input){input.checked=checked;});
+        updateSelection();
+        clearPreview();
+      }
+      selectAll.onclick=function(){setAllCategories(true);};
+      selectNone.onclick=function(){setAllCategories(false);};
       launch.onclick=function(){
         if(preparing||dialog.open||(preview&&!preview.canEdit()))return;
         storeId=allStores.current;
         start.value=monthPrefix()+'-01';
         end.value=monthPrefix()+'-'+pad(daysInMonth());
-        category.replaceChildren(...categories().map(function(item){
-          var option=el('option',item.name);
-          option.value=item.id;
-          return option;
+        paper.value='a4';
+        categoryOptions.replaceChildren(...categories().map(function(item){
+          var label=el('label'),input=el('input');
+          input.type='checkbox';
+          input.value=item.id;
+          input.checked=item.id===state.categoryId;
+          label.append(input,el('span',item.name));
+          return label;
         }));
-        category.value=state.categoryId;
+        updateSelection();
         clearPreview();
         page.append(dialog);
         dialog.showModal();
@@ -795,8 +832,11 @@
         event.preventDefault();
         closeDialog();
       });
-      fields.addEventListener('input',clearPreview);
-      fields.addEventListener('change',clearPreview);
+      controls.addEventListener('input',clearPreview);
+      controls.addEventListener('change',function(){
+        updateSelection();
+        clearPreview();
+      });
 
       function printableCard(snapshot,item,date,counts,waste,monthCache){
         var decision=root.InsightTripHistoryResolver.resolveDate(snapshot,storeId,item.id,date,{monthCache:monthCache});
@@ -821,14 +861,15 @@
       var emptyMessage='選択した期間に保存済みのカードはありません。';
       form.onsubmit=async function(event){
         event.preventDefault();
-        if(preparing)return;
+        var selected=selectedCategories();
+        if(preparing||!selected.size)return;
         clearPreview();
-        var from=start.value,to=end.value,categoryId=category.value;
+        var from=start.value,to=end.value;
         if(!validDateKey(from)||!validDateKey(to)||from>to){
           status.textContent='終了日を開始日以降に設定してください。';
           return;
         }
-        preparing=fields.disabled=prepare.disabled=true;
+        preparing=controls.disabled=prepare.disabled=true;
         try{
           var adopted=root.InsightIndexedDBCandidateV1?.isAdopted();
           if(!adopted&&root.localStorage.getItem(SK)===null){
@@ -841,30 +882,38 @@
           if(!dialog.open)return;
           ensure(snapshot);
           var source=snapshot.stores[storeId];
-          var item=snapshot.salesCountManagement.categories.find(function(c){return c.id===categoryId;});
-          if(!source||!item)throw new Error('Print selection is unavailable');
+          if(!source)throw new Error('Print store is unavailable');
           var counts=source.salesCounts,wastes=source.wasteCounts||{};
           var dates=Array.from(new Set([...Object.keys(counts),...Object.keys(wastes)])).sort().filter(function(date){
-            return date>=from&&date<=to&&validDateKey(date)&&
-              (counts[date]?.[item.id]||wastes[date]?.[item.id]);
+            return date>=from&&date<=to&&validDateKey(date);
           });
-          if(!dates.length){
+          var sheet=el('div',undefined,'sc-print-sheet');
+          sheet.classList.toggle('sc-print-b5',paper.value==='b5');
+          var monthCache=new Map();
+          snapshot.salesCountManagement.categories.forEach(function(item){
+            if(!selected.has(item.id))return;
+            var recordedDates=dates.filter(function(date){return counts[date]?.[item.id]||wastes[date]?.[item.id];});
+            if(!recordedDates.length)return;
+            var section=el('section',undefined,'sc-print-category'),row;
+            section.append(el('h2',source.name+' ／ '+item.name));
+            recordedDates.forEach(function(date,index){
+              if(index%5===0){row=el('div',undefined,'sc-print-row');section.append(row);}
+              row.append(printableCard(snapshot,item,date,counts[date]?.[item.id],wastes[date]?.[item.id],monthCache));
+            });
+            sheet.append(section);
+          });
+          if(!sheet.childElementCount){
             status.textContent=emptyMessage;
             return;
           }
-          var sheet=el('section',undefined,'sc-print-sheet');
-          sheet.append(el('h2',source.name+' ／ '+item.name));
-          var monthCache=new Map(),row;
-          dates.forEach(function(date,index){
-            if(index%5===0){row=el('div',undefined,'sc-print-row');sheet.append(row);}
-            row.append(printableCard(snapshot,item,date,counts[date]?.[item.id],wastes[date]?.[item.id],monthCache));
-          });
+          if(sheet.childElementCount<selected.size)status.textContent='保存済みのカードがあるカテゴリーを表示しています。';
           previewArea.append(sheet);
           print.disabled=false;
         }catch(_){
           if(dialog.open)status.textContent='保存済みデータを読み込めませんでした。';
         }finally{
-          preparing=fields.disabled=prepare.disabled=false;
+          preparing=controls.disabled=false;
+          updateSelection();
         }
       };
 
