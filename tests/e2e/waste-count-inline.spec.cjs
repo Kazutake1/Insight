@@ -492,6 +492,26 @@ test('カード印刷は店舗と期間とカテゴリーを絞り込み保存�
       expect(days[date],date).toEqual([ink,border,border,border,border,'rgb(255, 255, 255)','rgb(17, 17, 17)']);
     }
   }
+  async function checkHolidayAlignment(container){
+    for(const date of ['2021/3/20','2026/2/11']){
+      const row=container.locator('.sc-print-row').filter({has:page.locator('.sc-day-num').filter({hasText:date})});
+      await expect(row.locator('.sc-day')).toHaveCount(5);
+      await expect(row.locator('.sc-day-title small')).toHaveCount(0);
+      const layout=await row.locator('.sc-day').evaluateAll(cards=>cards.map(card=>{
+        const heading=card.querySelector('.sc-day-title'),title=heading.querySelector('.sc-day-num');
+        const dateRange=document.createRange();
+        dateRange.selectNodeContents(title);
+        const rect=heading.getBoundingClientRect(),text=dateRange.getBoundingClientRect();
+        return {
+          dateFits:dateRange.getClientRects().length===1&&text.right<=rect.right+1,
+          overflow:card.scrollWidth>card.clientWidth+1,
+          tops:[heading,...card.querySelectorAll('.sc-col-head,.sc-trip,.sc-totals')].map(node=>node.getBoundingClientRect().top)
+        };
+      }));
+      expect(layout.every(item=>item.dateFits&&!item.overflow&&
+        item.tops.every((top,index)=>Math.abs(top-layout[0].tops[index])<1))).toBe(true);
+    }
+  }
   const blue='rgb(29, 78, 216)',red='rgb(185, 28, 28)';
   const shortColors=[['2026/1/31',blue,blue],['2026/2/1',red,red],['2026/2/2','rgb(17, 17, 17)','rgb(170, 170, 170)']];
   async function checkPDFPages(pageCount){
@@ -614,18 +634,28 @@ test('カード印刷は店舗と期間とカテゴリーを絞り込み保存�
 
   await from.fill('2021-03-20');
   await to.fill('2026-04-20');
-  for(const value of ['a4','b5']){
+  await page.setViewportSize({width:1194,height:834});
+  for(const [value,width] of [['a4',718],['b5',612]]){
     await paper.selectOption(value);
     await preview.click();
+    for(const dark of [false,true]){
+      await page.evaluate(value=>document.documentElement.classList.toggle('dark',value),dark);
+      await checkHolidayAlignment(sheet);
+    }
+    await page.evaluate(()=>document.documentElement.classList.remove('dark'));
     await print.click();
+    await page.setViewportSize({width,height:1046});
     await page.emulateMedia({media:'print'});
     await expect(printed).toBeVisible();
     await checkCardColors(printed,[['2021/3/20',red,red],['2026/2/11',red,red]]);
+    await checkHolidayAlignment(printed);
     await checkPDFPages();
     await page.evaluate(()=>window.dispatchEvent(new Event('afterprint')));
     await expect(printed).toHaveCount(0);
     await page.emulateMedia({media:'screen'});
+    await page.setViewportSize({width:1194,height:834});
   }
+  await page.setViewportSize(originalViewport);
 
   // Contiguous print groups omit selected categories with no cards in the period.
   await from.fill('2026-01-31');
