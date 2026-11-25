@@ -518,9 +518,12 @@ test('カード印刷は店舗と期間とカテゴリーを絞り込み保存�
     const pages=[...objects.values()].filter(object=>/\/Type\s*\/Page\b/.test(object));
     const inks=new Set();
     for(const object of objects.values()){
-      const compressed=object.match(/\/Filter\s*\/FlateDecode[^]*?stream\r?\n([^]*?)\r?\nendstream/);
-      if(!compressed)continue;
-      const operators=inflateSync(Buffer.from(compressed[1],'latin1')).toString('latin1');
+      const stream=object.match(/^<<([^]*?)>>\s*stream\r?\n/);
+      if(!stream||!/\/Filter\s*\/FlateDecode\b/.test(stream[1]))continue;
+      const length=Number(stream[1].match(/\/Length\s+(\d+)\s*(?:\/|$)/)?.[1]);
+      if(!Number.isFinite(length))continue;
+      const bytes=object.slice(stream[0].length,stream[0].length+length);
+      const operators=inflateSync(Buffer.from(bytes,'latin1')).toString('latin1');
       for(const [,r,g,b] of operators.matchAll(/([\d.]+) ([\d.]+) ([\d.]+) (?:rg|RG)\b/g)){
         inks.add([r,g,b].map(channel=>Math.round(Number(channel)*255)).join(','));
       }
