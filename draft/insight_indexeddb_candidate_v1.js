@@ -2,7 +2,7 @@
 (function(root){
   'use strict';
   const document=root.document;
-  const version='20261125-weather-actions-1';
+  const version='20261125-prediction-health-1';
   let adopted=false;
   let verifiedSnapshot=null;
 

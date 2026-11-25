@@ -8,7 +8,7 @@
   const recordKey='current';
   const storeName='snapshots';
   // Pin the version exercised by the Draft migration. It must be updated with the release that enables it.
-  const migrationBuild='20261125-sales-cards-print-build-130';
+  const migrationBuild='20261125-prediction-health-build-131';
   const migrationFeatures='c1a11fbd';
 
   function parse(raw){

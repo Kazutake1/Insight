@@ -6,7 +6,7 @@ test.beforeEach(async({page})=>{
     if(!location.pathname.endsWith('-fixture'))return;
     window.__INSIGHT_SHELL_VERSION__=build;
     window.__INSIGHT_FEATURE_SIGNATURE__=features;
-  },{build:'20261125-sales-cards-print-build-130',features:'c1a11fbd'});
+  },{build:'20261125-prediction-health-build-131',features:'c1a11fbd'});
   await page.route(/https:\/\/(www\.jma\.go\.jp|[^/]*api\.open-meteo\.com)\//,route=>route.abort());
 });
 // The fixture server uses HTTP; keep the rest of the shell's CSP in effect.
@@ -3104,7 +3104,7 @@ test('a fully restarted browser keeps the adopted revision and holds the legacy 
       const page=context.pages()[0]??await context.newPage();
       await page.goto(url);
       await page.evaluate(()=>{
-        window.__INSIGHT_SHELL_VERSION__='20261125-sales-cards-print-build-130';
+        window.__INSIGHT_SHELL_VERSION__='20261125-prediction-health-build-131';
         window.__INSIGHT_FEATURE_SIGNATURE__='c1a11fbd';
       });
       await page.addScriptTag({url:new URL('/insight_indexeddb_storage_v1.js',url).href});
@@ -3141,7 +3141,7 @@ async function openLegacyPwaFixture(page){
     contentType:'text/html',body:'<!doctype html><title>Fictional online migration page</title>'
   }));
   await page.route('**/tests/e2e/fixtures/Index.html?insight_migration_probe=*',route=>route.fulfill({
-    contentType:'text/html',body:'<!doctype html><meta name="insight-shell-version" content="20261125-sales-cards-print-build-130">'
+    contentType:'text/html',body:'<!doctype html><meta name="insight-shell-version" content="20261125-prediction-health-build-131">'
   }));
   await page.goto(legacyPwaFixture);
   await page.addScriptTag({url:'/insight_indexeddb_storage_v1.js'});
@@ -3366,7 +3366,7 @@ test('cached legacy shell runs with its origin unavailable and adopted startup s
 });
 
 test('migration enforces the pinned environment before and after backup confirmation',async({page})=>{
-  const fixture='/forced-migration-gate-fixture',build='20261125-sales-cards-print-build-130';
+  const fixture='/forced-migration-gate-fixture',build='20261125-prediction-health-build-131';
   await page.route('**'+fixture,route=>route.fulfill({
     contentType:'text/html',body:'<!doctype html><title>Fictional forced migration fixture</title>'
   }));
@@ -3757,7 +3757,7 @@ for(const connectionFails of [false,true]){
       window.InsightHourlyCustomers={connectIndexedDBPreview(){}};
       window.shellReadyState=document.readyState;
       window.lateSnapshot=InsightIndexedDBCandidateV1.initializeAdopted();`}));
-    await page.route(/\/insight_indexeddb_(quick_input|sales_input|recovery)_preview_v1\.js\?v=20261125-weather-actions-1$/,route=>route.fulfill({
+    await page.route(/\/insight_indexeddb_(quick_input|sales_input|recovery)_preview_v1\.js\?v=20261125-prediction-health-1$/,route=>route.fulfill({
       contentType:'application/javascript',
       body:new URL(route.request().url()).pathname.endsWith('/insight_indexeddb_sales_input_preview_v1.js')
         ?`window.InsightIndexedDBSalesInputPreviewV1={async connect(){
@@ -4132,15 +4132,19 @@ httpsTest('Draft Index rehearses migration, editing and recovery at the release 
     page.on('request',watchAnalysisRequest);
     const diagnostics=page.locator('#insightWeatherSalesDiagnosticsOverlay');
     const trends=page.locator('#insightWeatherSalesViewOverlay');
+    const prediction=page.getByRole('dialog',{name:'予測用データ品質チェック'});
+    const predictionButton=page.locator('#insightPredictionDataButton');
     await page.locator('#insightWeatherSalesDiagnosticsButton').tap();
     await expect(diagnostics).toBeVisible();
     await page.evaluate(()=>{
       document.getElementById('insightWeatherSalesViewButton').click();
+      document.getElementById('insightPredictionDataButton').click();
       gotoNav(1);
       switchStore(allStores.current==='fixture-peer'?
         Object.keys(allStores.stores).find(id=>id!=='fixture-peer'):'fixture-peer');
     });
     await expect(trends).toBeHidden();
+    await expect(prediction).toBeHidden();
     await expect(page.locator('#pageSettings')).toBeVisible();
     await expect(page.locator('#storeSel')).toHaveValue(expected.snapshot.current);
     await diagnostics.getByRole('button',{name:'閉じる'}).tap();
@@ -4160,6 +4164,34 @@ httpsTest('Draft Index rehearses migration, editing and recovery at the release 
     await expect(page.locator('#iwsvTrip')).toHaveValue('2');
     await trends.getByRole('button',{name:'閉じる'}).tap();
     await expect(trends).toBeHidden();
+
+    await predictionButton.tap();
+    await expect(prediction.getByRole('heading',{name:'架空店舗A'})).toBeVisible();
+    await expect(prediction.getByRole('heading',{name:'架空店舗B'})).toBeVisible();
+    await expect(prediction.getByText('客数が正の値').first()).toBeVisible();
+    await page.evaluate(()=>{
+      document.getElementById('nav1').click();
+      document.getElementById('insightDataHealthButton').click();
+      document.getElementById('storeMenuBtn').click();
+      gotoNav(1);
+      showStoreMenu();
+      return switchStore(allStores.current==='fixture-peer'?
+        Object.keys(allStores.stores).find(id=>id!=='fixture-peer'):'fixture-peer');
+    });
+    await expect(page.locator('#pageSettings')).toBeVisible();
+    await expect(page.locator('#storeSel')).toHaveValue(expected.snapshot.current);
+    await expect(page.locator('#storeMenu')).not.toHaveClass(/is-open/);
+    await expect(page.locator('#insightDataHealthDialog')).toBeHidden();
+    await prediction.getByRole('button',{name:'閉じる'}).tap();
+    await expect(prediction).toBeHidden();
+    await expect(predictionButton).toBeFocused();
+    await predictionButton.tap();
+    await page.keyboard.press('Escape');
+    await expect(prediction).toBeHidden();
+    await predictionButton.tap();
+    await page.locator('#insightPredictionDataOverlay').tap({position:{x:3,y:3}});
+    await expect(prediction).toBeHidden();
+    expect(await committedInput(page)).toEqual(expected);
     page.off('request',watchAnalysisRequest);
     expect(analysisRequests).toEqual([]);
     expect(await readStoreSwitchRecord(peer)).toEqual(record);
