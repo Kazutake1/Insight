@@ -247,7 +247,7 @@
     }
     function finishSave(){
       state.wasteTouched={};setDirty(false);
-      showToast('✓ 販売数を保存しました','#15803d','#f0fdf4');renderAnalysis();
+      renderAnalysis();
     }
     function draftFingerprint(){
       return JSON.stringify([state.draft,state.wasteDraft,state.wasteTouched]);
@@ -268,7 +268,7 @@
         }
       });
       if(!commit){markOutcome('cancelled_before_mutation');return;}
-      button.disabled=true;label.textContent='保存を確認しています。';
+      button.disabled=true;
       return commit().then(function(saved){
         if(saved){finishSave();markOutcome('completed');}
         else{label.textContent='保存結果を確認できないため、追加の保存を停止しました。';markOutcome('unknown');}

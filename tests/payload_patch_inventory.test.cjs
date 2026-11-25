@@ -146,9 +146,6 @@ test('canonical payloadはinline script/styleを持たず外部assetを順序固
   assert.match(css,/\.ai-analysis-panel\.ai-analysis-workspace\{/);
   assert.match(css,/\.ai-analysis-workspace \.ai-analysis-card-title\{font-size:13px!important\}/);
   assert.match(css,/#donutBtnAmt\.active,#donutBtnPct\.active\{background:#1a1a1a;color:#fff;\}/);
-  assert.match(core,/msg\.classList\.add\("is-visible"\)/);
-  assert.match(core,/msg\.classList\.remove\("is-visible"\)/);
-  assert.match(css,/\.saved-msg\.is-visible\{display:flex;\}/);
   assert.match(core,/label\.classList\.remove\("backup-status-missing","backup-status-today","backup-status-recent","backup-status-stale"\)/);
   assert.match(core,/label\.classList\.add\("backup-status-missing"\)/);
   assert.match(core,/label\.classList\.add\("backup-status-today"\)/);
@@ -158,9 +155,6 @@ test('canonical payloadはinline script/styleを持たず外部assetを順序固
   assert.match(css,/#backupDaysLabel\.backup-status-today\{color:#15803d\}/);
   assert.match(css,/#backupDaysLabel\.backup-status-recent\{color:#888\}/);
   assert.doesNotMatch(core,/btn\.style\.background="#16a34a"/);
-  assert.match(core,/btn\.classList\.add\("is-saved-feedback"\)/);
-  assert.match(core,/btn\.classList\.remove\("is-saved-feedback"\)/);
-  assert.match(css,/\.quick-save\.is-saved-feedback\{background:#16a34a;\}/);
   assert.match(payload,/insight_payload_ai_legacy_v1\.js\?v=20261020-ai-panel-smooth-1/);
   assert.match(payload,/insight_payload_bindings_v1\.js\?v=20261030-step4-gate3-ab-1/);
   assert.doesNotMatch(payload,/\son(?:click|change)\s*=/i);

@@ -2251,18 +2251,15 @@ test('販売数入力で未登録の過年度へ移動すると年度を正式�
 });
 
 
-test('今日の入力の保存完了フィードバックはclass状態で2秒後に戻る',async({page})=>{
+test('今日の入力を保存してもボタンの文言を変更しない',async({page})=>{
   const errors=await openInsight(page);
   await page.locator('#nav0').click();
   const button=page.locator('#quickSaveBtn');
   await expect(button).toBeVisible();
   await expect(button).toHaveText('保存する');
   await button.click();
-  await expect(button).toHaveText('✓ 保存しました');
-  await expect(button).toHaveClass(/is-saved-feedback/);
-  await expect.poll(()=>button.evaluate(node=>getComputedStyle(node).backgroundColor)).toBe('rgb(22, 163, 74)');
-  await expect(button).toHaveText('保存する',{timeout:3500});
-  await expect(button).not.toHaveClass(/is-saved-feedback/);
+  await expect(button).toHaveText('保存する');
+  expect(await page.evaluate(()=>localStorage.getItem('insight_v11'))).not.toBeNull();
   expect(errors).toEqual([]);
 });
 

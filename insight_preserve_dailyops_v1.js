@@ -115,7 +115,7 @@
       persist();
       initInputPage(type);
       updateMissingBadge();
-      showToast('🗑 '+m+day+'日の'+label+'データをクリアしました','#dc2626','#fef2f2');
+
     });
   };
 
@@ -132,7 +132,7 @@
       persist();
       initInputPage('kyaku');
       updateMissingBadge();
-      showToast('🗑 '+m+'の客数データをクリアしました','#dc2626','#fef2f2');
+
     });
   };
 

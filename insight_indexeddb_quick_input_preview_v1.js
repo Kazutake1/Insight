@@ -38,7 +38,6 @@
     const selector=doc.getElementById('storeSel');
     const serialize=root.InsightStorage.serialize;
     const state=sharedState??{storeId:allStores.current,committed:await api.read(),busy:false,held:false};
-    let noticeTimer;
     let baselineDraft=null;
     let weatherView=0;
     function matchesBaseline(){
@@ -98,12 +97,6 @@
       return false;
     }
 
-    function finishFeedback(){
-      clearTimeout(noticeTimer);
-      button.textContent='保存する';
-      button.classList.remove('is-saved-feedback');
-    }
-
     async function save(target,inputs,baseline){
       const wasInert=doc.body.inert;
       doc.body.inert=true;
@@ -126,10 +119,7 @@
         rememberDraft(iso,inputs);
         root.InsightHooks.emit('quick:preview:committed',{});
         updateMissingBadge();
-        button.textContent='✓ 保存しました';
-        button.classList.add('is-saved-feedback');
-        status.textContent='今日の入力を保存しました。';
-        noticeTimer=root.setTimeout(finishFeedback,2000);
+        status.textContent='';
         return 'completed';
       }catch(_){
         stop();
@@ -143,7 +133,6 @@
 
     root.InsightHooks.on('quick:save:before','indexeddb-quick-input-preview',ctx=>{
       if(currentNav!==0||state.busy||state.held||state.pending||state.hourly?.dialog()?.open||state.eventDialogOpen?.())return false;
-      finishFeedback();
       const target=dateContext.getSelectedInfo();
       if(!supports(target.date)){
         allowDateChange(target.date);
@@ -162,7 +151,7 @@
       const baseline=state.committed;
       state.busy=true;
       button.disabled=true;
-      status.textContent='保存を確認しています。';
+      status.textContent='';
       ctx.runIndexedDBPreview=()=>save(target,inputs,baseline);
       return false;
     },-1000);
@@ -190,8 +179,7 @@
       try{
         if(!root.confirm(message))return false;
         if(!unchanged())throw new Error('Quick clear target changed during confirmation');
-        finishFeedback();
-        status.textContent='入力データのクリアを確認しています。';
+        status.textContent='';
         const candidate=JSON.parse(JSON.stringify(baseline.snapshot));
         const row=candidate.stores[state.storeId].data[fy][month][day-1];
         Object.assign(row,{売上:0,客数:0,買上点数:0,廃棄金額:0,haiki:blankHaiki()});
@@ -206,7 +194,6 @@
         rememberDraft(iso,readInputs());
         root.InsightHooks.emit('quick:preview:committed',{});
         updateMissingBadge();
-        status.textContent='入力データをクリアしました。';
         return true;
       }catch(_){
         stop();
@@ -264,7 +251,6 @@
     function onEnter(){
       weatherView++;
       baselineDraft=null;
-      finishFeedback();
       status.textContent='';
       rememberRenderedDraft();
     }
