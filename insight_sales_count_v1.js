@@ -384,7 +384,8 @@
         card=el('div',undefined,'sc-day '+(saturdayBlue?'sat-card':red?'sun-card':'')+(withWaste?' sc-readonly-waste':''));
       var head=el('div',undefined,'sc-day-title'),
         num=el('strong',month+'/'+day+'（'+WEEKDAYS[wd]+'）','sc-day-num '+(saturdayBlue?'sat':red?'sun':''));
-      head.append(num,holiday?el('small','祝日'):el('span'));
+      head.append(num);
+      if(!source?.forPrint)head.append(holiday?el('small','祝日'):el('span'));
       card.append(head,createHistoricalWeatherRow(date,source?.storeId,source?.snapshot));
       var labels=el('div',undefined,'sc-col-head');
       labels.innerHTML='<span>1便</span><span>2便</span><span>3便</span>';
