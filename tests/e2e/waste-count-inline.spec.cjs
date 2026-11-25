@@ -391,3 +391,71 @@ test('対象便のチェック解除後も納品・販売・廃棄の保存済�
     await expect(input).toBeEditable();
   }
 });
+
+test('カード印刷は店舗と期間とカテゴリーを絞り込み保存済みの実績だけを使う',async({page})=>{
+  await page.route('**/Index.html*',async route=>{
+    const response=await route.fetch();
+    await route.fulfill({response,body:(await response.text()).replace(/;?\s*upgrade-insecure-requests/g,'')});
+  });
+  await page.goto('/Index.html');
+  await page.locator('#navSalesCount').click();
+  const raw=await page.evaluate(()=>{
+    const record=n=>({trips:[{delivery:n,sales:0},{delivery:null,sales:null},{delivery:null,sales:null}]});
+    store.name='架空店舗A';
+    store.salesCounts={
+      '2026-01-30':{cat_onigiri:record(66)},
+      '2026-01-31':{cat_onigiri:record(12),cat_sandwich:record(77)}
+    };
+    store.wasteCounts={'2026-02-01':{cat_onigiri:{trips:[0,null,null]}}};
+    allStores.stores['fixture-peer']={...structuredClone(store),name:'架空店舗B',
+      salesCounts:{'2026-02-01':{cat_onigiri:record(88)}}};
+    return InsightStorage.writeSnapshot(allStores);
+  });
+  await page.reload();
+  await page.locator('#navSalesCount').click();
+  const draft=page.locator('#scCalendar .sc-day:not(.empty) .sc-delivery-row input').first();
+  await draft.fill('99');
+  await page.getByRole('button',{name:'カードを印刷'}).click();
+  const dialog=page.getByRole('dialog',{name:'納品・販売・廃棄カード'});
+  const from=dialog.getByLabel('開始日'),to=dialog.getByLabel('終了日'),category=dialog.getByLabel('カテゴリー');
+  const preview=dialog.getByRole('button',{name:'プレビュー'}),print=dialog.getByRole('button',{name:'印刷',exact:true});
+  await from.fill('2026-01-31');
+  await to.fill('2026-01-30');
+  await preview.click();
+  await expect(dialog.getByRole('status')).toHaveText('終了日を開始日以降に設定してください。');
+  await expect(print).toBeDisabled();
+
+  await to.fill('2026-02-01');
+  await category.selectOption('cat_onigiri');
+  await preview.click();
+  const sheet=dialog.locator('.sc-print-sheet'),cards=sheet.locator('.sc-day');
+  await expect(sheet).toContainText('架空店舗A ／ おにぎり');
+  await expect(cards.locator('.sc-day-num')).toHaveText([/^2026\/1\/31/,/^2026\/2\/1/]);
+  await expect(cards.nth(0).locator('.sc-delivery-row .sc-print-value').first()).toHaveText('12');
+  await expect(cards.nth(0).locator('.sc-sales-row .sc-print-value').first()).toHaveText('0');
+  await expect(cards.nth(1).locator('.sc-waste-row .sc-print-value').first()).toHaveText('0');
+  await expect(sheet).not.toContainText(/66|77|88|99/);
+
+  await page.evaluate(()=>{window.print=()=>{window.fixturePrintCalled=true;};});
+  await print.click();
+  expect(await page.evaluate(()=>window.fixturePrintCalled)).toBe(true);
+  await page.emulateMedia({media:'print'});
+  await expect(page.locator('#scPrintSheet .sc-day')).toHaveCount(2);
+  await expect(page.locator('#scPrintSheet')).toBeVisible();
+  await expect(page.locator('#app')).toBeHidden();
+  await page.evaluate(()=>window.dispatchEvent(new Event('afterprint')));
+  await expect(page.locator('#scPrintSheet')).toHaveCount(0);
+  await page.emulateMedia({media:'screen'});
+
+  await category.selectOption('cat_noodles');
+  await expect(print).toBeDisabled();
+  await preview.click();
+  await expect(dialog.getByRole('status')).toHaveText('選択した期間に保存済みのカードはありません。');
+  await from.fill('');
+  await dialog.getByRole('button',{name:'閉じる'}).click();
+  await expect(draft).toHaveValue('99');
+  expect(await page.evaluate(()=>localStorage.getItem('insight_v11'))).toBe(raw);
+  await page.locator('#scSave').click();
+  await expect(page.locator('#scSave')).toBeDisabled();
+  await expect(draft).toHaveValue('99');
+});

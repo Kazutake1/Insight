@@ -361,8 +361,8 @@
       return input;
     }
 
-    function createHistoricalWeatherRow(date,storeId){
-      var info=historicalWeather(allStores,storeId||allStores.current,date);
+    function createHistoricalWeatherRow(date,storeId,snapshot=allStores){
+      var info=historicalWeather(snapshot,storeId||snapshot.current,date);
       var line=el('div',undefined,'sc-history-weather');
       line.setAttribute('aria-label','天気 '+info.weather+'、最高気温 '+info.max+'℃、最低気温 '+info.min+'℃');
       var icon=el('span',undefined,'sc-history-icon');
@@ -374,7 +374,7 @@
         el('span',' / ','sc-history-divider'),el('span',info.min+'°','sc-history-low'));
       return line;
     }
-    function createReadOnlyDayCard(date,value,category,waste,historyMask){
+    function createReadOnlyDayCard(date,value,category,waste,historyMask,source){
       var r=normalizeRecord(value),mask=Array.isArray(historyMask)&&historyMask.length===3?historyMask:activeTrips(category||selectedCategory()),parts=date.split('-'),
         year=Number(parts[0]),month=Number(parts[1]),day=Number(parts[2]),
         wd=new Date(year,month-1,day).getDay(),
@@ -384,7 +384,7 @@
       var head=el('div',undefined,'sc-day-title'),
         num=el('strong',month+'/'+day+'（'+WEEKDAYS[wd]+'）','sc-day-num '+(wd===6?'sat':red?'sun':''));
       head.append(num,holiday?el('small','祝日'):el('span'));
-      card.append(head,createHistoricalWeatherRow(date,allStores.current));
+      card.append(head,createHistoricalWeatherRow(date,source?.storeId,source?.snapshot));
       var labels=el('div',undefined,'sc-col-head');
       labels.innerHTML='<span>1便</span><span>2便</span><span>3便</span>';
       card.append(labels);
@@ -730,13 +730,172 @@
         if(page&&page.classList.contains('show')&&!doc.querySelector('dialog.sc-dialog[open]'))manageCategories();
       });
     }
+    function connectCardPrinting(page){
+      var launch=el('button','カードを印刷');
+      launch.type='button';
+      page.querySelector('.sc-toolbar').append(launch);
+
+      var dialog=el('dialog',undefined,'sc-print-dialog');
+      var heading=el('h2','納品・販売・廃棄カード');
+      heading.id='scPrintHeading';
+      dialog.setAttribute('aria-labelledby',heading.id);
+      var form=el('form'),fields=el('fieldset',undefined,'sc-print-fields');
+      var start=el('input'),end=el('input'),category=el('select');
+      start.type=end.type='date';
+      start.required=end.required=category.required=true;
+      function field(label,control){
+        var wrapper=el('label',label);
+        wrapper.append(control);
+        fields.append(wrapper);
+      }
+      field('開始日',start);
+      field('終了日',end);
+      field('カテゴリー',category);
+      var actions=el('div',undefined,'sc-print-actions');
+      var prepare=el('button','プレビュー'),print=el('button','印刷'),close=el('button','閉じる');
+      prepare.type='submit';
+      print.type=close.type='button';
+      print.disabled=true;
+      actions.append(prepare,print,close);
+      var status=el('p',undefined,'sc-print-status');
+      status.setAttribute('role','status');
+      var previewArea=el('div',undefined,'sc-print-preview');
+      form.append(fields,actions);
+      dialog.append(heading,form,status,previewArea);
+
+      var storeId,preparing=false;
+      var metrics=['納品','販売','廃棄'];
+      function clearPreview(){
+        previewArea.replaceChildren();
+        status.textContent='';
+        print.disabled=true;
+      }
+      launch.onclick=function(){
+        if(preparing||dialog.open||(preview&&!preview.canEdit()))return;
+        storeId=allStores.current;
+        start.value=monthPrefix()+'-01';
+        end.value=monthPrefix()+'-'+pad(daysInMonth());
+        category.replaceChildren(...categories().map(function(item){
+          var option=el('option',item.name);
+          option.value=item.id;
+          return option;
+        }));
+        category.value=state.categoryId;
+        clearPreview();
+        page.append(dialog);
+        dialog.showModal();
+      };
+      function closeDialog(){
+        dialog.close();
+        dialog.remove();
+        clearPreview();
+      }
+      close.onclick=closeDialog;
+      dialog.addEventListener('cancel',function(event){
+        event.preventDefault();
+        closeDialog();
+      });
+      fields.addEventListener('input',clearPreview);
+      fields.addEventListener('change',clearPreview);
+
+      function printableCard(snapshot,item,date,counts,waste,monthCache){
+        var decision=root.InsightTripHistoryResolver.resolveDate(snapshot,storeId,item.id,date,{monthCache:monthCache});
+        var card=createReadOnlyDayCard(date,counts,item,waste,decision.mask,{snapshot:snapshot,storeId:storeId});
+        var day=card.querySelector('.sc-day-num');
+        day.textContent=date.slice(0,4)+'/'+day.textContent;
+        card.querySelector('.sc-col-head').prepend(el('span','区分'));
+        card.querySelectorAll('.sc-trip').forEach(function(row,index){
+          row.prepend(el('span',metrics[index],'sc-print-label'));
+          row.querySelectorAll('input').forEach(function(input){
+            var value=el('span',input.value||'—','sc-print-value '+input.className);
+            value.setAttribute('aria-label',input.getAttribute('aria-label'));
+            input.replaceWith(value);
+          });
+        });
+        card.querySelectorAll('.sc-totals b').forEach(function(total,index){
+          total.prepend(el('span',metrics[index]+'計'));
+        });
+        return card;
+      }
+
+      var emptyMessage='選択した期間に保存済みのカードはありません。';
+      form.onsubmit=async function(event){
+        event.preventDefault();
+        if(preparing)return;
+        clearPreview();
+        var from=start.value,to=end.value,categoryId=category.value;
+        if(!validDateKey(from)||!validDateKey(to)||from>to){
+          status.textContent='終了日を開始日以降に設定してください。';
+          return;
+        }
+        preparing=fields.disabled=prepare.disabled=true;
+        try{
+          var adopted=root.InsightIndexedDBCandidateV1?.isAdopted();
+          if(!adopted&&root.localStorage.getItem(SK)===null){
+            status.textContent=emptyMessage;
+            return;
+          }
+          var snapshot=adopted
+            ?(await root.InsightIndexedDBSalesInputPreviewV1.readCommittedView()).snapshot
+            :root.InsightStorage.readSnapshot();
+          if(!dialog.open)return;
+          ensure(snapshot);
+          var source=snapshot.stores[storeId];
+          var item=snapshot.salesCountManagement.categories.find(function(c){return c.id===categoryId;});
+          if(!source||!item)throw new Error('Print selection is unavailable');
+          var counts=source.salesCounts,wastes=source.wasteCounts||{};
+          var dates=Array.from(new Set([...Object.keys(counts),...Object.keys(wastes)])).sort().filter(function(date){
+            return date>=from&&date<=to&&validDateKey(date)&&
+              (counts[date]?.[item.id]||wastes[date]?.[item.id]);
+          });
+          if(!dates.length){
+            status.textContent=emptyMessage;
+            return;
+          }
+          var sheet=el('section',undefined,'sc-print-sheet');
+          sheet.append(el('h2','納品・販売・廃棄'),el('p',source.name+' ／ '+item.name),
+            el('p',from+' ～ '+to),el('p','— 未入力　／ 対象外　ー 対象便未確認　※ 一部未入力','sc-print-key'));
+          var monthCache=new Map(),row;
+          dates.forEach(function(date,index){
+            if(index%3===0){row=el('div',undefined,'sc-print-row');sheet.append(row);}
+            row.append(printableCard(snapshot,item,date,counts[date]?.[item.id],wastes[date]?.[item.id],monthCache));
+          });
+          previewArea.append(sheet);
+          print.disabled=false;
+        }catch(_){
+          if(dialog.open)status.textContent='保存済みデータを読み込めませんでした。';
+        }finally{
+          preparing=fields.disabled=prepare.disabled=false;
+        }
+      };
+
+      function clearPrintSheet(){
+        doc.getElementById('scPrintSheet')?.remove();
+        doc.body.classList.remove('sc-printing-cards');
+      }
+      root.addEventListener('afterprint',clearPrintSheet);
+      print.onclick=function(){
+        var sheet=previewArea.firstElementChild?.cloneNode(true);
+        if(!sheet||print.disabled)return;
+        clearPrintSheet();
+        sheet.id='scPrintSheet';
+        doc.body.append(sheet);
+        doc.body.classList.add('sc-printing-cards');
+        try{root.print();}
+        catch(_){
+          clearPrintSheet();
+          status.textContent='印刷画面を開けませんでした。';
+        }
+      };
+    }
     function buildPage(){var nav4=doc.getElementById('nav4'),nav=el('button',undefined,'nav-btn');nav.id='navSalesCount';nav.type='button';nav.innerHTML='<svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 4h18v16H3z"/><path d="M3 9h18M8 4v16M13 4v16M18 4v16"/></svg>販売数入力';nav.onclick=function(){root.gotoNav('salesCounts');};nav4.insertAdjacentElement('afterend',nav);var page=el('div',undefined,'page sc-page');page.id='pageSalesCount';page.innerHTML='<div class="page-header"><div class="page-title">販売数入力</div><div class="header-right"><span id="scDirty" class="sc-status saved">保存済み</span><button id="scSave" class="save-btn" disabled>保存する</button></div></div><div class="sc-toolbar"><button id="scPrev" type="button">‹ 前月</button><strong id="scPeriod"></strong><button id="scNext" type="button">翌月 ›</button><label>カテゴリー <select id="scCategory"></select></label><button id="scManage" type="button">カテゴリー管理</button></div><div class="sc-legend" aria-label="色分けの案内"><span><i class="sc-legend-delivery"></i>納品＝緑</span><span><i class="sc-legend-sales"></i>販売＝オレンジ</span><span><i class="sc-legend-waste"></i>廃棄＝赤</span><span>※一部未入力</span></div><div id="scCalendar" class="sc-calendar"></div><div id="scAverages" class="sc-averages"></div><div id="scAnalysis"></div>';doc.getElementById('main').append(page);doc.getElementById('scSave').onclick=save;doc.getElementById('scPrev').onclick=function(){changePeriod(-1);};doc.getElementById('scNext').onclick=function(){changePeriod(1);};doc.getElementById('scCategory').onchange=function(e){changeCategory(e.target.value);};var manageButton=doc.getElementById('scManage');
       doc.getElementById('pageSalesCount').addEventListener('focusout',function(e){
         if(e.target.matches&&e.target.matches('.sc-calendar .sc-trip input[inputmode="numeric"]:not([readonly])'))lastCountInputBlurAt=Date.now();
       },true);
       // Blur on pointerdown, before the tap moves focus to the management button.
       manageButton.addEventListener('pointerdown',blurSalesCountInput);
-      manageButton.onclick=openCategoryManager;}
+      manageButton.onclick=openCategoryManager;
+      connectCardPrinting(page);}
     buildPage();
     if(!activeCategories().length)categories()[0].hidden=false;state.categoryId=activeCategories()[0].id;readMonth();render();
     var originalGoto=root.gotoNav;root.gotoNav=function(i){if(i==='salesCounts'){if(currentNav==='salesCounts')return;doc.querySelectorAll('.nav-btn').forEach(function(n){n.classList.remove('active');});doc.querySelectorAll('.page').forEach(function(n){n.classList.remove('show');});doc.getElementById('navSalesCount').classList.add('active');doc.getElementById('pageSalesCount').classList.add('show');currentNav='salesCounts';if(!preview)ensure(allStores);store=allStores.stores[allStores.current];readMonth();render();return;}if(currentNav==='salesCounts'){if(!preview&&!confirmLeave())return;if(preview)setDirty(false);}doc.getElementById('navSalesCount').classList.remove('active');doc.getElementById('pageSalesCount').classList.remove('show');return originalGoto(i);};
