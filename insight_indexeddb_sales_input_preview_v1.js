@@ -5,9 +5,9 @@
   let connectedType=null,connectedStatus=null,allowConnectedNavigation=null,allowConnectedPeriod=null,yearManagement=null;
   let readCommittedView=null;
   const screens={
-    sales:{route:2,button:'salesSaveBtn',notice:'savedSales',label:'売上'},
-    kyaku:{route:3,button:'kyakuSaveBtn',notice:'savedKyaku',label:'客数'},
-    haiki:{route:4,button:'haikiSaveBtn',notice:'savedHaiki',label:'廃棄'}
+    sales:{route:2,button:'salesSaveBtn',label:'売上'},
+    kyaku:{route:3,button:'kyakuSaveBtn',label:'客数'},
+    haiki:{route:4,button:'haikiSaveBtn',label:'廃棄'}
   };
   const sidebarRoutes={
     nav0:0,nav1:1,nav2:2,nav3:3,nav4:4,navSalesCount:'salesCounts',navSaleResults:'saleResults'
@@ -26,12 +26,11 @@
       throw new Error('The management controls are unavailable');
     function controlsFor(screen){
       const button=doc.getElementById(screen.button);
-      const notice=doc.getElementById(screen.notice);
-      if(!button||!notice)throw new Error('The input controls are unavailable');
+      if(!button)throw new Error('The input controls are unavailable');
       const status=doc.createElement('p');
       status.setAttribute('role','status');
       button.parentNode.insertBefore(status,button.nextSibling);
-      return {button,notice,status};
+      return {button,status};
     }
 
     const api=root.InsightIndexedDBStorageV1;
@@ -108,21 +107,19 @@
         }
       }
     }
-    let button,notice,status;
+    let button,status;
     const attachments=new Map();
     if(!quick){
       if(!matchesScreen())throw new Error('The displayed month is not the committed snapshot');
       changes();
-      ({button,notice,status}=controlsFor(screen));
-      attachments.set(type,{target,button,notice,status});
+      ({button,status}=controlsFor(screen));
+      attachments.set(type,{target,button,status});
     }
 
     function followCurrentScreen(){
       if(!followInputScreens||(currentNav===screen.route&&attachments.has(type)&&!quick))return;
       const next=Object.keys(screens).find(key=>screens[key].route===currentNav);
       if(!next)return;
-      clearTimeout(timer);
-      notice?.classList.remove('is-visible');
       type=next;
       screen=screens[type];
       if(!attachments.has(type)){
@@ -131,10 +128,9 @@
       }
       const attachment=attachments.get(type);
       attachment.target??={...displayedPeriod(),storeId:state.storeId};
-      ({target,button,notice,status}=attachment);
+      ({target,button,status}=attachment);
       connectedType=type;
     }
-    let timer;
     const blocked=()=>state.busy||state.pending||state.held;
     let hourly;
     function prepareHourlySave({storeId,date,hours,unchanged}){
@@ -210,8 +206,6 @@
     async function save(){
       state.pending=false;
       if(state.held||state.busy)return 'cancelled_before_mutation';
-      clearTimeout(timer);
-      notice.classList.remove('is-visible');
       if(!matchesPeriod()){
         status.textContent='この期間は試験用の'+screen.label+'保存の対象外です。';
         return 'cancelled_before_mutation';
@@ -238,7 +232,7 @@
       state.busy=true;
       button.disabled=true;
       body.inert=true;
-      status.textContent='保存を確認しています。';
+      status.textContent='';
       try{
         const result=await api.save(state.committed.revision,candidate);
         if(!matchesScreen()||JSON.stringify(changes())!==JSON.stringify(edited)){
@@ -249,9 +243,6 @@
         state.committed=result;
         updateMissingBadge();
         status.textContent='';
-        notice.classList.add('is-visible');
-        const savedNotice=notice;
-        timer=root.setTimeout(()=>savedNotice.classList.remove('is-visible'),3000);
         return 'completed';
       }catch(_){
         stop('保存結果を確認できないため、追加の保存を停止しました。');
@@ -302,9 +293,7 @@
       try{
         if(!root.confirm(message))return false;
         if(!unchanged())throw new Error('Clear target changed during confirmation');
-        clearTimeout(timer);
-        notice.classList.remove('is-visible');
-        status.textContent=label+'クリアを確認しています。';
+        status.textContent='';
         if(clearType==='sales')Object.assign(row,{売上:0,買上点数:0});
         else if(clearType==='haiki')Object.assign(row,{廃棄金額:0,haiki:blankHaiki()});
         else month.forEach(row=>{if(row)row.客数=0;});
@@ -315,7 +304,6 @@
         state.committed=result;
         initInputPage(clearType);
         updateMissingBadge();
-        status.textContent=label+'をクリアしました。';
         return true;
       }catch(_){
         stop(label+'クリアの結果を確認できないため、追加の保存を停止しました。');
@@ -339,8 +327,8 @@
     const sidebarSelector=Object.keys(routes).map(id=>'#'+id).join(',');
     const reportDialog=()=>management&&doc.querySelector('#insightReportDialog[open]');
     const healthOverlay=()=>management&&doc.querySelector('#insightDataHealthOverlay:not([hidden])');
-    const weatherAnalysisOverlay=()=>management&&doc.querySelector(
-      '#insightWeatherSalesDiagnosticsOverlay:not([hidden]),#insightWeatherSalesViewOverlay:not([hidden])');
+    const settingsAnalysisOverlay=()=>management&&doc.querySelector(
+      '#insightWeatherSalesDiagnosticsOverlay:not([hidden]),#insightWeatherSalesViewOverlay:not([hidden]),#insightPredictionDataOverlay:not([hidden])');
     let approved=null;
     const screenQuestion='保存せずに画面を移動しますか？';
     const isInputRoute=route=>route===0||route==='salesCounts'||Object.values(screens).some(screen=>screen.route===route);
@@ -370,9 +358,9 @@
           event.stopImmediatePropagation();
           return;
         }
-        const weatherAnalysis=weatherAnalysisOverlay();
-        if(weatherAnalysis){
-          if(!blocked()&&weatherAnalysis.contains(event.target))return;
+        const settingsAnalysis=settingsAnalysisOverlay();
+        if(settingsAnalysis){
+          if(!blocked()&&settingsAnalysis.contains(event.target))return;
           event.preventDefault();
           event.stopImmediatePropagation();
           return;
@@ -420,9 +408,9 @@
         if(management&&(yearOverlay||currentNav==='settings')){
           const recoveryAction=recoveryDialog&&event.target.closest?.('#backupBtn,#restoreBtn');
           const capacityAction=event.target.closest?.('#insightSettingsDataActions button[aria-controls="insightStorageUsage"]');
-          const weatherAnalysisAction=!hourly?.dialog()?.open&&!root.InsightSalesCount.getCategoryDialog()?.open&&
-            event.target.closest?.('#insightWeatherSalesDiagnosticsButton,#insightWeatherSalesViewButton');
-          if(!blocked()&&(yearOverlay?yearOverlay.contains(event.target):recoveryAction||capacityAction||weatherAnalysisAction||
+          const settingsAnalysisAction=!hourly?.dialog()?.open&&!root.InsightSalesCount.getCategoryDialog()?.open&&
+            event.target.closest?.('#insightWeatherSalesDiagnosticsButton,#insightWeatherSalesViewButton,#insightPredictionDataButton');
+          if(!blocked()&&(yearOverlay?yearOverlay.contains(event.target):recoveryAction||capacityAction||settingsAnalysisAction||
             event.target.closest?.(yearControl+','+storeControl+','+storeActionControl+',#insightDataHealthButton,#csvImportBtn,#csvImportFile,#insightWeatherBulkStart,#insightWeatherBulkCancel')))return;
           event.preventDefault();
           event.stopImmediatePropagation();
@@ -457,7 +445,7 @@
     let navigationVersion=0;
     const gotoNav=root.gotoNav;
     root.gotoNav=function(destination){
-      if(followInputScreens&&(blocked()||yearDialog()||eventDialogs().length||budgetDialog()||recoveryDialog?.open||reportDialog()||healthOverlay()||weatherAnalysisOverlay()))return false;
+      if(followInputScreens&&(blocked()||yearDialog()||eventDialogs().length||budgetDialog()||recoveryDialog?.open||reportDialog()||healthOverlay()||settingsAnalysisOverlay()))return false;
       if(quick){
         if(hourly?.dialog()?.open||root.InsightSalesCount.getCategoryDialog()?.open||
            (!isInputRoute(destination)&&!(management&&isManagedRoute(destination)))||
@@ -523,7 +511,7 @@
         if(blocked()||yearDialog()||eventDialogs().length||budgetDialog()||recoveryDialog?.open||id===state.storeId||!Object.hasOwn(state.committed.snapshot.stores,id))return false;
         const route=currentNav;
         const monthly=route===screen.route;
-        if(reportDialog()||healthOverlay()||weatherAnalysisOverlay()||hourly?.dialog()?.open||root.InsightSalesCount.getCategoryDialog()?.open)return false;
+        if(reportDialog()||healthOverlay()||settingsAnalysisOverlay()||hourly?.dialog()?.open||root.InsightSalesCount.getCategoryDialog()?.open)return false;
         if(!monthly&&!management){
           storeStatus.textContent='試験用の店舗切替は月次入力画面で行ってください。';
           return false;
@@ -547,8 +535,6 @@
         candidate.current=id;
         applySharedWeatherToStore(candidate.stores[id],candidate);
         const wasInert=doc.body.inert;
-        clearTimeout(timer);
-        notice?.classList.remove('is-visible');
         state.busy=true;
         selector.disabled=true;
         if(button)button.disabled=true;
@@ -617,7 +603,7 @@
 
       function canOpenStoreMenu(){
         return isManagedRoute(currentNav)&&!blocked()&&!yearDialog()&&!eventDialogs().length&&
-          !budgetDialog()&&!recoveryDialog?.open&&!reportDialog()&&!healthOverlay()&&!weatherAnalysisOverlay()&&!hourly?.dialog()?.open&&
+          !budgetDialog()&&!recoveryDialog?.open&&!reportDialog()&&!healthOverlay()&&!settingsAnalysisOverlay()&&!hourly?.dialog()?.open&&
           !root.InsightSalesCount.getCategoryDialog()?.open&&!doc.querySelector('#ofEventDialog[open]');
       }
 

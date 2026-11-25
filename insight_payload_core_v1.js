@@ -910,10 +910,6 @@ function saveQuick(){
   Object.assign(rows[ri],readQuickValues());
   setSharedWeather(fy,month,quickEditDay,quickWeather);
   persist();
-  // Flash feedback
-  const btn=document.querySelector(".quick-save");
-  btn.textContent="✓ 保存しました";btn.classList.add("is-saved-feedback");
-  setTimeout(()=>{btn.textContent="保存する";btn.classList.remove("is-saved-feedback");},2000);
   updateMissingBadge();
 }
 
@@ -2373,9 +2369,6 @@ function saveInput(type){
   // 天気を共有ストアに同期
   clean.forEach(r=>{if(r.weather)setSharedWeather(editYear[type],editMonth[type],r.d,r.weather);});
   persist();updateMissingBadge();
-  const msgId={sales:"savedSales",kyaku:"savedKyaku",haiki:"savedHaiki"}[type];
-  const msg=document.getElementById(msgId);
-  if(msg){msg.classList.add("is-visible");setTimeout(()=>msg.classList.remove("is-visible"),3000);}
 }
 
 function clearDayData(type){
@@ -2394,7 +2387,6 @@ function clearDayData(type){
   persist();
   initInputPage(type);
   updateMissingBadge();
-  showToast(`🗑 ${m}${day}日のデータをクリアしました`,"danger");
 }
 
 
@@ -2476,7 +2468,6 @@ function clearKyakuMonth(){
   persist();
   initInputPage("kyaku");
   updateMissingBadge();
-  showToast(`🗑 ${m}の客数データをクリアしました`,"danger");
 }
 
 function clearTodayData(){
@@ -2494,7 +2485,6 @@ function clearTodayData(){
   persist();
   initQuickPage();
   updateMissingBadge();
-  showToast("🗑 本日のデータをクリアしました","danger");
 }
 
 /* ══ バックアップ・復元 ══ */

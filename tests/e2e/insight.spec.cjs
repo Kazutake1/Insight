@@ -359,10 +359,10 @@ test('トップページは外部shellと機能manifestの最新版確認をno-s
     fetch('/insight_payload_source_v1.html?e2e-shell-check=1',{cache:'no-store'}).then(r=>r.text())
   ]));
   const [source,boot,loader,payload]=sources;
-  expect(source).toContain('name="insight-shell-version" content="20261125-sales-cards-print-build-130"');
-  expect(source).toContain('insight_shell_boot_v1.js?v=20261125-sales-cards-print-build-130');
-  expect(source).toContain('insight_shell_loader_v1.js?v=20261125-sales-cards-print-3');
-  expect(source).toContain('insight_shell_v1.css?v=20261125-sales-cards-print-build-130');
+  expect(source).toContain('name="insight-shell-version" content="20261125-input-backup-build-132"');
+  expect(source).toContain('insight_shell_boot_v1.js?v=20261125-input-backup-build-132');
+  expect(source).toContain('insight_shell_loader_v1.js?v=20261125-input-backup-1');
+  expect(source).toContain('insight_shell_v1.css?v=20261125-input-backup-build-132');
   expect(source).not.toMatch(/<script(?![^>]*\bsrc=)[^>]*>/i);
   expect(source).not.toMatch(/<style\b/i);
   expect(source).not.toMatch(/script-src[^;]*'unsafe-inline'/);
@@ -371,13 +371,13 @@ test('トップページは外部shellと機能manifestの最新版確認をno-s
   expect(source).not.toMatch(/style-src[^;]*'unsafe-inline'/);
   expect(boot).toContain("fetch('./Index.html?insight_probe='+Date.now(),{cache:'no-store'})");
   expect(loader).toContain("fetch('./insight_shell_loader_v1.js?insight_manifest_probe='+Date.now(),{cache:'no-store'})");
-  expect(loader).toContain("fetch('./insight_payload_source_v1.html?v=20261125-sales-cards-print-3',{cache:'no-store'})");
+  expect(loader).toContain("fetch('./insight_payload_source_v1.html?v=20261125-input-backup-1',{cache:'no-store'})");
   expect(loader).toContain('function featureSignature(entries)');
   expect(source).toContain('https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js');
   expect(source).toContain('integrity="sha512-CQBWl4fJHWbryGE+Pc7UAxWMUMNMWzWxF4SQo9CgkJIN1kx6djDQZjh3Y8SZ1d+6I+1zze6Z7kHXO7q3UyZAWw=="');
   expect(loader).not.toContain('stripPayloadChartScript');
-  expect(payload).toContain('insight_payload_core_v1.css?v=20261125-sales-cards-print-3');
-  expect(payload).toContain('insight_payload_core_v1.js?v=20261124-indexeddb-preview-7');
+  expect(payload).toContain('insight_payload_core_v1.css?v=20261125-input-backup-1');
+  expect(payload).toContain('insight_payload_core_v1.js?v=20261125-input-backup-1');
   expect(payload).toContain('insight_payload_ai_legacy_v1.js?v=20261020-ai-panel-smooth-1');
   expect(payload).toContain('insight_payload_bindings_v1.js?v=20261030-step4-gate3-ab-1');
   expect(payload).not.toMatch(/\son(?:click|change)\s*=/i);
@@ -2251,18 +2251,15 @@ test('販売数入力で未登録の過年度へ移動すると年度を正式�
 });
 
 
-test('今日の入力の保存完了フィードバックはclass状態で2秒後に戻る',async({page})=>{
+test('今日の入力を保存してもボタンの文言を変更しない',async({page})=>{
   const errors=await openInsight(page);
   await page.locator('#nav0').click();
   const button=page.locator('#quickSaveBtn');
   await expect(button).toBeVisible();
   await expect(button).toHaveText('保存する');
   await button.click();
-  await expect(button).toHaveText('✓ 保存しました');
-  await expect(button).toHaveClass(/is-saved-feedback/);
-  await expect.poll(()=>button.evaluate(node=>getComputedStyle(node).backgroundColor)).toBe('rgb(22, 163, 74)');
-  await expect(button).toHaveText('保存する',{timeout:3500});
-  await expect(button).not.toHaveClass(/is-saved-feedback/);
+  await expect(button).toHaveText('保存する');
+  expect(await page.evaluate(()=>localStorage.getItem('insight_v11'))).not.toBeNull();
   expect(errors).toEqual([]);
 });
 

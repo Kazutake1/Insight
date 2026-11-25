@@ -186,7 +186,7 @@
       row.haiki=blankHaiki();delete row.storeMemo;
       persist();dirty=false;
       window.renderQuickNav();window.renderQuickPage();updateMissingBadge();
-      showToast('🗑 '+target+'の入力データをクリアしました','#dc2626','#fef2f2');
+
     });
   };
   if(typeof currentNav!=='undefined'&&currentNav===0)window.renderQuickNav();

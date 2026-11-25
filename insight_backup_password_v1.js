@@ -9,7 +9,7 @@
     try{if(previousFocus&&previousFocus.isConnected)previousFocus.focus();}catch(_){}
     previousFocus=null;
   }
-  function shell(title){
+  function shell(title,settingsBackup){
     if(!overlay){
       previousFocus=document.activeElement;
       overlay=document.createElement('div');overlay.id='insightBackupOverlay';
@@ -27,6 +27,7 @@
     }
     overlay.replaceChildren();
     var panel=document.createElement('section');panel.className='insight-backup-panel';
+    panel.classList.toggle('insight-backup-export',settingsBackup===true);
     panel.setAttribute('role','dialog');panel.setAttribute('aria-modal','true');panel.setAttribute('aria-labelledby','insightBackupTitle');
     var heading=document.createElement('h2');heading.id='insightBackupTitle';heading.textContent=title;panel.appendChild(heading);overlay.appendChild(panel);
     return panel;
@@ -37,7 +38,7 @@
   }
   function button(text,fn){var b=document.createElement('button');b.type='button';b.textContent=text;b.addEventListener('click',fn);return b;}
   function request(options){
-    var panel=shell(options.title),form=document.createElement('form');
+    var panel=shell(options.title,options.settingsBackup),form=document.createElement('form');
     var note=document.createElement('p');note.textContent=options.confirm
       ?'6〜1024文字で設定してください。パスワードを忘れると復号できません。保存・送信はしません。'
       :'このバックアップの作成時に設定したパスワードを入力してください。';
@@ -63,12 +64,12 @@
     inputs[0].focus();
     return new Promise(function(resolve){pending=resolve;});
   }
-  function busy(message,onCancel){
-    var panel=shell(message),note=document.createElement('p');note.textContent='処理中です。しばらくお待ちください。';note.setAttribute('role','status');panel.appendChild(note);
+  function busy(message,onCancel,settingsBackup){
+    var panel=shell(message,settingsBackup),note=document.createElement('p');note.textContent='処理中です。しばらくお待ちください。';note.setAttribute('role','status');panel.appendChild(note);
     cancelBusy=onCancel;var b=button('キャンセル',cancel);panel.appendChild(b);b.focus();
   }
   function confirmSaved(options){
-    var panel=shell('保存先のファイルを確認してください');
+    var panel=shell('保存先のファイルを確認してください',options.settingsBackup);
     var filename=document.createElement('p');filename.textContent='ファイル名：'+options.filename;panel.appendChild(filename);
     var note=document.createElement('p');
     note.textContent='ダウンロード処理を開始しましたが、保存完了は未確認です。端末の保存先でこのファイルを確認してから選んでください。確認はご本人の申告であり、アプリによる端末ファイルの検証ではありません。'+(options.kind==='preRestore'?' 確認するまで復元の書き込みは開始しません。':'');

@@ -251,7 +251,6 @@
         dialog.close();
         renderQuick();
         if(root.InsightEventResults&&typeof root.InsightEventResults.render==='function')root.InsightEventResults.render();
-        if(typeof showToast==='function')showToast('✓ 時間帯別客数を保存しました','#15803d','#f0fdf4');
       }
       cancel.type='button';cancel.onclick=closeDialog;save.type='button';save.onclick=function(){
         refresh();
@@ -263,7 +262,7 @@
             unchanged:function(){return dialog.isConnected&&dialog.open&&readDraft()===captured;}});
           if(!commit)return;
           save.disabled=true;dialog.inert=true;
-          feedback.textContent='保存を確認しています。';
+          feedback.textContent='';
           return observeHourlySave(async function(){
             try{
               if(await commit()){savedFeedback();return true;}

@@ -205,6 +205,7 @@
       original.replaceWith(button);
       button.addEventListener('click',()=>{
         if(dialog.open||committed)return;
+        dialog.classList.toggle('insight-backup-export',mode==='export');
         heading.textContent=title;
         formHost.replaceChildren();
         if(mode==='export')mountExport(formHost);
