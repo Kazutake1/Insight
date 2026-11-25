@@ -410,6 +410,10 @@ test('カード印刷は店舗と期間とカテゴリーを絞り込み保存�
       '2026-02-04':{cat_onigiri:record(23)},
       '2026-02-05':{cat_onigiri:record(24)}
     };
+    for(let offset=0;offset<65;offset++){
+      const date=new Date(Date.UTC(2026,1,6+offset)).toISOString().slice(0,10);
+      store.salesCounts[date]={cat_onigiri:record(45)};
+    }
     store.wasteCounts={'2026-02-01':{cat_onigiri:{trips:[0,null,null]}}};
     allStores.stores['fixture-peer']={...structuredClone(store),name:'架空店舗B',
       salesCounts:{'2026-02-01':{cat_onigiri:record(88)}}};
@@ -447,7 +451,7 @@ test('カード印刷は店舗と期間とカテゴリーを絞り込み保存�
   await to.fill('2026-02-05');
   await preview.click();
   const sheet=dialog.locator('.sc-print-sheet'),cards=sheet.locator('.sc-day');
-  await expect(sheet.locator('.sc-print-category > :not(.sc-print-row)')).toHaveText(['架空店舗A ／ おにぎり']);
+  await expect(sheet.locator('h2')).toHaveText(['架空店舗A ／ おにぎり']);
   await expect(cards.locator('.sc-day-num')).toHaveText([
     /^2026\/1\/31/,/^2026\/2\/1/,/^2026\/2\/2/,/^2026\/2\/3/,/^2026\/2\/4/,/^2026\/2\/5/
   ]);
@@ -472,6 +476,49 @@ test('カード印刷は店舗と期間とカテゴリーを絞り込み保存�
 
   await page.evaluate(()=>{window.print=()=>{window.fixturePrintCalled=true;};});
   const originalViewport=page.viewportSize();
+  const printed=page.locator('#scPrintSheet');
+  async function checkPDFPages(pageCount){
+    // Link annotations locate the actual printed positions without depending on font encoding.
+    // These markers are added to the isolated print copy only.
+    const expected=await printed.evaluate(sheet=>{
+      function mark(node,key){
+        const link=document.createElement('a');
+        link.href='https://example.invalid/insight-print/'+key;
+        link.append(...node.childNodes);
+        node.append(link);
+      }
+      const rows=[...sheet.querySelectorAll('.sc-print-row')];
+      rows.forEach((row,index)=>{
+        mark(row.querySelector('.sc-day-num'),'row-'+index+'-start');
+        mark(row.querySelector('.sc-day:last-child .sc-total-waste span'),'row-'+index+'-end');
+      });
+      const starts=[...sheet.querySelectorAll('.sc-print-start')];
+      starts.forEach((start,index)=>mark(start.querySelector('h2'),'category-'+index));
+      return {rowCount:rows.length,firstRows:starts.map(start=>rows.indexOf(start.querySelector('.sc-print-row')))};
+    });
+    const pdf=(await page.pdf({preferCSSPageSize:true})).toString('latin1');
+    const objects=new Map([...pdf.matchAll(/\b(\d+) 0 obj\s+([\s\S]*?)\s+endobj/g)].map(match=>[match[1],match[2]]));
+    const pages=[...objects.values()].filter(object=>/\/Type\s*\/Page\b/.test(object));
+    if(pageCount===1)expect(pages).toHaveLength(1);
+    else expect(pages.length).toBeGreaterThan(1);
+    const markerPages=new Map();
+    pages.forEach((pageObject,index)=>{
+      const refs=pageObject.match(/\/Annots\s*\[([^\]]*)\]/)?.[1]??'';
+      for(const [,id] of refs.matchAll(/(\d+) 0 R/g)){
+        const marker=objects.get(id)?.match(/example\.invalid\/insight-print\/([a-z0-9-]+)/)?.[1];
+        if(marker)markerPages.set(marker,index);
+      }
+    });
+    const pageOf=marker=>{
+      const result=markerPages.get(marker);
+      expect(result,marker).toBeDefined();
+      return result;
+    };
+    for(let row=0;row<expected.rowCount;row++){
+      expect(pageOf('row-'+row+'-start')).toBe(pageOf('row-'+row+'-end'));
+    }
+    expected.firstRows.forEach((row,index)=>expect(pageOf('category-'+index)).toBe(pageOf('row-'+row+'-start')));
+  }
   const a4PreviewWidth=await sheet.evaluate(node=>node.getBoundingClientRect().width);
   for(const {value,width,pageName,size} of [
     {value:'a4',width:718,pageName:'insightSalesCards',size:/^a4 portrait$/i},
@@ -490,7 +537,6 @@ test('カード印刷は店舗と期間とカテゴリーを絞り込み保存�
     // A4 and JIS B5 with 10mm side margins, in CSS pixels.
     await page.setViewportSize({width,height:1046});
     await page.emulateMedia({media:'print'});
-    const printed=page.locator('#scPrintSheet');
     await expect(printed.locator('.sc-day')).toHaveCount(7);
     await expect(printed).toBeVisible();
     const printLayout=await printed.evaluate(sheet=>{
@@ -507,18 +553,31 @@ test('カード印刷は店舗と期間とカテゴリーを絞り込み保存�
         columns:getComputedStyle(rows[0]).gridTemplateColumns.split(' ').length,
         categoryStarts:sections.map(section=>getComputedStyle(section).breakBefore),
         keepRows:rows.every(row=>getComputedStyle(row).breakInside==='avoid'),
+        keepHeadings:[...sheet.querySelectorAll('.sc-print-start')].every(group=>
+          getComputedStyle(group).breakInside==='avoid'&&group.querySelector('h2 + .sc-print-row')),
         wrapped:digitRange.getClientRects().length!==1,
         fits:sheet.scrollWidth<=sheet.clientWidth
       };
     });
     expect(printLayout).toMatchObject({
-      name:pageName,size,margin:'10mm',columns:5,categoryStarts:['auto','page'],keepRows:true,wrapped:false,fits:true
+      name:pageName,size,margin:'10mm',columns:5,categoryStarts:['auto','auto'],keepRows:true,keepHeadings:true,wrapped:false,fits:true
     });
     await expect(page.locator('#app')).toBeHidden();
+    await checkPDFPages(1);
     await page.evaluate(()=>{window.fixturePrintCalled=false;window.dispatchEvent(new Event('afterprint'));});
     await expect(printed).toHaveCount(0);
     await page.emulateMedia({media:'screen'});
     await page.setViewportSize(originalViewport);
+  }
+
+  await to.fill('2026-04-20');
+  for(const value of ['a4','b5']){
+    await paper.selectOption(value);
+    await preview.click();
+    await print.click();
+    await checkPDFPages();
+    await page.evaluate(()=>window.dispatchEvent(new Event('afterprint')));
+    await expect(printed).toHaveCount(0);
   }
 
   // Contiguous print groups omit selected categories with no cards in the period.
@@ -527,8 +586,8 @@ test('カード印刷は店舗と期間とカテゴリーを絞り込み保存�
   await preview.click();
   await expect(sections.locator('h2')).toHaveText(['架空店舗A ／ おにぎり','架空店舗A ／ サンドイッチ']);
   await expect(dialog.getByRole('status')).toHaveText('保存済みのカードがあるカテゴリーを表示しています。');
-  await from.fill('2026-02-06');
-  await to.fill('2026-02-06');
+  await from.fill('2026-05-01');
+  await to.fill('2026-05-01');
   await expect(print).toBeDisabled();
   await preview.click();
   await expect(dialog.getByRole('status')).toHaveText('選択した期間に保存済みのカードはありません。');

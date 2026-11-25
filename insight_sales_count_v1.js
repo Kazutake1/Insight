@@ -895,9 +895,14 @@
             var recordedDates=dates.filter(function(date){return counts[date]?.[item.id]||wastes[date]?.[item.id];});
             if(!recordedDates.length)return;
             var section=el('section',undefined,'sc-print-category'),row;
-            section.append(el('h2',source.name+' ／ '+item.name));
+            var firstRowGroup=el('div',undefined,'sc-print-start');
+            firstRowGroup.append(el('h2',source.name+' ／ '+item.name));
+            section.append(firstRowGroup);
             recordedDates.forEach(function(date,index){
-              if(index%5===0){row=el('div',undefined,'sc-print-row');section.append(row);}
+              if(index%5===0){
+                row=el('div',undefined,'sc-print-row');
+                (index===0?firstRowGroup:section).append(row);
+              }
               row.append(printableCard(snapshot,item,date,counts[date]?.[item.id],wastes[date]?.[item.id],monthCache));
             });
             sheet.append(section);

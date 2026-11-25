@@ -1665,7 +1665,6 @@ body.ai-analysis-open #main{margin-right:0!important}
   body.sc-printing-cards>*:not(#scPrintSheet){display:none!important}
   body.sc-printing-cards>#scPrintSheet{display:block;page:insightSalesCards;padding:0}
   body.sc-printing-cards>#scPrintSheet.sc-print-b5{page:insightSalesCardsB5}
-  #scPrintSheet .sc-print-category+.sc-print-category{break-before:page;page-break-before:always}
-  #scPrintSheet .sc-print-category>h2{break-after:avoid}
-  #scPrintSheet .sc-print-row{break-inside:avoid;page-break-inside:avoid}
+  #scPrintSheet .sc-print-category+.sc-print-category{margin-top:16px}
+  #scPrintSheet .sc-print-start,#scPrintSheet .sc-print-row{break-inside:avoid;page-break-inside:avoid}
 }
