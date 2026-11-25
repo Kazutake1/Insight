@@ -575,9 +575,12 @@ test('カード印刷は店舗と期間とカテゴリーを絞り込み保存�
     await paper.selectOption(value);
     await preview.click();
     await print.click();
+    await page.emulateMedia({media:'print'});
+    await expect(printed).toBeVisible();
     await checkPDFPages();
     await page.evaluate(()=>window.dispatchEvent(new Event('afterprint')));
     await expect(printed).toHaveCount(0);
+    await page.emulateMedia({media:'screen'});
   }
 
   // Contiguous print groups omit selected categories with no cards in the period.
