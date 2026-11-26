@@ -319,3 +319,304 @@ test('イベント・催事は開催記録ごとに実績表示カテゴリーID
   testSnapshot.resultCategoryIds=['cat_onigiri'];
   assert.doesNotThrow(()=>events.validateSnapshot(testSnapshot));
 });
+
+
+/* STEP4 P4d-5: original events dialog handlers in a fictional, isolated VM DOM.
+ * The witness is positive DIRTY or UNKNOWN only; this does not inspect saved
+ * data, establish a clean editor, or exercise real persistence/network.
+ */
+const fs=require('node:fs');
+const path=require('node:path');
+const vm=require('node:vm');
+const eventSource=fs.readFileSync(path.join(__dirname,'../insight_events_v1.js'),'utf8');
+
+function fictionalEventDialog(options={}){
+  const operations={transaction:0,network:0,model:0},dialogs=[];
+  function make(tag){
+    const element={
+      tagName:tag,id:'',className:'',value:'',textContent:'',children:[],
+      parentNode:null,listeners:{},open:false,removed:false,
+      classList:{add(){}},
+      setAttribute(){},
+      append(...nodes){
+        for(const n of nodes){
+          if(!n||typeof n!=='object')throw Error('invalid fictional child');
+          n.parentNode=this;this.children.push(n);
+        }
+      },
+      replaceChildren(...nodes){this.children=[];this.append(...nodes);},
+      insertBefore(child,before){
+        if(child.parentNode){
+          const idx=child.parentNode.children.indexOf(child);
+          if(idx>=0)child.parentNode.children.splice(idx,1);
+        }
+        child.parentNode=this;
+        const index=this.children.indexOf(before);
+        if(index<0)this.children.push(child);else this.children.splice(index,0,child);
+      },
+      addEventListener(type,fn){(this.listeners[type]||(this.listeners[type]=[])).push(fn);},
+      emit(type){
+        const evt={type,target:this,preventDefault(){}};
+        let cursor=this;
+        while(cursor){
+          for(const fn of cursor.listeners[type]||[])fn.call(cursor,evt);
+          cursor=cursor.parentNode;
+        }
+      },
+      close(){this.open=false;this.emit('close');},
+      showModal(){this.open=true;},
+      remove(){
+        if(this.parentNode){
+          const index=this.parentNode.children.indexOf(this);
+          if(index>=0)this.parentNode.children.splice(index,1);
+        }
+        this.removed=true;this.parentNode=null;
+      }
+    };
+    if(tag==='dialog'){dialogs.push(element);if(options.onDialogCreated)options.onDialogCreated(element);}
+    return element;
+  }
+  const body=make('body'),host=make('section');host.id='opsDailyWrap';
+  body.append(host);
+  function walk(parent,condition){
+    if(condition(parent))return parent;
+    for(const child of parent.children){
+      const found=walk(child,condition);
+      if(found)return found;
+    }
+    return null;
+  }
+  function getById(id){return walk(body,x=>x.id===id);}
+  const document={readyState:'complete',body,createElement:make,getElementById:getById};
+  const privateEvent={
+    id:'e_canary',type:'other',scope:'store',
+    startDate:'2026-10-26',endDate:'2026-10-26',
+    snapshot:{version:1,title:'FICTIONAL_PRIVATE_EVENT',note:''}
+  };
+  const allStores={current:'a',stores:{
+    a:{name:'FICTIONAL_PRIVATE_STORE',events:[JSON.parse(JSON.stringify(privateEvent))]},
+    b:{name:'Other fictional store'}
+  },eventManagement:{version:1,presets:[],events:[]}};
+  const original=JSON.stringify(allStores);
+  const root={
+    document,InsightDateContext:{getSelectedIso(){return '2026-10-26';}},
+    InsightHooks:{on(){}},
+    InsightStorage:{transaction(){operations.transaction++;throw Error('should not persist');}}
+  };
+  const sandbox={
+    window:root,globalThis:root,document,allStores,
+    Date,JSON,String,Number,Object,Array,Math,Set,Map,
+    alert(){throw Error('unexpected alert');},confirm(){return false;}
+  };
+  vm.createContext(sandbox);vm.runInContext(eventSource,sandbox);
+  const model=root.InsightEvents;
+  function read(){return JSON.parse(JSON.stringify(model.getForecastDraftStatus()));}
+  function openEdit(){
+    const b=walk(host,x=>x.tagName==='button'&&x.textContent==='編集');
+    assert.ok(b,'the existing event edit button should render');
+    b.onclick();
+    const d=dialogs.at(-1);
+    assert.ok(d&&d.open,'original edit handler must open dialog');
+    const input=walk(d,x=>x.tagName==='input');
+    const form=walk(d,x=>x.tagName==='form');
+    assert.ok(input&&form,'original event form must render');
+    return {dialog:d,input,form};
+  }
+  function openDetails(){
+    const b=walk(host,x=>x.tagName==='button'&&x.className==='ie-summary');
+    assert.ok(b);
+    b.onclick();
+    return dialogs.at(-1);
+  }
+  return {read,model,openEdit,openDetails,dialogs,allStores,original,operations};
+}
+function eventUnknown(s){
+  assert.equal(s.initialized,false);assert.equal(s.dirty,null);
+  assert.ok(Number.isSafeInteger(s.epoch));
+}
+test('P4d5 V01: no browser editor produces UNKNOWN without raw values',()=>{
+  const state=events.getForecastDraftStatus();
+  assert.deepEqual(state,{initialized:false,dirty:null,epoch:0});
+  assert.equal(Object.isFrozen(state),true);
+});
+test('P4d5 V02: browser fixture initializes UNKNOWN and opens real event editor',()=>{
+  const h=fictionalEventDialog(),start=h.read().epoch;
+  eventUnknown(h.read());
+  h.openEdit();
+  eventUnknown(h.read());
+  assert.ok(h.read().epoch>start);
+  assert.equal(h.operations.transaction,0);
+});
+test('P4d5 V03: real dialog input listener marks observed DIRTY',()=>{
+  const h=fictionalEventDialog(),ui=h.openEdit(),before=h.read().epoch;
+  ui.input.value='0';ui.input.emit('input');
+  assert.equal(h.read().initialized,true);
+  assert.equal(h.read().dirty,true);
+  assert.ok(h.read().epoch>before);
+  assert.equal(JSON.stringify(h.allStores),h.original);
+});
+test('P4d5 V04: input value getter is never accessed',()=>{
+  const h=fictionalEventDialog(),ui=h.openEdit();
+  Object.defineProperty(ui.input,'value',{get(){throw Error('RAW_EVENT_CANARY');}});
+  ui.input.emit('input');
+  assert.equal(h.read().dirty,true);
+  assert.doesNotMatch(JSON.stringify(h.read()),/RAW_EVENT_CANARY|FICTIONAL_PRIVATE_EVENT|FICTIONAL_PRIVATE_STORE/);
+});
+test('P4d5 V05: change event advances epoch without reading input',()=>{
+  const h=fictionalEventDialog(),ui=h.openEdit();
+  ui.input.emit('input');const first=h.read().epoch;
+  ui.input.emit('change');
+  assert.equal(h.read().dirty,true);
+  assert.ok(h.read().epoch>first);
+});
+test('P4d5 V06: form submit invalidates old dirty witness',()=>{
+  const h=fictionalEventDialog(),ui=h.openEdit();
+  ui.input.emit('input');const before=h.read().epoch;
+  ui.form.emit('submit');
+  eventUnknown(h.read());
+  assert.ok(h.read().epoch>before);
+  assert.equal(h.operations.transaction,0,'fictional dispatch does not run submit handler');
+});
+test('P4d5 V07: close and reopening never reuse old dirty epoch',()=>{
+  const h=fictionalEventDialog(),ui=h.openEdit();
+  ui.input.emit('input');const first=h.read().epoch;
+  ui.dialog.close();
+  eventUnknown(h.read());const after=h.read().epoch;
+  h.openEdit();eventUnknown(h.read());
+  assert.ok(after>first&&h.read().epoch>after);
+});
+test('P4d5 V08: a second dialog invalidates an earlier witness',()=>{
+  const h=fictionalEventDialog(),ui=h.openEdit();
+  ui.input.emit('input');const first=h.read().epoch;
+  const details=h.openDetails();
+  assert.ok(details.open);
+  eventUnknown(h.read());assert.ok(h.read().epoch>first);
+  ui.dialog.close();details.close();
+  eventUnknown(h.read());
+});
+test('P4d5 V09: view-only details dialog does not falsely claim clean',()=>{
+  const h=fictionalEventDialog(),d=h.openDetails();
+  eventUnknown(h.read());d.close();eventUnknown(h.read());
+});
+test('P4d5 V10: dirty -> unknown -> dirty is a new epoch',()=>{
+  const h=fictionalEventDialog(),ui=h.openEdit();
+  ui.input.emit('input');const a=h.read().epoch;
+  ui.form.emit('submit');const b=h.read().epoch;
+  ui.input.emit('change');const c=h.read().epoch;
+  assert.ok(a<b&&b<c);assert.equal(h.read().dirty,true);
+});
+test('P4d5 V11: getter has only three frozen metadata fields',()=>{
+  const h=fictionalEventDialog(),ui=h.openEdit();ui.input.emit('input');
+  const result=h.model.getForecastDraftStatus();
+  assert.equal(Object.isFrozen(result),true);
+  assert.deepEqual(Object.keys(result).sort(),['dirty','epoch','initialized']);
+  assert.doesNotMatch(JSON.stringify(result),/FICTIONAL_PRIVATE|value|name|date|store|raw/);
+});
+test('P4d5 V12: no storage transaction or model/network side effect',()=>{
+  const h=fictionalEventDialog(),ui=h.openEdit();
+  ui.input.emit('input');ui.form.emit('submit');
+  ui.dialog.close();
+  assert.equal(h.operations.transaction,0);
+  assert.equal(h.operations.network,0);assert.equal(h.operations.model,0);
+  assert.equal(JSON.stringify(h.allStores),h.original);
+});
+
+
+/* P4d-6: multi-dialog and button/programmatic fail-closed fence. */
+test('P4d6 M01: UI click invalidates previous witness without a CLEAN claim',()=>{
+  const h=fictionalEventDialog(),ui=h.openEdit();
+  ui.input.emit('input');const prior=h.read().epoch;
+  ui.input.emit('click');
+  eventUnknown(h.read());assert.ok(h.read().epoch>prior);
+  ui.input.emit('change');
+  assert.equal(h.read().dirty,true);
+  assert.equal(h.operations.transaction,0);
+  assert.equal(JSON.stringify(h.allStores),h.original);
+});
+test('P4d6 M02: multiple live dialogs remain UNKNOWN despite either input',()=>{
+  const h=fictionalEventDialog(),editor=h.openEdit();
+  editor.input.emit('input');assert.equal(h.read().dirty,true);
+  const details=h.openDetails();
+  eventUnknown(h.read());
+  editor.input.emit('input');
+  eventUnknown(h.read());
+  details.emit('input');
+  eventUnknown(h.read());
+  details.close();
+  eventUnknown(h.read());
+  editor.input.emit('input');
+  assert.equal(h.read().dirty,true);
+  assert.equal(JSON.stringify(h.allStores),h.original);
+});
+test('P4d6 M03: late events from closed older dialog cannot mask new dirty',()=>{
+  const h=fictionalEventDialog(),old=h.openEdit();
+  old.input.emit('input');old.dialog.close();
+  const next=h.openEdit();
+  next.input.emit('input');const state=h.read();
+  assert.equal(state.dirty,true);
+  old.input.emit('change');old.dialog.emit('click');old.dialog.emit('submit');
+  assert.deepEqual(h.read(),state);
+  assert.equal(h.operations.transaction,0);
+});
+test('P4d6 M04: reentrant showModal input remains UNKNOWN',()=>{
+  const h=fictionalEventDialog({onDialogCreated(dialog){
+    const original=dialog.showModal;
+    dialog.showModal=function(){
+      original.call(this);
+      this.emit('input');
+    };
+  }});
+  const editor=h.openEdit();
+  eventUnknown(h.read());
+  editor.input.emit('input');
+  eventUnknown(h.read(),'cannot revive a session with incomplete initialization');
+  editor.dialog.close();
+  eventUnknown(h.read());
+});
+test('P4d6 M05: cancel without close invalidates, later explicit input is new witness',()=>{
+  const h=fictionalEventDialog(),ui=h.openEdit();
+  ui.input.emit('input');const first=h.read().epoch;
+  ui.dialog.emit('cancel');eventUnknown(h.read());
+  assert.ok(h.read().epoch>first);
+  ui.input.emit('input');assert.equal(h.read().dirty,true);
+  ui.dialog.close();eventUnknown(h.read());
+});
+test('P4d6 M06: old dialog closing while second remains never certifies CLEAN',()=>{
+  const h=fictionalEventDialog(),old=h.openEdit(),detail=h.openDetails();
+  old.dialog.close();
+  eventUnknown(h.read());
+  detail.emit('change');
+  assert.equal(h.read().dirty,true,'sole current dialog input can be witnessed');
+  detail.close();eventUnknown(h.read());
+});
+test('P4d6 M07: synthetic changes on a closed dialog remain ignored',()=>{
+  const h=fictionalEventDialog(),ui=h.openEdit();
+  ui.input.emit('input');ui.dialog.close();
+  const start=h.read();eventUnknown(start);
+  ui.input.emit('input');ui.input.emit('change');ui.dialog.emit('cancel');
+  assert.deepEqual(h.read(),start);
+});
+test('P4d6 M08: input raw getter and private store identifiers remain inaccessible',()=>{
+  const h=fictionalEventDialog(),ui=h.openEdit();
+  Object.defineProperty(ui.input,'value',{get(){throw Error('SECRET_INPUT_GETTER');}});
+  ui.input.emit('input');
+  assert.equal(h.read().dirty,true);
+  assert.doesNotMatch(JSON.stringify(h.read()),/SECRET_INPUT_GETTER|FICTIONAL_PRIVATE/);
+  assert.equal(Object.isFrozen(h.model.getForecastDraftStatus()),true);
+  assert.deepEqual(Object.keys(h.read()).sort(),['dirty','epoch','initialized']);
+  assert.equal(h.operations.transaction,0);
+  assert.equal(JSON.stringify(h.allStores),h.original);
+});
+
+test('P4d6 M09: duplicate close notification from stale dialog cannot erase newer DIRTY',()=>{
+  const h=fictionalEventDialog(),old=h.openEdit();
+  old.input.emit('input');old.dialog.close();
+  const current=h.openEdit();
+  current.input.emit('input');
+  const before=h.read();
+  assert.equal(before.dirty,true);
+  old.dialog.emit('close');
+  assert.deepEqual(h.read(),before);
+  assert.equal(h.operations.transaction,0);
+  assert.equal(JSON.stringify(h.allStores),h.original);
+});
