@@ -8,7 +8,7 @@
   var FORMAT='InsightEncryptedBackup';
   var VERSION=1;
   var ITERATIONS=600000;
-  var MAX_PLAINTEXT_BYTES=15*1024*1024;
+  var MAX_PLAINTEXT_BYTES=25*1024*1024;
   var MAX_CIPHERTEXT_BYTES=MAX_PLAINTEXT_BYTES+16;
   var encoder=new TextEncoder();
   var decoder=new TextDecoder('utf-8',{fatal:true});

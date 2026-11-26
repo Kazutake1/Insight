@@ -31,9 +31,9 @@ var orderedFeatureLoads=[
   './insight_quick_date_nav_v1.js?v=20261125-input-backup-1',
   './insight_ops_kpifix_v1.js?v=20260930-hooks1',
   './insight_ai_ops_v1.js?v=20260930-hooks2',
-  './insight_backup_crypto_v1.js?v=20261103-backup-stage2-1',
+  './insight_backup_crypto_v1.js?v=20261126-backup-capacity-1',
   './insight_backup_password_v1.js?v=20261125-input-backup-1',
-  './insight_backup_guard_v1.js?v=20261125-input-backup-1',
+  './insight_backup_guard_v1.js?v=20261126-backup-capacity-1',
   './insight_data_health_v1.js?v=20261124-indexeddb-preview-7',
   './insight_prediction_data_health_v1.js?v=20261010-prediction-quality-1',
   './insight_waste_insights_v1.js?v=20261112-waste-comparison-1',
@@ -147,7 +147,7 @@ async function start(){
   if(!workers||workers.controller||await workers.getRegistration(location.href))
     throw new Error('旧版のキャッシュ状態を確認できないため、起動と保存を停止しています。');
   await Promise.all([
-    import('./insight_indexeddb_storage_v1.js?v=20261125-print-holiday-1'),
+    import('./insight_indexeddb_storage_v1.js?v=20261126-backup-capacity-1'),
     import('./insight_indexeddb_migration_preview_v1.js?v=20261124-indexeddb-step3-1'),
     import('./draft/insight_indexeddb_candidate_v1.js?v=20261125-input-backup-1')
   ]);

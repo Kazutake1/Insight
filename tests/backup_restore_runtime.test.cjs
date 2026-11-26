@@ -700,20 +700,42 @@ test('Stage2 FICTIONAL plain JSON keeps 20MiB limit and huge encrypted files fai
   await f.restore(plain);
   assert.equal(f.writeCount,0);assert.equal(f.passwordRequests.length,0);
   assert.match(f.alerts.join(' '),/20MiB/);
-  const input={value:'selected',files:[{name:'FICTIONAL.json',size:21*1024*1024+1}]};
+  const input={value:'selected',files:[{name:'FICTIONAL.json',size:36*1024*1024+1}]};
   f.ctx.restoreData({target:input});
   assert.equal(f.readers.length,1);assert.equal(input.value,'');
+  assert.match(f.alerts.at(-1),/暗号化形式は36MiB、平文JSONは20MiB/);
 });
-test('Stage2 FICTIONAL maximum plaintext restores through the 21MiB encrypted file gate',async()=>{
+test('FICTIONAL encrypted file gate reads limit minus one and the limit, but rejects limit plus one',async()=>{
+  const f=fixture({realCrypto:true});
+  const password='Fictional-capacity-fixture';
+  const {encrypted}=await f.window.InsightMigrationBackupV1.encodeCommitted(f.original,password);
+  const contents=JSON.stringify(encrypted);
+  const limit=36*1024*1024;
+  for(const size of [limit-1,limit,limit+1]){
+    let reads=0;
+    const file=new class extends Blob{
+      get size(){return size;}
+      async text(){reads++;return contents;}
+    }();
+    if(size<=limit){
+      await f.window.InsightMigrationBackupV1.verify(file,password,JSON.stringify(f.original));
+      assert.equal(reads,1);
+    }else{
+      await assert.rejects(f.window.InsightMigrationBackupV1.verify(file,password,JSON.stringify(f.original)),/36MiB以下/);
+      assert.equal(reads,0);
+    }
+  }
+});
+test('Stage2 FICTIONAL maximum plaintext restores through the 36MiB encrypted file gate',async()=>{
   const f=fixture({realCrypto:true,requestPassword:request=>request.confirm?SAFETY_PASSWORD:FILE_PASSWORD});
   const target=snapshot(750);
   target.stores.a.salesCounts={};target.stores.b.salesCounts={};
   const row=target.stores.a.data['2026']['1月'][0];row.storeMemo='';
-  row.storeMemo='A'.repeat(15*1024*1024-Buffer.byteLength(JSON.stringify(target)));
-  assert.equal(Buffer.byteLength(JSON.stringify(target)),15*1024*1024);
+  row.storeMemo='A'.repeat(25*1024*1024-Buffer.byteLength(JSON.stringify(target)));
+  assert.equal(Buffer.byteLength(JSON.stringify(target)),25*1024*1024);
   const file=await f.window.InsightBackupCryptoV1.encrypt(target,FILE_PASSWORD);
-  assert.ok(Buffer.byteLength(JSON.stringify(file))>20*1024*1024);
-  assert.ok(Buffer.byteLength(JSON.stringify(file))<21*1024*1024);
+  assert.ok(Buffer.byteLength(JSON.stringify(file))>21*1024*1024);
+  assert.ok(Buffer.byteLength(JSON.stringify(file))<36*1024*1024);
   await f.restore(file);
   assert.equal(f.writeCount,1);
   assert.deepEqual(f.persisted,target);

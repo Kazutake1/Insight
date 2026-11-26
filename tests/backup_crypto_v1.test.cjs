@@ -84,7 +84,7 @@ test('FICTIONAL six-character password works, short/blank passwords and oversize
   const file=await api.encrypt(clone(storeSnapshot),'123456');
   assert.deepEqual(clone(await api.decrypt(file,'123456')),clone(storeSnapshot));
   await assert.rejects(api.decrypt(file,'12345'),/6文字以上/);
-  await assert.rejects(api.encrypt({payload:'A'.repeat(15*1024*1024)},PASSWORD),/大きすぎます/);
+  await assert.rejects(api.encrypt({payload:'A'.repeat(25*1024*1024)},PASSWORD),/大きすぎます/);
 });
 
 test('existing plain JSON remains distinguishable; codec never rewrites the snapshot',async()=>{
@@ -99,7 +99,7 @@ test('existing plain JSON remains distinguishable; codec never rewrites the snap
 
 test('FICTIONAL multi-MiB backups round-trip up to the plaintext byte limit',async()=>{
   const api=codec();
-  const limit=15*1024*1024;
+  const limit=25*1024*1024;
   const overhead=Buffer.byteLength(JSON.stringify({fictional:''}));
   for(const size of [4*1024*1024,limit-1,limit]){
     const original={fictional:'A'.repeat(size-overhead)};
@@ -133,12 +133,12 @@ test('FICTIONAL malformed and noncanonical Base64 never reaches key derivation',
     '', 'AAA', '====', 'A===', 'AA=A', 'AA==AAAA', 'AA\nA', 'AA-_', 'AAéA',
     'AB==', 'AAB=', // Nonzero unused bits: permissive atob would accept these.
     large+'AAA@', large+'AA=A', large+'AB==',
-    'A'.repeat(Math.ceil((15*1024*1024+16)/3)*4+8)
+    'A'.repeat(Math.ceil((25*1024*1024+16)/3)*4+8)
   ]){
     await assert.rejects(api.decrypt({...base,ciphertext},PASSWORD),/形式が不正です/);
   }
   // Within the encoded-length bound, but one byte beyond the decoded limit.
-  const oversized=Buffer.alloc(15*1024*1024+17).toString('base64');
+  const oversized=Buffer.alloc(25*1024*1024+17).toString('base64');
   await assert.rejects(api.decrypt({...base,ciphertext:oversized},PASSWORD),/大きすぎます/);
   assert.equal(keyImports,0);
 });
