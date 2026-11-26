@@ -268,8 +268,10 @@ test('combined input session keeps a monthly draft and holds Quick after a compe
     expect(await quickInputBlocksUnload(page)).toBe(true);
     await page.evaluate(()=>saveQuick());
     expect(await other.evaluate(()=>InsightIndexedDBStorageV1.diagnose({verifyInterrupted:true})))
-      .toMatchObject({state:'hold',observedRevision:2});
+      .toEqual({state:'active',revision:2});
     expected.stores[seed.peer].name='別タブの確定済み店舗名';
+    expect(await other.evaluate(()=>InsightIndexedDBStorageV1.read()))
+      .toEqual({revision:2,snapshot:expected});
     const record=await readStoreSwitchRecord(other);
     expect(record.revision).toBe(2);
     expect(JSON.parse(record.raw)).toEqual(expected);
@@ -4905,7 +4907,7 @@ for(const failure of ['stale revision','quota failure','draft changed during sav
     }else{
       expect(await page.evaluate(()=>InsightIndexedDBStorageV1.diagnose({verifyInterrupted:true})))
         .toMatchObject(failure==='stale revision'
-          ?{state:'hold',observedRevision:2}
+          ?{state:'active',revision:2}
           :{state:'hold',observedRevision:1,recovery:'prior-save-verified'});
     }
     expect(await page.evaluate(()=>localStorage.getItem('insight_v11'))).toBe(seed.raw);
@@ -5135,7 +5137,7 @@ for(const config of [
       .toMatchObject({state:'HELD',activeCount:0});
     expect(await page.evaluate(()=>InsightInputDayNav.hasUnsavedInput())).toBe(true);
     expect(await page.evaluate(()=>InsightIndexedDBStorageV1.diagnose({verifyInterrupted:true}))).toMatchObject(
-      config.failure==='quota'?{state:'hold',observedRevision:1,recovery:'prior-save-verified'}:{state:'hold',observedRevision:2});
+      config.failure==='quota'?{state:'hold',observedRevision:1,recovery:'prior-save-verified'}:{state:'active',revision:2});
     expect(await page.evaluate(()=>localStorage.getItem('insight_v11'))).toBe(seed.raw);
   });
 }
@@ -5240,7 +5242,7 @@ test('sales, customer and waste screens share one committed revision when switch
     await expect(sales).toHaveValue('789');
     expect(await page.evaluate(()=>gotoNav(3))).toBe(false);
     expect(await page.evaluate(()=>InsightIndexedDBStorageV1.diagnose({verifyInterrupted:true})))
-      .toMatchObject({state:'hold',observedRevision:4});
+      .toEqual({state:'active',revision:4});
     expect(await page.evaluate(()=>localStorage.getItem('insight_v11'))).toBe(seed.raw);
   }finally{await other.close();}
 });
@@ -5430,7 +5432,7 @@ for(const overlap of ['previously saved','save in progress']){
           .toEqual({revision:1,snapshot:expected});
       }else{
         expect(await other.evaluate(()=>InsightIndexedDBStorageV1.diagnose({verifyInterrupted:true})))
-          .toMatchObject({state:'hold',reason:'writing',observedRevision:1});
+          .toEqual({state:'active',revision:1});
       }
       const record=await readStoreSwitchRecord(other);
       expect(record.revision).toBe(1);
