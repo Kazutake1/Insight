@@ -123,6 +123,25 @@ test('FICTIONAL actual Quick save button stays ACTIVE across shared weather/core
   expect(out.global).toEqual(initial.globalEvents);
 });
 
+test('FICTIONAL rapid legacy saves restart the two second button feedback',async({page})=>{
+  await prepareForm(page);
+  const start=new Date();
+  await page.clock.install({time:start});
+  await page.clock.pauseAt(new Date(start.getTime()+1000));
+  const button=page.locator('#quickSaveBtn');
+  const originalColor=await button.evaluate(el=>getComputedStyle(el).backgroundColor);
+  await button.click();
+  await expect(button).toHaveText('✓ 保存しました');
+  await expect(button).toHaveCSS('background-color','rgb(22, 163, 74)');
+  await page.clock.runFor(1200);
+  await button.click();
+  await page.clock.runFor(1999);
+  await expect(button).toHaveText('✓ 保存しました');
+  await page.clock.runFor(1);
+  await expect(button).toHaveText('保存する');
+  await expect(button).toHaveCSS('background-color',originalColor);
+});
+
 test('FICTIONAL temperature postcommit error retains handled warning and sticky HELD without retry',async({page})=>{
   await prepareForm(page);
   const out=await page.evaluate(()=>{
@@ -143,6 +162,7 @@ test('FICTIONAL temperature postcommit error retains handled warning and sticky 
   expect(saved.writes).toBe(4);
   expect(saved.row.tempMaxC).toBe(25);
   expect(saved.alerts.join(' ')).toContain('気温データを保存できませんでした。');
+  await expect(page.locator('#quickSaveBtn')).toHaveText('保存する');
   await page.evaluate(()=>{saveQuick();});
   expect((await readSave(page)).status.state).toBe('HELD');
 });

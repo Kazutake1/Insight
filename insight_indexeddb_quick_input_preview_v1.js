@@ -97,10 +97,18 @@
     }
 
     async function save(target,inputs,baseline){
-      const wasInert=doc.body.inert;
-      const saveHadFocus=doc.activeElement===button;
-      doc.body.inert=true;
+      // Protect the same controls while leaving the save button and its ancestors focusable.
+      // The busy check rejects repeat activation of the button.
+      const locked=[];
       try{
+        if(!doc.body.contains(button))throw new Error('Quick save button is no longer attached');
+        for(let node=button;node!==doc.body;node=node.parentElement){
+          for(const sibling of node.parentElement.children){
+            if(sibling===node||sibling.inert||sibling.matches('script,style,link'))continue;
+            sibling.inert=true;
+            locked.push(sibling);
+          }
+        }
         const {fy,month,day,iso}=target;
         const candidate=JSON.parse(JSON.stringify(baseline.snapshot));
         const shop=candidate.stores[state.storeId];
@@ -128,9 +136,7 @@
         state.busy=false;
         button.disabled=state.held;
         button.removeAttribute('aria-disabled');
-        doc.body.inert=wasInert;
-        if(saveHadFocus&&!state.held&&!wasInert&&doc.activeElement===doc.body)
-          button.focus({preventScroll:true});
+        for(const sibling of locked)sibling.inert=false;
       }
     }
 
