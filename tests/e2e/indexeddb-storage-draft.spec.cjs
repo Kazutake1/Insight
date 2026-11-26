@@ -6,7 +6,7 @@ test.beforeEach(async({page})=>{
     if(!location.pathname.endsWith('-fixture'))return;
     window.__INSIGHT_SHELL_VERSION__=build;
     window.__INSIGHT_FEATURE_SIGNATURE__=features;
-  },{build:'20261126-save-response-build-137',features:'1a0c61af'});
+  },{build:'20261126-quick-notice-build-138',features:'1a0c61af'});
   await page.route(/https:\/\/(www\.jma\.go\.jp|[^/]*api\.open-meteo\.com)\//,route=>route.abort());
 });
 // The fixture server uses HTTP; keep the rest of the shell's CSP in effect.
@@ -3180,7 +3180,7 @@ test('a fully restarted browser keeps the adopted revision and holds the legacy 
       const page=context.pages()[0]??await context.newPage();
       await page.goto(url);
       await page.evaluate(()=>{
-        window.__INSIGHT_SHELL_VERSION__='20261126-save-response-build-137';
+        window.__INSIGHT_SHELL_VERSION__='20261126-quick-notice-build-138';
         window.__INSIGHT_FEATURE_SIGNATURE__='1a0c61af';
       });
       await page.addScriptTag({url:new URL('/insight_indexeddb_storage_v1.js',url).href});
@@ -3217,7 +3217,7 @@ async function openLegacyPwaFixture(page){
     contentType:'text/html',body:'<!doctype html><title>Fictional online migration page</title>'
   }));
   await page.route('**/tests/e2e/fixtures/Index.html?insight_migration_probe=*',route=>route.fulfill({
-    contentType:'text/html',body:'<!doctype html><meta name="insight-shell-version" content="20261126-save-response-build-137">'
+    contentType:'text/html',body:'<!doctype html><meta name="insight-shell-version" content="20261126-quick-notice-build-138">'
   }));
   await page.goto(legacyPwaFixture);
   await page.addScriptTag({url:'/insight_indexeddb_storage_v1.js'});
@@ -3442,7 +3442,7 @@ test('cached legacy shell runs with its origin unavailable and adopted startup s
 });
 
 test('migration enforces the pinned environment before and after backup confirmation',async({page})=>{
-  const fixture='/forced-migration-gate-fixture',build='20261126-save-response-build-137';
+  const fixture='/forced-migration-gate-fixture',build='20261126-quick-notice-build-138';
   await page.route('**'+fixture,route=>route.fulfill({
     contentType:'text/html',body:'<!doctype html><title>Fictional forced migration fixture</title>'
   }));
@@ -3833,7 +3833,7 @@ for(const connectionFails of [false,true]){
       window.InsightHourlyCustomers={connectIndexedDBPreview(){}};
       window.shellReadyState=document.readyState;
       window.lateSnapshot=InsightIndexedDBCandidateV1.initializeAdopted();`}));
-    await page.route(/\/insight_indexeddb_(quick_input|sales_input|recovery)_preview_v1\.js\?v=20261126-save-response-1$/,route=>route.fulfill({
+    await page.route(/\/insight_indexeddb_(quick_input|sales_input|recovery)_preview_v1\.js\?v=20261126-quick-notice-1$/,route=>route.fulfill({
       contentType:'application/javascript',
       body:new URL(route.request().url()).pathname.endsWith('/insight_indexeddb_sales_input_preview_v1.js')
         ?`window.InsightIndexedDBSalesInputPreviewV1={async connect(){
@@ -5666,7 +5666,14 @@ for(const sameMunicipality of [true,false]){
 
     await page.locator('#iqdDateInput').fill(String(Number(seed.year)-30)+'-06-12');
     await expect(page.locator('#iqdDateInput')).toHaveValue(seed.iso);
-    await expect(status).toHaveText('試験用の保存は登録済み年度の当日・過去日に限ります。');
+    await expect(status).toBeEmpty();
+    expect(await page.evaluate(()=>{
+      const future=new Date();
+      future.setDate(future.getDate()+1);
+      return InsightIndexedDBQuickInputPreviewV1.allowDateChange(future);
+    })).toBe(false);
+    await expect(status).toBeEmpty();
+    await expect(page.locator('#iqdDateInput')).toHaveValue(seed.iso);
     await page.locator('#quickClearBtn').click();
     await page.locator('#autoWxBtn').click();
     await page.locator('#storeSel').selectOption(seed.peer);
