@@ -86,6 +86,25 @@ function buildBackupInfo(snapshot,now){
     stores:stores
   };
 }
+function buildBackupEnvelope(snapshot,now,preRestore){
+  var info=buildBackupInfo(snapshot,now);
+  if(preRestore)info.backupType="preRestore";
+  return {backupInfo:info,data:snapshot};
+}
+function measureBackupCapacity(snapshot,adopted){
+  var codec=window.InsightBackupCryptoV1;
+  var data=window.InsightStorage.migrateSnapshot(snapshot),now=new Date();
+  if(!isPlainObject(data.stores)||Array.isArray(data.stores)||typeof data.current!=='string'||
+     !Object.hasOwn(data.stores,data.current)||!isPlainObject(data.stores[data.current]))
+    throw validationError('店舗データを確認できません。');
+  var bytes=codec.plaintextBytes(buildBackupEnvelope(data,now));
+  if(!adopted&&shouldCreatePreRestoreBackup()){
+    bytes=Math.max(bytes,codec.plaintextBytes(buildBackupEnvelope(data,now,true)));
+  }
+  var limit=codec.maxPlaintextBytes;
+  return {bytes:bytes,limit:limit};
+}
+window.InsightBackupCapacityV1=Object.freeze({measure:measureBackupCapacity});
 function parseBackupEnvelope(raw){
   if(isPlainObject(raw)&&Object.prototype.hasOwnProperty.call(raw,"backupInfo")){
     if(!isPlainObject(raw.backupInfo)||!isPlainObject(raw.data))throw validationError("バックアップ情報またはデータ本体が不正です。");
@@ -310,8 +329,7 @@ function downloadBackupPayload(payload,filename,container=document.body){
 async function createPreRestoreBackup(operation,state){
   if(!window.InsightStorage)throw new Error("保存機能を初期化できませんでした");
   var now=new Date(),snapshot=window.InsightStorage.migrateSnapshot(allStores);
-  var payload={backupInfo:buildBackupInfo(snapshot,now),data:snapshot};
-  payload.backupInfo.backupType="preRestore";
+  var payload=buildBackupEnvelope(snapshot,now,true);
   var filename="Insight_pre_"+backupStamp(now)+".json";
   var password=await backupPassword('復元直前の安全バックアップ用パスワード',true,operation);
   var encrypted;
@@ -463,7 +481,7 @@ function rollbackPreRestoreSnapshot(){
   return restored;
 }
 async function downloadConfirmedBackup(snapshot,title,filename,operation,state,now){
-  var payload={backupInfo:buildBackupInfo(snapshot,now),data:snapshot};
+  var payload=buildBackupEnvelope(snapshot,now);
   var password=await backupPassword(title,true,operation);
   var encrypted;
   try{
@@ -665,7 +683,7 @@ async function inspectMissingStorageBackup(file,password){
 }
 async function encodeCommittedBackup(snapshot,password){
   var now=new Date(),data=window.InsightStorage.migrateSnapshot(snapshot);
-  var encrypted=await cryptoCodec().encrypt({backupInfo:buildBackupInfo(data,now),data:data},password);
+  var encrypted=await cryptoCodec().encrypt(buildBackupEnvelope(data,now),password);
   return {encrypted:encrypted,filename:'Insight_'+backupStamp(now)+'.json'};
 }
 window.InsightMigrationBackupV1=Object.freeze({

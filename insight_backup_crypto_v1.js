@@ -86,10 +86,11 @@
       material,{name:'AES-GCM',length:256},false,['encrypt','decrypt']
     );
   }
+  function encodePlaintext(payload){return encoder.encode(JSON.stringify(payload));}
   async function encrypt(payload,password){
     var api=cryptoApi(),bytes=passwordBytes(password);
     if(!plainObject(payload))throw new Error('バックアップデータが不正です。');
-    var plaintext=encoder.encode(JSON.stringify(payload));
+    var plaintext=encodePlaintext(payload);
     if(plaintext.length>MAX_PLAINTEXT_BYTES)throw new Error('バックアップデータが大きすぎます。');
     var salt=new Uint8Array(16),iv=new Uint8Array(12);
     api.getRandomValues(salt);api.getRandomValues(iv);
@@ -130,6 +131,8 @@
 
   root.InsightBackupCryptoV1=Object.freeze({
     format:FORMAT,version:VERSION,iterations:ITERATIONS,
-    encrypt:encrypt,decrypt:decrypt,isEncryptedEnvelope:isEncryptedEnvelope
+    encrypt:encrypt,decrypt:decrypt,isEncryptedEnvelope:isEncryptedEnvelope,
+    maxPlaintextBytes:MAX_PLAINTEXT_BYTES,
+    plaintextBytes:function(payload){return encodePlaintext(payload).length;}
   });
 })(typeof window!=='undefined'?window:globalThis);

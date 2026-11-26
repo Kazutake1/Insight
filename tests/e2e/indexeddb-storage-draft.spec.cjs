@@ -6,7 +6,7 @@ test.beforeEach(async({page})=>{
     if(!location.pathname.endsWith('-fixture'))return;
     window.__INSIGHT_SHELL_VERSION__=build;
     window.__INSIGHT_FEATURE_SIGNATURE__=features;
-  },{build:'20261126-backup-capacity-build-135',features:'ed30371f'});
+  },{build:'20261126-backup-usage-build-136',features:'adf0b137'});
   await page.route(/https:\/\/(www\.jma\.go\.jp|[^/]*api\.open-meteo\.com)\//,route=>route.abort());
 });
 // The fixture server uses HTTP; keep the rest of the shell's CSP in effect.
@@ -3167,8 +3167,8 @@ test('a fully restarted browser keeps the adopted revision and holds the legacy 
       const page=context.pages()[0]??await context.newPage();
       await page.goto(url);
       await page.evaluate(()=>{
-        window.__INSIGHT_SHELL_VERSION__='20261126-backup-capacity-build-135';
-        window.__INSIGHT_FEATURE_SIGNATURE__='ed30371f';
+        window.__INSIGHT_SHELL_VERSION__='20261126-backup-usage-build-136';
+        window.__INSIGHT_FEATURE_SIGNATURE__='adf0b137';
       });
       await page.addScriptTag({url:new URL('/insight_indexeddb_storage_v1.js',url).href});
       return {context,page};
@@ -3204,7 +3204,7 @@ async function openLegacyPwaFixture(page){
     contentType:'text/html',body:'<!doctype html><title>Fictional online migration page</title>'
   }));
   await page.route('**/tests/e2e/fixtures/Index.html?insight_migration_probe=*',route=>route.fulfill({
-    contentType:'text/html',body:'<!doctype html><meta name="insight-shell-version" content="20261126-backup-capacity-build-135">'
+    contentType:'text/html',body:'<!doctype html><meta name="insight-shell-version" content="20261126-backup-usage-build-136">'
   }));
   await page.goto(legacyPwaFixture);
   await page.addScriptTag({url:'/insight_indexeddb_storage_v1.js'});
@@ -3429,7 +3429,7 @@ test('cached legacy shell runs with its origin unavailable and adopted startup s
 });
 
 test('migration enforces the pinned environment before and after backup confirmation',async({page})=>{
-  const fixture='/forced-migration-gate-fixture',build='20261126-backup-capacity-build-135';
+  const fixture='/forced-migration-gate-fixture',build='20261126-backup-usage-build-136';
   await page.route('**'+fixture,route=>route.fulfill({
     contentType:'text/html',body:'<!doctype html><title>Fictional forced migration fixture</title>'
   }));
@@ -3987,6 +3987,8 @@ httpsTest('Draft Index rehearses migration, editing and recovery at the release 
   const safetyToggle=page.locator('#insightRestoreSafetyBackup');
   await capacity.tap();
   await expect(capacityResult).toContainText('店舗データ（全店舗）：');
+  await expect(capacityResult).toContainText('バックアップ容量（暗号化前）');
+  await expect(capacityResult.getByRole('progressbar')).toHaveAttribute('data-status','normal');
   await page.locator('label').filter({has:safetyToggle}).tap();
   await expect(safetyToggle).toBeChecked();
   const migrationEnvironment=await page.evaluate(()=>InsightIndexedDBStorageV1.checkMigrationEnvironment({
@@ -4152,6 +4154,7 @@ httpsTest('Draft Index rehearses migration, editing and recovery at the release 
   const committedLength=JSON.stringify(beforeRestore.snapshot).length;
   expect(formatMiB(committedLength)).not.toBe(formatMiB(capacityBefore.legacy.length));
   await capacity.tap();
+  await expect(capacityResult.getByRole('progressbar')).toHaveAttribute('data-status','normal');
   await expect(capacityResult.locator('div')).toHaveText([
     '店舗データ（全店舗）：'+formatMiB(committedLength),
     'その他のInsight設定：'+formatMiB(capacityBefore.settingsUnits),

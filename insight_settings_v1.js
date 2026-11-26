@@ -32,6 +32,47 @@
     return settingsUnits;
   }
 
+  function appendBackupCapacity(result,snapshot,adopted){
+    var section=doc.createElement('section');
+    section.className='insight-backup-usage';
+    var title=doc.createElement('strong');
+    title.textContent='バックアップ容量（暗号化前）';
+    section.append(title);
+    function line(text){
+      var element=doc.createElement('p');
+      element.textContent=text;
+      section.append(element);
+    }
+    if(snapshot===null){
+      line('店舗データが未保存です。');
+    }else{
+      var usage=root.InsightBackupCapacityV1.measure(snapshot,adopted);
+      var bytes=usage.bytes,limit=usage.limit,ratio=bytes/limit;
+      var used=bytes===limit?'100':(ratio*100).toFixed(2);
+      var status=bytes>limit?'exceeded':bytes===limit?'full':bytes*5>=limit*4?'near':'normal';
+      function formatBytes(value){
+        return value>0&&value<1048.576?'0.001 MiB未満':(value/1048576).toFixed(3)+' MiB';
+      }
+      line('使用量 '+formatBytes(bytes)+' / '+formatBytes(limit)+'（'+used+'%）');
+      line('残り '+formatBytes(Math.max(0,limit-bytes)));
+      var bar=doc.createElement('progress');
+      bar.setAttribute('aria-label','バックアップ容量の使用率');
+      bar.dataset.status=status;
+      bar.max=limit;
+      bar.value=Math.min(bytes,limit);
+      section.append(bar);
+      if(status==='near')line('注意：バックアップ上限の80%以上を使用しています。');
+      if(status==='full')line('バックアップ上限に達しています。現在の容量で作成できます。');
+      if(status==='exceeded')line('警告：バックアップ上限を超えているため、作成できません。');
+      var dirty=root.InsightQuickDateNavV1?.hasUnsavedInput?.()||
+        root.InsightSalesCount?.hasUnsavedInput?.()||root.InsightInputDayNav?.hasUnsavedInput?.()||
+        root.InsightIndexedDBSalesInputPreviewV1?.getConnectedStatus?.()?.hasUnsavedInput;
+      line(dirty?'未保存の入力があります。保存済みデータを計測しました。':'保存済みデータを計測しました。');
+      line('端末の空き容量やIndexedDBの保存可能量は含みません。');
+    }
+    result.append(section);
+  }
+
   function addCapacityCheck(actions){
     var button=doc.createElement('button');
     button.type='button';
@@ -55,10 +96,11 @@
       measuring=true;
       try{
         var storage=root.localStorage;
-        var raw;
+        var raw,snapshot;
         if(adopted){
           var committed=await root.InsightIndexedDBSalesInputPreviewV1.readCommittedView();
-          raw=root.InsightStorage.serialize(committed.snapshot);
+          snapshot=committed.snapshot;
+          raw=root.InsightStorage.serialize(snapshot);
         }else{
           raw=storage.getItem('insight_v11');
         }
@@ -75,6 +117,13 @@
           line.textContent=label;
           result.append(line);
         });
+        try{
+          appendBackupCapacity(result,adopted?snapshot:JSON.parse(raw),adopted);
+        }catch(_){
+          var unavailable=doc.createElement('p');
+          unavailable.textContent='バックアップ容量を計測できません。';
+          result.append(unavailable);
+        }
       }catch(_){
         result.textContent='保存容量を計測できません。';
       }finally{
