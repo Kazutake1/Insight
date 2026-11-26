@@ -27,10 +27,14 @@ ${moduleNames.map(name=>'<script src="/'+name+'"'+
   await page.goto(fixture);
 }
 
-for(const sizeMiB of [25,50,100]){
-  test('FICTIONAL '+sizeMiB+' MiB backup round-trip, safety and restore',async({page,browserName},info)=>{
+const scenarios=[
+  {sizeMiB:25,encoding:'japanese'},{sizeMiB:50,encoding:'japanese'},{sizeMiB:100,encoding:'japanese'},
+  {sizeMiB:25,encoding:'ascii'},{sizeMiB:50,encoding:'ascii'}
+];
+for(const {sizeMiB,encoding} of scenarios){
+  test('FICTIONAL '+sizeMiB+' MiB '+encoding+' backup round-trip, safety and restore',async({page,browserName},info)=>{
     await setup(page);
-    const saved=await page.evaluate(async wanted=>{
+    const saved=await page.evaluate(async ({wanted,encoding})=>{
       const api=InsightIndexedDBStorageV1,backup=InsightMigrationBackupV1,password='Fictional-capacity-only-2026';
       const data={schemaVersion:1,current:'fictional',stores:{fictional:{name:'架空容量店舗',years:['2025'],data:{'2025':{}}}}};
       const shop=data.stores.fictional;
@@ -54,7 +58,7 @@ for(const sizeMiB of [25,50,100]){
       shape.data=data;
       const emptyBytes=new TextEncoder().encode(JSON.stringify(shape)).length;
       const padding=wanted-emptyBytes;
-      row.storeMemo='架'.repeat(Math.floor(padding/3))+'A'.repeat(padding%3);
+      row.storeMemo=encoding==='ascii'?'A'.repeat(padding):'架'.repeat(Math.floor(padding/3))+'A'.repeat(padding%3);
       if(new TextEncoder().encode(JSON.stringify(shape)).length!==wanted)throw new Error('Wrong plaintext size');
       const t=performance.now();
       const result=await api.save(0,data);
@@ -65,9 +69,9 @@ for(const sizeMiB of [25,50,100]){
       const matches=readback.snapshot.stores.fictional.data['2025']['1月'][0].storeMemo===row.storeMemo;
       return {saveRevision:result.revision,readRevision:readback.revision,matches,memoLength:row.storeMemo.length,
         legacyBytes:raw.length,saveMs,readMs,heapSampleBytes:performance.memory?.usedJSHeapSize??null};
-    },sizeMiB*MiB);
+    },{wanted:sizeMiB*MiB,encoding});
     expect(saved).toMatchObject({saveRevision:1,readRevision:1,matches:true});
-    console.log(JSON.stringify({engine:browserName,sizeMiB,phase:'indexeddb',...saved}));
+    console.log(JSON.stringify({engine:browserName,sizeMiB,encoding,phase:'indexeddb',...saved}));
 
     await page.reload();
     const downloadPath=info.outputPath('fictional-capacity-backup.json');
@@ -140,7 +144,7 @@ for(const sizeMiB of [25,50,100]){
     expect(validation.selectedBytes).toBeLessThanOrEqual(encryptedFileLimit);
     await page.reload();
     expect(await page.evaluate(()=>InsightIndexedDBStorageV1.read().then(({revision})=>revision))).toBe(2);
-    if(sizeMiB===25){
+    if(sizeMiB===25&&encoding==='japanese'){
       const quota=await page.evaluate(async ()=>{
         const api=InsightIndexedDBStorageV1,backup=InsightMigrationBackupV1,password='Fictional-capacity-only-2026';
         const before=await api.read();
@@ -179,12 +183,13 @@ for(const sizeMiB of [25,50,100]){
     });
     expect(largeRestore).toMatchObject({revision:3,legacyUnchanged:true});
     await page.reload();
-    const restarted=await page.evaluate(async ()=>{
+    const restarted=await page.evaluate(async encoding=>{
       const {revision,snapshot}=await InsightIndexedDBStorageV1.read();
       const memo=snapshot.stores.fictional.data['2025']['1月'][0].storeMemo;
-      return {revision,length:memo.length,first:memo[0],prefix:/[^架]/.test(memo.slice(0,-3))};
-    });
-    expect(restarted).toEqual({revision:3,length:saved.memoLength,first:'架',prefix:false});
+      return {revision,length:memo.length,first:memo[0],prefix:(encoding==='ascii'?/[^A]/:/[^架]/).test(memo.slice(0,-3))};
+    },encoding);
+    expect(restarted).toEqual({revision:3,length:saved.memoLength,first:encoding==='ascii'?'A':'架',prefix:false});
+    await page.locator('#backupFile').setInputFiles(downloadPath);
     const consecutive=await page.evaluate(async ()=>{
       const api=InsightIndexedDBStorageV1;
       const before=await api.read();
@@ -192,20 +197,40 @@ for(const sizeMiB of [25,50,100]){
       const row=before.snapshot.stores.fictional.data['2025']['1月'][0];
       row.売上=1;
       const start=performance.now();
-      const after=await api.save(before.revision,before.snapshot);
-      return {revision:after.revision,legacyUnchanged:localStorage.getItem('insight_v11')===raw,
-        saveMs:Math.round(performance.now()-start),heapSampleBytes:performance.memory?.usedJSHeapSize??null};
+      try{
+        const after=await api.save(before.revision,before.snapshot);
+        return {revision:after.revision,sales:1,error:null,legacyUnchanged:localStorage.getItem('insight_v11')===raw,
+          saveMs:Math.round(performance.now()-start),heapSampleBytes:performance.memory?.usedJSHeapSize??null};
+      }catch(error){
+        if(error.name!=='UnknownError'||!error.message.includes('serialized keys and/or value are too large'))throw error;
+        const saveMs=Math.round(performance.now()-start);
+        const hold=await api.diagnose({verifyInterrupted:true});
+        const blocked=await api.read().catch(error=>error.message);
+        const recoveryFile=document.querySelector('#backupFile').files[0];
+        const resumed=await api.resumeRecovery({file:recoveryFile,password:'Fictional-capacity-only-2026',
+          legacyClientsClosed:true,confirm:()=>true});
+        const recovered=await api.read();
+        return {revision:resumed.revision,sales:recovered.snapshot.stores.fictional.data['2025']['1月'][0].売上,
+          error:error.message,hold,blocked,legacyUnchanged:localStorage.getItem('insight_v11')===raw,
+          saveMs,heapSampleBytes:performance.memory?.usedJSHeapSize??null};
+      }
     });
-    expect(consecutive).toMatchObject({revision:4,legacyUnchanged:true});
+    expect(consecutive.legacyUnchanged).toBe(true);
+    if(consecutive.error){
+      expect(consecutive).toMatchObject({revision:3,sales:0,blocked:'IndexedDB writes are on hold',
+        hold:{state:'hold',reason:'writing',observedRevision:3,recovery:'prior-save-verified'}});
+    }else{
+      expect(consecutive).toMatchObject({revision:4,sales:1});
+    }
     await page.reload();
     expect(await page.evaluate(async ()=>{
       const {revision,snapshot}=await InsightIndexedDBStorageV1.read();
       const row=snapshot.stores.fictional.data['2025']['1月'][0];
       return {revision,sales:row.売上,memoLength:row.storeMemo.length};
-    })).toEqual({revision:4,sales:1,memoLength:saved.memoLength});
-    console.log(JSON.stringify({engine:browserName,sizeMiB,phase:'backup-restore',downloadMs,
+    })).toEqual({revision:consecutive.revision,sales:consecutive.sales,memoLength:saved.memoLength});
+    console.log(JSON.stringify({engine:browserName,sizeMiB,encoding,phase:'backup-restore',downloadMs,
       fileBytes:validation.selectedBytes,cancelMs:validation.cancelMs,restoreMs:validation.restoreMs,
-      largeRestoreMs:largeRestore.restoreMs,consecutiveSaveMs:consecutive.saveMs,
+      largeRestoreMs:largeRestore.restoreMs,consecutiveSaveMs:consecutive.saveMs,consecutiveSaveError:consecutive.error,
       heapSampleBytes:Math.max(validation.heapSampleBytes??0,largeRestore.heapSampleBytes??0,consecutive.heapSampleBytes??0)||null}));
   });
 }
