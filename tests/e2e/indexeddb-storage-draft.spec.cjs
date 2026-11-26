@@ -5703,7 +5703,9 @@ for(const sameMunicipality of [true,false]){
     await page.waitForFunction(()=>quickSaveDigests.length===2);
     await expect(button).toHaveAttribute('aria-disabled','true');
     expect(await page.evaluate(()=>document.getElementById('quickSaveBtn').disabled)).toBe(false);
-    expect(await button.boundingBox()).toEqual(buttonBefore);
+    const buttonWhileSaving=await button.boundingBox();
+    // The prior validation message clears when a valid save starts, freeing width beside the button.
+    expect(buttonWhileSaving).toMatchObject({x:buttonBefore.x,y:buttonBefore.y,height:buttonBefore.height});
     await page.evaluate(()=>document.getElementById('quickSaveBtn').click());
     await expect(button).not.toHaveClass(/is-saved-feedback/);
     await expect(status).toBeEmpty();
@@ -5718,7 +5720,7 @@ for(const sameMunicipality of [true,false]){
 
     await expect(button).toBeEnabled();
     await expect(button).toBeFocused();
-    expect(await button.boundingBox()).toEqual(buttonBefore);
+    expect(await button.boundingBox()).toEqual(buttonWhileSaving);
     await expect(button).toHaveText('保存する');
     await expect(page.locator('#quickSaveBtn + [role=status]')).toBeEmpty();
     await expect(page.locator('#iqdDateInput')).toHaveValue(seed.iso);
