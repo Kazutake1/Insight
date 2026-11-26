@@ -1,0 +1,37 @@
+name: Backup capacity experiment
+on:
+  pull_request:
+    paths:
+      - 'tests/experiments/backup-capacity*'
+      - '.github/workflows/backup-capacity-experiment.yml'
+permissions:
+  contents: read
+jobs:
+  measure:
+    if: github.head_ref == 'work/backup-capacity-experiment-100mib'
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    strategy:
+      fail-fast: false
+      matrix:
+        engine: [node, chromium, webkit]
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@49933ea528caeca8642d1e84afbd3f7d6820020
+        with:
+          node-version: '22'
+      - if: matrix.engine == 'node'
+        run: |
+          set -e
+          for size in 25 50 100; do
+            node tests/experiments/backup-capacity-node.cjs "$size"
+          done
+      - if: matrix.engine != 'node'
+        run: |
+          npm ci --ignore-scripts --no-audit --no-fund
+          npx playwright install --with-deps "$INSIGHT_CAPACITY_BROWSER"
+          npx playwright test --config=tests/experiments/backup-capacity.config.cjs
+        env:
+          INSIGHT_CAPACITY_BROWSER: ${{ matrix.engine }}
