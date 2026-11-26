@@ -99,6 +99,7 @@
 
     async function save(target,inputs,baseline){
       const wasInert=doc.body.inert;
+      const saveHadFocus=doc.activeElement===button;
       doc.body.inert=true;
       try{
         const {fy,month,day,iso}=target;
@@ -127,7 +128,10 @@
       }finally{
         state.busy=false;
         button.disabled=state.held;
+        button.removeAttribute('aria-disabled');
         doc.body.inert=wasInert;
+        if(saveHadFocus&&!state.held&&!wasInert&&doc.activeElement===doc.body)
+          button.focus({preventScroll:true});
       }
     }
 
@@ -150,7 +154,7 @@
       }
       const baseline=state.committed;
       state.busy=true;
-      button.disabled=true;
+      button.setAttribute('aria-disabled','true');
       status.textContent='';
       ctx.runIndexedDBPreview=()=>save(target,inputs,baseline);
       return false;

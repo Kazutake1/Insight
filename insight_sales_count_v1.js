@@ -268,11 +268,15 @@
         }
       });
       if(!commit){markOutcome('cancelled_before_mutation');return;}
-      button.disabled=true;
+      button.setAttribute('aria-disabled','true');
       return commit().then(function(saved){
         if(saved){finishSave();markOutcome('completed');}
-        else{label.textContent='保存結果を確認できないため、追加の保存を停止しました。';markOutcome('unknown');}
-      });
+        else{
+          button.disabled=true;
+          label.textContent='保存結果を確認できないため、追加の保存を停止しました。';
+          markOutcome('unknown');
+        }
+      }).finally(function(){button.removeAttribute('aria-disabled');});
     }
     function save(){
       if(preview&&(!preview.canEdit()||categoryDialog?.open||!state.dirty))return;

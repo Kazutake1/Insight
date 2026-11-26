@@ -6,7 +6,7 @@ test.beforeEach(async({page})=>{
     if(!location.pathname.endsWith('-fixture'))return;
     window.__INSIGHT_SHELL_VERSION__=build;
     window.__INSIGHT_FEATURE_SIGNATURE__=features;
-  },{build:'20261126-backup-usage-build-136',features:'adf0b137'});
+  },{build:'20261126-save-response-build-137',features:'1a0c61af'});
   await page.route(/https:\/\/(www\.jma\.go\.jp|[^/]*api\.open-meteo\.com)\//,route=>route.abort());
 });
 // The fixture server uses HTTP; keep the rest of the shell's CSP in effect.
@@ -161,6 +161,7 @@ test('combined input session shares four saves and guards both destinations and 
     };
   });
   const reservation=await page.evaluate(()=>{
+    document.getElementById('salesSaveBtn').focus({preventScroll:true});
     window.combinedSave=saveInput('sales');
     const state=combinedPreview.getStatus().state;
     const route=gotoNav(0);
@@ -169,11 +170,13 @@ test('combined input session shares four saves and guards both destinations and 
   });
   expect(reservation).toEqual({state:'ACTIVE',route:false,otherSave:true});
   await page.waitForFunction(()=>combinedDigests.length===2);
-  await expect(page.locator('#salesSaveBtn')).toBeDisabled();
+  await expect(page.locator('#salesSaveBtn')).toHaveAttribute('aria-disabled','true');
+  expect(await page.evaluate(()=>document.getElementById('salesSaveBtn').disabled)).toBe(false);
   expect(await page.evaluate(peer=>switchStore(peer),seed.peer)).toBe(false);
   expect(await page.evaluate(()=>InsightIndexedDBQuickInputPreviewV1.getStatus().state)).toBe('ACTIVE');
   await page.evaluate(()=>resumeCombinedSave());
   await expect(page.locator('#salesSaveBtn')).toBeEnabled();
+  await expect(page.locator('#salesSaveBtn')).toBeFocused();
   await expect(page.locator('#savedSales')).toHaveCount(0);
   row.売上=777;
   expect(await committedInput(page)).toEqual({revision:2,snapshot:expected});
@@ -669,8 +672,18 @@ for(const outcome of ['success','conflict','quota']){
       await expect(status).toHaveText('未保存の変更があります');
       expect(await committedInput(page)).toEqual({revision:0,snapshot:expected});
       await delivery.fill('14');
+      await page.evaluate(()=>{
+        const put=IDBObjectStore.prototype.put;
+        IDBObjectStore.prototype.put=function(){
+          IDBObjectStore.prototype.put=put;
+          document.getElementById('scSave').click();
+          return put.apply(this,arguments);
+        };
+      });
       await button.click();
       await expect(status).toHaveText('保存済み');
+      await expect(button).toBeDisabled();
+      await expect(button).not.toHaveAttribute('aria-disabled');
       count.trips[0]={delivery:14,sales:0};count.trips[2].sales=null;wasted.trips[0]=4;
       expect(await committedInput(page)).toEqual({revision:1,snapshot:expected});
       await page.locator('#nav0').click();
@@ -3167,8 +3180,8 @@ test('a fully restarted browser keeps the adopted revision and holds the legacy 
       const page=context.pages()[0]??await context.newPage();
       await page.goto(url);
       await page.evaluate(()=>{
-        window.__INSIGHT_SHELL_VERSION__='20261126-backup-usage-build-136';
-        window.__INSIGHT_FEATURE_SIGNATURE__='adf0b137';
+        window.__INSIGHT_SHELL_VERSION__='20261126-save-response-build-137';
+        window.__INSIGHT_FEATURE_SIGNATURE__='1a0c61af';
       });
       await page.addScriptTag({url:new URL('/insight_indexeddb_storage_v1.js',url).href});
       return {context,page};
@@ -3204,7 +3217,7 @@ async function openLegacyPwaFixture(page){
     contentType:'text/html',body:'<!doctype html><title>Fictional online migration page</title>'
   }));
   await page.route('**/tests/e2e/fixtures/Index.html?insight_migration_probe=*',route=>route.fulfill({
-    contentType:'text/html',body:'<!doctype html><meta name="insight-shell-version" content="20261126-backup-usage-build-136">'
+    contentType:'text/html',body:'<!doctype html><meta name="insight-shell-version" content="20261126-save-response-build-137">'
   }));
   await page.goto(legacyPwaFixture);
   await page.addScriptTag({url:'/insight_indexeddb_storage_v1.js'});
@@ -3429,7 +3442,7 @@ test('cached legacy shell runs with its origin unavailable and adopted startup s
 });
 
 test('migration enforces the pinned environment before and after backup confirmation',async({page})=>{
-  const fixture='/forced-migration-gate-fixture',build='20261126-backup-usage-build-136';
+  const fixture='/forced-migration-gate-fixture',build='20261126-save-response-build-137';
   await page.route('**'+fixture,route=>route.fulfill({
     contentType:'text/html',body:'<!doctype html><title>Fictional forced migration fixture</title>'
   }));
@@ -3820,7 +3833,7 @@ for(const connectionFails of [false,true]){
       window.InsightHourlyCustomers={connectIndexedDBPreview(){}};
       window.shellReadyState=document.readyState;
       window.lateSnapshot=InsightIndexedDBCandidateV1.initializeAdopted();`}));
-    await page.route(/\/insight_indexeddb_(quick_input|sales_input|recovery)_preview_v1\.js\?v=20261125-input-backup-1$/,route=>route.fulfill({
+    await page.route(/\/insight_indexeddb_(quick_input|sales_input|recovery)_preview_v1\.js\?v=20261126-save-response-1$/,route=>route.fulfill({
       contentType:'application/javascript',
       body:new URL(route.request().url()).pathname.endsWith('/insight_indexeddb_sales_input_preview_v1.js')
         ?`window.InsightIndexedDBSalesInputPreviewV1={async connect(){
@@ -5684,9 +5697,16 @@ for(const sameMunicipality of [true,false]){
         resume.forEach(resolve=>resolve());
       };
     });
-    await button.click();
+    await button.focus();
+    const buttonBefore=await button.boundingBox();
+    await button.press('Enter');
     await page.waitForFunction(()=>quickSaveDigests.length===2);
-    await expect(button).toBeDisabled();
+    await expect(button).toHaveAttribute('aria-disabled','true');
+    expect(await page.evaluate(()=>document.getElementById('quickSaveBtn').disabled)).toBe(false);
+    const buttonWhileSaving=await button.boundingBox();
+    // The prior validation message clears when a valid save starts, freeing width beside the button.
+    expect(buttonWhileSaving).toMatchObject({x:buttonBefore.x,y:buttonBefore.y,height:buttonBefore.height});
+    await page.evaluate(()=>document.getElementById('quickSaveBtn').click());
     await expect(button).not.toHaveClass(/is-saved-feedback/);
     await expect(status).toBeEmpty();
     expect(await page.evaluate(()=>InsightQuickSaveObserverV0.getStatus()))
@@ -5698,8 +5718,10 @@ for(const sameMunicipality of [true,false]){
       resumeQuickSave();
     });
 
-    await expect(page.locator('#quickSaveBtn')).toBeEnabled();
-    await expect(page.locator('#quickSaveBtn')).toHaveText('保存する');
+    await expect(button).toBeEnabled();
+    await expect(button).toBeFocused();
+    expect(await button.boundingBox()).toEqual(buttonWhileSaving);
+    await expect(button).toHaveText('保存する');
     await expect(page.locator('#quickSaveBtn + [role=status]')).toBeEmpty();
     await expect(page.locator('#iqdDateInput')).toHaveValue(seed.iso);
     expect(await page.evaluate(()=>quickPreview.getStatus())).toEqual({state:'IDLE_OBSERVED',hasUnsavedInput:false});
