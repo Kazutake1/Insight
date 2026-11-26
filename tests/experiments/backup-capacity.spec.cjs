@@ -185,8 +185,27 @@ for(const sizeMiB of [25,50,100]){
       return {revision,length:memo.length,first:memo[0],prefix:/[^架]/.test(memo.slice(0,-3))};
     });
     expect(restarted).toEqual({revision:3,length:saved.memoLength,first:'架',prefix:false});
+    const consecutive=await page.evaluate(async ()=>{
+      const api=InsightIndexedDBStorageV1;
+      const before=await api.read();
+      const raw=localStorage.getItem('insight_v11');
+      const row=before.snapshot.stores.fictional.data['2025']['1月'][0];
+      row.売上=1;
+      const start=performance.now();
+      const after=await api.save(before.revision,before.snapshot);
+      return {revision:after.revision,legacyUnchanged:localStorage.getItem('insight_v11')===raw,
+        saveMs:Math.round(performance.now()-start),heapSampleBytes:performance.memory?.usedJSHeapSize??null};
+    });
+    expect(consecutive).toMatchObject({revision:4,legacyUnchanged:true});
+    await page.reload();
+    expect(await page.evaluate(async ()=>{
+      const {revision,snapshot}=await InsightIndexedDBStorageV1.read();
+      const row=snapshot.stores.fictional.data['2025']['1月'][0];
+      return {revision,sales:row.売上,memoLength:row.storeMemo.length};
+    })).toEqual({revision:4,sales:1,memoLength:saved.memoLength});
     console.log(JSON.stringify({engine:browserName,sizeMiB,phase:'backup-restore',downloadMs,
       fileBytes:validation.selectedBytes,cancelMs:validation.cancelMs,restoreMs:validation.restoreMs,
-      largeRestoreMs:largeRestore.restoreMs,heapSampleBytes:Math.max(validation.heapSampleBytes??0,largeRestore.heapSampleBytes??0)||null}));
+      largeRestoreMs:largeRestore.restoreMs,consecutiveSaveMs:consecutive.saveMs,
+      heapSampleBytes:Math.max(validation.heapSampleBytes??0,largeRestore.heapSampleBytes??0,consecutive.heapSampleBytes??0)||null}));
   });
 }
