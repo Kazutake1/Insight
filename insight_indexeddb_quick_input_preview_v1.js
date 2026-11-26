@@ -93,7 +93,6 @@
     function allowDateChange(date){
       if(state.busy||state.held||state.pending||state.hourly?.dialog()?.open||state.eventDialogOpen?.())return false;
       if(supports(date))return true;
-      status.textContent='試験用の保存は登録済み年度の当日・過去日に限ります。';
       return false;
     }
 
