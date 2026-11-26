@@ -229,8 +229,9 @@
       apply(candidate,edited);
       const body=doc.body;
       const wasInert=body.inert;
+      const saveHadFocus=doc.activeElement===button;
       state.busy=true;
-      button.disabled=true;
+      button.setAttribute('aria-disabled','true');
       body.inert=true;
       status.textContent='';
       try{
@@ -251,6 +252,9 @@
         state.busy=false;
         body.inert=wasInert;
         button.disabled=state.held;
+        button.removeAttribute('aria-disabled');
+        if(saveHadFocus&&!state.held&&!wasInert&&doc.activeElement===body)
+          button.focus({preventScroll:true});
       }
     }
 
