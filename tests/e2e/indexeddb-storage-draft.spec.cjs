@@ -6,7 +6,7 @@ test.beforeEach(async({page})=>{
     if(!location.pathname.endsWith('-fixture'))return;
     window.__INSIGHT_SHELL_VERSION__=build;
     window.__INSIGHT_FEATURE_SIGNATURE__=features;
-  },{build:'20261125-print-holiday-build-134',features:'2a1f565f'});
+  },{build:'20261126-backup-capacity-build-135',features:'ed30371f'});
   await page.route(/https:\/\/(www\.jma\.go\.jp|[^/]*api\.open-meteo\.com)\//,route=>route.abort());
 });
 // The fixture server uses HTTP; keep the rest of the shell's CSP in effect.
@@ -2778,6 +2778,56 @@ test('migration startup gate requires a confirmed restart and a fresh build with
   expect(await page.evaluate(()=>localStorage.length)).toBe(0);
 });
 
+test('FICTIONAL maximum backup survives consecutive IndexedDB saves, restore and reopening',async({page,context})=>{
+  test.setTimeout(90000);
+  const seed=await openQuickInputPreview(page,{useRealBackupAfterMigration:true,connectQuick:false});
+  const result=await page.evaluate(async ({active,year,month,day,raw})=>{
+    const api=InsightIndexedDBStorageV1,backup=InsightMigrationBackupV1;
+    const password='Fictional-capacity-fixture';
+    const {snapshot}=await api.read();
+    for(const shop of Object.values(snapshot.stores)){
+      Object.assign(shop.weatherLocation,{latitude:35.1,longitude:136.8,timezone:'Asia/Tokyo'});
+      shop.data[year][month][day-1].stockout='なし';
+    }
+    const row=snapshot.stores[active].data[year][month][day-1];
+    row.storeMemo='';
+    row.売上=1;
+    const sample=await backup.encodeCommitted(snapshot,password);
+    const shape=await InsightBackupCryptoV1.decrypt(sample.encrypted,password);
+    const limit=25*1024*1024;
+    const padding=limit-new TextEncoder().encode(JSON.stringify(shape)).length;
+    row.storeMemo='A'.repeat(padding);
+    async function committedFile(data){
+      const {encrypted,filename}=await backup.encodeCommitted(data,password);
+      return new File([JSON.stringify(encrypted,null,2)],filename);
+    }
+    const first=await api.save(0,snapshot);
+    const file=await committedFile(snapshot);
+    row.売上=2;
+    const second=await api.save(first.revision,snapshot);
+    const safetyFile=await committedFile(snapshot);
+    const args={file,password,safetyFile,safetyPassword:password,legacyClientsClosed:true};
+    const cancelled=await api.restoreBackup({...args,confirm:()=>false});
+    const afterCancel=await api.read();
+    const restored=await api.restoreBackup({...args,confirm:()=>true});
+    return {fileSize:file.size,padding,second:second.revision,cancelled,restored:restored.revision,
+      saleAfterCancel:afterCancel.snapshot.stores[active].data[year][month][day-1].売上,
+      legacyUnchanged:localStorage.getItem('insight_v11')===raw};
+  },seed);
+  expect(result).toMatchObject({second:2,cancelled:{review:'cancelled',revision:2},restored:3,saleAfterCancel:2,legacyUnchanged:true});
+  expect(result.fileSize).toBeGreaterThan(21*1024*1024);
+  expect(result.fileSize).toBeLessThanOrEqual(36*1024*1024);
+  const reopened=await openStoreSwitchPeer(context);
+  try{
+    expect(await reopened.evaluate(async ({active,year,month,day,raw})=>{
+      const {revision,snapshot}=await InsightIndexedDBStorageV1.read();
+      const row=snapshot.stores[active].data[year][month][day-1];
+      return {revision,sale:row.売上,memoLength:row.storeMemo.length,
+        legacyUnchanged:localStorage.getItem('insight_v11')===raw};
+    },seed)).toEqual({revision:3,sale:1,memoLength:result.padding,legacyUnchanged:true});
+  }finally{await reopened.close();}
+});
+
 test('encrypted restore keeps the pre-restore revision and resumes only the verified committed copy',async({page,context})=>{
   const seed=await openQuickInputPreview(page,{useRealBackupAfterMigration:true});
   const observer=await openStoreSwitchPeer(context);
@@ -3117,8 +3167,8 @@ test('a fully restarted browser keeps the adopted revision and holds the legacy 
       const page=context.pages()[0]??await context.newPage();
       await page.goto(url);
       await page.evaluate(()=>{
-        window.__INSIGHT_SHELL_VERSION__='20261125-print-holiday-build-134';
-        window.__INSIGHT_FEATURE_SIGNATURE__='2a1f565f';
+        window.__INSIGHT_SHELL_VERSION__='20261126-backup-capacity-build-135';
+        window.__INSIGHT_FEATURE_SIGNATURE__='ed30371f';
       });
       await page.addScriptTag({url:new URL('/insight_indexeddb_storage_v1.js',url).href});
       return {context,page};
@@ -3154,7 +3204,7 @@ async function openLegacyPwaFixture(page){
     contentType:'text/html',body:'<!doctype html><title>Fictional online migration page</title>'
   }));
   await page.route('**/tests/e2e/fixtures/Index.html?insight_migration_probe=*',route=>route.fulfill({
-    contentType:'text/html',body:'<!doctype html><meta name="insight-shell-version" content="20261125-print-holiday-build-134">'
+    contentType:'text/html',body:'<!doctype html><meta name="insight-shell-version" content="20261126-backup-capacity-build-135">'
   }));
   await page.goto(legacyPwaFixture);
   await page.addScriptTag({url:'/insight_indexeddb_storage_v1.js'});
@@ -3379,7 +3429,7 @@ test('cached legacy shell runs with its origin unavailable and adopted startup s
 });
 
 test('migration enforces the pinned environment before and after backup confirmation',async({page})=>{
-  const fixture='/forced-migration-gate-fixture',build='20261125-print-holiday-build-134';
+  const fixture='/forced-migration-gate-fixture',build='20261126-backup-capacity-build-135';
   await page.route('**'+fixture,route=>route.fulfill({
     contentType:'text/html',body:'<!doctype html><title>Fictional forced migration fixture</title>'
   }));

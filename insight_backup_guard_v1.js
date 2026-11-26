@@ -1,7 +1,7 @@
 (function(){
 var validationOnly=typeof document!=="undefined"&&document.currentScript?.dataset?.insightRecoveryModel==="true";
 var BACKUP_FORMAT="InsightBackup",BACKUP_FORMAT_VERSION=2;
-var ENCRYPTED_FILE_LIMIT=21*1024*1024;
+var ENCRYPTED_FILE_LIMIT=36*1024*1024;
 if(validationOnly){
   window.InsightMigrationBackupV1=Object.freeze({readRestoreCandidate:readRestoreCandidate,verify:verifyMigrationBackup});
   return;
@@ -538,7 +538,7 @@ function encryptedRestoreData(e){
     alert('別のバックアップ復元処理が進行中です。完了後にもう一度お試しください。');
     e.target.value='';return;
   }
-  if(file.size>ENCRYPTED_FILE_LIMIT){alert("バックアップファイルが大きすぎます。\n暗号化形式は21MiB、平文JSONは20MiB以下にしてください。");e.target.value="";return;}
+  if(file.size>ENCRYPTED_FILE_LIMIT){alert("バックアップファイルが大きすぎます。\n暗号化形式は36MiB、平文JSONは20MiB以下にしてください。");e.target.value="";return;}
   var state;
   try{state=captureBackupState();}catch(_){alert('現在の保存内容を確認できないため復元を開始できません。');e.target.value='';return;}
   var operation={cancelled:false};
@@ -649,7 +649,7 @@ async function verifyMigrationBackup(file,password,sourceRaw){
 }
 async function readEncryptedBackupFile(file){
   if(!(file instanceof Blob)||file.size>ENCRYPTED_FILE_LIMIT)
-    throw validationError('21MiB以下の暗号化バックアップを選んでください。');
+    throw validationError('36MiB以下の暗号化バックアップを選んでください。');
   try{return JSON.parse(await file.text());}
   catch(_){throw validationError('バックアップファイルを読み込めませんでした。');}
 }

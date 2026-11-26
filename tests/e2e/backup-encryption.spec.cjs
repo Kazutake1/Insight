@@ -205,17 +205,17 @@ test('FICTIONAL legacy plaintext imports but safety encryption cancellation pres
   await expect(page.locator('#insightBackupOverlay')).toHaveCount(0);
   expect(await page.evaluate(()=>localStorage.getItem('insight_v11'))).toBe(raw);
 });
-test('FICTIONAL maximum 15MiB plaintext produces a restorable envelope above old 20MiB file limit',async({page})=>{
+test('FICTIONAL maximum 25MiB plaintext produces a restorable envelope above the previous 21MiB encrypted file limit',async({page})=>{
   test.setTimeout(90000);await setup(page);
   const raw=await page.evaluate(()=>localStorage.getItem('insight_v11'));
   const file=await page.evaluate(async PASSWORD=>{
     const snapshot=JSON.parse(JSON.stringify(allStores));
     snapshot.fictionalPadding='';
-    snapshot.fictionalPadding='A'.repeat(15*1024*1024-new TextEncoder().encode(JSON.stringify(snapshot)).length);
+    snapshot.fictionalPadding='A'.repeat(25*1024*1024-new TextEncoder().encode(JSON.stringify(snapshot)).length);
     return InsightBackupCryptoV1.encrypt(snapshot,PASSWORD);
   },PASSWORD);
-  expect(Buffer.byteLength(JSON.stringify(file))).toBeGreaterThan(20*1024*1024);
-  expect(Buffer.byteLength(JSON.stringify(file))).toBeLessThan(21*1024*1024);
+  expect(Buffer.byteLength(JSON.stringify(file))).toBeGreaterThan(21*1024*1024);
+  expect(Buffer.byteLength(JSON.stringify(file))).toBeLessThan(36*1024*1024);
   // Cancel at the normal restore confirmation: exercising file/decrypt/preflight
   // limits must not require an oversized localStorage write on this browser.
   page.removeAllListeners('dialog');let confirmed=false;
