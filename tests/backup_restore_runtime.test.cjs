@@ -705,6 +705,26 @@ test('Stage2 FICTIONAL plain JSON keeps 20MiB limit and huge encrypted files fai
   assert.equal(f.readers.length,1);assert.equal(input.value,'');
   assert.match(f.alerts.at(-1),/暗号化形式は36MiB、平文JSONは20MiB/);
 });
+test('capacity measurement matches actual UTF-8 backup envelopes and does not write',async()=>{
+  const f=fixture({realCrypto:true});
+  const password='Fictional-capacity-fixture';
+  const data=clone(f.original);
+  data.stores.a.data['2026']['1月'][0].storeMemo='架空😀';
+  const api=f.window.InsightBackupCapacityV1;
+  const {encrypted}=await f.window.InsightMigrationBackupV1.encodeCommitted(data,password);
+  const normal=await f.window.InsightBackupCryptoV1.decrypt(encrypted,password);
+  const published=api.measure(data,true);
+  const legacy=api.measure(data,false);
+  assert.equal(published.bytes,Buffer.byteLength(JSON.stringify(normal)));
+  assert.equal(published.limit,25*1024*1024);
+  normal.backupInfo.backupType='preRestore';
+  assert.equal(legacy.bytes,Buffer.byteLength(JSON.stringify(normal)));
+  assert.equal(f.writeCount,0);
+  assert.equal(f.downloads.length,0);
+  assert.deepEqual(f.metadataWrites,[]);
+  assert.deepEqual(f.passwordRequests,[]);
+});
+
 test('FICTIONAL encrypted file gate reads limit minus one and the limit, but rejects limit plus one',async()=>{
   const f=fixture({realCrypto:true});
   const password='Fictional-capacity-fixture';

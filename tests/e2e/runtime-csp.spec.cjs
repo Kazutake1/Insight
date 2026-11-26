@@ -199,7 +199,9 @@ test('保存容量は操作時に保存文字列を参照し、保存内容を�
     const remove=proto.removeItem;
     // Use an isolated context with fictional UTF-16 text, never real data.
     for(const key of Object.keys(localStorage))if(key.startsWith('insight_'))remove.call(localStorage,key);
+    const validSnapshot=InsightStorage.serialize(allStores);
     set.call(localStorage,'insight_v11','架😀'.repeat(10000));
+    window.__seedCapacitySnapshot=()=>set.call(localStorage,'insight_v11',validSnapshot);
     set.call(localStorage,'insight_fixture','日'.repeat(10000));
     set.call(localStorage,'unrelated_fixture','X'.repeat(60000));
     window.__capacityWrites=[];
@@ -223,6 +225,7 @@ test('保存容量は操作時に保存文字列を参照し、保存内容を�
   await expect(result.locator('div')).toHaveText([
     '店舗データ（全店舗）：0.057 MiB','その他のInsight設定：0.019 MiB','合計（概算）：0.076 MiB'
   ]);
+  await expect(result).toContainText('バックアップ容量を計測できません。');
   await page.evaluate(()=>window.__updateCapacityFixture());
   await expect(result).toContainText('合計（概算）：0.076 MiB');
   await page.evaluate(()=>document.documentElement.classList.add('dark'));
@@ -231,9 +234,37 @@ test('保存容量は操作時に保存文字列を参照し、保存内容を�
   const controlBox=await button.boundingBox();
   const resultBox=await result.boundingBox();
   expect(resultBox.y-controlBox.y-controlBox.height).toBeGreaterThanOrEqual(7);
+  await page.evaluate(()=>{
+    window.__seedCapacitySnapshot();
+    document.documentElement.classList.remove('dark');
+  });
+  await button.click();
+  await expect(result).toContainText('バックアップ容量（暗号化前）');
+  await expect(result.getByRole('progressbar')).toHaveAttribute('data-status','normal');
+  await expect(result).toContainText('残り');
+  await page.evaluate(()=>document.documentElement.classList.add('dark'));
+  expect(await page.evaluate(()=>document.querySelector('.insight-backup-usage progress').getBoundingClientRect().width))
+    .toBeGreaterThan(50);
+  await page.evaluate(()=>{
+    window.InsightBackupCapacityV1={measure:()=>({bytes:window.__capacityBytes,limit:25*1024*1024})};
+    window.InsightSalesCount.hasUnsavedInput=()=>true;
+  });
+  const bar=result.getByRole('progressbar');
+  const MiB=1024*1024;
+  for(const [bytes,status] of [[20*MiB-1,'normal'],[20*MiB,'near'],[20*MiB+1,'near'],
+    [25*MiB-1,'near'],[25*MiB,'full'],[25*MiB+1,'exceeded']]){
+    await page.evaluate(value=>{window.__capacityBytes=value;},bytes);
+    await button.click();
+    await expect(bar).toHaveAttribute('data-status',status);
+    await expect(result).toContainText('未保存の入力があります');
+    if(status==='full')await expect(result).toContainText('容量上は作成できます');
+    if(status==='exceeded')await expect(result).toContainText('上限を超えているため');
+  }
   await page.evaluate(()=>window.__removePrimaryFixture());
   await button.click();
   await expect(result).toContainText('店舗データ（全店舗）：未保存');
+  await expect(result).toContainText('店舗データが未保存です。');
+  await expect(bar).toHaveCount(0);
   await page.evaluate(()=>window.__denyCapacityRead());
   await button.click();
   await expect(result).toHaveText('保存容量を計測できません。');
