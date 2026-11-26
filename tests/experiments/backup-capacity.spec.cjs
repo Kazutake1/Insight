@@ -164,7 +164,29 @@ for(const sizeMiB of [25,50,100]){
       expect(quota).toEqual({failure:'QuotaExceededError',hold:'hold',
         blocked:'IndexedDB writes are on hold',unchanged:true});
     }
+    await page.locator('#backupFile').setInputFiles(downloadPath);
+    const largeRestore=await page.evaluate(async ()=>{
+      const api=InsightIndexedDBStorageV1,backup=InsightMigrationBackupV1,password='Fictional-capacity-only-2026';
+      const file=document.querySelector('#backupFile').files[0];
+      const before=await api.read();
+      const safety=await backup.encodeCommitted(before.snapshot,password);
+      const safetyFile=new File([JSON.stringify(safety.encrypted)],safety.filename);
+      const raw=localStorage.getItem('insight_v11');
+      const start=performance.now();
+      const result=await api.restoreBackup({file,password,safetyFile,safetyPassword:password,legacyClientsClosed:true,confirm:()=>true});
+      return {revision:result.revision,legacyUnchanged:localStorage.getItem('insight_v11')===raw,
+        restoreMs:Math.round(performance.now()-start),heapSampleBytes:performance.memory?.usedJSHeapSize??null};
+    });
+    expect(largeRestore).toMatchObject({revision:3,legacyUnchanged:true});
+    await page.reload();
+    const restarted=await page.evaluate(async ()=>{
+      const {revision,snapshot}=await InsightIndexedDBStorageV1.read();
+      const memo=snapshot.stores.fictional.data['2025']['1月'][0].storeMemo;
+      return {revision,length:memo.length,first:memo[0],prefix:/[^架]/.test(memo.slice(0,-3))};
+    });
+    expect(restarted).toEqual({revision:3,length:saved.memoLength,first:'架',prefix:false});
     console.log(JSON.stringify({engine:browserName,sizeMiB,phase:'backup-restore',downloadMs,
-      fileBytes:validation.selectedBytes,cancelMs:validation.cancelMs,restoreMs:validation.restoreMs,heapSampleBytes:validation.heapSampleBytes}));
+      fileBytes:validation.selectedBytes,cancelMs:validation.cancelMs,restoreMs:validation.restoreMs,
+      largeRestoreMs:largeRestore.restoreMs,heapSampleBytes:Math.max(validation.heapSampleBytes??0,largeRestore.heapSampleBytes??0)||null}));
   });
 }
