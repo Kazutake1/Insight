@@ -6,7 +6,7 @@ test.beforeEach(async({page})=>{
     if(!location.pathname.endsWith('-fixture'))return;
     window.__INSIGHT_SHELL_VERSION__=build;
     window.__INSIGHT_FEATURE_SIGNATURE__=features;
-  },{build:'20261126-quick-save-feedback-build-139',features:'85eef2d7'});
+  },{build:'20261127-indexeddb-revision-build-140',features:'85eef2d7'});
   await page.route(/https:\/\/(www\.jma\.go\.jp|[^/]*api\.open-meteo\.com)\//,route=>route.abort());
 });
 // The fixture server uses HTTP; keep the rest of the shell's CSP in effect.
@@ -2363,20 +2363,30 @@ test('manual adoption uses the real encrypted backup confirmation and preserves 
     const shop=initial.snapshot.stores[initial.snapshot.current];
     shop.data[shop.years.at(-1)]['1月'][0].売上=456;
     const saved=await store.save(initial.revision,initial.snapshot);
-    const conflict=await store.save(initial.revision,initial.snapshot).catch(error=>error.message);
-    return {saved,conflict,raw:localStorage.getItem('insight_v11')};
+    const markerKey='insight_indexeddb_adoption_v1';
+    const marker=localStorage.getItem(markerKey);
+    shop.data[shop.years.at(-1)]['1月'][0].売上=789;
+    const conflict=await store.save(initial.revision,initial.snapshot).catch(error=>({
+      name:error.name,message:error.message
+    }));
+    return {saved,conflict,markerUnchanged:localStorage.getItem(markerKey)===marker,
+      raw:localStorage.getItem('insight_v11')};
   });
   const shop=source.stores[source.current];
   shop.data[shop.years.at(-1)]['1月'][0].売上=456;
-  expect(result).toEqual({saved:{revision:2,snapshot:source},conflict:'IndexedDB revision conflict',raw});
+  expect(result).toEqual({
+    saved:{revision:2,snapshot:source},
+    conflict:{name:'InsightIndexedDBStaleRevisionError',message:'IndexedDB revision conflict'},
+    markerUnchanged:true,raw
+  });
   await open();
-  expect(await page.evaluate(()=>InsightIndexedDBStorageV1.read().catch(error=>error.message))).toBe('IndexedDB writes are on hold');
+  expect(await page.evaluate(()=>InsightIndexedDBStorageV1.read())).toEqual(result.saved);
   const diagnostic=await page.evaluate(async ({file,password})=>{
     const store=InsightIndexedDBStorageV1;
     const markerKey='insight_indexeddb_adoption_v1';
     const before=localStorage.getItem(markerKey);
     const originalRaw=localStorage.getItem('insight_v11');
-    const writing=await store.diagnose();
+    const active=await store.diagnose();
     const unchanged=before===localStorage.getItem(markerKey);
     localStorage.removeItem(markerKey);
     const missingMarker=await store.diagnose();
@@ -2410,12 +2420,12 @@ test('manual adoption uses the real encrypted backup confirmation and preserves 
     const markerStillMissing=localStorage.getItem(markerKey)===null;
     const stillMissing=await store.diagnose();
     localStorage.setItem(markerKey,before);
-    return {writing,unchanged,missingMarker,missingDatabase,bothMissing,wrongPassword,wrongBackup,cancelled,confirmed,reviewedStores,changed,repeatedMigration,markerStillMissing,stillMissing,
+    return {active,unchanged,missingMarker,missingDatabase,bothMissing,wrongPassword,wrongBackup,cancelled,confirmed,reviewedStores,changed,repeatedMigration,markerStillMissing,stillMissing,
       markerPreserved:localStorage.getItem(markerKey)===before,
       rawPreserved:localStorage.getItem('insight_v11')===originalRaw};
   },{file,password});
   expect(diagnostic).toEqual({
-    writing:{state:'hold',reason:'writing',observedRevision:2},unchanged:true,
+    active:{state:'active',revision:2},unchanged:true,
     missingMarker:{state:'hold',reason:'marker-missing'},
     missingDatabase:{state:'hold',reason:'database-missing'},
     bothMissing:{state:'hold',reason:'history-only'},
@@ -3180,7 +3190,7 @@ test('a fully restarted browser keeps the adopted revision and holds the legacy 
       const page=context.pages()[0]??await context.newPage();
       await page.goto(url);
       await page.evaluate(()=>{
-        window.__INSIGHT_SHELL_VERSION__='20261126-quick-save-feedback-build-139';
+        window.__INSIGHT_SHELL_VERSION__='20261127-indexeddb-revision-build-140';
         window.__INSIGHT_FEATURE_SIGNATURE__='85eef2d7';
       });
       await page.addScriptTag({url:new URL('/insight_indexeddb_storage_v1.js',url).href});
@@ -3217,7 +3227,7 @@ async function openLegacyPwaFixture(page){
     contentType:'text/html',body:'<!doctype html><title>Fictional online migration page</title>'
   }));
   await page.route('**/tests/e2e/fixtures/Index.html?insight_migration_probe=*',route=>route.fulfill({
-    contentType:'text/html',body:'<!doctype html><meta name="insight-shell-version" content="20261126-quick-save-feedback-build-139">'
+    contentType:'text/html',body:'<!doctype html><meta name="insight-shell-version" content="20261127-indexeddb-revision-build-140">'
   }));
   await page.goto(legacyPwaFixture);
   await page.addScriptTag({url:'/insight_indexeddb_storage_v1.js'});
@@ -3442,7 +3452,7 @@ test('cached legacy shell runs with its origin unavailable and adopted startup s
 });
 
 test('migration enforces the pinned environment before and after backup confirmation',async({page})=>{
-  const fixture='/forced-migration-gate-fixture',build='20261126-quick-save-feedback-build-139';
+  const fixture='/forced-migration-gate-fixture',build='20261127-indexeddb-revision-build-140';
   await page.route('**'+fixture,route=>route.fulfill({
     contentType:'text/html',body:'<!doctype html><title>Fictional forced migration fixture</title>'
   }));

@@ -8,7 +8,7 @@
   const recordKey='current';
   const storeName='snapshots';
   // Pin the version exercised by the Draft migration. It must be updated with the release that enables it.
-  const migrationBuild='20261126-quick-save-feedback-build-139';
+  const migrationBuild='20261127-indexeddb-revision-build-140';
   const migrationFeatures='85eef2d7';
 
   function parse(raw){
@@ -273,6 +273,12 @@
   }
 
   async function commitSnapshot({markerRaw,adopted,record:baseline},expectedRevision,snapshot){
+    // A stale caller has not started a write. Keep the committed version available to other tabs.
+    if(baseline.revision!==expectedRevision){
+      const error=new Error('IndexedDB revision conflict');
+      error.name='InsightIndexedDBStaleRevisionError';
+      throw error;
+    }
     const raw=JSON.stringify(snapshot);
     parse(raw);
     // Record both versions before opening the write transaction.
