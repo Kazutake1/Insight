@@ -62,7 +62,7 @@
       bar.value=Math.min(bytes,limit);
       section.append(bar);
       if(status==='near')line('注意：バックアップ上限の80%以上を使用しています。');
-      if(status==='full')line('バックアップ上限に達しています。現在の容量で作成できます。');
+      if(status==='full')line('バックアップ上限に達しています。容量上は作成できます。');
       if(status==='exceeded')line('警告：バックアップ上限を超えているため、作成できません。');
       var dirty=root.InsightQuickDateNavV1?.hasUnsavedInput?.()||
         root.InsightSalesCount?.hasUnsavedInput?.()||root.InsightInputDayNav?.hasUnsavedInput?.()||
@@ -118,7 +118,11 @@
           result.append(line);
         });
         try{
-          appendBackupCapacity(result,adopted?snapshot:JSON.parse(raw),adopted);
+          if(!adopted&&raw!==null){
+            snapshot=JSON.parse(raw);
+            if(snapshot===null)throw new Error('Invalid saved snapshot');
+          }
+          appendBackupCapacity(result,raw===null?null:snapshot,adopted);
         }catch(_){
           var unavailable=doc.createElement('p');
           unavailable.textContent='バックアップ容量を計測できません。';

@@ -234,11 +234,15 @@ test('保存容量は操作時に保存文字列を参照し、保存内容を�
   const controlBox=await button.boundingBox();
   const resultBox=await result.boundingBox();
   expect(resultBox.y-controlBox.y-controlBox.height).toBeGreaterThanOrEqual(7);
-  await page.evaluate(()=>window.__seedCapacitySnapshot());
+  await page.evaluate(()=>{
+    window.__seedCapacitySnapshot();
+    document.documentElement.classList.remove('dark');
+  });
   await button.click();
   await expect(result).toContainText('バックアップ容量（暗号化前）');
   await expect(result.getByRole('progressbar')).toHaveAttribute('data-status','normal');
   await expect(result).toContainText('残り');
+  await page.evaluate(()=>document.documentElement.classList.add('dark'));
   expect(await page.evaluate(()=>document.querySelector('.insight-backup-usage progress').getBoundingClientRect().width))
     .toBeGreaterThan(50);
   await page.evaluate(()=>{
@@ -253,7 +257,7 @@ test('保存容量は操作時に保存文字列を参照し、保存内容を�
     await button.click();
     await expect(bar).toHaveAttribute('data-status',status);
     await expect(result).toContainText('未保存の入力があります');
-    if(status==='full')await expect(result).toContainText('現在の容量で作成できます');
+    if(status==='full')await expect(result).toContainText('容量上は作成できます');
     if(status==='exceeded')await expect(result).toContainText('上限を超えているため');
   }
   await page.evaluate(()=>window.__removePrimaryFixture());
