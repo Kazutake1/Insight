@@ -6,7 +6,7 @@ test.beforeEach(async({page})=>{
     if(!location.pathname.endsWith('-fixture'))return;
     window.__INSIGHT_SHELL_VERSION__=build;
     window.__INSIGHT_FEATURE_SIGNATURE__=features;
-  },{build:'20261126-quick-notice-build-138',features:'1a0c61af'});
+  },{build:'20261126-quick-save-feedback-build-139',features:'85eef2d7'});
   await page.route(/https:\/\/(www\.jma\.go\.jp|[^/]*api\.open-meteo\.com)\//,route=>route.abort());
 });
 // The fixture server uses HTTP; keep the rest of the shell's CSP in effect.
@@ -134,7 +134,7 @@ test('combined input session shares four saves and guards both destinations and 
 
   await page.locator('#quickSaveBtn').click();
   await expect(page.locator('#quickSaveBtn')).toBeEnabled();
-  await expect(page.locator('#quickSaveBtn')).toHaveText('保存する');
+  await expect(page.locator('#quickSaveBtn')).toHaveText('✓ 保存しました');
   await expect(quickStatus).toBeEmpty();
   expect(await committedInput(page)).toEqual({revision:1,snapshot:expected});
   await page.locator('#nav2').click();
@@ -243,7 +243,7 @@ test('combined input session keeps a monthly draft and holds Quick after a compe
   await editQuickInput(page,seed.category);
   await page.locator('#quickSaveBtn').click();
   await expect(page.locator('#quickSaveBtn')).toBeEnabled();
-  await expect(page.locator('#quickSaveBtn')).toHaveText('保存する');
+  await expect(page.locator('#quickSaveBtn')).toHaveText('✓ 保存しました');
   await expect(page.locator('#quickSaveBtn + [role=status]')).toBeEmpty();
   const expected=quickExpectedSnapshot(seed,true);
   await page.locator('#nav2').click();
@@ -514,7 +514,7 @@ for(const outcome of ['success','quota']){
       await page.locator('#qi_客数').fill('123');
       await page.locator('#quickSaveBtn').click();
       await expect(page.locator('#quickSaveBtn')).toBeEnabled();
-      await expect(page.locator('#quickSaveBtn')).toHaveText('保存する');
+      await expect(page.locator('#quickSaveBtn')).toHaveText('✓ 保存しました');
       await expect(page.locator('#quickSaveBtn + [role=status]')).toBeEmpty();
       const row=expected.stores[seed.active].data[seed.year][seed.month][seed.day-1];
       row.客数=123;
@@ -2013,7 +2013,7 @@ test('explicit automatic weather fills only the draft and ignores manual changes
   expect(await committedInput(page)).toEqual(baseline);
   await page.locator('#quickSaveBtn').click();
   await expect(page.locator('#quickSaveBtn')).toBeEnabled();
-  await expect(page.locator('#quickSaveBtn')).toHaveText('保存する');
+  await expect(page.locator('#quickSaveBtn')).toHaveText('✓ 保存しました');
   await expect(page.locator('#quickSaveBtn + [role=status]')).toBeEmpty();
   const expected=baseline.snapshot;
   Object.assign(expected.stores[seed.active].data[seed.year][seed.month][seed.day-1],{weather:'雨',tempMaxC:27,tempMinC:13});
@@ -3180,8 +3180,8 @@ test('a fully restarted browser keeps the adopted revision and holds the legacy 
       const page=context.pages()[0]??await context.newPage();
       await page.goto(url);
       await page.evaluate(()=>{
-        window.__INSIGHT_SHELL_VERSION__='20261126-quick-notice-build-138';
-        window.__INSIGHT_FEATURE_SIGNATURE__='1a0c61af';
+        window.__INSIGHT_SHELL_VERSION__='20261126-quick-save-feedback-build-139';
+        window.__INSIGHT_FEATURE_SIGNATURE__='85eef2d7';
       });
       await page.addScriptTag({url:new URL('/insight_indexeddb_storage_v1.js',url).href});
       return {context,page};
@@ -3217,7 +3217,7 @@ async function openLegacyPwaFixture(page){
     contentType:'text/html',body:'<!doctype html><title>Fictional online migration page</title>'
   }));
   await page.route('**/tests/e2e/fixtures/Index.html?insight_migration_probe=*',route=>route.fulfill({
-    contentType:'text/html',body:'<!doctype html><meta name="insight-shell-version" content="20261126-quick-notice-build-138">'
+    contentType:'text/html',body:'<!doctype html><meta name="insight-shell-version" content="20261126-quick-save-feedback-build-139">'
   }));
   await page.goto(legacyPwaFixture);
   await page.addScriptTag({url:'/insight_indexeddb_storage_v1.js'});
@@ -3442,7 +3442,7 @@ test('cached legacy shell runs with its origin unavailable and adopted startup s
 });
 
 test('migration enforces the pinned environment before and after backup confirmation',async({page})=>{
-  const fixture='/forced-migration-gate-fixture',build='20261126-quick-notice-build-138';
+  const fixture='/forced-migration-gate-fixture',build='20261126-quick-save-feedback-build-139';
   await page.route('**'+fixture,route=>route.fulfill({
     contentType:'text/html',body:'<!doctype html><title>Fictional forced migration fixture</title>'
   }));
@@ -3833,7 +3833,7 @@ for(const connectionFails of [false,true]){
       window.InsightHourlyCustomers={connectIndexedDBPreview(){}};
       window.shellReadyState=document.readyState;
       window.lateSnapshot=InsightIndexedDBCandidateV1.initializeAdopted();`}));
-    await page.route(/\/insight_indexeddb_(quick_input|sales_input|recovery)_preview_v1\.js\?v=20261126-quick-notice-1$/,route=>route.fulfill({
+    await page.route(/\/insight_indexeddb_(quick_input|sales_input|recovery)_preview_v1\.js\?v=20261126-quick-save-feedback-1$/,route=>route.fulfill({
       contentType:'application/javascript',
       body:new URL(route.request().url()).pathname.endsWith('/insight_indexeddb_sales_input_preview_v1.js')
         ?`window.InsightIndexedDBSalesInputPreviewV1={async connect(){
@@ -4132,7 +4132,7 @@ httpsTest('Draft Index rehearses migration, editing and recovery at the release 
   await page.locator('#qi_売上').fill('321');
   await page.locator('#quickSaveBtn').click();
   await expect(page.locator('#quickSaveBtn')).toBeEnabled();
-  await expect(page.locator('#quickSaveBtn')).toHaveText('保存する');
+  await expect(page.locator('#quickSaveBtn')).toHaveText('✓ 保存しました');
   await expect(page.locator('#quickSaveBtn + [role=status]')).toBeEmpty();
   const edited=await committedInput(page);
   expect(edited.revision).toBe(1);
@@ -4480,7 +4480,7 @@ httpsTest('Draft Index rehearses migration, editing and recovery at the release 
   await page.locator('#qi_売上').fill('876');
   await page.locator('#quickSaveBtn').click();
   await expect(page.locator('#quickSaveBtn')).toBeEnabled();
-  await expect(page.locator('#quickSaveBtn')).toHaveText('保存する');
+  await expect(page.locator('#quickSaveBtn')).toHaveText('✓ 保存しました');
   await expect(page.locator('#quickSaveBtn + [role=status]')).toBeEmpty();
   await page.reload();
   await expect(page.locator('#qi_売上')).toHaveValue('876');
@@ -5709,7 +5709,13 @@ for(const sameMunicipality of [true,false]){
     await button.press('Enter');
     await page.waitForFunction(()=>quickSaveDigests.length===2);
     await expect(button).toHaveAttribute('aria-disabled','true');
-    expect(await page.evaluate(()=>document.getElementById('quickSaveBtn').disabled)).toBe(false);
+    await expect(button).toBeFocused();
+    expect(await page.evaluate(()=>({
+      body:document.body.inert,save:document.getElementById('quickSaveBtn').disabled,
+      input:!!document.getElementById('qi_売上').closest('[inert]'),
+      date:!!document.getElementById('iqdDateInput').closest('[inert]'),
+      store:!!document.getElementById('storeSel').closest('[inert]')
+    }))).toEqual({body:false,save:false,input:true,date:true,store:true});
     const buttonWhileSaving=await button.boundingBox();
     // The prior validation message clears when a valid save starts, freeing width beside the button.
     expect(buttonWhileSaving).toMatchObject({x:buttonBefore.x,y:buttonBefore.y,height:buttonBefore.height});
@@ -5728,6 +5734,8 @@ for(const sameMunicipality of [true,false]){
     await expect(button).toBeEnabled();
     await expect(button).toBeFocused();
     expect(await button.boundingBox()).toEqual(buttonWhileSaving);
+    await expect(button).toHaveText('✓ 保存しました');
+    await expect(button).toHaveCSS('background-color','rgb(22, 163, 74)');
     await expect(button).toHaveText('保存する');
     await expect(page.locator('#quickSaveBtn + [role=status]')).toBeEmpty();
     await expect(page.locator('#iqdDateInput')).toHaveValue(seed.iso);

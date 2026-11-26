@@ -77,6 +77,26 @@
       if(initial.state!=='IDLE_OBSERVED'||initial.activeCount!==0)quickSaveFault=true;
     }catch(_){quickSaveFault=true;}
   }
+  var quickSaveFeedbackTimer=null;
+  function clearQuickSaveFeedback(){
+    if(quickSaveFeedbackTimer!==null){
+      root.clearTimeout(quickSaveFeedbackTimer);
+      quickSaveFeedbackTimer=null;
+    }
+    var button=root.document?.getElementById('quickSaveBtn');
+    if(button?.classList.contains('is-saved-feedback')){
+      button.classList.remove('is-saved-feedback');
+      button.textContent='保存する';
+    }
+  }
+  function showQuickSaveFeedback(){
+    var button=root.document?.getElementById('quickSaveBtn');
+    if(!button)return;
+    clearQuickSaveFeedback();
+    button.classList.add('is-saved-feedback');
+    button.textContent='✓ 保存しました';
+    quickSaveFeedbackTimer=root.setTimeout(clearQuickSaveFeedback,2000);
+  }
   function observeQuickSave(action,context,asyncPreview){
     if(asyncPreview)quickSaveAsyncObserved=true;
     initQuickSaveObserver();
@@ -104,6 +124,7 @@
     if(asyncPreview){
       return Promise.resolve().then(action).then(function(value){
         finish(value==='completed'||value==='cancelled_before_mutation'?value:'unknown');
+        if(value==='completed')showQuickSaveFeedback();
         return value;
       },function(error){
         finish('unknown');
@@ -112,7 +133,10 @@
     }
     try{
       var result=action();
-      if(context.cancel!==true&&context.state.quickSaveObservationFailed!==true)outcome='completed';
+      if(context.cancel!==true&&context.state.quickSaveObservationFailed!==true){
+        outcome='completed';
+        showQuickSaveFeedback();
+      }
       return result;
     }finally{finish(outcome);}
   }
@@ -208,6 +232,7 @@
       var self=this,args=Array.prototype.slice.call(arguments);
       return runScoped(dateScoped,function(){
         var context={name:functionName,thisArg:self,args:args,state:{},cancel:false,result:undefined};
+        if(functionName==='saveQuick')clearQuickSaveFeedback();
         if(beforeEvent)emit(beforeEvent,context);
         if(context.cancel){
           if(functionName==='saveQuick'&&typeof context.runIndexedDBPreview==='function')
