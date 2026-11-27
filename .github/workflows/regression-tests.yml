@@ -27,7 +27,7 @@ jobs:
       - name: Inspect tracked public assets and secret files
         run: node --test tests/publication_security.test.cjs
       - name: Build the GitHub Pages site
-        uses: actions/jekyll-build-pages@44a6e6beabd48582f863aeeb6cb2151cc17166938
+        uses: actions/jekyll-build-pages@44a6e6beabd48582f863aeeb6cb2151cc1716697
         with:
           source: .
           destination: ./_site
