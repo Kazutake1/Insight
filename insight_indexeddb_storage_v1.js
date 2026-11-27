@@ -272,7 +272,7 @@
     return {markerRaw,adopted,record:validateRecord(record,adopted.id)};
   }
 
-  async function commitSnapshot({markerRaw,adopted,record:baseline},expectedRevision,snapshot){
+  async function commitSnapshot({markerRaw,adopted,record:baseline},expectedRevision,snapshot,writeId){
     // A stale caller has not started a write. Keep the committed version available to other tabs.
     if(baseline.revision!==expectedRevision){
       const error=new Error('IndexedDB revision conflict');
@@ -283,7 +283,7 @@
     parse(raw);
     // Record both versions before opening the write transaction.
     const [candidateDigest,baselineDigest]=await Promise.all([digest(raw),digest(baseline.raw)]);
-    const operation={id:root.crypto.randomUUID(),expectedRevision,digest:candidateDigest,
+    const operation={id:writeId??root.crypto.randomUUID(),expectedRevision,digest:candidateDigest,
       baselineDigest,baselineWriteId:baseline.writeId??null};
     checkActiveSource(baseline,adopted,markerRaw);
     // Leave a persistent hold if the browser exits or the outcome is unclear.
@@ -312,6 +312,30 @@
 
   async function save(expectedRevision,snapshot){
     return exclusive(async ()=>commitSnapshot(await activeEvidence(),expectedRevision,snapshot));
+  }
+
+  // Draft-only entry points. The normal app does not invoke them.
+  async function readQuickDraftEvidence(){
+    return exclusive(async ()=>{
+      const {adopted,record}=await activeEvidence();
+      return {sourceIdentity:adopted.id,revision:record.revision,writeId:record.writeId??null,
+        snapshot:parse(record.raw)};
+    });
+  }
+
+  async function saveQuickDraft({sourceIdentity,revision,token,prepare}){
+    if(typeof token!=='string'||!token||typeof prepare!=='function')throw new Error('Invalid quick draft request');
+    return exclusive(async ()=>{
+      const evidence=await activeEvidence();
+      const {adopted,record}=evidence;
+      if(adopted.id!==sourceIdentity||record.revision!==revision||record.writeId===token)
+        return {state:'not-started'};
+      const snapshot=await prepare(parse(record.raw));
+      if(snapshot===null)return {state:'not-started'};
+      // Check the marker and the old source again after the asynchronous draft claim.
+      checkActiveSource(record,adopted,evidence.markerRaw);
+      return {state:'confirmed',...(await commitSnapshot(evidence,revision,snapshot,token))};
+    });
   }
 
   // Check whether an interrupted operation produced a complete snapshot.
@@ -587,6 +611,6 @@
   }
 
   root.InsightIndexedDBStorageV1=Object.freeze({
-    migrate,read,save,diagnose,diagnoseStartup,checkMigrationEnvironment,reviewRecovery,reviewHistoryOnlyBackup,reviewMissingStorageBackup,restoreMissingStorage,restoreBackup,resumeRecovery,downloadCommittedBackup
+    migrate,read,save,readQuickDraftEvidence,saveQuickDraft,diagnose,diagnoseStartup,checkMigrationEnvironment,reviewRecovery,reviewHistoryOnlyBackup,reviewMissingStorageBackup,restoreMissingStorage,restoreBackup,resumeRecovery,downloadCommittedBackup
   });
 })(globalThis);

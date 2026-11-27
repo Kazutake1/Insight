@@ -105,3 +105,136 @@ test('a failed draft transaction retains the prior draft and the legacy source',
   expect(result.differentRaw.state).toBe('conflict');
   expect(result.raw).toBe('{"fixture":true}');
 });
+
+async function openAdoptedFixture(page){
+  await openFixture(page);
+  await page.evaluate(()=>{window.SK='insight_v11';});
+  await page.addScriptTag({url:'/insight_storage_v1.js'});
+  await page.addScriptTag({url:'/insight_indexeddb_storage_v1.js'});
+  await page.evaluate(async ()=>{
+    window.quickApply=await import('/draft/insight_offline_quick_apply_v1.mjs');
+  });
+}
+
+async function seedAdoptedFixture(page,draft,sourceIdentity=draft.basis.sourceIdentity){
+  return page.evaluate(async ({draft,sourceIdentity})=>{
+    const days=Array.from({length:24},(_,index)=>({d:String(index+1)}));
+    days[23]={...draft.before,d:'24',買上点数:1.7,storeMemo:'架空メモ',weather:'曇',tempMaxC:21,tempMinC:10};
+    const snapshot={current:draft.shopId,stores:{
+      [draft.shopId]:{years:['2026'],data:{2026:{'11月':days}}},
+      'fictional-shop-b':{years:['2026'],data:{2026:{'11月':[ {d:'1',売上:100} ]}}}
+    }};
+    const raw=JSON.stringify(snapshot);
+    localStorage.setItem('insight_v11',raw);
+    localStorage.setItem('insight_indexeddb_adoption_v1',JSON.stringify({state:'active',id:sourceIdentity}));
+    async function seed(name,value){
+      await new Promise((resolve,reject)=>{
+        const request=indexedDB.open(name,1);
+        request.onupgradeneeded=()=>request.result.createObjectStore('snapshots');
+        request.onerror=()=>reject(request.error);
+        request.onsuccess=()=>{
+          const db=request.result;
+          const tx=db.transaction('snapshots','readwrite');
+          tx.objectStore('snapshots').add(value,'current');
+          tx.oncomplete=()=>{db.close();resolve();};
+          tx.onabort=()=>{db.close();reject(tx.error);};
+        };
+      });
+    }
+    await seed('insight-migration-history-v1',{id:sourceIdentity});
+    await seed('insight-store-snapshots-v1',{id:sourceIdentity,raw,sourceRaw:raw,revision:draft.basis.revision});
+    return {snapshot,raw};
+  },{draft,sourceIdentity});
+}
+
+test('editing an existing draft cannot replace its original values or basis',async({page})=>{
+  await openFixture(page);
+  const actual=await page.evaluate(async draft=>{
+    const first=await drafts.saveDraft(draft);
+    const updates=[{...draft,basis:{...draft.basis,revision:5}},{...draft,before:{...draft.before,客数:89}}];
+    const errors=[];
+    for(const update of updates)
+      errors.push(await drafts.saveDraft(update,first.token).catch(error=>error.message));
+    return {first,errors,again:await drafts.loadDraft(draft.shopId,draft.day)};
+  },draft);
+  expect(actual.errors).toEqual(['Draft basis cannot change during an edit','Draft basis cannot change during an edit']);
+  expect(actual.again).toEqual(actual.first);
+});
+
+test('real writer rejects a different source with the same revision before claiming the draft',async({page})=>{
+  await openAdoptedFixture(page);
+  const seed=await seedAdoptedFixture(page,draft,'replacement-adoption');
+  const result=await page.evaluate(async ({shopId,day,basis,...rest})=>{
+    const saved=await drafts.saveDraft({shopId,day,basis,...rest});
+    const storage=InsightIndexedDBStorageV1;
+    const reply=await quickApply.applyIndexedDBQuickDraft({shopId,day,storage,build:basis.build,features:basis.features});
+    return {reply,unchanged:await storage.read(),pending:(await drafts.loadDraft(shopId,day)).token===saved.token};
+  },draft);
+  expect(result).toEqual({reply:{state:'not-started'},unchanged:{revision:4,snapshot:seed.snapshot},pending:true});
+});
+
+test('real confirmed write survives interrupted draft cleanup and can be identified after reopening',async({page,context})=>{
+  await openAdoptedFixture(page);
+  const seed=await seedAdoptedFixture(page,draft);
+  const first=await page.evaluate(async ({shopId,day,basis,...rest})=>{
+    const saved=await drafts.saveDraft({shopId,day,basis,...rest});
+    const remove=IDBObjectStore.prototype.delete;
+    let error;
+    try{
+      IDBObjectStore.prototype.delete=()=>{throw new Error('Interrupted draft cleanup fixture');};
+      error=await quickApply.applyIndexedDBQuickDraft({
+        shopId,day,storage:InsightIndexedDBStorageV1,build:basis.build,features:basis.features
+      }).catch(error=>error.message);
+    }finally{IDBObjectStore.prototype.delete=remove;}
+    return {token:saved.token,error,state:(await drafts.loadDraft(shopId,day)).state};
+  },draft);
+  expect(first).toMatchObject({error:'Interrupted draft cleanup fixture',state:'applying'});
+  await page.close();
+  const reopened=await context.newPage();
+  await openAdoptedFixture(reopened);
+  const result=await reopened.evaluate(async ({shopId,day})=>{
+    const storage=InsightIndexedDBStorageV1;
+    const record=await storage.readQuickDraftEvidence();
+    const outcome=await quickApply.recoverIndexedDBQuickDraft({shopId,day,storage});
+    return {record,outcome,remaining:await drafts.loadDraft(shopId,day),raw:localStorage.getItem('insight_v11')};
+  },draft);
+  Object.assign(seed.snapshot.stores[draft.shopId].data['2026']['11月'][23],draft.after);
+  expect(result).toEqual({
+    record:{sourceIdentity:draft.basis.sourceIdentity,revision:5,writeId:first.token,snapshot:seed.snapshot},
+    outcome:{state:'confirmed'},remaining:null,raw:seed.raw
+  });
+});
+
+test('an unacknowledged real write leaves the draft on hold after reopening',async({page,context})=>{
+  await openAdoptedFixture(page);
+  const seed=await seedAdoptedFixture(page,draft);
+  const error=await page.evaluate(async draft=>{
+    await drafts.saveDraft(draft);
+    const {shopId,day,basis}=draft;
+    const write=InsightStorage.writeMetadata;
+    InsightStorage.writeMetadata=(key,raw)=>{
+      if(key==='insight_indexeddb_adoption_v1'&&JSON.parse(raw).state==='active')
+        throw new Error('Fixture lost save acknowledgement');
+      return write(key,raw);
+    };
+    try{
+      return await quickApply.applyIndexedDBQuickDraft({
+        shopId,day,storage:InsightIndexedDBStorageV1,build:basis.build,features:basis.features
+      }).catch(error=>error.message);
+    }finally{InsightStorage.writeMetadata=write;}
+  },draft);
+  expect(error).toBe('Fixture lost save acknowledgement');
+  await page.close();
+  const reopened=await context.newPage();
+  await openAdoptedFixture(reopened);
+  const state=await reopened.evaluate(async ({shopId,day,basis})=>{
+    const storage=InsightIndexedDBStorageV1;
+    const retry=await quickApply.applyIndexedDBQuickDraft({shopId,day,storage,build:basis.build,features:basis.features});
+    const recovery=await quickApply.recoverIndexedDBQuickDraft({shopId,day,storage}).catch(error=>error.message);
+    const pending=await drafts.loadDraft(shopId,day);
+    return {retry,recovery,pending,diagnosis:await storage.diagnose({verifyInterrupted:true}),
+      raw:localStorage.getItem('insight_v11')};
+  },draft);
+  expect(state).toMatchObject({retry:{state:'unavailable'},recovery:'IndexedDB writes are on hold',
+    pending:{state:'applying'},diagnosis:{state:'hold',reason:'writing',observedRevision:5,recovery:'save-verified'},raw:seed.raw});
+});

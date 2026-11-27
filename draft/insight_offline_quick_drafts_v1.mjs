@@ -111,6 +111,9 @@ export function saveDraft(input, expectedToken = null) {
   return transact(draft.key, 'readwrite', (stored, store) => {
     if ((stored?.token ?? null) !== expectedToken || (stored && stored.state !== 'pending'))
       throw new Error('Draft changed in another tab');
+    if (stored && (JSON.stringify(stored.basis) !== JSON.stringify(draft.basis) ||
+        JSON.stringify(stored.before) !== JSON.stringify(draft.before)))
+      throw new Error('Draft basis cannot change during an edit');
     const next = {...draft, token:crypto.randomUUID(), state:'pending'};
     store.put(next);
     return next;
