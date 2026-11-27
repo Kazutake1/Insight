@@ -365,7 +365,7 @@
     if(day>limit||snapshot.current!==shopId||!Object.hasOwn(snapshot.stores,shopId))return null;
     const shop=snapshot.stores[shopId];
     if(!shop?.years?.some(value=>String(value)===year))return null;
-    const row=shop.data?.[year]?.[Number(month)+'月']?.[Number(date)-1];
+    const row=shop.data?.[year]?.[Number(month)+'\u6708']?.[Number(date)-1];
     return row&&String(row.d)===String(Number(date))?row:null;
   }
 
@@ -393,9 +393,9 @@
         return {state:'not-started',reason:'offline',draftPending:released};
       }
       // Only these fields from the validated draft can reach the commit.
-      row.売上=claim.proposed.売上;
-      row.客数=claim.proposed.客数;
-      row.廃棄金額=claim.proposed.廃棄金額;
+      row['\u58f2\u4e0a']=claim.proposed['\u58f2\u4e0a'];
+      row['\u5ba2\u6570']=claim.proposed['\u5ba2\u6570'];
+      row['\u5ec3\u68c4\u91d1\u984d']=claim.proposed['\u5ec3\u68c4\u91d1\u984d'];
       row.haiki=claim.proposed.haiki;
       return {state:'confirmed',...(await commitSnapshot(evidence,record.revision,snapshot,token))};
     });
