@@ -20,7 +20,7 @@ const assets = new Map([
   ],
   [
     "../insight_indexeddb_storage_v1.js",
-    "3921fd162bcf8e3e05069957a682ef6a817065727a5e4897212cc409809e1bfa"
+    "9f05c18366df58dde9edf8aa4aefb1cfc812685c771147c95ae8291fb5523e96"
   ]
 ]);
 

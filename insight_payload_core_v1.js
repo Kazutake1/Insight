@@ -2349,7 +2349,27 @@ function updateTotals(type){
   // haiki合計はフォーム内で管理
 }
 
+const monthlySaveFeedbackTimers=new WeakMap();
+function monthlySaveMessage(type){
+  return document.getElementById({sales:"savedSales",kyaku:"savedKyaku",haiki:"savedHaiki"}[type]);
+}
+function clearMonthlySaveFeedback(type){
+  const message=monthlySaveMessage(type);
+  if(!message)return;
+  clearTimeout(monthlySaveFeedbackTimers.get(message));
+  monthlySaveFeedbackTimers.delete(message);
+  message.classList.remove("is-visible");
+}
+function showMonthlySaveFeedback(type){
+  const message=monthlySaveMessage(type);
+  if(!message)return;
+  clearMonthlySaveFeedback(type);
+  message.classList.add("is-visible");
+  monthlySaveFeedbackTimers.set(message,setTimeout(()=>clearMonthlySaveFeedback(type),3000));
+}
+
 function saveInput(type){
+  clearMonthlySaveFeedback(type);
   if(!store.data[editYear[type]])store.data[editYear[type]]=blankYearData(editYear[type]);
   const clean=drafts[type].map(r=>{
     const row={d:r.d,weather:r.weather||""};
@@ -2368,7 +2388,9 @@ function saveInput(type){
   store.data[editYear[type]][editMonth[type]]=clean;
   // 天気を共有ストアに同期
   clean.forEach(r=>{if(r.weather)setSharedWeather(editYear[type],editMonth[type],r.d,r.weather);});
-  persist();updateMissingBadge();
+  const saved=persist();
+  updateMissingBadge();
+  if(saved===true)showMonthlySaveFeedback(type);
 }
 
 function clearDayData(type){

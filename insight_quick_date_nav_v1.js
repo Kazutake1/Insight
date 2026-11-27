@@ -40,7 +40,7 @@
   function selectDate(date,preserveDatePicker){
     if(!date||typeof date.getTime!=='function'||!Number.isFinite(date.getTime())||dateContext.iso(date)===dateContext.getSelectedIso())return;
     var management=window.InsightIndexedDBSalesInputPreviewV1,year=String(date.getFullYear());
-    if(management?.managesYears()&&!dateContext.isFuture(date)&&!window.InsightYearManager.isCurrentRegistered(year)){
+    if(management?.managesYears()&&!window.InsightYearManager.isCurrentRegistered(year)){
       // The date picker stores its proposed value before it dispatches change.
       if(preserveDatePicker)document.getElementById('iqdDateInput').value=dateContext.getSelectedIso();
       void management.promoteForPeriod(year,0,'この日付',()=>applySelectedDate(date,preserveDatePicker));

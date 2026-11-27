@@ -25,7 +25,7 @@
 
 <title>Insight</title>
 <link rel="stylesheet" href="./insight_report_preview_v1.css?v=20261021-csp-events-payload-1">
-<link rel="stylesheet" href="./insight_payload_core_v1.css?v=20261126-quick-save-feedback-1">
+<link rel="stylesheet" href="./insight_payload_core_v1.css?v=20261127-monthly-save-feedback-1">
 <link rel="stylesheet" href="./insight_input_day_nav_v1.css?v=20261014-day-nav-1">
 <link rel="stylesheet" href="./insight_backup_password_v1.css?v=20261125-input-backup-1">
 </head>
@@ -197,6 +197,7 @@
       <div class="page-header">
         <div class="page-title">売上入力</div>
         <div class="header-right">
+          <div class="saved-msg" id="savedSales" role="status">✓ 保存しました</div>
           <button id="salesClearBtn" class="clear-btn">クリア</button>
           <button id="salesSaveBtn" class="save-btn">保存する</button>
         </div>
@@ -236,6 +237,7 @@
       <div class="page-header">
         <div class="page-title">客数入力</div>
         <div class="header-right">
+          <div class="saved-msg" id="savedKyaku" role="status">✓ 保存しました</div>
           <button id="kyakuClearBtn" class="clear-btn">クリア</button>
           <button id="kyakuSaveBtn" class="save-btn">保存する</button>
         </div>
@@ -273,6 +275,7 @@
       <div class="page-header">
         <div class="page-title">廃棄入力</div>
         <div class="header-right">
+          <div class="saved-msg" id="savedHaiki" role="status">✓ 保存しました</div>
           <button id="haikiClearBtn" class="clear-btn">クリア</button>
           <button id="haikiSaveBtn" class="save-btn">保存する</button>
         </div>
@@ -332,7 +335,7 @@
   </div>
 </div>
 
-<script src="./insight_payload_core_v1.js?v=20261125-input-backup-1"></script>
+<script src="./insight_payload_core_v1.js?v=20261127-monthly-save-feedback-1"></script>
 
 
 <!-- Split View 経営分析AIパネル（既存画面から独立） -->
