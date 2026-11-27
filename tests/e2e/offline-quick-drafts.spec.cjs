@@ -365,8 +365,9 @@ test('verified quick-entry reopens offline without controlling the actual normal
     expect(await reopened.evaluate(()=>localStorage.getItem('insight_v11'))).toBe(raw);
     expect(await reopened.evaluate(()=>localStorage.getItem('insight_indexeddb_adoption_v1'))).toBeNull();
     expect(await reopened.evaluate(()=>navigator.serviceWorker.getRegistration('/Insight/Index.html').then(Boolean))).toBe(false);
-    const normal=await context.newPage();
-    expect(await normal.goto(appUrl).then(()=>false,()=>true)).toBe(true);
+    const disconnectedNormal=await context.newPage();
+    expect(await disconnectedNormal.goto(appUrl).then(()=>false,()=>true)).toBe(true);
+    await disconnectedNormal.close();
     await reopened.evaluate(async ()=>{
       const [name]=await caches.keys();
       const cache=await caches.open(name);
@@ -375,6 +376,7 @@ test('verified quick-entry reopens offline without controlling the actual normal
     expect((await reopened.reload()).status()).toBe(503);
 
     disconnected=false;
+    const normal=await context.newPage();
     await normal.goto(origin+'/Insight/');
     await expect(normal).toHaveURL(appUrl);
     await normal.locator('#nav0').click();
