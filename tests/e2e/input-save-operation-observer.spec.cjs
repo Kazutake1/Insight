@@ -1,4 +1,5 @@
 const {test,expect}=require('@playwright/test');
+require('./helpers/verified-chart.cjs')(test);
 
 async function openFictionalInput(page,{type='sales',missingObserver=false,weather=false}={}){
   await page.route('**/Index.html*',async route=>{
@@ -254,4 +255,31 @@ test('FICTIONAL actual input save button opens native guarded postcommit warning
     raw:fault.raw,saved:123,live:123,
     report:{held:false,conflict:false},restoreHeld:false
   });
+});
+
+test('monthly legacy saves show only the confirmed message and restart its three-second timer',async({page})=>{
+  await openFictionalInput(page);
+  await page.clock.install();
+  for(const [type,route,notice] of [['sales',2,'savedSales'],['kyaku',3,'savedKyaku'],['haiki',4,'savedHaiki']]){
+    await page.locator('#nav'+route).click();
+    const message=page.locator('#'+notice);
+    await expect(message).toBeHidden();
+    const button=page.locator('#'+type+'SaveBtn');
+    await button.click();
+    await expect(message).toHaveText('✓ 保存しました');
+    await expect(message).toBeVisible();
+    await expect(button).toHaveText('保存する');
+    await page.clock.fastForward(2000);
+    await button.click();
+    await page.clock.fastForward(1500);
+    await expect(message).toBeVisible();
+    await page.clock.fastForward(1600);
+    await expect(message).toBeHidden();
+  }
+  await page.evaluate(()=>{
+    window.alert=()=>{};
+    InsightStorage.persistCurrent=()=>{throw new Error('isolated save failure');};
+  });
+  await page.locator('#haikiSaveBtn').click();
+  await expect(page.locator('#savedHaiki')).toBeHidden();
 });

@@ -206,6 +206,7 @@
     async function save(){
       state.pending=false;
       if(state.held||state.busy)return 'cancelled_before_mutation';
+      root.clearMonthlySaveFeedback(type);
       if(!matchesPeriod()){
         status.textContent='この期間は試験用の'+screen.label+'保存の対象外です。';
         return 'cancelled_before_mutation';
@@ -228,13 +229,20 @@
       const candidate=JSON.parse(JSON.stringify(state.committed.snapshot));
       apply(candidate,edited);
       const body=doc.body;
-      const wasInert=body.inert;
-      const saveHadFocus=doc.activeElement===button;
+      const locked=[];
       state.busy=true;
       button.setAttribute('aria-disabled','true');
-      body.inert=true;
       status.textContent='';
       try{
+        if(!body.contains(button)||body.inert)throw new Error('Monthly save controls are unavailable');
+        // Keep the save button focusable while preventing interaction with the rest of the screen.
+        for(let node=button;node!==body;node=node.parentElement){
+          for(const sibling of node.parentElement.children){
+            if(sibling===node||sibling.inert||sibling.matches('script,style,link'))continue;
+            sibling.inert=true;
+            locked.push(sibling);
+          }
+        }
         const result=await api.save(state.committed.revision,candidate);
         if(!matchesScreen()||JSON.stringify(changes())!==JSON.stringify(edited)){
           stop('表示中の店舗・日付または保存済みデータが変わりました。保存済みの内容を確認してください。');
@@ -244,17 +252,16 @@
         state.committed=result;
         updateMissingBadge();
         status.textContent='';
+        root.showMonthlySaveFeedback(type);
         return 'completed';
       }catch(_){
         stop('保存結果を確認できないため、追加の保存を停止しました。');
         return 'unknown';
       }finally{
         state.busy=false;
-        body.inert=wasInert;
         button.disabled=state.held;
         button.removeAttribute('aria-disabled');
-        if(saveHadFocus&&!state.held&&!wasInert&&doc.activeElement===body)
-          button.focus({preventScroll:true});
+        for(const sibling of locked)sibling.inert=false;
       }
     }
 
