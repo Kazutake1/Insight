@@ -3,11 +3,11 @@ const {test,expect}=require('@playwright/test');
 const before={売上:250,客数:90,廃棄金額:12,haiki:{米飯:10,FF:2}};
 const after={売上:255,客数:0,廃棄金額:14,haiki:{FF:2,米飯:12}};
 const draft={shopId:'fictional-shop-a',day:'2026-11-24',before,after,
-  basis:{build:'fixture-142',features:'fixture-shell',sourceIdentity:'fixture-adoption',mode:'indexeddb',revision:4}};
+  basis:{build:'20261127-quick-future-date-build-142',features:'f0fcd0ba',sourceIdentity:'fixture-adoption',mode:'indexeddb',revision:4}};
 
 async function openFixture(page){
   await page.route('**/offline-quick-drafts-fixture',route=>route.fulfill({
-    contentType:'text/html',body:'<!doctype html><title>Fictional quick drafts</title>'
+    contentType:'text/html; charset=utf-8',body:'<!doctype html><meta charset=utf-8><title>Fictional quick drafts</title>'
   }));
   await page.goto('/offline-quick-drafts-fixture');
   await page.evaluate(async ()=>{
@@ -108,9 +108,20 @@ test('a failed draft transaction retains the prior draft and the legacy source',
 
 async function openAdoptedFixture(page){
   await openFixture(page);
-  await page.evaluate(()=>{window.SK='insight_v11';});
+  await page.evaluate(({build,features})=>{
+    window.SK='insight_v11';
+    window.__INSIGHT_SHELL_VERSION__=build;
+    window.__INSIGHT_FEATURE_SIGNATURE__=features;
+  },draft.basis);
   await page.addScriptTag({url:'/insight_storage_v1.js'});
-  await page.addScriptTag({url:'/insight_indexeddb_storage_v1.js'});
+  await page.evaluate(()=>new Promise((resolve,reject)=>{
+    const script=document.createElement('script');
+    script.src='/insight_indexeddb_storage_v1.js';
+    script.dataset.insightQuickDraftFixture='true';
+    script.onload=()=>resolve();
+    script.onerror=()=>reject(new Error('Fixture writer did not load'));
+    document.head.append(script);
+  }));
   await page.evaluate(async ()=>{
     window.quickApply=await import('/draft/insight_offline_quick_apply_v1.mjs');
   });
@@ -167,7 +178,7 @@ test('real writer rejects a different source with the same revision before claim
   const result=await page.evaluate(async ({shopId,day,basis,...rest})=>{
     const saved=await drafts.saveDraft({shopId,day,basis,...rest});
     const storage=InsightIndexedDBStorageV1;
-    const reply=await quickApply.applyIndexedDBQuickDraft({shopId,day,storage,build:basis.build,features:basis.features});
+    const reply=await quickApply.applyIndexedDBQuickDraft({shopId,day,storage});
     return {reply,unchanged:await storage.read(),pending:(await drafts.loadDraft(shopId,day)).token===saved.token};
   },draft);
   expect(result).toEqual({reply:{state:'not-started'},unchanged:{revision:4,snapshot:seed.snapshot},pending:true});
@@ -179,16 +190,14 @@ test('real confirmed write survives interrupted draft cleanup and can be identif
   const first=await page.evaluate(async ({shopId,day,basis,...rest})=>{
     const saved=await drafts.saveDraft({shopId,day,basis,...rest});
     const remove=IDBObjectStore.prototype.delete;
-    let error;
+    let receipt;
     try{
       IDBObjectStore.prototype.delete=()=>{throw new Error('Interrupted draft cleanup fixture');};
-      error=await quickApply.applyIndexedDBQuickDraft({
-        shopId,day,storage:InsightIndexedDBStorageV1,build:basis.build,features:basis.features
-      }).catch(error=>error.message);
+      receipt=await quickApply.applyIndexedDBQuickDraft({shopId,day,storage:InsightIndexedDBStorageV1});
     }finally{IDBObjectStore.prototype.delete=remove;}
-    return {token:saved.token,error,state:(await drafts.loadDraft(shopId,day)).state};
+    return {token:saved.token,receipt,state:(await drafts.loadDraft(shopId,day)).state};
   },draft);
-  expect(first).toMatchObject({error:'Interrupted draft cleanup fixture',state:'applying'});
+  expect(first).toMatchObject({receipt:{state:'confirmed',revision:5,cleanup:'pending'},state:'applying'});
   await page.close();
   const reopened=await context.newPage();
   await openAdoptedFixture(reopened);
@@ -201,7 +210,7 @@ test('real confirmed write survives interrupted draft cleanup and can be identif
   Object.assign(seed.snapshot.stores[draft.shopId].data['2026']['11月'][23],draft.after);
   expect(result).toEqual({
     record:{sourceIdentity:draft.basis.sourceIdentity,revision:5,writeId:first.token,snapshot:seed.snapshot},
-    outcome:{state:'confirmed'},remaining:null,raw:seed.raw
+    outcome:{state:'confirmed',revision:5,cleanup:'cleared'},remaining:null,raw:seed.raw
   });
 });
 
@@ -210,7 +219,7 @@ test('an unacknowledged real write leaves the draft on hold after reopening',asy
   const seed=await seedAdoptedFixture(page,draft);
   const error=await page.evaluate(async draft=>{
     await drafts.saveDraft(draft);
-    const {shopId,day,basis}=draft;
+    const {shopId,day}=draft;
     const write=InsightStorage.writeMetadata;
     InsightStorage.writeMetadata=(key,raw)=>{
       if(key==='insight_indexeddb_adoption_v1'&&JSON.parse(raw).state==='active')
@@ -219,22 +228,50 @@ test('an unacknowledged real write leaves the draft on hold after reopening',asy
     };
     try{
       return await quickApply.applyIndexedDBQuickDraft({
-        shopId,day,storage:InsightIndexedDBStorageV1,build:basis.build,features:basis.features
-      }).catch(error=>error.message);
+        shopId,day,storage:InsightIndexedDBStorageV1
+      });
     }finally{InsightStorage.writeMetadata=write;}
   },draft);
-  expect(error).toBe('Fixture lost save acknowledgement');
+  expect(error).toEqual({state:'unknown'});
   await page.close();
   const reopened=await context.newPage();
   await openAdoptedFixture(reopened);
-  const state=await reopened.evaluate(async ({shopId,day,basis})=>{
+  const state=await reopened.evaluate(async ({shopId,day})=>{
     const storage=InsightIndexedDBStorageV1;
-    const retry=await quickApply.applyIndexedDBQuickDraft({shopId,day,storage,build:basis.build,features:basis.features});
+    const retry=await quickApply.applyIndexedDBQuickDraft({shopId,day,storage});
     const recovery=await quickApply.recoverIndexedDBQuickDraft({shopId,day,storage}).catch(error=>error.message);
     const pending=await drafts.loadDraft(shopId,day);
     return {retry,recovery,pending,diagnosis:await storage.diagnose({verifyInterrupted:true}),
       raw:localStorage.getItem('insight_v11')};
   },draft);
-  expect(state).toMatchObject({retry:{state:'unavailable'},recovery:'IndexedDB writes are on hold',
+  expect(state).toMatchObject({retry:{state:'unavailable'},recovery:{state:'unconfirmed'},
     pending:{state:'applying'},diagnosis:{state:'hold',reason:'writing',observedRevision:5,recovery:'save-verified'},raw:seed.raw});
+});
+
+test('draft-only write API is absent from the regular storage module',async({page})=>{
+  await openFixture(page);
+  await page.addScriptTag({url:'/insight_indexeddb_storage_v1.js'});
+  expect(await page.evaluate(()=>['saveQuickDraft','readQuickDraftEvidence']
+    .every(key=>!(key in InsightIndexedDBStorageV1)))).toBe(true);
+});
+
+test('network request failure and a stale feature list both stop before writing',async({page})=>{
+  await openAdoptedFixture(page);
+  const seed=await seedAdoptedFixture(page,draft);
+  await page.evaluate(input=>drafts.saveDraft(input),draft);
+  const apply=()=>page.evaluate(({shopId,day})=>quickApply.applyIndexedDBQuickDraft({
+    shopId,day,storage:InsightIndexedDBStorageV1
+  }),draft);
+
+  await page.route('**/Index.html?insight_migration_probe=*',route=>route.abort());
+  expect(await apply()).toEqual({state:'not-started',reason:'build-check-unavailable'});
+  await page.unroute('**/Index.html?insight_migration_probe=*');
+  await page.route('**/insight_shell_loader_v1.js?insight_draft_probe=*',route=>route.fulfill({
+    contentType:'text/javascript',body:"var orderedFeatureLoads=['./stale.js'];"
+  }));
+  expect(await apply()).toEqual({state:'not-started',reason:'build-mismatch'});
+  const state=await page.evaluate(async ({shopId,day})=>({
+    draft:(await drafts.loadDraft(shopId,day)).state,record:await InsightIndexedDBStorageV1.read()
+  }),draft);
+  expect(state).toEqual({draft:'pending',record:{revision:4,snapshot:seed.snapshot}});
 });
