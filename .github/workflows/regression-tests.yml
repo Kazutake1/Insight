@@ -26,6 +26,17 @@ jobs:
           node-version: '22'
       - name: Inspect tracked public assets and secret files
         run: node --test tests/publication_security.test.cjs
+      - name: Build the GitHub Pages site
+        uses: actions/jekyll-build-pages@44a6e6beabd48582f863aeeb6cb2151cc17166938
+        with:
+          source: .
+          destination: ./_site
+      - name: Verify both Insight entry points in the Pages output
+        run: |
+          cmp Index.html _site/Index.html
+          grep -F '<meta http-equiv="refresh" content="0; url=./Index.html">' _site/index.html
+          grep -F '<a href="./Index.html">Insightを開く</a>' _site/index.html
+          test "$(git ls-files | awk 'tolower($0) == "index.html"' | wc -l)" -eq 1
 
   dependency-audit:
     name: security / npm audit high+
