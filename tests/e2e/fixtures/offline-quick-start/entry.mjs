@@ -12,12 +12,23 @@ const status = document.querySelector('[role=status]');
 
 async function start() {
   const worker = navigator.serviceWorker;
+  const scope = new URL('./',location.href);
+  const expectedScript = new URL('worker.js',scope).href;
+  const registration = await worker.getRegistration(scope.href);
+  if ((registration && registration.scope !== scope.href) ||
+      [registration?.installing, registration?.waiting, registration?.active, worker.controller]
+        .some(candidate => candidate && candidate.scriptURL !== expectedScript))
+    throw new Error('Unexpected service worker');
+
   if (!worker.controller) {
-    await worker.register('./worker.js',{scope:'./',updateViaCache:'none'});
-    await worker.ready;
+    await worker.register(expectedScript,{scope:scope.href,updateViaCache:'none'});
+    const ready = await worker.ready;
+    if (ready.scope !== scope.href || ready.active?.scriptURL !== expectedScript)
+      throw new Error('Unexpected service worker');
     window.location.reload();
     return;
   }
+  if (registration?.active !== worker.controller) throw new Error('Unverified active service worker');
   const stored = await loadDraft(target.shopId,target.day);
   let token = stored?.token ?? null;
   const initial = stored?.after ?? target.before;

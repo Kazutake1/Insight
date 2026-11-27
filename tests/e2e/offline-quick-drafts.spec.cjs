@@ -299,13 +299,17 @@ test('verified quick-entry reopens offline without controlling the actual normal
   const contentTypes={'.html':'text/html; charset=utf-8','.js':'text/javascript; charset=utf-8',
     '.mjs':'text/javascript; charset=utf-8','.css':'text/css; charset=utf-8'};
   let disconnected=false;
+  let invalidUpdate=false;
   const server=http.createServer(async (req,res)=>{
     if(disconnected){res.destroy();return;}
     const url=new URL(req.url,'http://localhost');
     if(url.pathname.startsWith(scope)){
       const name=url.pathname.slice(scope.length)||'index.html';
       if(!assets.has(name)){res.writeHead(404).end();return;}
-      res.writeHead(200,{'Content-Type':contentTypes[path.extname(name)],'Cache-Control':'no-store'}).end(assets.get(name));
+      const body=invalidUpdate&&name==='worker.js'?
+        source.replace('/* fixture-manifest */ null',JSON.stringify({...manifest,'entry.mjs':'0'.repeat(64)})):
+        assets.get(name);
+      res.writeHead(200,{'Content-Type':contentTypes[path.extname(name)],'Cache-Control':'no-store'}).end(body);
       return;
     }
     if(url.pathname==='/Insight/'){
@@ -356,6 +360,29 @@ test('verified quick-entry reopens offline without controlling the actual normal
     disconnected=true;
     await sales.fill('267');
     await expect(page.getByRole('status')).toHaveText('下書きを保存しました。');
+    const previousCache=await page.evaluate(()=>caches.keys());
+    expect(previousCache).toHaveLength(1);
+
+    disconnected=false;
+    invalidUpdate=true;
+    const update=await page.evaluate(async ()=>{
+      const registration=await navigator.serviceWorker.getRegistration();
+      const previous=registration.active;
+      const rejected=new Promise(resolve=>{
+        registration.addEventListener('updatefound',()=>{
+          const worker=registration.installing;
+          const check=()=>{
+            if(worker.state==='redundant'||worker.state==='installed')resolve(worker.state);
+          };
+          worker.addEventListener('statechange',check);
+          check();
+        },{once:true});
+      });
+      await registration.update();
+      return {state:await rejected,previousActive:registration.active===previous,cache:await caches.keys()};
+    });
+    expect(update).toEqual({state:'redundant',previousActive:true,cache:previousCache});
+    disconnected=true;
     await page.close();
 
     const reopened=await context.newPage();
@@ -368,11 +395,15 @@ test('verified quick-entry reopens offline without controlling the actual normal
     const disconnectedNormal=await context.newPage();
     expect(await disconnectedNormal.goto(appUrl).then(()=>false,()=>true)).toBe(true);
     await disconnectedNormal.close();
-    await reopened.evaluate(async ()=>{
-      const [name]=await caches.keys();
+    await reopened.evaluate(async name=>{
+      const cache=await caches.open(name);
+      await cache.put('entry.mjs',new Response('/* invalid fixture asset */',{headers:{'Content-Type':'text/javascript'}}));
+    },previousCache[0]);
+    expect((await reopened.reload()).status()).toBe(503);
+    await reopened.evaluate(async name=>{
       const cache=await caches.open(name);
       await cache.delete('entry.mjs');
-    });
+    },previousCache[0]);
     expect((await reopened.reload()).status()).toBe(503);
 
     disconnected=false;
@@ -390,6 +421,16 @@ test('verified quick-entry reopens offline without controlling the actual normal
     await normal.reload();
     await expect(normal.getByRole('status')).toContainText('旧版のキャッシュ状態を確認できないため、起動と保存を停止しています。');
     expect(await normal.evaluate(()=>localStorage.getItem('insight_v11'))).toBe(raw);
+
+    expect(await normal.evaluate(async scope=>{
+      const registration=await navigator.serviceWorker.getRegistration(scope);
+      return registration?.scope===new URL(scope,location.href).href&&await registration.unregister();
+    },scope)).toBe(true);
+    const blocked=await context.newPage();
+    await blocked.goto(origin+scope);
+    await expect(blocked.getByRole('status')).toHaveText('下書き用の画面を開けませんでした。');
+    await expect(blocked.getByRole('spinbutton',{name:'売上（千円）'})).toBeDisabled();
+    expect(await blocked.evaluate(()=>localStorage.getItem('insight_v11'))).toBe(raw);
   }finally{
     await new Promise(resolve=>{server.close(resolve);server.closeAllConnections();});
   }

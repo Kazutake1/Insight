@@ -20,10 +20,16 @@ async function verifiedBundle(cache) {
 self.addEventListener('install',event=>{
   event.waitUntil((async ()=>{
     const cache = await caches.open(cacheName);
-    for (const [path, hash] of Object.entries(manifest)) {
-      const response = await fetch(path,{cache:'no-store',redirect:'error'});
-      if (!await verified(response,hash)) throw new Error('Unverified test asset');
-      await cache.put(path,response);
+    if (await verifiedBundle(cache)) return;
+    try {
+      for (const [path, hash] of Object.entries(manifest)) {
+        const response = await fetch(path,{cache:'no-store',redirect:'error'});
+        if (!await verified(response,hash)) throw new Error('Unverified test asset');
+        await cache.put(path,response);
+      }
+    } catch (error) {
+      await caches.delete(cacheName);
+      throw error;
     }
   })());
 });
