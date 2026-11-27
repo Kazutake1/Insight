@@ -63,7 +63,7 @@
       baselineDraft=null;
       try{
         const {date,iso}=dateContext.getSelectedInfo();
-        if(matchesBaseline()&&supports(date)&&matchesDate(iso))rememberDraft(iso,readInputs());
+        if(matchesBaseline()&&canReadDate(date)&&matchesDate(iso))rememberDraft(iso,readInputs());
       }catch(_){
         // Without a complete baseline the draft is treated as unsaved.
       }
@@ -84,16 +84,18 @@
     function matchesDate(iso){
       return dateContext.getSelectedIso()===iso&&doc.getElementById('iqdDateInput')?.value===iso;
     }
-    function supports(date){
+    function canReadDate(date){
       const info=dateContext.info(date);
       const shop=state.committed.snapshot.stores[state.storeId];
-      return info&&!dateContext.isFuture(date)&&shop.years.some(year=>String(year)===info.fy)&&
+      return info&&shop.years.some(year=>String(year)===info.fy)&&
         shop.data?.[info.fy]?.[info.month]?.[info.day-1];
+    }
+    function canWriteDate(date){
+      return !dateContext.isFuture(date)&&canReadDate(date);
     }
     function allowDateChange(date){
       if(state.busy||state.held||state.pending||state.hourly?.dialog()?.open||state.eventDialogOpen?.())return false;
-      if(supports(date))return true;
-      return false;
+      return Boolean(canReadDate(date));
     }
 
     async function save(target,inputs,baseline){
@@ -143,10 +145,7 @@
     root.InsightHooks.on('quick:save:before','indexeddb-quick-input-preview',ctx=>{
       if(currentNav!==0||state.busy||state.held||state.pending||state.hourly?.dialog()?.open||state.eventDialogOpen?.())return false;
       const target=dateContext.getSelectedInfo();
-      if(!supports(target.date)){
-        allowDateChange(target.date);
-        return false;
-      }
+      if(!canWriteDate(target.date))return false;
       if(!matchesBaseline()||!matchesDate(target.iso)){
         ctx.runIndexedDBPreview=()=>{stop();return 'unknown';};
         return false;
@@ -168,7 +167,7 @@
     async function clearTodayData(){
       if(state.busy||state.held||state.pending||state.hourly?.dialog()?.open||state.eventDialogOpen?.()||currentNav!==0)return false;
       const {date,fy,month,day,iso}=dateContext.getSelectedInfo();
-      if(!supports(date))return false;
+      if(!canWriteDate(date))return false;
       if(!matchesBaseline()||!matchesDate(iso)){
         stop();
         return false;
@@ -217,7 +216,7 @@
     const fetchWeather=root.fetchWeather;
     async function fillWeatherDraft(){
       if(!allowAutomaticWeather||currentNav!==0||state.busy||state.held||state.pending||
-        state.hourly?.dialog()?.open||state.eventDialogOpen?.()||!supports(dateContext.getSelectedDate()))return false;
+        state.hourly?.dialog()?.open||state.eventDialogOpen?.()||!canWriteDate(dateContext.getSelectedDate()))return false;
       const iso=dateContext.getSelectedIso(),baseline=state.committed,view=weatherView;
       let edited=false;
       const recordEdit=event=>{

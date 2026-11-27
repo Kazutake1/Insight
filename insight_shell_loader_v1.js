@@ -28,7 +28,7 @@ var orderedFeatureLoads=[
   './insight_year_manager_v1.js?v=20261011-waste-inline-1',
   './insight_ops_v1.js?v=20260930-step5-2',
   './insight_preserve_dailyops_v1.js?v=20261125-input-backup-1',
-  './insight_quick_date_nav_v1.js?v=20261125-input-backup-1',
+  './insight_quick_date_nav_v1.js?v=20261127-quick-future-date-1',
   './insight_ops_kpifix_v1.js?v=20260930-hooks1',
   './insight_ai_ops_v1.js?v=20260930-hooks2',
   './insight_backup_crypto_v1.js?v=20261126-backup-usage-1',
@@ -147,9 +147,9 @@ async function start(){
   if(!workers||workers.controller||await workers.getRegistration(location.href))
     throw new Error('旧版のキャッシュ状態を確認できないため、起動と保存を停止しています。');
   await Promise.all([
-    import('./insight_indexeddb_storage_v1.js?v=20261127-monthly-save-feedback-1'),
+    import('./insight_indexeddb_storage_v1.js?v=20261127-quick-future-date-1'),
     import('./insight_indexeddb_migration_preview_v1.js?v=20261124-indexeddb-step3-1'),
-    import('./draft/insight_indexeddb_candidate_v1.js?v=20261127-monthly-save-feedback-1')
+    import('./draft/insight_indexeddb_candidate_v1.js?v=20261127-quick-future-date-1')
   ]);
   async function prepareRecovery(){
     const modules=['insight_storage_v1.js','insight_events_v1.js','insight_trip_overrides_v1.js','insight_sales_count_v1.js',
