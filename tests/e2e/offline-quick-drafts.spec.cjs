@@ -3,6 +3,7 @@ const {createHash}=require('node:crypto');
 const fs=require('node:fs/promises');
 const http=require('node:http');
 const path=require('node:path');
+require('./helpers/verified-chart.cjs')(test);
 
 const before={売上:250,客数:90,廃棄金額:12,haiki:{米飯:10,FF:2}};
 const after={売上:255,客数:0,廃棄金額:14,haiki:{FF:2,米飯:12}};
@@ -280,7 +281,7 @@ test('network request failure and a stale feature list both stop before writing'
   expect(state).toEqual({draft:'pending',record:{revision:4,snapshot:seed.snapshot}});
 });
 
-test('verified quick-entry fixture reopens offline and restores input made when the network drops',async({page,context})=>{
+test('verified quick-entry reopens offline without controlling the actual normal app',async({page,context})=>{
   const directory=path.join(__dirname,'fixtures/offline-quick-start');
   const assetFiles={
     'index.html':path.join(directory,'index.html'),
@@ -291,25 +292,63 @@ test('verified quick-entry fixture reopens offline and restores input made when 
   const manifest=Object.fromEntries(Array.from(assets,([name,bytes])=>[name,createHash('sha256').update(bytes).digest('hex')]));
   const source=await fs.readFile(path.join(directory,'worker.js'),'utf8');
   assets.set('worker.js',source.replace('/* fixture-manifest */ null',JSON.stringify(manifest)));
-  const scope='/isolated-quick-start/';
+  const scope='/Insight/isolated-quick-start/';
+  const appRoot=path.join(__dirname,'../..');
+  // Render the existing Pages entry fragment without its Jekyll front matter.
+  const home=(await fs.readFile(path.join(appRoot,'index.md'),'utf8')).replace(/^---[\s\S]*?\n---\n/,'');
+  const contentTypes={'.html':'text/html; charset=utf-8','.js':'text/javascript; charset=utf-8',
+    '.mjs':'text/javascript; charset=utf-8','.css':'text/css; charset=utf-8'};
   let disconnected=false;
-  const server=http.createServer((req,res)=>{
+  const server=http.createServer(async (req,res)=>{
     if(disconnected){res.destroy();return;}
-    const url=new URL(req.url,'http://127.0.0.1');
-    if(url.pathname==='/Insight/Index.html'){
-      res.writeHead(200,{'Content-Type':'text/html; charset=utf-8'}).end('<!doctype html><title>Normal-entry fixture</title>');
+    const url=new URL(req.url,'http://localhost');
+    if(url.pathname.startsWith(scope)){
+      const name=url.pathname.slice(scope.length)||'index.html';
+      if(!assets.has(name)){res.writeHead(404).end();return;}
+      res.writeHead(200,{'Content-Type':contentTypes[path.extname(name)],'Cache-Control':'no-store'}).end(assets.get(name));
       return;
     }
-    const name=url.pathname.startsWith(scope)?url.pathname.slice(scope.length)||'index.html':'';
-    if(!assets.has(name)){res.writeHead(404).end();return;}
-    res.writeHead(200,{'Content-Type':name.endsWith('.html')?'text/html; charset=utf-8':'text/javascript; charset=utf-8',
-      'Cache-Control':'no-store'}).end(assets.get(name));
+    if(url.pathname==='/Insight/'){
+      res.writeHead(200,{'Content-Type':contentTypes['.html']}).end(home);
+      return;
+    }
+    if(url.pathname==='/Insight/seed-fixture.html'){
+      res.writeHead(200,{'Content-Type':contentTypes['.html']}).end('<!doctype html><title>Fictional storage seed</title>');
+      return;
+    }
+    if(url.pathname==='/Insight/legacy-worker-fixture.js'){
+      res.writeHead(200,{'Content-Type':contentTypes['.js']}).end("'use strict';");
+      return;
+    }
+    const appFile=/^\/Insight\/((?:draft\/)?[a-zA-Z0-9_-]+\.(?:html|js|css))$/.exec(url.pathname)?.[1];
+    if(!appFile){res.writeHead(404).end();return;}
+    try{
+      let body=await fs.readFile(path.join(appRoot,appFile));
+      // Only the HTTP fixture needs this adjustment to the delivered CSP.
+      if(appFile.endsWith('.html'))body=body.toString().replace(/;?\s*upgrade-insecure-requests/g,'');
+      res.writeHead(200,{'Content-Type':contentTypes[path.extname(appFile)],'Cache-Control':'no-store'}).end(body);
+    }catch{res.writeHead(404).end();}
   });
   await new Promise(resolve=>server.listen(0,'127.0.0.1',resolve));
-  const origin='http://127.0.0.1:'+server.address().port;
+  const origin='http://localhost:'+server.address().port;
+  const appUrl=origin+'/Insight/Index.html';
   try{
-    await page.goto(origin+'/Insight/Index.html');
-    await page.evaluate(()=>localStorage.setItem('insight_v11','{"fictional":true}'));
+    await context.route(/https:\/\/(www\.jma\.go\.jp|[^/]*api\.open-meteo\.com)\//,route=>route.abort());
+    await page.goto(origin+'/Insight/seed-fixture.html');
+    await page.evaluate(()=>{
+      const year=String(new Date().getFullYear());
+      const snapshot={current:'fixture',stores:{fixture:{name:'架空店舗',years:[year],data:{[year]:{}}}}};
+      localStorage.setItem('insight_v11',JSON.stringify(snapshot));
+    });
+    await page.goto(origin+'/Insight/');
+    await expect(page).toHaveURL(appUrl);
+    await page.locator('#nav0').click();
+    await expect(page.locator('#iqdDateInput')).toBeVisible();
+    const raw=await page.evaluate(()=>{
+      InsightStorage.persistCurrent(allStores);
+      return localStorage.getItem('insight_v11');
+    });
+    expect(JSON.parse(raw).stores).toBeTruthy();
     await page.goto(origin+scope);
     const sales=page.getByRole('spinbutton',{name:'売上（千円）'});
     await expect(sales).toHaveValue('250');
@@ -323,17 +362,32 @@ test('verified quick-entry fixture reopens offline and restores input made when 
     await reopened.goto(origin+scope);
     await expect(reopened.getByRole('status')).toHaveText('下書きを復元しました。');
     await expect(reopened.getByRole('spinbutton',{name:'売上（千円）'})).toHaveValue('267');
-    expect(await reopened.evaluate(()=>localStorage.getItem('insight_v11'))).toBe('{"fictional":true}');
+    expect(await reopened.evaluate(()=>localStorage.getItem('insight_v11'))).toBe(raw);
     expect(await reopened.evaluate(()=>localStorage.getItem('insight_indexeddb_adoption_v1'))).toBeNull();
     expect(await reopened.evaluate(()=>navigator.serviceWorker.getRegistration('/Insight/Index.html').then(Boolean))).toBe(false);
     const normal=await context.newPage();
-    expect(await normal.goto(origin+'/Insight/Index.html').then(()=>false,()=>true)).toBe(true);
+    expect(await normal.goto(appUrl).then(()=>false,()=>true)).toBe(true);
     await reopened.evaluate(async ()=>{
       const [name]=await caches.keys();
       const cache=await caches.open(name);
       await cache.delete('entry.mjs');
     });
     expect((await reopened.reload()).status()).toBe(503);
+
+    disconnected=false;
+    await normal.goto(origin+'/Insight/');
+    await expect(normal).toHaveURL(appUrl);
+    await normal.locator('#nav0').click();
+    await expect(normal.locator('#iqdDateInput')).toBeVisible();
+    expect(await normal.evaluate(()=>localStorage.getItem('insight_v11'))).toBe(raw);
+    expect(await normal.evaluate(()=>Boolean(navigator.serviceWorker.controller))).toBe(false);
+    await normal.evaluate(async ()=>{
+      await navigator.serviceWorker.register('./legacy-worker-fixture.js',{scope:'./'});
+      await navigator.serviceWorker.ready;
+    });
+    await normal.reload();
+    await expect(normal.getByRole('status')).toContainText('旧版のキャッシュ状態を確認できないため、起動と保存を停止しています。');
+    expect(await normal.evaluate(()=>localStorage.getItem('insight_v11'))).toBe(raw);
   }finally{
     await new Promise(resolve=>{server.close(resolve);server.closeAllConnections();});
   }
