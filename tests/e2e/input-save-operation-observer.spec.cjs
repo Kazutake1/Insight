@@ -258,8 +258,7 @@ test('FICTIONAL actual input save button opens native guarded postcommit warning
 });
 
 test('monthly legacy saves show only the confirmed message and restart its three-second timer',async({page})=>{
-  await page.goto('/Index.html');
-  await page.waitForFunction(()=>typeof InsightPersistGuard!=='undefined');
+  await openFictionalInput(page);
   await page.clock.install();
   for(const [type,route,notice] of [['sales',2,'savedSales'],['kyaku',3,'savedKyaku'],['haiki',4,'savedHaiki']]){
     await page.locator('#nav'+route).click();
