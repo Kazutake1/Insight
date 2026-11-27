@@ -277,7 +277,7 @@
     return {markerRaw,adopted,record:validateRecord(record,adopted.id)};
   }
 
-  async function commitSnapshot({markerRaw,adopted,record:baseline},expectedRevision,snapshot,writeId){
+  async function commitSnapshot({markerRaw,adopted,record:baseline},expectedRevision,snapshot,draftToken){
     // A stale caller has not started a write. Keep the committed version available to other tabs.
     if(baseline.revision!==expectedRevision){
       const error=new Error('IndexedDB revision conflict');
@@ -288,9 +288,12 @@
     parse(raw);
     // Record both versions before opening the write transaction.
     const [candidateDigest,baselineDigest]=await Promise.all([digest(raw),digest(baseline.raw)]);
-    const operation={id:writeId??root.crypto.randomUUID(),expectedRevision,digest:candidateDigest,
+    const operation={id:draftToken??root.crypto.randomUUID(),expectedRevision,digest:candidateDigest,
       baselineDigest,baselineWriteId:baseline.writeId??null};
     checkActiveSource(baseline,adopted,markerRaw);
+    // This is the start boundary. A draft that loses its connection before it
+    // remains pending. After the marker is written, finish the local transaction.
+    if(draftToken&&root.navigator.onLine!==true)return null;
     // Leave a persistent hold if the browser exits or the outcome is unclear.
     writeMarker('writing',adopted.id,operation);
     const writingMarker=root.localStorage.getItem(markerKey);
@@ -388,16 +391,15 @@
       if(!row)return {state:'wrong-target'};
       const claim=await drafts.claimDraft(shopId,day,token,{shopId,day,basis,values:row});
       if(claim.state!=='ready')return claim;
-      if(root.navigator.onLine!==true){
-        const released=await drafts.finishDraft(shopId,day,token,'not-started');
-        return {state:'not-started',reason:'offline',draftPending:released};
-      }
       // Only these fields from the validated draft can reach the commit.
       row['\u58f2\u4e0a']=claim.proposed['\u58f2\u4e0a'];
       row['\u5ba2\u6570']=claim.proposed['\u5ba2\u6570'];
       row['\u5ec3\u68c4\u91d1\u984d']=claim.proposed['\u5ec3\u68c4\u91d1\u984d'];
       row.haiki=claim.proposed.haiki;
-      return {state:'confirmed',...(await commitSnapshot(evidence,record.revision,snapshot,token))};
+      const saved=await commitSnapshot(evidence,record.revision,snapshot,token);
+      if(saved)return {state:'confirmed',...saved};
+      const released=await drafts.finishDraft(shopId,day,token,'not-started');
+      return {state:'not-started',reason:'offline',draftPending:released};
     });
   }
 

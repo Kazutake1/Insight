@@ -1,0 +1,17 @@
+<!doctype html>
+<html lang="ja">
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'self'; worker-src 'self'; connect-src 'self'">
+<title>今日の入力</title>
+<h1>今日の入力</h1>
+<p role="status">下書き用の画面を準備しています。</p>
+<form>
+  <fieldset disabled>
+    <label>売上（千円）<input name="sales" type="number" required></label>
+    <label>客数（人）<input name="customers" type="number" required></label>
+    <label>廃棄（円）<input name="waste" type="number" required></label>
+  </fieldset>
+</form>
+<script type="module" src="./entry.mjs"></script>
+</html>

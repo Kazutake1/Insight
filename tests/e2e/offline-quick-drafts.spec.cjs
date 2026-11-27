@@ -1,4 +1,8 @@
 const {test,expect}=require('@playwright/test');
+const {createHash}=require('node:crypto');
+const fs=require('node:fs/promises');
+const http=require('node:http');
+const path=require('node:path');
 
 const before={売上:250,客数:90,廃棄金額:12,haiki:{米飯:10,FF:2}};
 const after={売上:255,客数:0,廃棄金額:14,haiki:{FF:2,米飯:12}};
@@ -274,4 +278,120 @@ test('network request failure and a stale feature list both stop before writing'
     draft:(await drafts.loadDraft(shopId,day)).state,record:await InsightIndexedDBStorageV1.read()
   }),draft);
   expect(state).toEqual({draft:'pending',record:{revision:4,snapshot:seed.snapshot}});
+});
+
+test('verified quick-entry fixture reopens offline and restores input made when the network drops',async({page,context})=>{
+  const directory=path.join(__dirname,'fixtures/offline-quick-start');
+  const assetFiles={
+    'index.html':path.join(directory,'index.html'),
+    'entry.mjs':path.join(directory,'entry.mjs'),
+    'drafts.mjs':path.join(__dirname,'../../draft/insight_offline_quick_drafts_v1.mjs')
+  };
+  const assets=new Map(await Promise.all(Object.entries(assetFiles).map(async ([name,file])=>[name,await fs.readFile(file)])));
+  const manifest=Object.fromEntries(Array.from(assets,([name,bytes])=>[name,createHash('sha256').update(bytes).digest('hex')]));
+  const source=await fs.readFile(path.join(directory,'worker.js'),'utf8');
+  assets.set('worker.js',source.replace('/* fixture-manifest */ null',JSON.stringify(manifest)));
+  const scope='/isolated-quick-start/';
+  let disconnected=false;
+  const server=http.createServer((req,res)=>{
+    if(disconnected){res.destroy();return;}
+    const url=new URL(req.url,'http://127.0.0.1');
+    if(url.pathname==='/Insight/Index.html'){
+      res.writeHead(200,{'Content-Type':'text/html; charset=utf-8'}).end('<!doctype html><title>Normal-entry fixture</title>');
+      return;
+    }
+    const name=url.pathname.startsWith(scope)?url.pathname.slice(scope.length)||'index.html':'';
+    if(!assets.has(name)){res.writeHead(404).end();return;}
+    res.writeHead(200,{'Content-Type':name.endsWith('.html')?'text/html; charset=utf-8':'text/javascript; charset=utf-8',
+      'Cache-Control':'no-store'}).end(assets.get(name));
+  });
+  await new Promise(resolve=>server.listen(0,'127.0.0.1',resolve));
+  const origin='http://127.0.0.1:'+server.address().port;
+  try{
+    await page.goto(origin+'/Insight/Index.html');
+    await page.evaluate(()=>localStorage.setItem('insight_v11','{"fictional":true}'));
+    await page.goto(origin+scope);
+    const sales=page.getByRole('spinbutton',{name:'売上（千円）'});
+    await expect(sales).toHaveValue('250');
+    await expect(sales).toBeEnabled();
+    disconnected=true;
+    await sales.fill('267');
+    await expect(page.getByRole('status')).toHaveText('下書きを保存しました。');
+    await page.close();
+
+    const reopened=await context.newPage();
+    await reopened.goto(origin+scope);
+    await expect(reopened.getByRole('status')).toHaveText('下書きを復元しました。');
+    await expect(reopened.getByRole('spinbutton',{name:'売上（千円）'})).toHaveValue('267');
+    expect(await reopened.evaluate(()=>localStorage.getItem('insight_v11'))).toBe('{"fictional":true}');
+    expect(await reopened.evaluate(()=>localStorage.getItem('insight_indexeddb_adoption_v1'))).toBeNull();
+    expect(await reopened.evaluate(()=>navigator.serviceWorker.getRegistration('/Insight/Index.html').then(Boolean))).toBe(false);
+    const normal=await context.newPage();
+    expect(await normal.goto(origin+'/Insight/Index.html').then(()=>false,()=>true)).toBe(true);
+    await reopened.evaluate(async ()=>{
+      const [name]=await caches.keys();
+      const cache=await caches.open(name);
+      await cache.delete('entry.mjs');
+    });
+    expect((await reopened.reload()).status()).toBe(503);
+  }finally{
+    await new Promise(resolve=>{server.close(resolve);server.closeAllConnections();});
+  }
+});
+
+test('loss of connectivity after version verification but before the write marker leaves the draft pending',async({page,context})=>{
+  await openAdoptedFixture(page);
+  const seed=await seedAdoptedFixture(page,draft);
+  await page.evaluate(async draft=>{
+    await drafts.saveDraft(draft);
+    const digest=crypto.subtle.digest;
+    crypto.subtle.digest=function(...args){
+      return new Promise(resolve=>{
+        (window.fixtureDigestResumes??=[]).push(()=>resolve(digest.apply(this,args)));
+      });
+    };
+    const {shopId,day}=draft;
+    window.fixtureAttempt=quickApply.applyIndexedDBQuickDraft({shopId,day,storage:InsightIndexedDBStorageV1});
+  },draft);
+  await page.waitForFunction(()=>window.fixtureDigestResumes?.length===2);
+  await context.setOffline(true);
+  await page.waitForFunction(()=>navigator.onLine===false);
+  await page.evaluate(()=>fixtureDigestResumes.forEach(resume=>resume()));
+  expect(await page.evaluate(()=>fixtureAttempt)).toEqual({state:'not-started',reason:'offline',draftPending:true});
+  await context.setOffline(false);
+  const result=await page.evaluate(async ({shopId,day})=>({
+    draft:(await drafts.loadDraft(shopId,day)).state,
+    record:await InsightIndexedDBStorageV1.read()
+  }),draft);
+  expect(result).toEqual({draft:'pending',record:{revision:4,snapshot:seed.snapshot}});
+});
+
+test('connectivity loss at the write marker does not interrupt local readback',async({page})=>{
+  await openAdoptedFixture(page);
+  const seed=await seedAdoptedFixture(page,draft);
+  const result=await page.evaluate(async draft=>{
+    await drafts.saveDraft(draft);
+    const {shopId,day}=draft;
+    const storage=InsightIndexedDBStorageV1;
+    const metadata=InsightStorage.writeMetadata;
+    let changed=false;
+    InsightStorage.writeMetadata=(key,value)=>{
+      const result=metadata(key,value);
+      if(key==='insight_indexeddb_adoption_v1'&&JSON.parse(value).state==='writing'){
+        Object.defineProperty(navigator,'onLine',{configurable:true,value:false});
+        changed=true;
+      }
+      return result;
+    };
+    try{
+      const reply=await quickApply.applyIndexedDBQuickDraft({shopId,day,storage});
+      return {reply,changed,record:await storage.read(),raw:localStorage.getItem('insight_v11')};
+    }finally{
+      InsightStorage.writeMetadata=metadata;
+      delete navigator.onLine;
+    }
+  },draft);
+  Object.assign(seed.snapshot.stores[draft.shopId].data['2026']['11月'][23],draft.after);
+  expect(result).toEqual({reply:{state:'confirmed',revision:5,cleanup:'cleared'},changed:true,
+    record:{revision:5,snapshot:seed.snapshot},raw:seed.raw});
 });
