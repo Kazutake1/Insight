@@ -4,7 +4,7 @@
 const assets = new Map([
   [
     "index.html",
-    "2bf53a0d3604c993bcf8c93e983f5bec3f3b56b149469770bff69a1fd54d1818"
+    "785b74b526cd2cc58252794c2d0832c1be445b7304b7773bbd49a326bdca721c"
   ],
   [
     "offline.css",
@@ -16,7 +16,7 @@ const assets = new Map([
   ],
   [
     "viewer.js",
-    "a15a0b9de60da5298832f16dfc215b82c37ae78c1bc3ed8248ea2e01f5eed842"
+    "e0922b652851abed4d1721e59139a8356d7262ce92359b19ca348eddb76d4954"
   ],
   [
     "../insight_indexeddb_storage_v1.js",

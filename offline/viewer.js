@@ -11,6 +11,8 @@
   const number=new Intl.NumberFormat('ja-JP');
   const wasteCategories=['米飯','調理パン','麺類・その他','デリカテッセン','スイーツ','FF','その他デイリー','パン・ペストリー'];
   let chart;
+  let storageChanged=false;
+  let reading=false;
 
   const platformHost=['localhost','127.0.0.1'].includes(location.hostname);
   const scope=new URL('./',location.href);
@@ -79,7 +81,16 @@
     return false;
   }
 
-  async function readSnapshot(){
+  function storageState(){
+    return {raw:root.localStorage.getItem(sourceKey),adoption:root.localStorage.getItem(adoptionKey)};
+  }
+
+  function unchanged({raw,adoption}){
+    const current=storageState();
+    return !storageChanged&&current.raw===raw&&current.adoption===adoption;
+  }
+
+  function readOnlyStorage(){
     const storage=root.InsightIndexedDBStorageV1;
     Object.defineProperty(root,'InsightIndexedDBStorageV1',{
       value:undefined,configurable:false,writable:false
@@ -88,14 +99,14 @@
     Object.defineProperty(root,'InsightStorage',{value:Object.freeze({
       writeMetadata(){throw new Error('Offline mode does not write data');}
     })});
-    const raw=root.localStorage.getItem(sourceKey);
-    const adoption=root.localStorage.getItem(adoptionKey);
+    return storage;
+  }
+
+  async function readSnapshot(storage,{raw,adoption}){
     const diagnosis=await storage.diagnoseStartup();
-    if(diagnosis.reason==='indexeddb-adopted')return (await storage.read()).snapshot;
-    if(diagnosis.state!=='legacy'||raw===null||adoption!==null||
-       raw!==root.localStorage.getItem(sourceKey)||root.localStorage.getItem(adoptionKey)!==null)
-      throw new Error('No verified snapshot');
-    return JSON.parse(raw);
+    if(diagnosis.reason==='indexeddb-adopted'&&adoption!==null)return storage.read();
+    if(diagnosis.state!=='legacy'||raw===null||adoption!==null)throw new Error('No verified snapshot');
+    return {snapshot:JSON.parse(raw)};
   }
 
   function option(label,value){
@@ -105,54 +116,86 @@
     return item;
   }
 
-  function wasteAmount(row){
-    const categories=wasteCategories.reduce((sum,category)=>{
-      const value=Number(row?.haiki?.[category]);
-      return sum+(Number.isFinite(value)?value:0);
-    },0);
-    return categories>0?categories:row?.廃棄金額;
+  function record(value){
+    return value!==null&&typeof value==='object'&&!Array.isArray(value);
   }
 
-  function showSnapshot(snapshot){
-    if(!snapshot||!snapshot.stores||Array.isArray(snapshot.stores)||
-       !Object.hasOwn(snapshot.stores,snapshot.current)||!root.Chart)
-      throw new Error('Invalid snapshot');
-    if(snapshot.schemaVersion!=null&&![0,1,'0','1'].includes(snapshot.schemaVersion))
-      throw new Error('Unknown snapshot version');
-    const shops=Object.entries(snapshot.stores);
-    for(const [key,shop] of shops){
-      if(!shop||typeof shop.name!=='string'||!shop.data||Array.isArray(shop.data))
+  function metric(value){
+    if(value==null)return 0;
+    if(typeof value!=='number'&&typeof value!=='string')throw new Error('Invalid number');
+    const parsed=Number(value);
+    if(!Number.isFinite(parsed))throw new Error('Invalid number');
+    return parsed;
+  }
+
+  function workRow(row,index){
+    if(!record(row)||!['d','売上','客数','廃棄金額','haiki','weather'].some(key=>Object.hasOwn(row,key))||
+       (Object.hasOwn(row,'d')&&String(index+1)!==String(row.d))||
+       (row.haiki!=null&&!record(row.haiki))||(row.weather!=null&&typeof row.weather!=='string'))
+      throw new Error('Invalid daily record');
+    const categories=wasteCategories.reduce((sum,category)=>sum+metric(row.haiki?.[category]),0);
+    const fallback=metric(row.廃棄金額);
+    if(!Number.isFinite(categories))throw new Error('Invalid waste total');
+    return {day:index+1,sales:metric(row.売上),customers:metric(row.客数),
+      waste:categories>0?categories:fallback,weather:row.weather||'—'};
+  }
+
+  function checkedShops(snapshot){
+    if(!record(snapshot)||!record(snapshot.stores)||typeof snapshot.current!=='string'||
+       !Object.hasOwn(snapshot.stores,snapshot.current)||
+       (snapshot.schemaVersion!=null&&![0,1,'0','1'].includes(snapshot.schemaVersion)))
+      throw new Error('Unknown snapshot format');
+    return Object.entries(snapshot.stores).map(([key,shop])=>{
+      if(!record(shop)||typeof shop.name!=='string'||!shop.name.trim()||!record(shop.data))
         throw new Error('Invalid shop');
-      stores.append(option(shop.name,key));
-    }
-    stores.value=snapshot.current;
+      const years=Object.keys(shop.data);
+      if(!years.length||years.some(year=>!/^[1-9]\d{3}$/.test(year)))
+        throw new Error('Invalid years');
+      if(shop.years!==undefined&&(!Array.isArray(shop.years)||
+         shop.years.length!==years.length||new Set(shop.years.map(String)).size!==years.length||
+         shop.years.some(year=>!years.includes(String(year)))))
+        throw new Error('Invalid year list');
+      const available=years.sort().reverse().flatMap(year=>{
+        const byMonth=shop.data[year];
+        if(!record(byMonth)||!Object.keys(byMonth).length)throw new Error('Invalid months');
+        return Object.entries(byMonth).map(([name,daily])=>{
+          const match=/^(1[0-2]|[1-9])月$/.exec(name);
+          if(!match)throw new Error('Invalid month');
+          const month=Number(match[1]);
+          if(!Array.isArray(daily)||!daily.length||daily.length>new Date(Date.UTC(Number(year),month,0)).getUTCDate())
+            throw new Error('Invalid number of daily records');
+          return {year,month,daily:daily.map(workRow)};
+        }).sort((a,b)=>b.month-a.month);
+      });
+      return [key,{name:shop.name,available}];
+    });
+  }
+
+  function showSnapshot(shops,current){
+    if(!root.Chart)throw new Error('Chart is unavailable');
+    stores.replaceChildren(...shops.map(([key,shop])=>option(shop.name,key)));
+    stores.value=current;
+    const lookup=new Map(shops);
     function renderMonths(){
-      const shop=snapshot.stores[stores.value];
-      const available=[];
-      for(const year of Object.keys(shop.data).filter(key=>/^\d{4}$/.test(key)).sort().reverse()){
-        for(let month=12;month>=1;month--){
-          const daily=shop.data[year]?.[month+'月'];
-          if(Array.isArray(daily))available.push({year,month,daily});
-        }
-      }
+      const {available}=lookup.get(stores.value);
       months.replaceChildren(...available.map(({year,month},i)=>option(year+'年'+month+'月',String(i))));
       function render(){
-        const daily=available[Number(months.value)]?.daily??[];
-        const lines=daily.map((row,index)=>{
+        const {daily}=available[Number(months.value)];
+        rows.replaceChildren(...daily.map(({day,sales,customers,waste,weather})=>{
           const line=document.createElement('tr');
-          for(const value of [index+1,row?.売上,row?.客数,wasteAmount(row),row?.weather]){
+          for(const value of [day,sales,customers,waste,weather]){
             const cell=document.createElement('td');
-            cell.textContent=Number.isFinite(value)?number.format(value):typeof value==='string'&&value?value:'—';
+            cell.textContent=typeof value==='number'?number.format(value):value;
             line.append(cell);
           }
           return line;
-        });
-        rows.replaceChildren(...lines);
+        }));
         chart?.destroy();
         chart=new root.Chart(document.getElementById('offline-sales'),{
           type:'line',
-          data:{labels:daily.map((_,i)=>String(i+1)),datasets:[{label:'売上',data:daily.map(row=>
-            Number.isFinite(row?.売上)?row.売上:null),borderColor:'#387ba8'}]},
+          data:{labels:daily.map(row=>String(row.day)),datasets:[
+            {label:'売上（千円）',data:daily.map(row=>row.sales),borderColor:'#387ba8'}
+          ]},
           options:{animation:false}
         });
       }
@@ -169,26 +212,42 @@
     status.textContent='保存済み実績を確認できません。通信できる状態で通常のInsightを開いてください。';
   }
 
+  function refresh(){
+    data.hidden=true;
+    const link=document.createElement('a');
+    link.href=scope.href;
+    link.textContent='最新の保存済み実績を開く';
+    status.replaceChildren(link);
+  }
+
   navigator.serviceWorker?.addEventListener('controllerchange',()=>{
-    if(data.hidden)return;
-    hold();
+    if(reading||!data.hidden)hold();
   });
   root.addEventListener('storage',event=>{
-    if([null,sourceKey,adoptionKey].includes(event.key)&&!data.hidden){
-      data.hidden=true;
-      const refresh=document.createElement('a');
-      refresh.href=scope.href;
-      refresh.textContent='最新の保存済み実績を開く';
-      status.replaceChildren(refresh);
-    }
+    if(![null,sourceKey,adoptionKey].includes(event.key))return;
+    storageChanged=true;
+    if(reading||!data.hidden)refresh();
   });
 
   (async()=>{
     if(!await controlled())return;
+    reading=true;
     const controller=navigator.serviceWorker.controller;
-    const snapshot=await readSnapshot();
+    const storage=readOnlyStorage();
+    const captured=storageState();
+    const result=await readSnapshot(storage,captured);
+    const shops=checkedShops(result.snapshot);
+    if(result.revision!==undefined){
+      const current=await storage.read();
+      if(current.revision!==result.revision||
+         JSON.stringify(current.snapshot)!==JSON.stringify(result.snapshot))return refresh();
+    }
     if(!controller||navigator.serviceWorker.controller!==controller)throw new Error('Offline worker changed');
-    showSnapshot(snapshot);
-    status.textContent='閲覧専用';
-  })().catch(hold);
+    if(!unchanged(captured))return refresh();
+    showSnapshot(shops,result.snapshot.current);
+    status.textContent='閲覧専用（読み込み時点の確定データ）';
+  })().catch(()=>{
+    if(storageChanged)refresh();
+    else hold();
+  }).finally(()=>{reading=false;});
 })(globalThis);
