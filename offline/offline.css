@@ -1,0 +1,15 @@
+:root {
+  color-scheme: light dark;
+  font-family: system-ui, sans-serif;
+}
+body { margin: 0; }
+main { max-width: 54rem; margin: 0 auto; padding: 1.5rem; }
+h1 { margin: 0; font-size: 1.5rem; }
+.filters { display: flex; flex-wrap: wrap; gap: .75rem 1.25rem; margin: 1.25rem 0; }
+.filters label { display: flex; align-items: center; gap: .5rem; }
+select { font: inherit; padding: .4rem; }
+.table-scroll { margin-bottom: 1rem; overflow-x: auto; max-height: 26rem; }
+table { width: 100%; border-collapse: collapse; font-variant-numeric: tabular-nums; }
+caption { text-align: start; padding-block: .5rem; font-weight: 600; }
+th, td { padding: .4rem .65rem; text-align: end; border-bottom: 1px solid GrayText; }
+th:first-child, td:first-child, th:last-child, td:last-child { text-align: start; }
