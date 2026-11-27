@@ -6,7 +6,7 @@ test.beforeEach(async({page})=>{
     if(!location.pathname.endsWith('-fixture'))return;
     window.__INSIGHT_SHELL_VERSION__=build;
     window.__INSIGHT_FEATURE_SIGNATURE__=features;
-  },{build:'20261127-indexeddb-revision-build-140',features:'85eef2d7'});
+  },{build:'20261127-monthly-save-feedback-build-141',features:'85eef2d7'});
   await page.route(/https:\/\/(www\.jma\.go\.jp|[^/]*api\.open-meteo\.com)\//,route=>route.abort());
 });
 // The fixture server uses HTTP; keep the rest of the shell's CSP in effect.
@@ -172,12 +172,17 @@ test('combined input session shares four saves and guards both destinations and 
   await page.waitForFunction(()=>combinedDigests.length===2);
   await expect(page.locator('#salesSaveBtn')).toHaveAttribute('aria-disabled','true');
   expect(await page.evaluate(()=>document.getElementById('salesSaveBtn').disabled)).toBe(false);
+  await expect(page.locator('#salesSaveBtn')).toBeFocused();
+  expect(await page.evaluate(()=>({
+    body:document.body.inert,field:!!document.getElementById('sf_売上').closest('[inert]')
+  }))).toEqual({body:false,field:true});
+  await expect(page.locator('#savedSales')).toBeHidden();
   expect(await page.evaluate(peer=>switchStore(peer),seed.peer)).toBe(false);
   expect(await page.evaluate(()=>InsightIndexedDBQuickInputPreviewV1.getStatus().state)).toBe('ACTIVE');
   await page.evaluate(()=>resumeCombinedSave());
   await expect(page.locator('#salesSaveBtn')).toBeEnabled();
   await expect(page.locator('#salesSaveBtn')).toBeFocused();
-  await expect(page.locator('#savedSales')).toHaveCount(0);
+  await expect(page.locator('#savedSales')).toBeVisible();
   row.売上=777;
   expect(await committedInput(page)).toEqual({revision:2,snapshot:expected});
 
@@ -187,7 +192,7 @@ test('combined input session shares four saves and guards both destinations and 
   await fillCombinedInput(customer,'303');
   await page.locator('#kyakuSaveBtn').click();
   await expect(page.locator('#kyakuSaveBtn')).toBeEnabled();
-  await expect(page.locator('#savedKyaku')).toHaveCount(0);
+  await expect(page.locator('#savedKyaku')).toBeVisible();
   row.客数=303;
   expect(await committedInput(page)).toEqual({revision:3,snapshot:expected});
 
@@ -198,7 +203,7 @@ test('combined input session shares four saves and guards both destinations and 
   await fillCombinedInput(waste,'404');
   await page.locator('#haikiSaveBtn').click();
   await expect(page.locator('#haikiSaveBtn')).toBeEnabled();
-  await expect(page.locator('#savedHaiki')).toHaveCount(0);
+  await expect(page.locator('#savedHaiki')).toBeVisible();
   row.haiki[seed.category]=404;
   row.廃棄金額=404;
   expect(await committedInput(page)).toEqual({revision:4,snapshot:expected});
@@ -287,7 +292,7 @@ test('combined input session holds the monthly screens when Quick loses its save
   await fillCombinedInput(page.locator('#sf_売上'),'777');
   await page.locator('#salesSaveBtn').click();
   await expect(page.locator('#salesSaveBtn')).toBeEnabled();
-  await expect(page.locator('#savedSales')).toHaveCount(0);
+  await expect(page.locator('#savedSales')).toBeVisible();
   const prior=JSON.parse(seed.raw);
   prior.stores[seed.active].data[seed.year][seed.month][seed.day-1].売上=777;
   expect(await committedInput(page)).toEqual({revision:1,snapshot:prior});
@@ -3192,7 +3197,7 @@ test('a fully restarted browser keeps the adopted revision and holds the legacy 
       const page=context.pages()[0]??await context.newPage();
       await page.goto(url);
       await page.evaluate(()=>{
-        window.__INSIGHT_SHELL_VERSION__='20261127-indexeddb-revision-build-140';
+        window.__INSIGHT_SHELL_VERSION__='20261127-monthly-save-feedback-build-141';
         window.__INSIGHT_FEATURE_SIGNATURE__='85eef2d7';
       });
       await page.addScriptTag({url:new URL('/insight_indexeddb_storage_v1.js',url).href});
@@ -3229,7 +3234,7 @@ async function openLegacyPwaFixture(page){
     contentType:'text/html',body:'<!doctype html><title>Fictional online migration page</title>'
   }));
   await page.route('**/tests/e2e/fixtures/Index.html?insight_migration_probe=*',route=>route.fulfill({
-    contentType:'text/html',body:'<!doctype html><meta name="insight-shell-version" content="20261127-indexeddb-revision-build-140">'
+    contentType:'text/html',body:'<!doctype html><meta name="insight-shell-version" content="20261127-monthly-save-feedback-build-141">'
   }));
   await page.goto(legacyPwaFixture);
   await page.addScriptTag({url:'/insight_indexeddb_storage_v1.js'});
@@ -3454,7 +3459,7 @@ test('cached legacy shell runs with its origin unavailable and adopted startup s
 });
 
 test('migration enforces the pinned environment before and after backup confirmation',async({page})=>{
-  const fixture='/forced-migration-gate-fixture',build='20261127-indexeddb-revision-build-140';
+  const fixture='/forced-migration-gate-fixture',build='20261127-monthly-save-feedback-build-141';
   await page.route('**'+fixture,route=>route.fulfill({
     contentType:'text/html',body:'<!doctype html><title>Fictional forced migration fixture</title>'
   }));
@@ -3845,7 +3850,7 @@ for(const connectionFails of [false,true]){
       window.InsightHourlyCustomers={connectIndexedDBPreview(){}};
       window.shellReadyState=document.readyState;
       window.lateSnapshot=InsightIndexedDBCandidateV1.initializeAdopted();`}));
-    await page.route(/\/insight_indexeddb_(quick_input|sales_input|recovery)_preview_v1\.js\?v=20261126-quick-save-feedback-1$/,route=>route.fulfill({
+    await page.route(/\/insight_indexeddb_(?:(?:quick_input|recovery)_preview_v1\.js\?v=20261126-quick-save-feedback-1|sales_input_preview_v1\.js\?v=20261127-monthly-save-feedback-1)$/,route=>route.fulfill({
       contentType:'application/javascript',
       body:new URL(route.request().url()).pathname.endsWith('/insight_indexeddb_sales_input_preview_v1.js')
         ?`window.InsightIndexedDBSalesInputPreviewV1={async connect(){
@@ -4831,14 +4836,14 @@ for(const failure of ['stale revision','quota failure','draft changed during sav
     expect(await readMonitor()).toMatchObject({observed:{state:'ACTIVE',activeCount:1},dirty:true});
     expect(await page.evaluate(()=>gotoNav(1))).toBe(false);
     await expect(status).toBeEmpty();
-    await expect(notice).toHaveCount(0);
+    await expect(notice).toBeHidden();
     expect(await page.evaluate(()=>store.data[editYear.sales][editMonth.sales][window.salesSelDay-1].売上)).toBe(42);
     await page.evaluate(()=>{
       window.restoreFixtureDigest();
       window.resumeFixtureSave.forEach(resolve=>resolve());
     });
     await expect(save).toBeEnabled();
-    await expect(notice).toHaveCount(0);
+    await expect(notice).toBeVisible();
     Object.assign(getRow(expected),{売上:456,買上点数:8.25,weather:seed.weather});
     expected.stores[seed.active].data[seed.year][seed.month][siblingDay-1].売上=222;
     expected.stores['fictional-second-shop'].data[seed.year][seed.month][seed.day-1].weather=seed.weather;
@@ -4899,7 +4904,7 @@ for(const failure of ['stale revision','quota failure','draft changed during sav
     expect(await readMonitor()).toMatchObject({observed:{state:'HELD',activeCount:0},dirty:true});
     expect(await page.evaluate(()=>gotoNav(1))).toBe(false);
     await expect(save).toBeDisabled();
-    await expect(notice).toHaveCount(0);
+    await expect(notice).toBeHidden();
     if(failure==='draft changed during save'){
       const actual=await page.evaluate(()=>InsightIndexedDBStorageV1.read());
       getRow(expected).売上=789;
@@ -5098,12 +5103,12 @@ for(const config of [
     await save.click();
     await page.waitForFunction(()=>fixtureDigests.length===2);
     await expect(status).toBeEmpty();
-    await expect(notice).toHaveCount(0);
+    await expect(notice).toBeHidden();
     expect(await page.evaluate(()=>InsightInputSaveObserverV0.getStatus()))
       .toMatchObject({state:'ACTIVE',activeCount:1});
     await page.evaluate(()=>resumeFixtureCommit());
     await expect(save).toBeEnabled();
-    await expect(notice).toHaveCount(0);
+    await expect(notice).toBeVisible();
     expect(await page.evaluate(()=>InsightInputDayNav.hasUnsavedInput())).toBe(false);
     const snapshot=JSON.parse(seed.raw),row=snapshot.stores[seed.current].data[seed.year][seed.month][seed.day-1];
     if(config.type==='kyaku')row.客数=123;
@@ -5132,7 +5137,7 @@ for(const config of [
     await expect(status).toHaveText('保存結果を確認できないため、追加の保存を停止しました。');
     await expect(field).toHaveValue('333');
     await expect(save).toBeDisabled();
-    await expect(notice).toHaveCount(0);
+    await expect(notice).toBeHidden();
     expect(await page.evaluate(()=>InsightInputSaveObserverV0.getStatus()))
       .toMatchObject({state:'HELD',activeCount:0});
     expect(await page.evaluate(()=>InsightInputDayNav.hasUnsavedInput())).toBe(true);
@@ -5151,7 +5156,7 @@ test('sales, customer and waste screens share one committed revision when switch
   await sales.fill('456');
   await page.locator('#salesSaveBtn').click();
   await expect(page.locator('#salesSaveBtn')).toBeEnabled();
-  await expect(page.locator('#savedSales')).toHaveCount(0);
+  await expect(page.locator('#savedSales')).toBeVisible();
   expect(await getRevision()).toBe(1);
 
   await page.locator('#nav3').click();
@@ -5168,7 +5173,7 @@ test('sales, customer and waste screens share one committed revision when switch
   expect(await page.evaluate(()=>fixtureLeaveWarnings)).toBe(1);
   await page.locator('#kyakuSaveBtn').click();
   await expect(page.locator('#kyakuSaveBtn')).toBeEnabled();
-  await expect(page.locator('#savedKyaku')).toHaveCount(0);
+  await expect(page.locator('#savedKyaku')).toBeVisible();
   expect(await getRevision()).toBe(2);
 
   await page.locator('#nav4').click();
@@ -5198,10 +5203,10 @@ test('sales, customer and waste screens share one committed revision when switch
   await page.evaluate(()=>saveInput('kyaku'));
   expect(await page.evaluate(()=>InsightInputSaveObserverV0.getStatus()))
     .toMatchObject({state:'ACTIVE',activeCount:1});
-  await expect(page.locator('#savedHaiki')).toHaveCount(0);
+  await expect(page.locator('#savedHaiki')).toBeHidden();
   await page.evaluate(()=>resumeMultiScreenSave());
   await expect(page.locator('#haikiSaveBtn')).toBeEnabled();
-  await expect(page.locator('#savedHaiki')).toHaveCount(0);
+  await expect(page.locator('#savedHaiki')).toBeVisible();
   const expected=JSON.parse(seed.raw);
   const row=expected.stores[seed.active].data[seed.year][seed.month][seed.day-1];
   row.売上=456;
@@ -5305,7 +5310,7 @@ test('isolated store selection keeps drafts on cancellation and changes the save
   await sales.fill('789');
   await save.click();
   await expect(page.locator('#salesSaveBtn')).toBeEnabled();
-  await expect(page.locator('#savedSales')).toHaveCount(0);
+  await expect(page.locator('#savedSales')).toBeVisible();
   expected.stores[peer].data[seed.year][seed.month][seed.day-1].売上=789;
   expect(await page.evaluate(()=>InsightIndexedDBStorageV1.read())).toEqual({revision:2,snapshot:expected});
 
@@ -5315,7 +5320,7 @@ test('isolated store selection keeps drafts on cancellation and changes the save
   await customer.fill('678');
   await page.locator('#kyakuSaveBtn').click();
   await expect(page.locator('#kyakuSaveBtn')).toBeEnabled();
-  await expect(page.locator('#savedKyaku')).toHaveCount(0);
+  await expect(page.locator('#savedKyaku')).toBeVisible();
   const peerRow=expected.stores[peer].data[seed.year][seed.month][seed.day-1];
   peerRow.客数=678;
   expect(await page.evaluate(()=>InsightIndexedDBStorageV1.read())).toEqual({revision:3,snapshot:expected});
@@ -5329,7 +5334,7 @@ test('isolated store selection keeps drafts on cancellation and changes the save
   await waste.fill('321');
   await page.locator('#haikiSaveBtn').click();
   await expect(page.locator('#haikiSaveBtn')).toBeEnabled();
-  await expect(page.locator('#savedHaiki')).toHaveCount(0);
+  await expect(page.locator('#savedHaiki')).toBeVisible();
   peerRow.haiki={...peerRow.haiki,[category]:321};
   peerRow.廃棄金額=categories.reduce((sum,key)=>sum+Number(peerRow.haiki[key]??0),0);
   expect(await page.evaluate(()=>InsightIndexedDBStorageV1.read())).toEqual({revision:4,snapshot:expected});
