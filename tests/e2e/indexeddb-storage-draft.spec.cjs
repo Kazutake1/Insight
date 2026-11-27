@@ -6,7 +6,7 @@ test.beforeEach(async({page})=>{
     if(!location.pathname.endsWith('-fixture'))return;
     window.__INSIGHT_SHELL_VERSION__=build;
     window.__INSIGHT_FEATURE_SIGNATURE__=features;
-  },{build:'20261127-monthly-save-feedback-build-141',features:'85eef2d7'});
+  },{build:'20261127-quick-future-date-build-142',features:'f0fcd0ba'});
   await page.route(/https:\/\/(www\.jma\.go\.jp|[^/]*api\.open-meteo\.com)\//,route=>route.abort());
 });
 // The fixture server uses HTTP; keep the rest of the shell's CSP in effect.
@@ -1226,6 +1226,60 @@ for(const screen of dailyClearScreens){
     });
   }
 }
+
+test('IndexedDB Quick input can browse future dates without writing daily actuals',async({page})=>{
+  await page.clock.setFixedTime(new Date(2026,6,31,12));
+  const seed=await openQuickInputPreview(page,{followMonthlyInputs:true,manageStoresAndYears:true});
+  const date=page.locator('#iqdDateInput');
+  const sales=page.locator('#qi_売上');
+  await date.fill('2026-07-31');
+  await page.locator('#iqdNext').click();
+  await expect(date).toHaveValue('2026-08-01');
+  const status=()=>page.evaluate(()=>InsightIndexedDBQuickInputPreviewV1.getStatus());
+  expect(await status()).toMatchObject({hasUnsavedInput:false});
+
+  await date.fill('2026-12-31');
+  await expect(date).toHaveValue('2026-12-31');
+  await expect(page.locator('#autoWxBtn')).toBeDisabled();
+  await sales.fill('456');
+  await page.locator('#quickSaveBtn').click();
+  expect(await page.evaluate(()=>clearTodayData())).toBe(false);
+  expect(await status()).toMatchObject({hasUnsavedInput:true});
+  await page.evaluate(()=>{
+    window.futureDatePrompts=[];
+    window.confirm=message=>{futureDatePrompts.push(message);return false;};
+  });
+  await page.locator('#iqdToday').click();
+  await expect(date).toHaveValue('2026-12-31');
+  await expect(sales).toHaveValue('456');
+
+  await page.evaluate(()=>{
+    window.confirm=message=>{
+      futureDatePrompts.push(message);
+      return !message.includes('年度はダッシュボードに登録されていません');
+    };
+  });
+  await page.locator('#iqdNext').click();
+  await expect.poll(()=>page.evaluate(()=>futureDatePrompts.at(-1))).toContain('2027年度はダッシュボードに登録されていません');
+  await expect(date).toHaveValue('2026-12-31');
+  expect(await committedInput(page)).toEqual({revision:0,snapshot:JSON.parse(seed.raw)});
+
+  await page.evaluate(()=>{window.confirm=()=>true;});
+  await page.locator('#iqdNext').click();
+  await expect(date).toHaveValue('2027-01-01');
+  const expected=JSON.parse(seed.raw);
+  const promoted=await committedInput(page);
+  expect(promoted.revision).toBe(1);
+  const active=promoted.snapshot.stores[seed.active];
+  expect(active.years).toContain('2027');
+  delete active.data['2027'];
+  active.years=active.years.filter(year=>year!=='2027');
+  expect(promoted.snapshot).toEqual(expected);
+  await page.locator('#iqdToday').click();
+  await expect(date).toHaveValue('2026-07-31');
+  await expect(page.locator('#quickSaveBtn')).toBeEnabled();
+  expect(await page.evaluate(()=>localStorage.getItem('insight_v11'))).toBe(seed.raw);
+});
 
 test('isolated quick clear respects the year boundary and repeating a clear keeps the same data',async({page})=>{
   const seed=await openQuickInputPreview(page,{seedYearBoundary:true});
@@ -3197,8 +3251,8 @@ test('a fully restarted browser keeps the adopted revision and holds the legacy 
       const page=context.pages()[0]??await context.newPage();
       await page.goto(url);
       await page.evaluate(()=>{
-        window.__INSIGHT_SHELL_VERSION__='20261127-monthly-save-feedback-build-141';
-        window.__INSIGHT_FEATURE_SIGNATURE__='85eef2d7';
+        window.__INSIGHT_SHELL_VERSION__='20261127-quick-future-date-build-142';
+        window.__INSIGHT_FEATURE_SIGNATURE__='f0fcd0ba';
       });
       await page.addScriptTag({url:new URL('/insight_indexeddb_storage_v1.js',url).href});
       return {context,page};
@@ -3234,7 +3288,7 @@ async function openLegacyPwaFixture(page){
     contentType:'text/html',body:'<!doctype html><title>Fictional online migration page</title>'
   }));
   await page.route('**/tests/e2e/fixtures/Index.html?insight_migration_probe=*',route=>route.fulfill({
-    contentType:'text/html',body:'<!doctype html><meta name="insight-shell-version" content="20261127-monthly-save-feedback-build-141">'
+    contentType:'text/html',body:'<!doctype html><meta name="insight-shell-version" content="20261127-quick-future-date-build-142">'
   }));
   await page.goto(legacyPwaFixture);
   await page.addScriptTag({url:'/insight_indexeddb_storage_v1.js'});
@@ -3459,7 +3513,7 @@ test('cached legacy shell runs with its origin unavailable and adopted startup s
 });
 
 test('migration enforces the pinned environment before and after backup confirmation',async({page})=>{
-  const fixture='/forced-migration-gate-fixture',build='20261127-monthly-save-feedback-build-141';
+  const fixture='/forced-migration-gate-fixture',build='20261127-quick-future-date-build-142';
   await page.route('**'+fixture,route=>route.fulfill({
     contentType:'text/html',body:'<!doctype html><title>Fictional forced migration fixture</title>'
   }));
@@ -5684,11 +5738,6 @@ for(const sameMunicipality of [true,false]){
     await page.locator('#iqdDateInput').fill(String(Number(seed.year)-30)+'-06-12');
     await expect(page.locator('#iqdDateInput')).toHaveValue(seed.iso);
     await expect(status).toBeEmpty();
-    expect(await page.evaluate(()=>{
-      const future=new Date();
-      future.setDate(future.getDate()+1);
-      return InsightIndexedDBQuickInputPreviewV1.allowDateChange(future);
-    })).toBe(false);
     await expect(status).toBeEmpty();
     await expect(page.locator('#iqdDateInput')).toHaveValue(seed.iso);
     await page.locator('#quickClearBtn').click();

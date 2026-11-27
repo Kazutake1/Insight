@@ -35,11 +35,10 @@
       }
       stage='modules';
       await Promise.all([
-        './insight_indexeddb_quick_input_preview_v1.js',
-        './insight_indexeddb_recovery_preview_v1.js'
-      ].map(url=>loadScript(url)).concat(
+        loadScript('./insight_indexeddb_quick_input_preview_v1.js','20261127-quick-future-date-1'),
+        loadScript('./insight_indexeddb_recovery_preview_v1.js'),
         loadScript('./insight_indexeddb_sales_input_preview_v1.js','20261127-monthly-save-feedback-1')
-      ));
+      ]);
       stage='storage-connection';
       await root.InsightIndexedDBSalesInputPreviewV1.connect('sales',{
         followInputScreens:true,followQuickInput:true,manageStoresAndYears:true,
