@@ -34,8 +34,43 @@ jobs:
       - name: Verify both Insight entry points in the Pages output
         run: |
           cmp Index.html _site/Index.html
-          grep -F '<meta http-equiv="refresh" content="0; url=./Index.html">' _site/index.html
-          grep -F '<a href="./Index.html">Insightを開く</a>' _site/index.html
+          python3 - <<'PY'
+          from functools import partial
+          from html.parser import HTMLParser
+          from http.server import SimpleHTTPRequestHandler, ThreadingHTTPServer
+          from pathlib import Path
+          from threading import Thread
+          from urllib.request import urlopen
+
+          class Entry(HTMLParser):
+              def __init__(self):
+                  super().__init__()
+                  self.targets = []
+                  self.links = []
+
+              def handle_starttag(self, tag, attrs):
+                  attrs = dict(attrs)
+                  if tag == 'meta' and attrs.get('http-equiv', '').lower() == 'refresh':
+                      self.targets.append(attrs.get('content'))
+                  if tag == 'a':
+                      self.links.append(attrs.get('href'))
+
+          with ThreadingHTTPServer(('127.0.0.1', 0), partial(SimpleHTTPRequestHandler, directory='_site')) as server:
+              thread = Thread(target=server.serve_forever, daemon=True)
+              thread.start()
+              try:
+                  base = f'http://127.0.0.1:{server.server_port}'
+                  with urlopen(base + '/', timeout=5) as response:
+                      assert response.status == 200
+                      entry = Entry()
+                      entry.feed(response.read().decode('utf-8'))
+                  assert entry.targets == ['0; url=./Index.html'], entry.targets
+                  assert './Index.html' in entry.links, entry.links
+                  with urlopen(base + '/Index.html', timeout=5) as response:
+                      assert response.status == 200 and response.read() == Path('Index.html').read_bytes()
+              finally:
+                  server.shutdown()
+          PY
           test "$(git ls-files | awk 'tolower($0) == "index.html"' | wc -l)" -eq 1
 
   dependency-audit:
