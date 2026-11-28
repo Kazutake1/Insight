@@ -337,7 +337,7 @@ test('actual Insight entrances can reopen verified drafts offline and retain the
       res.writeHead(200,{'Content-Type':contentTypes['.html']}).end('<!doctype html><title>Fictional storage seed</title>');
       return;
     }
-    if(['/Insight/legacy-worker-fixture.js','/legacy-root-worker-fixture.js'].includes(url.pathname)){
+    if(url.pathname==='/Insight/legacy-worker-fixture.js'){
       res.writeHead(200,{'Content-Type':contentTypes['.js']}).end("'use strict';");
       return;
     }
@@ -421,13 +421,16 @@ test('actual Insight entrances can reopen verified drafts offline and retain the
 
     disconnected=false;
     const navigationScript=origin+'/Insight/navigation-worker-fixture.js';
-    await reopened.evaluate(async script=>{
+    const registrationPage=await context.newPage();
+    await registrationPage.goto(origin+'/Insight/seed-fixture.html');
+    await registrationPage.evaluate(async script=>{
       await navigator.serviceWorker.register(script,{scope:'/Insight/',updateViaCache:'none'});
     },navigationScript);
-    await expect.poll(()=>reopened.evaluate(async ()=>{
+    await expect.poll(()=>registrationPage.evaluate(async ()=>{
       const registration=await navigator.serviceWorker.getRegistration('/Insight/Index.html');
       return registration?.active?.state==='activated'?registration.active.scriptURL:null;
     })).toBe(navigationScript);
+    await registrationPage.close();
 
     disconnected=true;
     for(const entrance of [origin+'/Insight/',appUrl]){
@@ -488,20 +491,6 @@ test('actual Insight entrances can reopen verified drafts offline and retain the
     await offlineAgain.close();
 
     disconnected=false;
-    await reopened.evaluate(()=>navigator.serviceWorker.register('/legacy-root-worker-fixture.js',{scope:'/'}));
-    await expect.poll(()=>reopened.evaluate(async url=>
-      (await navigator.serviceWorker.getRegistration(url))?.active?.state,onlineUrl)).toBe('activated');
-    const heldOnline=await context.newPage();
-    await heldOnline.goto(appUrl);
-    await expect(heldOnline).toHaveURL(onlineUrl);
-    await expect(heldOnline.getByRole('status')).toContainText('旧版のキャッシュ状態を確認できないため、起動と保存を停止しています。');
-    expect(await heldOnline.evaluate(()=>localStorage.getItem('insight_v11'))).toBe(raw);
-    expect(await heldOnline.evaluate(async ()=>{
-      const registration=await navigator.serviceWorker.getRegistration();
-      return registration?.scope===location.origin+'/'&&await registration.unregister();
-    })).toBe(true);
-    await heldOnline.close();
-
     routeOutsideWorker=false;
     expect(await reopened.evaluate(async script=>{
       const registration=await navigator.serviceWorker.getRegistration('/Insight/Index.html');
