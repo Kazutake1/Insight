@@ -371,7 +371,7 @@ test('トップページは外部shellと機能manifestの最新版確認をno-s
   expect(source).not.toMatch(/style-src[^;]*'unsafe-inline'/);
   expect(boot).toContain("fetch('./Index.html?insight_probe='+Date.now(),{cache:'no-store'})");
   expect(loader).toContain("fetch('./insight_shell_loader_v1.js?insight_manifest_probe='+Date.now(),{cache:'no-store'})");
-  expect(loader).toContain("fetch('./insight_payload_source_v1.html?v=20261128-analysis-wording-1',{cache:'no-store'})");
+  expect(loader).toContain("fetch('./insight_payload_source_v1.html?v=20261127-monthly-save-feedback-1',{cache:'no-store'})");
   expect(loader).toContain('function featureSignature(entries)');
   expect(source).toContain('https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js');
   expect(source).toContain('integrity="sha512-CQBWl4fJHWbryGE+Pc7UAxWMUMNMWzWxF4SQo9CgkJIN1kx6djDQZjh3Y8SZ1d+6I+1zze6Z7kHXO7q3UyZAWw=="');

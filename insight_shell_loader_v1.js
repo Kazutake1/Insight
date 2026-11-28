@@ -104,7 +104,7 @@ function featureSignature(entries){
 var currentFeatureSignature=featureSignature(orderedFeatureLoads);
 window.__INSIGHT_FEATURE_SIGNATURE__=currentFeatureSignature;
 function loadShell(){
-return fetch('./insight_payload_source_v1.html?v=20261128-analysis-wording-1',{cache:'no-store'}).then(function(r){if(!r.ok)throw new Error('Insight payload の取得に失敗しました ('+r.status+')');return r.text();}).then(function(html){
+return fetch('./insight_payload_source_v1.html?v=20261127-monthly-save-feedback-1',{cache:'no-store'}).then(function(r){if(!r.ok)throw new Error('Insight payload の取得に失敗しました ('+r.status+')');return r.text();}).then(function(html){
 if(html.indexOf('<!DOCTYPE html>')!==0&&html.indexOf('<!doctype html>')!==0)throw new Error('HTMLデータの検証に失敗しました');
 // STEP5 complete: payload source is self-contained; feature modules are inserted before document.write().
 

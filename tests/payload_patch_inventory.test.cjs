@@ -39,7 +39,7 @@ test('Index shellはinline script/styleを持たず外部assetへ分離する',(
   assert.match(boot,/fetch\('\.\/Index\.html\?insight_probe='/);
   assert.match(loader,/fetch\('\.\/insight_shell_loader_v1\.js\?insight_manifest_probe='/);
   assert.match(loader,/document\.open\(\);document\.write\(html\);document\.close\(\)/);
-  assert.match(loader,/fetch\('\.\/insight_payload_source_v1\.html\?v=20261128-analysis-wording-1'/);
+  assert.match(loader,/fetch\('\.\/insight_payload_source_v1\.html\?v=20261127-monthly-save-feedback-1'/);
   assert.doesNotMatch(index+loader,/pako|insight_payload_v1_part0/);
   assert.match(css,/#loading\{/);
 });

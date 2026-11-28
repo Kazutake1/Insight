@@ -273,8 +273,6 @@ test('サイドバーは分析AIだけを発注予測の直下へ移動しiPad�
     await page.locator('#aiAnalysisToggle').click();
     await expect(page.locator('body')).toHaveClass(/ai-analysis-open/);
     await expect(page.locator('#aiAnalysisPanel')).toHaveAttribute('aria-hidden','false');
-    await expect(page.locator('#aiAnalysisPanel .ai-analysis-subtitle')).toHaveText('経営コメント');
-    await expect(page.locator('#aiAnalysisPanel .ai-analysis-foot')).toHaveCount(0);
     await page.locator('#aiAnalysisToggle').click();
     await expect(page.locator('body')).not.toHaveClass(/ai-analysis-open/);
     await expect(page.locator('#pageOrderForecast')).toHaveClass(/show/);
