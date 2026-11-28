@@ -2,7 +2,7 @@
 (function(root){
   'use strict';
   const document=root.document;
-  const version='20261126-quick-save-feedback-1';
+  const version='20261128-backup-wording-1';
   let adopted=false;
   let verifiedSnapshot=null;
 

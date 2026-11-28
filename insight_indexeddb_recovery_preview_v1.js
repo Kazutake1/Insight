@@ -41,13 +41,13 @@
     password.type='password';
     password.required=true;
     password.autocomplete='off';
-    field(fields,restoring?'復元する暗号化バックアップ':'暗号化バックアップ',file);
+    field(fields,restoring?'復元するバックアップ':'暗号化バックアップ',file);
     field(fields,restoring?'復元するバックアップのパスワード':'バックアップのパスワード',password);
     const safetyFile=file.cloneNode();
     const safetyPassword=password.cloneNode();
     if(restoring){
-      field(fields,'現在の確定版の暗号化バックアップ',safetyFile);
-      field(fields,'現在の確定版のパスワード',safetyPassword);
+      field(fields,'復元前のバックアップ',safetyFile);
+      field(fields,'復元前のパスワード',safetyPassword);
     }
     const closed=element('input');
     closed.type='checkbox';
@@ -70,11 +70,10 @@
       for(const store of info.stores){
         list.append(element('li',store.name+'（'+store.years.join('、')+'年度）'));
       }
-      const approve=element('button',restoring||missing?'この内容を復元する':resuming?'この版で保存を再開する':'確認済みにする');
+      const approve=element('button',restoring||missing?'復元する':resuming?'この版で保存を再開する':'確認済みにする');
       const cancel=element('button','取り消す');
       approve.type=cancel.type='button';
       summary.replaceChildren(heading,element('p','作成日時 '+timestamp),list);
-      if(restoring||resuming)summary.append(element('p','確認した確定版 '+info.revision));
       summary.append(approve,cancel);
       summary.hidden=false;
       approve.focus();
@@ -109,7 +108,7 @@
             status.textContent='取り消しました。';
           }else{
             committed=true;
-            status.textContent=restoring||missing?'復元した確定版を確認しました。画面を読み直しています。':
+            status.textContent=restoring||missing?'復元しました。':
               '保存を再開しました。画面を読み直しています。';
             await onCommitted(result.revision);
           }
@@ -136,7 +135,7 @@
   function mountExport(container){
     const form=element('form');
     const fields=element('fieldset');
-    fields.append(element('legend','確定版の暗号化バックアップ'));
+    fields.append(element('legend','暗号化バックアップ'));
     const password=element('input'),repeat=element('input');
     for(const input of [password,repeat]){
       input.type='password';
@@ -145,7 +144,7 @@
     }
     field(fields,'バックアップ用パスワード',password);
     field(fields,'パスワードの確認',repeat);
-    const submit=element('button','暗号化してダウンロード');
+    const submit=element('button','バックアップを作成');
     submit.type='submit';
     const status=element('p');
     status.setAttribute('role','status');
@@ -164,13 +163,13 @@
         return;
       }
       fields.disabled=true;
-      status.textContent='確定版を確認しています。';
+      status.textContent='バックアップ作成中';
       try{
-        const revision=await root.InsightIndexedDBStorageV1.downloadCommittedBackup(passphrase,form);
-        status.textContent='確定版 '+revision+' のバックアップをダウンロードしました。';
+        await root.InsightIndexedDBStorageV1.downloadCommittedBackup(passphrase,form);
+        status.textContent='バックアップを作成しました。';
       }catch(error){
         status.textContent=error?.name==='InsightBackupValidationError'?error.message:
-          '確定版のバックアップをダウンロードできませんでした。';
+          'バックアップを作成できませんでした。';
       }finally{
         passphrase='';
         fields.disabled=false;
