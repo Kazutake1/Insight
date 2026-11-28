@@ -184,6 +184,9 @@ test('保存容量は操作時に保存文字列を参照し、保存内容を�
   await page.locator('#navSettings').click();
   const button=page.getByRole('button',{name:'保存容量を確認',exact:true});
   const result=page.locator('#insightStorageUsage');
+  const estimateNote=page.getByText('概算値です。端末の空き容量・予測用記録は含みません。',{exact:true});
+  await expect(estimateNote).toBeVisible();
+  await expect(page.getByText('バックアップ、復元、保存データの状態確認、CSVインポートを管理します。',{exact:true})).toHaveCount(0);
   const safety=page.locator('#insightRestoreSafetyBackup');
   await expect(safety).not.toBeChecked();
   await page.locator('.insight-restore-safety-switch-track').click();
@@ -223,7 +226,7 @@ test('保存容量は操作時に保存文字列を参照し、保存内容を�
   });
   await button.click();
   await expect(result.locator('div')).toHaveText([
-    '店舗データ（全店舗）：0.057 MiB','その他のInsight設定：0.019 MiB','合計（概算）：0.076 MiB'
+    '店舗データ（全店舗）：0.057 MiB','その他の設定：0.019 MiB','合計（概算）：0.076 MiB'
   ]);
   await expect(result).toContainText('バックアップ容量を計測できません。');
   await page.evaluate(()=>window.__updateCapacityFixture());
@@ -231,6 +234,7 @@ test('保存容量は操作時に保存文字列を参照し、保存内容を�
   await page.evaluate(()=>document.documentElement.classList.add('dark'));
   await button.click();
   await expect(result).toContainText('合計（概算）：0.095 MiB');
+  await expect(estimateNote).toBeVisible();
   const controlBox=await button.boundingBox();
   const resultBox=await result.boundingBox();
   expect(resultBox.y-controlBox.y-controlBox.height).toBeGreaterThanOrEqual(7);
@@ -242,6 +246,7 @@ test('保存容量は操作時に保存文字列を参照し、保存内容を�
   await expect(result).toContainText('バックアップ容量（暗号化前）');
   await expect(result.getByRole('progressbar')).toHaveAttribute('data-status','normal');
   await expect(result).toContainText('残り');
+  await expect(result.getByText('保存済みデータを計測しました。',{exact:true})).toHaveCount(0);
   await page.evaluate(()=>document.documentElement.classList.add('dark'));
   expect(await page.evaluate(()=>document.querySelector('.insight-backup-usage progress').getBoundingClientRect().width))
     .toBeGreaterThan(50);
@@ -267,6 +272,6 @@ test('保存容量は操作時に保存文字列を参照し、保存内容を�
   await expect(bar).toHaveCount(0);
   await page.evaluate(()=>window.__denyCapacityRead());
   await button.click();
-  await expect(result).toHaveText('保存容量を計測できません。');
+  await expect(result).toHaveText('容量を確認できません。');
   expect(await page.evaluate(()=>window.__capacityWrites)).toEqual([]);
 });

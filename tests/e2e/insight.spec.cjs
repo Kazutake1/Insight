@@ -359,10 +359,10 @@ test('トップページは外部shellと機能manifestの最新版確認をno-s
     fetch('/insight_payload_source_v1.html?e2e-shell-check=1',{cache:'no-store'}).then(r=>r.text())
   ]));
   const [source,boot,loader,payload]=sources;
-  expect(source).toContain('name="insight-shell-version" content="20261128-backup-wording-build-144"');
-  expect(source).toContain('insight_shell_boot_v1.js?v=20261128-backup-wording-build-144');
-  expect(source).toContain('insight_shell_loader_v1.js?v=20261128-backup-wording-1');
-  expect(source).toContain('insight_shell_v1.css?v=20261128-backup-wording-build-144');
+  expect(source).toContain('name="insight-shell-version" content="20261128-daily-wording-build-145"');
+  expect(source).toContain('insight_shell_boot_v1.js?v=20261128-daily-wording-build-145');
+  expect(source).toContain('insight_shell_loader_v1.js?v=20261128-daily-wording-1');
+  expect(source).toContain('insight_shell_v1.css?v=20261128-daily-wording-build-145');
   expect(source).not.toMatch(/<script(?![^>]*\bsrc=)[^>]*>/i);
   expect(source).not.toMatch(/<style\b/i);
   expect(source).not.toMatch(/script-src[^;]*'unsafe-inline'/);
@@ -1498,6 +1498,7 @@ test('データ状態チェックは未登録年度を要確認表示し保存�
   expect(await page.locator('#insightDataHealthButton').evaluate(node=>getComputedStyle(node).color)).toBe('rgb(180, 35, 24)');
   await page.locator('#insightDataHealthButton').click();
   await expect(page.locator('#insightDataHealthOverlay')).toBeVisible();
+  await expect(page.locator('#insightDataHealthNote')).toHaveText('データは変更されません。');
   await expect(page.locator('#insightDataHealthSummary')).toContainText('要確認');
   await expect(page.locator('#insightDataHealthSummary')).toHaveClass(/insight-health-status-error/);
   expect(await page.locator('#insightDataHealthSummary').evaluate(node=>getComputedStyle(node).color)).toBe('rgb(180, 35, 24)');

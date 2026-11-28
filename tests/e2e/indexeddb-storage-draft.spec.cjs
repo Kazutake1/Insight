@@ -6,7 +6,7 @@ test.beforeEach(async({page})=>{
     if(!location.pathname.endsWith('-fixture'))return;
     window.__INSIGHT_SHELL_VERSION__=build;
     window.__INSIGHT_FEATURE_SIGNATURE__=features;
-  },{build:'20261128-backup-wording-build-144',features:'f0fcd0ba'});
+  },{build:'20261128-daily-wording-build-145',features:'d710d11f'});
   await page.route(/https:\/\/(www\.jma\.go\.jp|[^/]*api\.open-meteo\.com)\//,route=>route.abort());
 });
 // The fixture server uses HTTP; keep the rest of the shell's CSP in effect.
@@ -676,7 +676,7 @@ for(const outcome of ['success','conflict','quota']){
       await expect(page.locator('#scCategory')).toHaveValue(seed.countCategory);
       await delivery.fill('1000');
       await button.click();
-      await expect(status).toHaveText('未保存の変更があります');
+      await expect(status).toHaveText('未保存');
       expect(await committedInput(page)).toEqual({revision:0,snapshot:expected});
       await delivery.fill('14');
       await page.evaluate(()=>{
@@ -3268,8 +3268,8 @@ test('a fully restarted browser keeps the adopted revision and holds the legacy 
       const page=context.pages()[0]??await context.newPage();
       await page.goto(url);
       await page.evaluate(()=>{
-        window.__INSIGHT_SHELL_VERSION__='20261128-backup-wording-build-144';
-        window.__INSIGHT_FEATURE_SIGNATURE__='f0fcd0ba';
+        window.__INSIGHT_SHELL_VERSION__='20261128-daily-wording-build-145';
+        window.__INSIGHT_FEATURE_SIGNATURE__='d710d11f';
       });
       await page.addScriptTag({url:new URL('/insight_indexeddb_storage_v1.js',url).href});
       return {context,page};
@@ -3305,7 +3305,7 @@ async function openLegacyPwaFixture(page){
     contentType:'text/html',body:'<!doctype html><title>Fictional online migration page</title>'
   }));
   await page.route('**/tests/e2e/fixtures/Index.html?insight_migration_probe=*',route=>route.fulfill({
-    contentType:'text/html',body:'<!doctype html><meta name="insight-shell-version" content="20261128-backup-wording-build-144">'
+    contentType:'text/html',body:'<!doctype html><meta name="insight-shell-version" content="20261128-daily-wording-build-145">'
   }));
   await page.goto(legacyPwaFixture);
   await page.addScriptTag({url:'/insight_indexeddb_storage_v1.js'});
@@ -3530,7 +3530,7 @@ test('cached legacy shell runs with its origin unavailable and adopted startup s
 });
 
 test('migration enforces the pinned environment before and after backup confirmation',async({page})=>{
-  const fixture='/forced-migration-gate-fixture',build='20261128-backup-wording-build-144';
+  const fixture='/forced-migration-gate-fixture',build='20261128-daily-wording-build-145';
   await page.route('**'+fixture,route=>route.fulfill({
     contentType:'text/html',body:'<!doctype html><title>Fictional forced migration fixture</title>'
   }));
@@ -4258,10 +4258,12 @@ httpsTest('Draft Index rehearses migration, editing and recovery at the release 
   const committedLength=JSON.stringify(beforeRestore.snapshot).length;
   expect(formatMiB(committedLength)).not.toBe(formatMiB(capacityBefore.legacy.length));
   await capacity.tap();
+  await expect(page.getByText('概算値です。端末の空き容量・予測用記録は含みません。',{exact:true})).toBeVisible();
+  await expect(page.getByText(/店舗データはIndexedDBの現在の確定版が対象です。/)).toHaveCount(0);
   await expect(capacityResult.getByRole('progressbar')).toHaveAttribute('data-status','normal');
   await expect(capacityResult.locator('div')).toHaveText([
     '店舗データ（全店舗）：'+formatMiB(committedLength),
-    'その他のInsight設定：'+formatMiB(capacityBefore.settingsUnits),
+    'その他の設定：'+formatMiB(capacityBefore.settingsUnits),
     '合計（概算）：'+formatMiB(committedLength+capacityBefore.settingsUnits)
   ]);
   expect(await page.evaluate(()=>({
@@ -4356,7 +4358,7 @@ httpsTest('Draft Index rehearses migration, editing and recovery at the release 
     page.on('request',watchAnalysisRequest);
     const diagnostics=page.locator('#insightWeatherSalesDiagnosticsOverlay');
     const trends=page.locator('#insightWeatherSalesViewOverlay');
-    const prediction=page.getByRole('dialog',{name:'予測用データ品質チェック'});
+    const prediction=page.getByRole('dialog',{name:'予測データの確認'});
     const predictionButton=page.locator('#insightPredictionDataButton');
     await page.locator('#insightWeatherSalesDiagnosticsButton').tap();
     await expect(diagnostics).toBeVisible();

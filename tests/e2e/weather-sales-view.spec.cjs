@@ -1,6 +1,6 @@
 const {test,expect}=require('@playwright/test');
 
-test('販売傾向の確認：期間選択・画面配置・既存保存データの保護',async({page})=>{
+test('販売傾向：期間選択・画面配置・既存保存データの保護',async({page})=>{
   const errors=[],external=[];
   page.on('pageerror',e=>errors.push(e.message));
   await page.route('**/Index.html*',async route=>{
@@ -20,7 +20,8 @@ test('販売傾向の確認：期間選択・画面配置・既存保存デー�
   await page.locator('#insightWeatherSalesViewButton').click();
   const overlay=page.locator('#insightWeatherSalesViewOverlay');
   await expect(overlay).toBeVisible();
-  await expect(page.locator('#iwsvHeading')).toHaveText('販売傾向の確認');
+  await expect(page.locator('#iwsvHeading')).toHaveText('販売傾向');
+  await expect(overlay.getByText('同じ曜日・祝日区分で販売実績を比較します。',{exact:true})).toBeVisible();
   await expect(page.locator('#iwsvDays option')).toHaveCount(3);
   await expect(page.locator('#iwsvStore option')).not.toHaveCount(0);
   for(const days of ['84','168','366']){

@@ -175,11 +175,11 @@
       dialog.setAttribute('role','dialog');dialog.setAttribute('aria-modal','true');
       dialog.setAttribute('aria-labelledby','iwsvHeading');
       var header=element('div',undefined,'ipdh-header');
-      var title=element('h2','販売傾向の確認');title.id='iwsvHeading';
+      var title=element('h2','販売傾向');title.id='iwsvHeading';
       var exit=element('button','閉じる','ipdh-close');exit.type='button';
       exit.addEventListener('click',close);header.append(title,exit);dialog.append(header);
       var body=element('div',undefined,'iwsv-body');
-      var explanation=element('p','店舗ごとの保存済み販売実績と天気・気温を、同じ曜日・祝日区分で比較します。','iwsv-note');
+      var explanation=element('p','同じ曜日・祝日区分で販売実績を比較します。','iwsv-note');
       body.append(explanation);
       var selectorRow=element('div',undefined,'iwsv-controls');
       controls.days=field('分析期間','iwsvDays',selectorRow);
@@ -212,7 +212,7 @@
     var anchor=root.document.getElementById('insightWeatherSalesDiagnosticsButton');
     var parent=root.document.getElementById('insightSettingsDataActions');
     if(!anchor||!parent||!parent.contains(anchor))return false;
-    launchButton=element('button','販売傾向の確認','sidebar-btn');
+    launchButton=element('button','販売傾向','sidebar-btn');
     launchButton.type='button';launchButton.id='insightWeatherSalesViewButton';
     launchButton.addEventListener('click',open);
     anchor.insertAdjacentElement('afterend',launchButton);

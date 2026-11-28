@@ -34,8 +34,8 @@ var orderedFeatureLoads=[
   './insight_backup_crypto_v1.js?v=20261126-backup-usage-1',
   './insight_backup_password_v1.js?v=20261125-input-backup-1',
   './insight_backup_guard_v1.js?v=20261126-backup-usage-1',
-  './insight_data_health_v1.js?v=20261124-indexeddb-preview-7',
-  './insight_prediction_data_health_v1.js?v=20261010-prediction-quality-1',
+  './insight_data_health_v1.js?v=20261128-daily-wording-1',
+  './insight_prediction_data_health_v1.js?v=20261128-daily-wording-1',
   './insight_waste_insights_v1.js?v=20261112-waste-comparison-1',
   './insight_dashboard_year_fix_v1.js?v=20261011-waste-inline-year-warning-1',
   './insight_kyaku_insights_v1.js?v=20260930-hooks2',
@@ -52,12 +52,12 @@ var orderedFeatureLoads=[
   './insight_weather_temperature_auto_v1.js?v=20261020-weather-fetch-stale-guard-1',
   './insight_weather_location_v1.js?v=20261030-step4-gate3-ab-1',
   './insight_input_weather_temp_v1.js?v=20261019-input-temperature-trunc-1',
-  './insight_sales_count_v1.js?v=20261126-save-response-1',
+  './insight_sales_count_v1.js?v=20261128-daily-wording-1',
   './insight_numeric_caret_v1.js?v=20261018-caret-end-1',
   './insight_trip_inference_v1.js?v=20261011-month-infer-1',
   './insight_trip_overrides_v1.js?v=20261011-trip-manual-1',
   './insight_trip_history_resolver_v1.js?v=20261011-trip-averages-1',
-  './insight_sale_results_v1.js?v=20261124-sale-details-1',
+  './insight_sale_results_v1.js?v=20261128-daily-wording-1',
   './insight_page_title_layout_v1.js?v=20261002-title-align',
   './insight_page_period_sync_v1.js?v=20261001-route-order',
   './insight_sales_period_selector_v1.js?v=20261006-input-period-runtime-2',
@@ -67,7 +67,7 @@ var orderedFeatureLoads=[
   './insight_weather_sales_readiness_v1.js?v=20261022-step3-quality-1',
   './insight_weather_sales_trends_v1.js?v=20261022-step3-trends-1',
   './insight_weather_sales_diagnostics_v1.js?v=20261022-step3-diagnostics-1',
-  './insight_weather_sales_view_v1.js?v=20261022-step4-view-1',
+  './insight_weather_sales_view_v1.js?v=20261128-daily-wording-1',
   './insight_multiyear_analysis_v1.js?v=20261003-multiyear-1',
   './insight_weekday_analysis_v1.js?v=20261003-weekday-1',
   './insight_sale_impact_v1.js?v=20261003-sale-impact-1',
@@ -83,7 +83,7 @@ var orderedFeatureLoads=[
   './insight_ai_interpretation_v1.js?v=20261001-decision-analysis',
   './insight_ai_context_v1.js?v=20261003-ai-pipeline-1',
   './insight_ai_page_comments_v1.js?v=20261001-decision-analysis',
-  './insight_settings_v1.js?v=20261126-backup-usage-1',
+  './insight_settings_v1.js?v=20261128-daily-wording-1',
   './insight_trip_inference_view_v1.js?v=20261011-trip-manual-1',
   './insight_weather_bulk_v1.js?v=20261030-step4-gate3-ab-1',
   './insight_year_controls_layout_v1.js?v=20261006-csp-style-year-controls-1',
@@ -147,7 +147,7 @@ async function start(){
   if(!workers||workers.controller||await workers.getRegistration(location.href))
     throw new Error('旧版のキャッシュ状態を確認できないため、起動と保存を停止しています。');
   await Promise.all([
-    import('./insight_indexeddb_storage_v1.js?v=20261128-backup-wording-1'),
+    import('./insight_indexeddb_storage_v1.js?v=20261128-daily-wording-1'),
     import('./insight_indexeddb_migration_preview_v1.js?v=20261124-indexeddb-step3-1'),
     import('./draft/insight_indexeddb_candidate_v1.js?v=20261128-backup-wording-1')
   ]);

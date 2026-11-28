@@ -43,7 +43,7 @@ test('FICTIONAL all-period sale history shows twenty rows with scrolling and kee
 
   await page.locator('#srPeriodTabs button[data-period="all"]').click();
   await expect(page.locator('#srListBody tr')).toHaveCount(27);
-  await expect(page.locator('#srListCount')).toContainText('全27件');
+  await expect(page.locator('#srListCount')).toHaveText('全27件');
   const dimensions=await page.evaluate(()=>{
     const scroller=document.querySelector('#pageSaleResults .sr-table-scroll');
     const table=scroller.querySelector('table'),rows=table.tBodies[0].rows;

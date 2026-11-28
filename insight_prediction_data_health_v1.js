@@ -214,7 +214,7 @@
       var dialog=element('div',undefined,'ipdh-dialog');dialog.setAttribute('role','dialog');dialog.setAttribute('aria-modal','true');
       dialog.setAttribute('aria-labelledby','ipdhHeading');
       var header=element('div',undefined,'ipdh-header');
-      var title=element('h2','予測用データ品質チェック');title.id='ipdhHeading';
+      var title=element('h2','予測データの確認');title.id='ipdhHeading';
       var exit=element('button','閉じる');exit.type='button';exit.className='ipdh-close';exit.onclick=close;
       header.append(title,exit);dialog.append(header);
       dialog.append(element('div',undefined,'ipdh-body'));overlay.append(dialog);doc.body.append(overlay);
@@ -290,7 +290,7 @@
     // Settings builds later and moves the existing health button into this container.
     // Insert only after that move so the new button is not discarded by replaceChildren().
     if(!anchor||!actions||!actions.contains(anchor))return false;
-    button=element('button','予測用データ品質チェック');button.type='button';button.id='insightPredictionDataButton';
+    button=element('button','予測データの確認');button.type='button';button.id='insightPredictionDataButton';
     button.onclick=function(){try{open();}catch(error){alert('データ診断に失敗しました。'+(error&&error.message||''));}};
     anchor.insertAdjacentElement('afterend',button);return true;
   }
