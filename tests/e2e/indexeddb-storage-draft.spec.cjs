@@ -4142,8 +4142,8 @@ httpsTest('Draft Index rehearses migration, editing and recovery at the release 
   await page.locator('#insightSettingsDetails > summary').click();
   await expect(button).toBeHidden();
   await expect(page.getByText('バックアップの確認を取り消しました。')).toBeVisible();
-  await expect(checkbox).not.toBeChecked();
   await page.locator('#insightSettingsDetails > summary').click();
+  await expect(checkbox).not.toBeChecked();
   expect(await marker()).toBeNull();
 
   const downloaded=async download=>({name:download.suggestedFilename(),mimeType:'application/json',
