@@ -359,10 +359,10 @@ test('トップページは外部shellと機能manifestの最新版確認をno-s
     fetch('/insight_payload_source_v1.html?e2e-shell-check=1',{cache:'no-store'}).then(r=>r.text())
   ]));
   const [source,boot,loader,payload]=sources;
-  expect(source).toContain('name="insight-shell-version" content="20261128-analysis-wording-build-146"');
-  expect(source).toContain('insight_shell_boot_v1.js?v=20261128-analysis-wording-build-146');
-  expect(source).toContain('insight_shell_loader_v1.js?v=20261128-analysis-wording-1');
-  expect(source).toContain('insight_shell_v1.css?v=20261128-analysis-wording-build-146');
+  expect(source).toContain('name="insight-shell-version" content="20261129-settings-details-build-147"');
+  expect(source).toContain('insight_shell_boot_v1.js?v=20261129-settings-details-build-147');
+  expect(source).toContain('insight_shell_loader_v1.js?v=20261129-settings-details-1');
+  expect(source).toContain('insight_shell_v1.css?v=20261129-settings-details-build-147');
   expect(source).not.toMatch(/<script(?![^>]*\bsrc=)[^>]*>/i);
   expect(source).not.toMatch(/<style\b/i);
   expect(source).not.toMatch(/script-src[^;]*'unsafe-inline'/);
@@ -371,12 +371,12 @@ test('トップページは外部shellと機能manifestの最新版確認をno-s
   expect(source).not.toMatch(/style-src[^;]*'unsafe-inline'/);
   expect(boot).toContain("fetch('./Index.html?insight_probe='+Date.now(),{cache:'no-store'})");
   expect(loader).toContain("fetch('./insight_shell_loader_v1.js?insight_manifest_probe='+Date.now(),{cache:'no-store'})");
-  expect(loader).toContain("fetch('./insight_payload_source_v1.html?v=20261127-monthly-save-feedback-1',{cache:'no-store'})");
+  expect(loader).toContain("fetch('./insight_payload_source_v1.html?v=20261129-settings-details-1',{cache:'no-store'})");
   expect(loader).toContain('function featureSignature(entries)');
   expect(source).toContain('https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js');
   expect(source).toContain('integrity="sha512-CQBWl4fJHWbryGE+Pc7UAxWMUMNMWzWxF4SQo9CgkJIN1kx6djDQZjh3Y8SZ1d+6I+1zze6Z7kHXO7q3UyZAWw=="');
   expect(loader).not.toContain('stripPayloadChartScript');
-  expect(payload).toContain('insight_payload_core_v1.css?v=20261127-monthly-save-feedback-1');
+  expect(payload).toContain('insight_payload_core_v1.css?v=20261129-settings-details-1');
   expect(payload).toContain('insight_payload_core_v1.js?v=20261127-monthly-save-feedback-1');
   expect(payload).toContain('insight_payload_ai_legacy_v1.js?v=20261020-ai-panel-smooth-1');
   expect(payload).toContain('insight_payload_bindings_v1.js?v=20261030-step4-gate3-ab-1');
@@ -429,7 +429,19 @@ test('サイドバー下部は設定と定型報告を表示し管理項目は�
   await expect(page.locator('#insightSettingsDataActions #backupBtn')).toBeVisible();
   await expect(page.locator('#insightSettingsDataActions')).toContainText('データ復元');
   await expect(page.locator('#insightSettingsDataActions #insightDataHealthButton')).toBeVisible();
-  await expect(page.locator('#insightSettingsDataActions')).toContainText('CSVインポート');
+  const details=page.locator('#insightSettingsDetails');
+  const summary=details.locator('summary');
+  const csv=details.locator('#csvImportBtn');
+  await expect(csv).toBeHidden();
+  await summary.focus();
+  await summary.press('Enter');
+  await expect(csv).toBeVisible();
+  await page.evaluate(()=>gotoNav(1));
+  await page.locator('#navSettings').click();
+  await expect(csv).toBeVisible();
+  await summary.press('Space');
+  await expect(csv).toBeHidden();
+  await expect(page.locator('#insightSettingsYearSection')).toBeVisible();
   await expect(page.locator('#insightSettingsDisplayActions')).toHaveCount(0);
   await expect(page.locator('#pageSettings #darkModeBtn')).toHaveCount(0);
   await expect(page.locator('#insightThemeBridge #darkModeBtn')).toBeHidden();
@@ -1290,6 +1302,7 @@ test('設定ページで月別・店舗別・カテゴリー別の対象便判�
     return {a,b,category,other};
   });
   await page.locator('#navSettings').click();
+  await page.locator('#insightSettingsDetails > summary').click();
   const panel=page.locator('#insightTripHistorySection');
   await expect(panel).toBeVisible();
   await expect(panel.locator('h2')).toHaveText('過去の対象便判定');
@@ -1326,6 +1339,7 @@ test('過去の対象便確認カードはiPad横向き幅で見切れずダー�
   const errors=await openInsight(page);
   await page.setViewportSize({width:1024,height:768});
   await page.locator('#navSettings').click();
+  await page.locator('#insightSettingsDetails > summary').click();
   const panel=page.locator('#insightTripHistorySection');
   await expect(panel).toBeVisible();
   await panel.scrollIntoViewIfNeeded();
@@ -1359,6 +1373,7 @@ test('過去の対象便確認カードはiPad横向き幅で見切れずダー�
 test('手動判定は月・カテゴリー・便ごとに保存され再読込でき、自動判定に戻せる',async({page})=>{
   const errors=await openInsight(page);
   await page.locator('#navSettings').click();
+  await page.locator('#insightSettingsDetails > summary').click();
   const panel=page.locator('#insightTripHistorySection');
   await expect(panel).toBeVisible();
   await panel.locator('#insightTripHistoryMonth').selectOption('2026-09');
@@ -1385,6 +1400,7 @@ test('手動判定は月・カテゴリー・便ごとに保存され再読込�
   await page.reload();
   await expect(page.locator('#navSettings')).toBeVisible();
   await page.locator('#navSettings').click();
+  await page.locator('#insightSettingsDetails > summary').click();
   const restoredPanel=page.locator('#insightTripHistorySection');
   await restoredPanel.locator('#insightTripHistoryStore').selectOption(ids.store);
   await restoredPanel.locator('#insightTripHistoryCategory').selectOption(ids.category);
@@ -1404,6 +1420,7 @@ test('手動判定は月・カテゴリー・便ごとに保存され再読込�
 test('手動判定の保存が競合で失敗した場合は画面表示も確定せず保存内容を保持する',async({page})=>{
   const errors=await openInsight(page);
   await page.locator('#navSettings').click();
+  await page.locator('#insightSettingsDetails > summary').click();
   const panel=page.locator('#insightTripHistorySection');
   await panel.locator('#insightTripHistoryMonth').selectOption('2026-09');
   const before=await page.evaluate(()=>localStorage.getItem('insight_v11'));
@@ -1438,6 +1455,7 @@ test('0個でも数値がある過去便は手動で対象外にできない',as
     window.InsightTripInferenceView.refresh(true);
     return {store:allStores.current,category:cat};
   });
+  await page.locator('#insightSettingsDetails > summary').click();
   const panel=page.locator('#insightTripHistorySection');
   await panel.locator('#insightTripHistoryStore').selectOption(fixture.store);
   await panel.locator('#insightTripHistoryCategory').selectOption(fixture.category);
@@ -1733,6 +1751,7 @@ test('設定ページの過去天気一括補完は未入力欄だけ保存し�
     s.weatherLocation={latitude:35.25,longitude:136.78,timezone:'Asia/Tokyo',label:'テスト地点'};
   });
   await page.locator('#navSettings').click();
+  await page.locator('#insightSettingsDetails > summary').click();
   const button=page.locator('#insightWeatherBulkStart');
   await expect(button).toBeVisible();
   page.once('dialog',dialog=>dialog.accept());

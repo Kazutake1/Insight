@@ -154,7 +154,7 @@
   function initButton(){
     if(button&&button.isConnected)return true;
     var anchor=doc.getElementById('insightPredictionDataButton');
-    var actions=doc.getElementById('insightSettingsDataActions');
+    var actions=doc.getElementById('insightSettingsDetailActions');
     if(!anchor||!actions||!actions.contains(anchor))return false;
     button=node('button','天気・気温の分析可否チェック','sidebar-btn');
     button.type='button';button.id='insightWeatherSalesDiagnosticsButton';

@@ -31,7 +31,7 @@ test('入力実績・推定対象外・判定不能の日本語が明確であ�
 });
 
 test('既存設定ページに追加し、既存の管理機能と選択中の店舗を保持する',()=>{
-  assert.match(view,/pageSettings \.insight-settings-content/);
+  assert.match(view,/insightSettingsDetailContent/);
   for(const key of ['insightTripHistorySection','insightTripHistoryStore','insightTripHistoryCategory','insightTripHistoryMonth','insightTripHistoryResults'])
     assert.ok(view.includes(key),key);
   assert.match(view,/syncStore\?'':storeSelect\.value/);

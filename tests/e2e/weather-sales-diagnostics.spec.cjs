@@ -1,4 +1,5 @@
 const {test,expect}=require('@playwright/test');
+require('./helpers/verified-chart.cjs')(test);
 
 test('STEP3: 店舗保存データの分析可否をiPad内で診断し、閉じてもデータを変更しない',async({page})=>{
   const errors=[],externalRequests=[];
@@ -12,9 +13,10 @@ test('STEP3: 店舗保存データの分析可否をiPad内で診断し、閉じ
   await expect.poll(()=>page.evaluate(()=>!!(window.InsightWeatherSalesReadiness&&
     window.InsightWeatherSalesTrends&&window.InsightWeatherSalesDiagnostics))).toBe(true);
   await page.locator('#navSettings').click();
+  await page.locator('#insightSettingsDetails > summary').click();
   await expect(page.locator('#pageSettings')).toHaveClass(/show/);
-  await expect(page.locator('#insightSettingsDataActions #insightWeatherSalesDiagnosticsButton')).toBeVisible();
-  await expect(page.locator('#insightSettingsDataActions #insightPredictionDataButton')).toBeVisible();
+  await expect(page.locator('#insightSettingsDetailActions #insightWeatherSalesDiagnosticsButton')).toBeVisible();
+  await expect(page.locator('#insightSettingsDetailActions #insightPredictionDataButton')).toBeVisible();
 
   const before=await page.evaluate(()=>({
     snapshot:JSON.stringify(allStores),

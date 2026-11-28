@@ -39,7 +39,7 @@
       await Promise.all([
         loadScript('./insight_indexeddb_quick_input_preview_v1.js','20261127-quick-future-date-1'),
         loadScript('./insight_indexeddb_recovery_preview_v1.js'),
-        loadScript('./insight_indexeddb_sales_input_preview_v1.js','20261127-monthly-save-feedback-1')
+        loadScript('./insight_indexeddb_sales_input_preview_v1.js','20261129-settings-details-1')
       ]);
       stage='storage-connection';
       await root.InsightIndexedDBSalesInputPreviewV1.connect('sales',{
@@ -62,12 +62,13 @@
   }
 
   function mountMigration(){
-    const actions=document.getElementById('insightSettingsDataActions');
-    if(!actions)throw new Error('Migration settings did not load');
+    const details=document.getElementById('insightSettingsDetailContent');
+    const status=document.getElementById('insightSettingsDetailStatus');
+    if(!details||!status)throw new Error('Migration settings did not load');
     const panel=document.createElement('section');
     panel.id='insightIndexedDBMigration';
-    actions.after(panel);
-    root.InsightIndexedDBMigrationPreviewV1.mount(panel);
+    details.append(panel);
+    root.InsightIndexedDBMigrationPreviewV1.mount(panel,status);
   }
 
   async function waitForShell(){

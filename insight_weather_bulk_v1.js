@@ -310,9 +310,9 @@ function button(id,title){
 }
 function install(){
   if(!root.document)return false;
-  var page=root.document.getElementById('pageSettings');
-  var container=page&&page.querySelector('.insight-settings-content');
-  if(!container)return false;
+  var container=root.document.getElementById('insightSettingsDetailContent');
+  var statusHost=root.document.getElementById('insightSettingsDetailStatus');
+  if(!container||!statusHost)return false;
   if(root.document.getElementById('insightWeatherBulkStart'))return true;
   var section=root.document.createElement('section');
   section.className='insight-settings-section insight-weather-bulk-section';
@@ -325,7 +325,8 @@ function install(){
   var start=button('insightWeatherBulkStart','未取得の天気を一括取得');
   var cancel=button('insightWeatherBulkCancel','中止');cancel.disabled=true;
   var status=root.document.createElement('p');status.id='insightWeatherBulkStatus';status.className='insight-weather-bulk-status';status.setAttribute('role','status');status.setAttribute('aria-live','polite');
-  row.append(start,cancel);section.append(h,p,note,row,status);container.append(section);
+  row.append(start);section.append(h,p,note,row);container.append(section);
+  statusHost.append(status,cancel);
   cancel.addEventListener('click',function(){cancelRequested=true;status.textContent='中止を受け付けました。進行中の取得完了後に停止します。';});
   start.addEventListener('click',async function(){
     if(running)return;

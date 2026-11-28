@@ -867,7 +867,7 @@ test('Optional pre-restore safety setting renders unchecked on every new Setting
   const settings=fs.readFileSync(path.join(__dirname,'..','insight_settings_v1.js'),'utf8');
   assert.match(settings,/id="insightRestoreSafetyBackup" type="checkbox"/);
   assert.match(settings,/querySelector\('#insightRestoreSafetyBackup'\)\.checked=false/);
-  assert.match(settings,/append\(backup,restore,restoreSafety,health,csv,restoreFile,csvFile\)/);
+  assert.match(settings,/append\(backup,restore,restoreSafety,health,restoreFile\)/);
 });
 test('Optional safety OFF or unavailable: two-store plain restore requires no extra password, file or metadata',async()=>{
   for(const safetyBackup of [false,null]){

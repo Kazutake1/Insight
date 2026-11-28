@@ -1,4 +1,5 @@
 const {test,expect}=require('@playwright/test');
+require('./helpers/verified-chart.cjs')(test);
 test('予測データの確認は設定画面から開け、データを変更しない',async({page})=>{
   const errors=[];
   page.on('pageerror',error=>errors.push(error.message));
@@ -9,8 +10,9 @@ test('予測データの確認は設定画面から開け、データを変更�
   await page.goto('/Index.html');
   await expect(page.locator('#insightPredictionDataButton')).toHaveCount(1);
   await page.locator('#navSettings').click();
+  await page.locator('#insightSettingsDetails > summary').click();
   await expect(page.locator('#pageSettings')).toHaveClass(/show/);
-  await expect(page.locator('#insightSettingsDataActions #insightPredictionDataButton')).toBeVisible();
+  await expect(page.locator('#insightSettingsDetailActions #insightPredictionDataButton')).toBeVisible();
   const before=await page.evaluate(()=>JSON.stringify(allStores));
   await page.locator('#insightPredictionDataButton').click();
   await expect(page.locator('#insightPredictionDataOverlay')).toBeVisible();

@@ -6,7 +6,7 @@ test.beforeEach(async({page})=>{
     if(!location.pathname.endsWith('-fixture'))return;
     window.__INSIGHT_SHELL_VERSION__=build;
     window.__INSIGHT_FEATURE_SIGNATURE__=features;
-  },{build:'20261128-analysis-wording-build-146',features:'6ddc4233'});
+  },{build:'20261129-settings-details-build-147',features:'54e3b2a4'});
   await page.route(/https:\/\/(www\.jma\.go\.jp|[^/]*api\.open-meteo\.com)\//,route=>route.abort());
 });
 // The fixture server uses HTTP; keep the rest of the shell's CSP in effect.
@@ -1605,6 +1605,7 @@ function csvFixture(text){
 test('CSV preview confirms the store, years and duplicates before a single commit',async({page})=>{
   const seed=await openQuickInputPreview(page,{followMonthlyInputs:true,manageStoresAndYears:true,seedCSV:true});
   await page.locator('#navSettings').click();
+  await page.locator('#insightSettingsDetails > summary').click();
   const oldYear=String(Number(seed.year)-2);
   const file=csvFixture('日付,売上,客数,買上点数,FFおでん,FFフライヤー\n'+
     seed.iso+',170,22,+3.25,100,200\n'+seed.iso+',+180,0,,,\n'+
@@ -2104,6 +2105,7 @@ async function openBulkWeatherPreview(page){
     };
   });
   await page.locator('#navSettings').click();
+  await page.locator('#insightSettingsDetails > summary').click();
   return seed;
 }
 
@@ -2124,9 +2126,15 @@ test('bulk weather resumes only missing intervals after cancelling and preserves
   await expectBulkRequest(page,1,seed.year+'-07-01','35.1');
   expected.stores[seed.active].data[seed.year]['6月'][seed.day-1].tempMaxC=28;
   expect(await committedInput(page)).toEqual({revision:1,snapshot:expected});
+  await page.locator('#insightSettingsDetails > summary').click();
+  await expect(start).toBeHidden();
+  await expect(status).toBeVisible();
+  await expect(status).toContainText('取得中');
   await page.locator('#insightWeatherBulkCancel').click();
   await page.evaluate(()=>bulkRequests[1].reply());
   await expect(status).toContainText('中止しました');
+  await expect(status).toBeVisible();
+  await page.locator('#insightSettingsDetails > summary').click();
   expect(await committedInput(page)).toEqual({revision:1,snapshot:expected});
 
   await start.click();
@@ -2171,8 +2179,10 @@ for(const cause of ['changed location','competing revision','interrupted readbac
         await interruptCountReadback(page,'readback failure');
         expected.stores[seed.active].data[seed.year]['6月'][seed.day-1].tempMaxC=28;
       }
+      await page.locator('#insightSettingsDetails > summary').click();
       await page.evaluate(()=>bulkRequests[0].reply());
       await expect(page.locator('#insightWeatherBulkStatus')).toContainText('取得を中断しました');
+      await expect(page.locator('#insightWeatherBulkStatus')).toBeVisible();
       expect(await page.evaluate(()=>combinedPreview.getStatus().state)).toBe(
         cause==='changed location'?'IDLE_OBSERVED':'HELD');
       expect(await page.evaluate(()=>bulkRequests.length)).toBe(1);
@@ -3268,8 +3278,8 @@ test('a fully restarted browser keeps the adopted revision and holds the legacy 
       const page=context.pages()[0]??await context.newPage();
       await page.goto(url);
       await page.evaluate(()=>{
-        window.__INSIGHT_SHELL_VERSION__='20261128-analysis-wording-build-146';
-        window.__INSIGHT_FEATURE_SIGNATURE__='6ddc4233';
+        window.__INSIGHT_SHELL_VERSION__='20261129-settings-details-build-147';
+        window.__INSIGHT_FEATURE_SIGNATURE__='54e3b2a4';
       });
       await page.addScriptTag({url:new URL('/insight_indexeddb_storage_v1.js',url).href});
       return {context,page};
@@ -3305,7 +3315,7 @@ async function openLegacyPwaFixture(page){
     contentType:'text/html',body:'<!doctype html><title>Fictional online migration page</title>'
   }));
   await page.route('**/tests/e2e/fixtures/Index.html?insight_migration_probe=*',route=>route.fulfill({
-    contentType:'text/html',body:'<!doctype html><meta name="insight-shell-version" content="20261128-analysis-wording-build-146">'
+    contentType:'text/html',body:'<!doctype html><meta name="insight-shell-version" content="20261129-settings-details-build-147">'
   }));
   await page.goto(legacyPwaFixture);
   await page.addScriptTag({url:'/insight_indexeddb_storage_v1.js'});
@@ -3530,7 +3540,7 @@ test('cached legacy shell runs with its origin unavailable and adopted startup s
 });
 
 test('migration enforces the pinned environment before and after backup confirmation',async({page})=>{
-  const fixture='/forced-migration-gate-fixture',build='20261128-analysis-wording-build-146';
+  const fixture='/forced-migration-gate-fixture',build='20261129-settings-details-build-147';
   await page.route('**'+fixture,route=>route.fulfill({
     contentType:'text/html',body:'<!doctype html><title>Fictional forced migration fixture</title>'
   }));
@@ -4090,7 +4100,10 @@ httpsTest('Draft Index rehearses migration, editing and recovery at the release 
   const capacityResult=page.locator('#insightStorageUsage');
   const safetyToggle=page.locator('#insightRestoreSafetyBackup');
   await capacity.tap();
-  await expect(capacityResult).toContainText('店舗データ（全店舗）：');
+  const estimate=page.locator('.insight-capacity-estimate');
+  await expect(estimate.getByText('店舗データ（全店舗）：',{exact:false})).toBeHidden();
+  await estimate.locator('summary').tap();
+  await expect(estimate.getByText('店舗データ（全店舗）：',{exact:false})).toBeVisible();
   await expect(capacityResult).toContainText('バックアップ容量（暗号化前）');
   await expect(capacityResult.getByRole('progressbar')).toHaveAttribute('data-status','normal');
   await page.locator('label').filter({has:safetyToggle}).tap();
@@ -4107,6 +4120,8 @@ httpsTest('Draft Index rehearses migration, editing and recovery at the release 
   await page.goto(release+'/');
   await waitForMigrationChecks(page);
   await page.locator('#navSettings').click();
+  await expect(button).toBeHidden();
+  await page.locator('#insightSettingsDetails > summary').click();
   await expect(button).toBeDisabled();
   expect(await marker()).toBeNull();
   expect(await page.evaluate(()=>InsightIndexedDBStorageV1.diagnoseStartup())).toEqual({state:'legacy'});
@@ -4124,7 +4139,10 @@ httpsTest('Draft Index rehearses migration, editing and recovery at the release 
   }
   await start();
   await page.getByRole('button',{name:'未確認のまま閉じる',exact:true}).click();
+  await page.locator('#insightSettingsDetails > summary').click();
+  await expect(button).toBeHidden();
   await expect(page.getByText('バックアップの確認を取り消しました。')).toBeVisible();
+  await page.locator('#insightSettingsDetails > summary').click();
   await expect(checkbox).not.toBeChecked();
   expect(await marker()).toBeNull();
 
@@ -4258,10 +4276,13 @@ httpsTest('Draft Index rehearses migration, editing and recovery at the release 
   const committedLength=JSON.stringify(beforeRestore.snapshot).length;
   expect(formatMiB(committedLength)).not.toBe(formatMiB(capacityBefore.legacy.length));
   await capacity.tap();
-  await expect(page.getByText('概算値です。端末の空き容量・予測用記録は含みません。',{exact:true})).toBeVisible();
+  const estimateNote=estimate.getByText('概算値です。端末の空き容量・予測用記録は含みません。',{exact:true});
+  await expect(estimateNote).toBeHidden();
+  await estimate.locator('summary').tap();
+  await expect(estimateNote).toBeVisible();
   await expect(page.getByText(/店舗データはIndexedDBの現在の確定版が対象です。/)).toHaveCount(0);
   await expect(capacityResult.getByRole('progressbar')).toHaveAttribute('data-status','normal');
-  await expect(capacityResult.locator('div')).toHaveText([
+  await expect(estimate.locator('div > div')).toHaveText([
     '店舗データ（全店舗）：'+formatMiB(committedLength),
     'その他の設定：'+formatMiB(capacityBefore.settingsUnits),
     '合計（概算）：'+formatMiB(committedLength+capacityBefore.settingsUnits)
@@ -4359,7 +4380,10 @@ httpsTest('Draft Index rehearses migration, editing and recovery at the release 
     const diagnostics=page.locator('#insightWeatherSalesDiagnosticsOverlay');
     const trends=page.locator('#insightWeatherSalesViewOverlay');
     const prediction=page.getByRole('dialog',{name:'予測データの確認'});
+    const details=page.locator('#insightSettingsDetails');
     const predictionButton=page.locator('#insightPredictionDataButton');
+    await expect(predictionButton).toBeHidden();
+    await details.locator('summary').tap();
     await page.locator('#insightWeatherSalesDiagnosticsButton').tap();
     await expect(diagnostics).toBeVisible();
     await page.evaluate(()=>{

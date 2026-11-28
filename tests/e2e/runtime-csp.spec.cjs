@@ -1,4 +1,5 @@
 const {test,expect}=require('@playwright/test');
+require('./helpers/verified-chart.cjs')(test);
 
 test('実際の画面操作でCSP違反が出ず、禁止されたinline scriptとhandlerはブロックされる',async({page})=>{
   // document.open() in the production shell clears document/window listeners.
@@ -185,7 +186,7 @@ test('保存容量は操作時に保存文字列を参照し、保存内容を�
   const button=page.getByRole('button',{name:'保存容量を確認',exact:true});
   const result=page.locator('#insightStorageUsage');
   const estimateNote=page.getByText('概算値です。端末の空き容量・予測用記録は含みません。',{exact:true});
-  await expect(estimateNote).toBeVisible();
+  await expect(estimateNote).toBeHidden();
   await expect(page.getByText('バックアップ、復元、保存データの状態確認、CSVインポートを管理します。',{exact:true})).toHaveCount(0);
   const safety=page.locator('#insightRestoreSafetyBackup');
   await expect(safety).not.toBeChecked();
@@ -225,15 +226,18 @@ test('保存容量は操作時に保存文字列を参照し、保存内容を�
     }
   });
   await button.click();
-  await expect(result.locator('div')).toHaveText([
+  const estimate=page.locator('.insight-capacity-estimate');
+  await expect(estimateNote).toBeHidden();
+  await estimate.locator('summary').press('Enter');
+  await expect(estimate.locator('div > div')).toHaveText([
     '店舗データ（全店舗）：0.057 MiB','その他の設定：0.019 MiB','合計（概算）：0.076 MiB'
   ]);
   await expect(result).toContainText('バックアップ容量を計測できません。');
   await page.evaluate(()=>window.__updateCapacityFixture());
-  await expect(result).toContainText('合計（概算）：0.076 MiB');
+  await expect(estimate).toContainText('合計（概算）：0.076 MiB');
   await page.evaluate(()=>document.documentElement.classList.add('dark'));
   await button.click();
-  await expect(result).toContainText('合計（概算）：0.095 MiB');
+  await expect(estimate).toContainText('合計（概算）：0.095 MiB');
   await expect(estimateNote).toBeVisible();
   const controlBox=await button.boundingBox();
   const resultBox=await result.boundingBox();
@@ -265,13 +269,36 @@ test('保存容量は操作時に保存文字列を参照し、保存内容を�
     if(status==='full')await expect(result).toContainText('容量上は作成できます');
     if(status==='exceeded')await expect(result).toContainText('上限を超えているため');
   }
+  const settingsDetails=page.locator('#insightSettingsDetails');
+  const detailsSummary=settingsDetails.locator('summary');
+  await expect(settingsDetails.locator('#csvImportBtn')).toBeHidden();
+  for(const dark of [false,true]){
+    await page.evaluate(dark=>document.documentElement.classList.toggle('dark',dark),dark);
+    await detailsSummary.click();
+    await expect(settingsDetails.locator('#insightTripHistorySection')).toBeVisible();
+    await expect(settingsDetails.locator('#insightWeatherBulkStart')).toBeVisible();
+    const boxes=await settingsDetails.evaluate(details=>{
+      const rect=id=>document.getElementById(id).getBoundingClientRect();
+      const panel=details.getBoundingClientRect();
+      const trip=rect('insightTripHistorySection');
+      const bulk=rect('insightWeatherBulkStart');
+      const actions=rect('insightSettingsDetailActions');
+      return {gap:trip.top-actions.bottom,inBounds:trip.right<=panel.right&&bulk.right<=panel.right};
+    });
+    expect(boxes.gap).toBeGreaterThanOrEqual(10);
+    expect(boxes.inBounds).toBe(true);
+    await detailsSummary.click();
+    await expect(result.getByText(/上限を超えている/)).toBeVisible();
+  }
   await page.evaluate(()=>window.__removePrimaryFixture());
   await button.click();
-  await expect(result).toContainText('店舗データ（全店舗）：未保存');
+  await expect(estimate).toContainText('店舗データ（全店舗）：未保存');
   await expect(result).toContainText('店舗データが未保存です。');
   await expect(bar).toHaveCount(0);
   await page.evaluate(()=>window.__denyCapacityRead());
   await button.click();
-  await expect(result).toHaveText('容量を確認できません。');
+  await expect(result).toContainText('容量を確認できません。');
+  await expect(estimate).toBeHidden();
+  await expect(page.getByText('端末の空き容量やIndexedDBの保存可能量は含みません。')).toBeVisible();
   expect(await page.evaluate(()=>window.__capacityWrites)).toEqual([]);
 });

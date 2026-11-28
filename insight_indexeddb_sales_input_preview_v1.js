@@ -417,6 +417,8 @@
           return;
         }
         if(management&&(yearOverlay||currentNav==='settings')){
+          const disclosure=event.target.closest?.('#insightSettingsDetails > summary,.insight-capacity-estimate > summary');
+          if(!yearOverlay&&disclosure)return;
           const recoveryAction=recoveryDialog&&event.target.closest?.('#backupBtn,#restoreBtn');
           const capacityAction=event.target.closest?.('#insightSettingsDataActions button[aria-controls="insightStorageUsage"]');
           const settingsAnalysisAction=!hourly?.dialog()?.open&&!root.InsightSalesCount.getCategoryDialog()?.open&&
