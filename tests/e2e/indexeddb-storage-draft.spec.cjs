@@ -4276,10 +4276,13 @@ httpsTest('Draft Index rehearses migration, editing and recovery at the release 
   const committedLength=JSON.stringify(beforeRestore.snapshot).length;
   expect(formatMiB(committedLength)).not.toBe(formatMiB(capacityBefore.legacy.length));
   await capacity.tap();
-  await expect(page.getByText('概算値です。端末の空き容量・予測用記録は含みません。',{exact:true})).toBeVisible();
+  const estimateNote=estimate.getByText('概算値です。端末の空き容量・予測用記録は含みません。',{exact:true});
+  await expect(estimateNote).toBeHidden();
+  await estimate.locator('summary').tap();
+  await expect(estimateNote).toBeVisible();
   await expect(page.getByText(/店舗データはIndexedDBの現在の確定版が対象です。/)).toHaveCount(0);
   await expect(capacityResult.getByRole('progressbar')).toHaveAttribute('data-status','normal');
-  await expect(capacityResult.locator('div')).toHaveText([
+  await expect(estimate.locator('div > div')).toHaveText([
     '店舗データ（全店舗）：'+formatMiB(committedLength),
     'その他の設定：'+formatMiB(capacityBefore.settingsUnits),
     '合計（概算）：'+formatMiB(committedLength+capacityBefore.settingsUnits)
