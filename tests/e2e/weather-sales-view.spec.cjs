@@ -1,4 +1,5 @@
 const {test,expect}=require('@playwright/test');
+require('./helpers/verified-chart.cjs')(test);
 
 test('販売傾向：期間選択・画面配置・既存保存データの保護',async({page})=>{
   const errors=[],external=[];
@@ -10,6 +11,7 @@ test('販売傾向：期間選択・画面配置・既存保存データの保�
   await page.goto('/Index.html');
   await expect.poll(()=>page.evaluate(()=>!!(window.InsightWeatherSalesTrends&&window.InsightWeatherSalesView))).toBe(true);
   await page.locator('#navSettings').click();
+  await page.locator('#insightSettingsDetails > summary').click();
   await expect(page.locator('#insightWeatherSalesViewButton')).toBeVisible();
   const before=await page.evaluate(()=>({
     snapshot:JSON.stringify(allStores),saved:localStorage.getItem('insight_v11')
@@ -55,6 +57,7 @@ test('同曜日の条件別平均と基準0、データ不足を区別して表�
   await page.goto('/Index.html');
   await expect.poll(()=>page.evaluate(()=>!!window.InsightWeatherSalesView)).toBe(true);
   await page.locator('#navSettings').click();
+  await page.locator('#insightSettingsDetails > summary').click();
   await page.evaluate(()=>{
     window.InsightWeatherSalesTrends.analyze=(snapshot,options)=>({
       store:{id:options.storeId,name:snapshot.stores[options.storeId].name||options.storeId},

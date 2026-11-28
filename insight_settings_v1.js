@@ -64,11 +64,6 @@
       if(status==='near')line('注意：バックアップ上限の80%以上を使用しています。');
       if(status==='full')line('バックアップ上限に達しています。容量上は作成できます。');
       if(status==='exceeded')line('警告：バックアップ上限を超えているため、作成できません。');
-      var dirty=root.InsightQuickDateNavV1?.hasUnsavedInput?.()||
-        root.InsightSalesCount?.hasUnsavedInput?.()||root.InsightInputDayNav?.hasUnsavedInput?.()||
-        root.InsightIndexedDBSalesInputPreviewV1?.getConnectedStatus?.()?.hasUnsavedInput;
-      if(dirty)line('未保存の入力があります。保存済みデータを計測しました。');
-      line('端末の空き容量やIndexedDBの保存可能量は含みません。');
     }
     result.append(section);
   }
@@ -82,9 +77,29 @@
     var result=doc.createElement('div');
     result.id='insightStorageUsage';
     result.setAttribute('role','status');
-    var note=doc.createElement('small');
+    var estimate=doc.createElement('details');
+    estimate.className='insight-settings-disclosure insight-capacity-estimate';
+    var summary=doc.createElement('summary');
+    summary.textContent='容量の詳細（概算）';
+    var estimateBody=doc.createElement('div');
+    var estimateNote=doc.createElement('small');
+    estimateNote.textContent='概算値です。端末の空き容量・予測用記録は含みません。';
+    estimate.append(summary,estimateBody,estimateNote);
+    estimate.hidden=true;
+    var scope=doc.createElement('small');
+    scope.textContent='端末の空き容量やIndexedDBの保存可能量は含みません。';
     var adopted=root.InsightIndexedDBCandidateV1?.isAdopted()===true;
-    note.textContent='概算値です。端末の空き容量・予測用記録は含みません。';
+
+    function appendUnsavedNotice(){
+      var dirty=root.InsightQuickDateNavV1?.hasUnsavedInput?.()||
+        root.InsightSalesCount?.hasUnsavedInput?.()||root.InsightInputDayNav?.hasUnsavedInput?.()||
+        root.InsightIndexedDBSalesInputPreviewV1?.getConnectedStatus?.()?.hasUnsavedInput;
+      if(dirty){
+        var notice=doc.createElement('p');
+        notice.textContent='未保存の入力があります。計測対象は保存済みデータです。';
+        result.append(notice);
+      }
+    }
 
     function format(units){
       return (units*2/1048576).toFixed(3)+' MiB';
@@ -111,11 +126,6 @@
           '合計（概算）：'+format((primary===null?0:primary)+settingsUnits)
         ];
         result.replaceChildren();
-        labels.forEach(function(label){
-          var line=doc.createElement('div');
-          line.textContent=label;
-          result.append(line);
-        });
         try{
           if(!adopted&&raw!==null){
             snapshot=JSON.parse(raw);
@@ -127,13 +137,22 @@
           unavailable.textContent='バックアップ容量を計測できません。';
           result.append(unavailable);
         }
+        appendUnsavedNotice();
+        estimateBody.replaceChildren(...labels.map(function(label){
+          var line=doc.createElement('div');
+          line.textContent=label;
+          return line;
+        }));
+        estimate.hidden=false;
       }catch(_){
         result.textContent='容量を確認できません。';
+        estimate.hidden=true;
+        appendUnsavedNotice();
       }finally{
         measuring=false;
       }
     });
-    actions.append(button,result,note);
+    actions.append(button,result,scope,estimate);
   }
 
   function build(){
@@ -165,6 +184,11 @@
     page.innerHTML='<div class="page-header"><div class="page-title">設定</div></div>'+
       '<div class="insight-settings-content">'+
         '<section class="insight-settings-section"><h2>データ管理</h2><div id="insightSettingsDataActions" class="insight-settings-actions"></div></section>'+
+        '<div><details class="insight-settings-section insight-settings-disclosure" id="insightSettingsDetails">'+
+          '<summary>詳細設定</summary><div id="insightSettingsDetailContent">'+
+            '<div id="insightSettingsDetailActions" class="insight-settings-actions"></div>'+
+          '</div>'+
+        '</details><div id="insightSettingsDetailStatus"></div></div>'+
       '</div>';
 
     main.appendChild(page);
@@ -173,7 +197,9 @@
     restoreSafety.innerHTML='<span>復元直前の安全バックアップを保存する（任意）</span><span class="insight-theme-switch"><input id="insightRestoreSafetyBackup" type="checkbox" role="switch"><span class="insight-restore-safety-switch-track"></span></span>';
     // Always start unchecked; never persist this optional choice across visits.
     restoreSafety.querySelector('#insightRestoreSafetyBackup').checked=false;
-    page.querySelector('#insightSettingsDataActions').append(backup,restore,restoreSafety,health,csv,restoreFile,csvFile);
+    page.querySelector('#insightSettingsDataActions').append(backup,restore,restoreSafety,health,restoreFile);
+    page.querySelector('#insightSettingsDetailActions').append(csv);
+    page.querySelector('#insightSettingsDetailStatus').append(csvFile);
     addCapacityCheck(page.querySelector('#insightSettingsDataActions'));
     var themeWrap=doc.createElement('div');
     themeWrap.className='insight-theme-toggle';

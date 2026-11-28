@@ -35,7 +35,7 @@ var orderedFeatureLoads=[
   './insight_backup_password_v1.js?v=20261125-input-backup-1',
   './insight_backup_guard_v1.js?v=20261126-backup-usage-1',
   './insight_data_health_v1.js?v=20261128-daily-wording-1',
-  './insight_prediction_data_health_v1.js?v=20261128-daily-wording-1',
+  './insight_prediction_data_health_v1.js?v=20261129-settings-details-1',
   './insight_waste_insights_v1.js?v=20261112-waste-comparison-1',
   './insight_dashboard_year_fix_v1.js?v=20261011-waste-inline-year-warning-1',
   './insight_kyaku_insights_v1.js?v=20260930-hooks2',
@@ -66,8 +66,8 @@ var orderedFeatureLoads=[
   './insight_analysis_context_v1.js?v=20261004-special-demand',
   './insight_weather_sales_readiness_v1.js?v=20261022-step3-quality-1',
   './insight_weather_sales_trends_v1.js?v=20261022-step3-trends-1',
-  './insight_weather_sales_diagnostics_v1.js?v=20261022-step3-diagnostics-1',
-  './insight_weather_sales_view_v1.js?v=20261128-daily-wording-1',
+  './insight_weather_sales_diagnostics_v1.js?v=20261129-settings-details-1',
+  './insight_weather_sales_view_v1.js?v=20261129-settings-details-1',
   './insight_multiyear_analysis_v1.js?v=20261003-multiyear-1',
   './insight_weekday_analysis_v1.js?v=20261003-weekday-1',
   './insight_sale_impact_v1.js?v=20261003-sale-impact-1',
@@ -83,9 +83,9 @@ var orderedFeatureLoads=[
   './insight_ai_interpretation_v1.js?v=20261001-decision-analysis',
   './insight_ai_context_v1.js?v=20261003-ai-pipeline-1',
   './insight_ai_page_comments_v1.js?v=20261001-decision-analysis',
-  './insight_settings_v1.js?v=20261128-daily-wording-1',
-  './insight_trip_inference_view_v1.js?v=20261011-trip-manual-1',
-  './insight_weather_bulk_v1.js?v=20261128-analysis-wording-1',
+  './insight_settings_v1.js?v=20261129-settings-details-1',
+  './insight_trip_inference_view_v1.js?v=20261129-settings-details-1',
+  './insight_weather_bulk_v1.js?v=20261129-settings-details-1',
   './insight_year_controls_layout_v1.js?v=20261006-csp-style-year-controls-1',
   './insight_dark_theme_v1.js?v=20261007-csp-style-dark-theme-1',
   './insight_readability_v1.js?v=20261007-csp-style-readability-global-containers-1',
@@ -104,7 +104,7 @@ function featureSignature(entries){
 var currentFeatureSignature=featureSignature(orderedFeatureLoads);
 window.__INSIGHT_FEATURE_SIGNATURE__=currentFeatureSignature;
 function loadShell(){
-return fetch('./insight_payload_source_v1.html?v=20261127-monthly-save-feedback-1',{cache:'no-store'}).then(function(r){if(!r.ok)throw new Error('Insight payload の取得に失敗しました ('+r.status+')');return r.text();}).then(function(html){
+return fetch('./insight_payload_source_v1.html?v=20261129-settings-details-1',{cache:'no-store'}).then(function(r){if(!r.ok)throw new Error('Insight payload の取得に失敗しました ('+r.status+')');return r.text();}).then(function(html){
 if(html.indexOf('<!DOCTYPE html>')!==0&&html.indexOf('<!doctype html>')!==0)throw new Error('HTMLデータの検証に失敗しました');
 // STEP5 complete: payload source is self-contained; feature modules are inserted before document.write().
 
@@ -147,9 +147,9 @@ async function start(){
   if(!workers||workers.controller||await workers.getRegistration(location.href))
     throw new Error('旧版のキャッシュ状態を確認できないため、起動と保存を停止しています。');
   await Promise.all([
-    import('./insight_indexeddb_storage_v1.js?v=20261128-analysis-wording-1'),
-    import('./insight_indexeddb_migration_preview_v1.js?v=20261124-indexeddb-step3-1'),
-    import('./draft/insight_indexeddb_candidate_v1.js?v=20261128-backup-wording-1')
+    import('./insight_indexeddb_storage_v1.js?v=20261129-settings-details-1'),
+    import('./insight_indexeddb_migration_preview_v1.js?v=20261129-settings-details-1'),
+    import('./draft/insight_indexeddb_candidate_v1.js?v=20261129-settings-details-1')
   ]);
   async function prepareRecovery(){
     const modules=['insight_storage_v1.js','insight_events_v1.js','insight_trip_overrides_v1.js','insight_sales_count_v1.js',

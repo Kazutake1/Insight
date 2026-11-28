@@ -62,12 +62,13 @@
   }
 
   function mountMigration(){
-    const actions=document.getElementById('insightSettingsDataActions');
-    if(!actions)throw new Error('Migration settings did not load');
+    const details=document.getElementById('insightSettingsDetailContent');
+    const status=document.getElementById('insightSettingsDetailStatus');
+    if(!details||!status)throw new Error('Migration settings did not load');
     const panel=document.createElement('section');
     panel.id='insightIndexedDBMigration';
-    actions.after(panel);
-    root.InsightIndexedDBMigrationPreviewV1.mount(panel);
+    details.append(panel);
+    root.InsightIndexedDBMigrationPreviewV1.mount(panel,status);
   }
 
   async function waitForShell(){

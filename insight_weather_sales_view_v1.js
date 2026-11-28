@@ -210,7 +210,7 @@
   function initButton(){
     if(launchButton&&launchButton.isConnected)return true;
     var anchor=root.document.getElementById('insightWeatherSalesDiagnosticsButton');
-    var parent=root.document.getElementById('insightSettingsDataActions');
+    var parent=root.document.getElementById('insightSettingsDetailActions');
     if(!anchor||!parent||!parent.contains(anchor))return false;
     launchButton=element('button','販売傾向','sidebar-btn');
     launchButton.type='button';launchButton.id='insightWeatherSalesViewButton';

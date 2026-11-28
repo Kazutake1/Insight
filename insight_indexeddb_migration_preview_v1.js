@@ -148,7 +148,7 @@
     });
   }
 
-  function mount(container){
+  function mount(container,statusHost=container){
     if(root.localStorage.getItem('insight_v11')===null)return;
     const section=element('section');
     const heading=element('h2','IndexedDBへの移行（試験用）');
@@ -163,8 +163,9 @@
     button.disabled=true;
     const status=element('p');
     status.setAttribute('role','status');
-    section.append(heading,confirmation,button,status);
+    section.append(heading,confirmation,button);
     container.append(section);
+    statusHost.append(status);
 
     checkbox.addEventListener('change',()=>{button.disabled=!checkbox.checked;});
     button.addEventListener('click',async ()=>{

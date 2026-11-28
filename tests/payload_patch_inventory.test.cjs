@@ -27,9 +27,9 @@ test('Index shellはinline script/styleを持たず外部assetへ分離する',(
   const boot=read('insight_shell_boot_v1.js');
   const loader=read('insight_shell_loader_v1.js');
   const css=read('insight_shell_v1.css');
-  assert.match(index,/insight_shell_boot_v1\.js\?v=20261128-analysis-wording-build-146/);
-  assert.match(index,/insight_shell_loader_v1\.js\?v=20261128-analysis-wording-1/);
-  assert.match(index,/insight_shell_v1\.css\?v=20261128-analysis-wording-build-146/);
+  assert.match(index,/insight_shell_boot_v1\.js\?v=20261129-settings-details-build-147/);
+  assert.match(index,/insight_shell_loader_v1\.js\?v=20261129-settings-details-1/);
+  assert.match(index,/insight_shell_v1\.css\?v=20261129-settings-details-build-147/);
   assert.doesNotMatch(index,/<script(?![^>]*\bsrc=)[^>]*>/i);
   assert.doesNotMatch(index,/<style\b/i);
   assert.doesNotMatch(index,/script-src[^;]*'unsafe-inline'/);
@@ -39,7 +39,7 @@ test('Index shellはinline script/styleを持たず外部assetへ分離する',(
   assert.match(boot,/fetch\('\.\/Index\.html\?insight_probe='/);
   assert.match(loader,/fetch\('\.\/insight_shell_loader_v1\.js\?insight_manifest_probe='/);
   assert.match(loader,/document\.open\(\);document\.write\(html\);document\.close\(\)/);
-  assert.match(loader,/fetch\('\.\/insight_payload_source_v1\.html\?v=20261127-monthly-save-feedback-1'/);
+  assert.match(loader,/fetch\('\.\/insight_payload_source_v1\.html\?v=20261129-settings-details-1'/);
   assert.doesNotMatch(index+loader,/pako|insight_payload_v1_part0/);
   assert.match(css,/#loading\{/);
 });
@@ -51,7 +51,7 @@ test('canonical payloadはinline script/styleを持たず外部assetを順序固
   const aiPresentation=read('insight_ai_presentation_v1.js');
   const readability=read('insight_readability_v1.js');
   const css=read('insight_payload_core_v1.css');
-  assert.match(payload,/insight_payload_core_v1\.css\?v=20261127-monthly-save-feedback-1/);
+  assert.match(payload,/insight_payload_core_v1\.css\?v=20261129-settings-details-1/);
   assert.match(payload,/insight_payload_core_v1\.js\?v=20261127-monthly-save-feedback-1/);
   assert.doesNotMatch(core,/label\.style\.color/);
   assert.doesNotMatch(core,/msg\.style\.display/);
@@ -182,8 +182,8 @@ test('canonical payloadはinline script/styleを持たず外部assetを順序固
 
 test('トップページはキャッシュ抑止とシェル・機能manifestの自己更新を持つ',()=>{
   const index=readShell();
-  assert.match(index,/insight-shell-version" content="20261128-analysis-wording-build-146/);
-  assert.match(index,/var BUILD="20261128-analysis-wording-build-146"/);
+  assert.match(index,/insight-shell-version" content="20261129-settings-details-build-147/);
+  assert.match(index,/var BUILD="20261129-settings-details-build-147"/);
   assert.match(index,/Shell rule: bump BUILD whenever the loader/);
   assert.match(index,/Cache-Control" content="no-cache, no-store, must-revalidate/);
   assert.match(index,/insight_probe=/);
@@ -552,7 +552,7 @@ test('過去の対象便判定UIは設定ページだけに追加される',()=>
   const manifest=readShell();
   const view=read('insight_trip_inference_view_v1.js');
   const css=read('insight_payload_core_v1.css');
-  assert.ok(manifest.includes('insight_trip_inference_view_v1.js?v=20261011-trip-manual-1'));
+  assert.ok(manifest.includes('insight_trip_inference_view_v1.js?v=20261129-settings-details-1'));
   assert.ok(manifest.indexOf('insight_settings_v1.js')<manifest.indexOf('insight_trip_inference_view_v1.js'));
   assert.match(view,/insightTripHistorySection/);
   assert.match(view,/InsightTripInference.inferAvailableMonths/);
@@ -564,12 +564,12 @@ test('設定ページはサイドバー下部の管理項目を集約する',()=
   const index=readShell();
   const settings=fs.readFileSync(path.join(root,'insight_settings_v1.js'),'utf8');
   const css=read('insight_payload_core_v1.css');
-  assert.match(index,/insight_settings_v1\.js\?v=20261128-daily-wording-1/);
+  assert.match(index,/insight_settings_v1\.js\?v=20261129-settings-details-1/);
   assert.ok(index.indexOf('insight_data_health_v1.js')<index.indexOf('insight_settings_v1.js'));
   assert.match(settings,/nav\.id='navSettings'/);
   assert.match(settings,/page\.id='pageSettings'/);
   assert.match(settings,/insightSettingsDataActions/);
-  assert.match(settings,/append\(backup,restore,restoreSafety,health,csv,restoreFile,csvFile\)/);
+  assert.match(settings,/append\(backup,restore,restoreSafety,health,restoreFile\)/);
   assert.doesNotMatch(settings,/insightSettingsDisplayActions/);
   assert.match(settings,/themeBridge\.append\(dark\)/);
   assert.match(settings,/dark\.classList\.add\('insight-settings-legacy-hidden'\)/);

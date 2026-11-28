@@ -183,7 +183,7 @@
   }
   function mount(){
     if(section&&section.isConnected)return true;
-    var container=doc.querySelector('#pageSettings .insight-settings-content');
+    var container=doc.getElementById('insightSettingsDetailContent');
     if(!container)return false;
     section=doc.createElement('section');
     section.id='insightTripHistorySection';
