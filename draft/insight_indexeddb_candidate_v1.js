@@ -12,7 +12,9 @@
     status.setAttribute('role','status');
     status.dataset.indexeddbStartupStage=stage;
     status.textContent='確定版で画面を開けないため、起動と保存を停止しています。';
-    document.body.replaceChildren(status);
+    const detail=document.createElement('p');
+    detail.textContent='起動コード：'+stage;
+    document.body.replaceChildren(status,detail);
   }
 
   function loadScript(url,assetVersion=version){
@@ -46,15 +48,16 @@
       });
       document.body.inert=false;
     }catch(error){
-      const reason={
+      const reasons={
         'Quick input preview cannot start in this session':'quick-session',
         'Quick input preview does not match the committed store':'quick-snapshot',
         'Another Insight operation is in progress':'storage-lock',
         'Missing isolated settings controls':'settings-controls',
         'Open the corresponding input screen first':'input-screen',
         'The management controls are unavailable':'management-controls'
-      }[error?.message];
-      halt(reason??stage);
+      };
+      const message=error?.message;
+      halt(Object.hasOwn(reasons,message)?reasons[message]:stage);
     }
   }
 
