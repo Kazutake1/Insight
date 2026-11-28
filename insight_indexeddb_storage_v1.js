@@ -162,6 +162,11 @@
   async function checkMigrationEnvironment({expectedBuild,expectedFeatures,legacyClientsClosed,requireManualMigration=false}={}){
     const hold=reason=>({state:'hold',reason});
     if(legacyClientsClosed!==true)return hold('legacy-client-confirmation-required');
+    return checkRunningVersion({expectedBuild,expectedFeatures,requireManualMigration});
+  }
+
+  async function checkRunningVersion({expectedBuild,expectedFeatures,requireManualMigration}){
+    const hold=reason=>({state:'hold',reason});
     const matchesLoadedVersion=()=>root.__INSIGHT_SHELL_VERSION__===expectedBuild&&
       root.__INSIGHT_FEATURE_SIGNATURE__===expectedFeatures;
     if(!expectedBuild||!expectedFeatures||!matchesLoadedVersion())return hold('build-mismatch');
@@ -272,7 +277,7 @@
     return {markerRaw,adopted,record:validateRecord(record,adopted.id)};
   }
 
-  async function commitSnapshot({markerRaw,adopted,record:baseline},expectedRevision,snapshot){
+  async function commitSnapshot({markerRaw,adopted,record:baseline},expectedRevision,snapshot,draftToken){
     // A stale caller has not started a write. Keep the committed version available to other tabs.
     if(baseline.revision!==expectedRevision){
       const error=new Error('IndexedDB revision conflict');
@@ -283,9 +288,12 @@
     parse(raw);
     // Record both versions before opening the write transaction.
     const [candidateDigest,baselineDigest]=await Promise.all([digest(raw),digest(baseline.raw)]);
-    const operation={id:root.crypto.randomUUID(),expectedRevision,digest:candidateDigest,
+    const operation={id:draftToken??root.crypto.randomUUID(),expectedRevision,digest:candidateDigest,
       baselineDigest,baselineWriteId:baseline.writeId??null};
     checkActiveSource(baseline,adopted,markerRaw);
+    // This is the start boundary. A draft that loses its connection before it
+    // remains pending. After the marker is written, finish the local transaction.
+    if(draftToken&&root.navigator.onLine!==true)return null;
     // Leave a persistent hold if the browser exits or the outcome is unclear.
     writeMarker('writing',adopted.id,operation);
     const writingMarker=root.localStorage.getItem(markerKey);
@@ -312,6 +320,87 @@
 
   async function save(expectedRevision,snapshot){
     return exclusive(async ()=>commitSnapshot(await activeEvidence(),expectedRevision,snapshot));
+  }
+
+  // Keep these entry points on the local test fixture. They use the same
+  // private lock and transaction as the normal writer.
+  const quickDraftFixture=['localhost','127.0.0.1'].includes(root.location?.hostname)&&
+    root.location.pathname==='/offline-quick-drafts-fixture'&&
+    root.document?.currentScript?.dataset.insightQuickDraftFixture==='true';
+
+  async function readQuickDraftEvidence(){
+    return exclusive(async ()=>{
+      const {adopted,record}=await activeEvidence();
+      return {sourceIdentity:adopted.id,revision:record.revision,writeId:record.writeId??null,
+        snapshot:parse(record.raw)};
+    });
+  }
+
+  async function quickDraftEnvironment(){
+    const version=await checkRunningVersion({expectedBuild:migrationBuild,expectedFeatures:migrationFeatures});
+    if(version.state!=='ready')return version;
+    try{
+      const url=new URL('insight_shell_loader_v1.js',root.location.href);
+      url.searchParams.set('insight_draft_probe',root.crypto.randomUUID());
+      const response=await root.fetch(url,{cache:'no-store',redirect:'error'});
+      if(!response.ok)return {state:'hold',reason:'build-check-unavailable'};
+      const code=await response.text();
+      const list=code.match(/var orderedFeatureLoads=\[([\s\S]*?)\];/)?.[1];
+      const paths=Array.from(list?.matchAll(/'([^']+)'/g)??[],match=>match[1]);
+      let hash=2166136261;
+      for(const char of paths.join('\n'))hash=Math.imul(hash^char.charCodeAt(0),16777619);
+      if(!paths.length||(hash>>>0).toString(16).padStart(8,'0')!==migrationFeatures||
+         root.__INSIGHT_FEATURE_SIGNATURE__!==migrationFeatures||
+         root.__INSIGHT_SHELL_VERSION__!==migrationBuild)
+        return {state:'hold',reason:'build-mismatch'};
+      const workers=root.navigator.serviceWorker;
+      if(workers.controller||await workers.getRegistration(root.location.href))
+        return {state:'hold',reason:'service-worker-present'};
+      return root.navigator.onLine===true?{state:'ready'}:{state:'hold',reason:'offline'};
+    }catch(_){return {state:'hold',reason:'build-check-unavailable'};}
+  }
+
+  function quickDraftTarget(snapshot,shopId,day){
+    const [year,month,date]=day.split('-');
+    const today=new Date();
+    const limit=[today.getFullYear(),today.getMonth()+1,today.getDate()]
+      .map(value=>String(value).padStart(2,'0')).join('-');
+    if(day>limit||snapshot.current!==shopId||!Object.hasOwn(snapshot.stores,shopId))return null;
+    const shop=snapshot.stores[shopId];
+    if(!shop?.years?.some(value=>String(value)===year))return null;
+    const row=shop.data?.[year]?.[Number(month)+'\u6708']?.[Number(date)-1];
+    return row&&String(row.d)===String(Number(date))?row:null;
+  }
+
+  async function saveQuickDraft({shopId,day,token}){
+    const drafts=await import('./draft/insight_offline_quick_drafts_v1.mjs');
+    const draft=await drafts.loadDraft(shopId,day);
+    if(!draft||draft.state!=='pending'||draft.token!==token||draft.basis.mode!=='indexeddb')
+      return {state:'unavailable'};
+    return exclusive(async ()=>{
+      const {basis}=draft;
+      if(basis.build!==migrationBuild||basis.features!==migrationFeatures)return {state:'conflict'};
+      const environment=await quickDraftEnvironment();
+      if(environment.state!=='ready')return {state:'not-started',reason:environment.reason};
+      const evidence=await activeEvidence();
+      const {adopted,record}=evidence;
+      if(adopted.id!==basis.sourceIdentity||record.revision!==basis.revision||record.writeId===token)
+        return {state:'not-started'};
+      const snapshot=parse(record.raw);
+      const row=quickDraftTarget(snapshot,shopId,day);
+      if(!row)return {state:'wrong-target'};
+      const claim=await drafts.claimDraft(shopId,day,token,{shopId,day,basis,values:row});
+      if(claim.state!=='ready')return claim;
+      // Only these fields from the validated draft can reach the commit.
+      row['\u58f2\u4e0a']=claim.proposed['\u58f2\u4e0a'];
+      row['\u5ba2\u6570']=claim.proposed['\u5ba2\u6570'];
+      row['\u5ec3\u68c4\u91d1\u984d']=claim.proposed['\u5ec3\u68c4\u91d1\u984d'];
+      row.haiki=claim.proposed.haiki;
+      const saved=await commitSnapshot(evidence,record.revision,snapshot,token);
+      if(saved)return {state:'confirmed',...saved};
+      const released=await drafts.finishDraft(shopId,day,token,'not-started');
+      return {state:'not-started',reason:'offline',draftPending:released};
+    });
   }
 
   // Check whether an interrupted operation produced a complete snapshot.
@@ -587,6 +676,6 @@
   }
 
   root.InsightIndexedDBStorageV1=Object.freeze({
-    migrate,read,save,diagnose,diagnoseStartup,checkMigrationEnvironment,reviewRecovery,reviewHistoryOnlyBackup,reviewMissingStorageBackup,restoreMissingStorage,restoreBackup,resumeRecovery,downloadCommittedBackup
+    migrate,read,save,...(quickDraftFixture?{readQuickDraftEvidence,saveQuickDraft}:{}),diagnose,diagnoseStartup,checkMigrationEnvironment,reviewRecovery,reviewHistoryOnlyBackup,reviewMissingStorageBackup,restoreMissingStorage,restoreBackup,resumeRecovery,downloadCommittedBackup
   });
 })(globalThis);
