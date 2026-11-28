@@ -6,7 +6,7 @@ test.beforeEach(async({page})=>{
     if(!location.pathname.endsWith('-fixture'))return;
     window.__INSIGHT_SHELL_VERSION__=build;
     window.__INSIGHT_FEATURE_SIGNATURE__=features;
-  },{build:'20261127-quick-future-date-build-142',features:'f0fcd0ba'});
+  },{build:'20261128-startup-status-build-143',features:'f0fcd0ba'});
   await page.route(/https:\/\/(www\.jma\.go\.jp|[^/]*api\.open-meteo\.com)\//,route=>route.abort());
 });
 // The fixture server uses HTTP; keep the rest of the shell's CSP in effect.
@@ -3251,7 +3251,7 @@ test('a fully restarted browser keeps the adopted revision and holds the legacy 
       const page=context.pages()[0]??await context.newPage();
       await page.goto(url);
       await page.evaluate(()=>{
-        window.__INSIGHT_SHELL_VERSION__='20261127-quick-future-date-build-142';
+        window.__INSIGHT_SHELL_VERSION__='20261128-startup-status-build-143';
         window.__INSIGHT_FEATURE_SIGNATURE__='f0fcd0ba';
       });
       await page.addScriptTag({url:new URL('/insight_indexeddb_storage_v1.js',url).href});
@@ -3288,7 +3288,7 @@ async function openLegacyPwaFixture(page){
     contentType:'text/html',body:'<!doctype html><title>Fictional online migration page</title>'
   }));
   await page.route('**/tests/e2e/fixtures/Index.html?insight_migration_probe=*',route=>route.fulfill({
-    contentType:'text/html',body:'<!doctype html><meta name="insight-shell-version" content="20261127-quick-future-date-build-142">'
+    contentType:'text/html',body:'<!doctype html><meta name="insight-shell-version" content="20261128-startup-status-build-143">'
   }));
   await page.goto(legacyPwaFixture);
   await page.addScriptTag({url:'/insight_indexeddb_storage_v1.js'});
@@ -3513,7 +3513,7 @@ test('cached legacy shell runs with its origin unavailable and adopted startup s
 });
 
 test('migration enforces the pinned environment before and after backup confirmation',async({page})=>{
-  const fixture='/forced-migration-gate-fixture',build='20261127-quick-future-date-build-142';
+  const fixture='/forced-migration-gate-fixture',build='20261128-startup-status-build-143';
   await page.route('**'+fixture,route=>route.fulfill({
     contentType:'text/html',body:'<!doctype html><title>Fictional forced migration fixture</title>'
   }));
@@ -3904,7 +3904,7 @@ for(const connectionFails of [false,true]){
       window.InsightHourlyCustomers={connectIndexedDBPreview(){}};
       window.shellReadyState=document.readyState;
       window.lateSnapshot=InsightIndexedDBCandidateV1.initializeAdopted();`}));
-    await page.route(/\/insight_indexeddb_(?:(?:quick_input|recovery)_preview_v1\.js\?v=20261126-quick-save-feedback-1|sales_input_preview_v1\.js\?v=20261127-monthly-save-feedback-1)$/,route=>route.fulfill({
+    await page.route(/\/insight_indexeddb_(?:quick_input|recovery|sales_input)_preview_v1\.js\?v=[\w-]+$/,route=>route.fulfill({
       contentType:'application/javascript',
       body:new URL(route.request().url()).pathname.endsWith('/insight_indexeddb_sales_input_preview_v1.js')
         ?`window.InsightIndexedDBSalesInputPreviewV1={async connect(){
@@ -3934,10 +3934,13 @@ for(const connectionFails of [false,true]){
     await page.evaluate(()=>window.finishConnection());
     if(connectionFails){
       await expect(page.getByRole('status')).toHaveText('確定版で画面を開けないため、起動と保存を停止しています。');
+      await expect(page.getByText('起動コード：storage-connection',{exact:true})).toBeVisible();
+      await expect(page.getByText('Simulated connection failure')).toHaveCount(0);
       await expect(page.locator('main')).toHaveCount(0);
     }else{
       await page.waitForFunction(()=>!document.body.inert);
       await expect(page.locator('main')).toHaveText('架空店舗A');
+      await expect(page.getByText(/起動コード：/)).toHaveCount(0);
     }
     expect(await page.evaluate(()=>window.connectionCount)).toBe(1);
   });
@@ -4135,7 +4138,7 @@ httpsTest('Draft Index rehearses migration, editing and recovery at the release 
   await selectFile(file,password);
   await expect(button).toHaveCount(0);
   await waitForMigrationChecks(page);
-  await page.waitForFunction(()=>InsightIndexedDBCandidateV1.isAdopted()&&!document.body.inert&&
+  await page.waitForFunction(()=>window.InsightIndexedDBCandidateV1?.isAdopted()&&!document.body.inert&&
     !!document.getElementById('insightIndexedDBBackupDialog'));
   expect(JSON.parse(await marker()).state).toBe('active');
   expect(await committedInput(page)).toEqual({revision:0,snapshot:JSON.parse(raw)});
@@ -4223,7 +4226,7 @@ httpsTest('Draft Index rehearses migration, editing and recovery at the release 
     await api.save(revision,snapshot);
   },seed.id);
   await page.reload();
-  await page.waitForFunction(()=>InsightIndexedDBCandidateV1.isAdopted()&&!document.body.inert&&
+  await page.waitForFunction(()=>window.InsightIndexedDBCandidateV1?.isAdopted()&&!document.body.inert&&
     !!document.getElementById('insightIndexedDBBackupDialog'));
   const beforeRestore=await committedInput(page);
   expect(beforeRestore.revision).toBe(3);
@@ -4280,7 +4283,7 @@ httpsTest('Draft Index rehearses migration, editing and recovery at the release 
   await settings.getByRole('button',{name:'この内容を復元する'}).click();
   await expect(page.locator('#qi_売上')).toHaveValue('123');
   await expect(page.locator('#storeSel')).toHaveValue(seed.id);
-  await page.waitForFunction(()=>InsightIndexedDBCandidateV1.isAdopted()&&!document.body.inert&&
+  await page.waitForFunction(()=>window.InsightIndexedDBCandidateV1?.isAdopted()&&!document.body.inert&&
     !!document.getElementById('insightIndexedDBBackupDialog'));
   const readback=await committedInput(page);
   expect(readback.revision).toBe(4);
