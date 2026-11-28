@@ -4138,7 +4138,7 @@ httpsTest('Draft Index rehearses migration, editing and recovery at the release 
   await selectFile(file,password);
   await expect(button).toHaveCount(0);
   await waitForMigrationChecks(page);
-  await page.waitForFunction(()=>InsightIndexedDBCandidateV1.isAdopted()&&!document.body.inert&&
+  await page.waitForFunction(()=>window.InsightIndexedDBCandidateV1?.isAdopted()&&!document.body.inert&&
     !!document.getElementById('insightIndexedDBBackupDialog'));
   expect(JSON.parse(await marker()).state).toBe('active');
   expect(await committedInput(page)).toEqual({revision:0,snapshot:JSON.parse(raw)});
@@ -4226,7 +4226,7 @@ httpsTest('Draft Index rehearses migration, editing and recovery at the release 
     await api.save(revision,snapshot);
   },seed.id);
   await page.reload();
-  await page.waitForFunction(()=>InsightIndexedDBCandidateV1.isAdopted()&&!document.body.inert&&
+  await page.waitForFunction(()=>window.InsightIndexedDBCandidateV1?.isAdopted()&&!document.body.inert&&
     !!document.getElementById('insightIndexedDBBackupDialog'));
   const beforeRestore=await committedInput(page);
   expect(beforeRestore.revision).toBe(3);
@@ -4283,7 +4283,7 @@ httpsTest('Draft Index rehearses migration, editing and recovery at the release 
   await settings.getByRole('button',{name:'この内容を復元する'}).click();
   await expect(page.locator('#qi_売上')).toHaveValue('123');
   await expect(page.locator('#storeSel')).toHaveValue(seed.id);
-  await page.waitForFunction(()=>InsightIndexedDBCandidateV1.isAdopted()&&!document.body.inert&&
+  await page.waitForFunction(()=>window.InsightIndexedDBCandidateV1?.isAdopted()&&!document.body.inert&&
     !!document.getElementById('insightIndexedDBBackupDialog'));
   const readback=await committedInput(page);
   expect(readback.revision).toBe(4);
