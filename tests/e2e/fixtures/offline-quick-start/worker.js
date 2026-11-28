@@ -2,7 +2,8 @@
 
 // The fixture server injects the SHA-256 manifest computed from the test assets.
 const manifest = /* fixture-manifest */ null;
-const cacheName = 'insight-quick-start-fixture-' + Object.values(manifest).join('-');
+const release = /* fixture-release */ null;
+const cacheName = 'insight-quick-start-fixture-' + release;
 
 async function verified(response, expected) {
   if (!response?.ok) return false;
@@ -19,8 +20,12 @@ async function verifiedBundle(cache) {
 
 self.addEventListener('install',event=>{
   event.waitUntil((async ()=>{
+    if (await caches.has(cacheName)) {
+      const existing = await caches.open(cacheName);
+      if (await verifiedBundle(existing)) return;
+      throw new Error('Existing release cache failed verification');
+    }
     const cache = await caches.open(cacheName);
-    if (await verifiedBundle(cache)) return;
     try {
       for (const [path, hash] of Object.entries(manifest)) {
         const response = await fetch(path,{cache:'no-store',redirect:'error'});

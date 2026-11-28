@@ -291,7 +291,12 @@ test('verified quick-entry reopens offline without controlling the actual normal
   const assets=new Map(await Promise.all(Object.entries(assetFiles).map(async ([name,file])=>[name,await fs.readFile(file)])));
   const manifest=Object.fromEntries(Array.from(assets,([name,bytes])=>[name,createHash('sha256').update(bytes).digest('hex')]));
   const source=await fs.readFile(path.join(directory,'worker.js'),'utf8');
-  assets.set('worker.js',source.replace('/* fixture-manifest */ null',JSON.stringify(manifest)));
+  function workerRelease(build) {
+    const release = createHash('sha256').update(source).update(JSON.stringify(manifest)).update(build).digest('hex');
+    return source.replace('/* fixture-manifest */ null',JSON.stringify(manifest))
+      .replace('/* fixture-release */ null',JSON.stringify(release));
+  }
+  assets.set('worker.js',workerRelease('original'));
   const scope='/Insight/isolated-quick-start/';
   const appRoot=path.join(__dirname,'../..');
   // Render the existing Pages entry fragment without its Jekyll front matter.
@@ -300,15 +305,19 @@ test('verified quick-entry reopens offline without controlling the actual normal
     '.mjs':'text/javascript; charset=utf-8','.css':'text/css; charset=utf-8'};
   let disconnected=false;
   let invalidUpdate=false;
+  let candidateRequests=0;
   const server=http.createServer(async (req,res)=>{
     if(disconnected){res.destroy();return;}
     const url=new URL(req.url,'http://localhost');
     if(url.pathname.startsWith(scope)){
       const name=url.pathname.slice(scope.length)||'index.html';
       if(!assets.has(name)){res.writeHead(404).end();return;}
-      const body=invalidUpdate&&name==='worker.js'?
-        source.replace('/* fixture-manifest */ null',JSON.stringify({...manifest,'entry.mjs':'0'.repeat(64)})):
-        assets.get(name);
+      let body=assets.get(name);
+      if(invalidUpdate&&name==='worker.js')body=workerRelease('candidate');
+      if(invalidUpdate&&name==='entry.mjs'){
+        candidateRequests++;
+        body='/* invalid candidate bytes */';
+      }
       res.writeHead(200,{'Content-Type':contentTypes[path.extname(name)],'Cache-Control':'no-store'}).end(body);
       return;
     }
@@ -382,6 +391,8 @@ test('verified quick-entry reopens offline without controlling the actual normal
       return {state:await rejected,previousActive:registration.active===previous,cache:await caches.keys()};
     });
     expect(update).toEqual({state:'redundant',previousActive:true,cache:previousCache});
+    expect(candidateRequests).toBe(1);
+    invalidUpdate=false;
     disconnected=true;
     await page.close();
 
