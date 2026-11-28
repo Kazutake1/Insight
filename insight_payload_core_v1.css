@@ -1020,10 +1020,11 @@ body.ai-analysis-open #main{margin-right:0!important}
 .insight-settings-section h2{margin:0 0 5px;font-size:15px;color:var(--text)}
 .insight-settings-section>p{margin:0 0 12px;color:var(--text4);font-size:11px;line-height:1.55}
 .insight-settings-actions{display:grid;gap:8px}
-.insight-settings-disclosure>summary{min-height:40px;padding:10px 0;box-sizing:border-box;color:var(--text);font-size:14px;font-weight:700;cursor:pointer}
+.insight-settings-disclosure>summary{min-height:44px;padding:10px 0;box-sizing:border-box;color:var(--text);font-size:14px;font-weight:700;cursor:pointer}
 .insight-settings-disclosure>summary:focus-visible{outline:2px solid var(--text3);outline-offset:2px;border-radius:4px}
 #insightSettingsDetailContent{display:grid;gap:12px;margin-top:10px;min-width:0}
-#insightSettingsDetailStatus>p:empty,#insightWeatherBulkCancel:disabled{display:none}
+#insightSettingsDetailStatus>p:empty{margin:0}
+#insightWeatherBulkCancel:disabled{display:none}
 #insightSettingsDetailStatus>p:not(:empty){margin:12px 0 0;padding:10px 12px;border:1px solid var(--border);border-radius:11px;background:var(--surface);color:var(--text);overflow-wrap:anywhere}
 #insightSettingsDetailStatus #insightWeatherBulkCancel{margin-top:8px}
 .insight-capacity-estimate{margin-top:8px;padding:0 12px;border:1px solid var(--border);border-radius:11px}
