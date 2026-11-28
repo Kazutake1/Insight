@@ -8,8 +8,8 @@
   const recordKey='current';
   const storeName='snapshots';
   // Pin the version exercised by the Draft migration. It must be updated with the release that enables it.
-  const migrationBuild='20261128-daily-wording-build-145';
-  const migrationFeatures='d710d11f';
+  const migrationBuild='20261128-analysis-wording-build-146';
+  const migrationFeatures='6ddc4233';
 
   function parse(raw){
     const snapshot=JSON.parse(raw);

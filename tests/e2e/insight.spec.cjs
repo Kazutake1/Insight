@@ -359,10 +359,10 @@ test('トップページは外部shellと機能manifestの最新版確認をno-s
     fetch('/insight_payload_source_v1.html?e2e-shell-check=1',{cache:'no-store'}).then(r=>r.text())
   ]));
   const [source,boot,loader,payload]=sources;
-  expect(source).toContain('name="insight-shell-version" content="20261128-daily-wording-build-145"');
-  expect(source).toContain('insight_shell_boot_v1.js?v=20261128-daily-wording-build-145');
-  expect(source).toContain('insight_shell_loader_v1.js?v=20261128-daily-wording-1');
-  expect(source).toContain('insight_shell_v1.css?v=20261128-daily-wording-build-145');
+  expect(source).toContain('name="insight-shell-version" content="20261128-analysis-wording-build-146"');
+  expect(source).toContain('insight_shell_boot_v1.js?v=20261128-analysis-wording-build-146');
+  expect(source).toContain('insight_shell_loader_v1.js?v=20261128-analysis-wording-1');
+  expect(source).toContain('insight_shell_v1.css?v=20261128-analysis-wording-build-146');
   expect(source).not.toMatch(/<script(?![^>]*\bsrc=)[^>]*>/i);
   expect(source).not.toMatch(/<style\b/i);
   expect(source).not.toMatch(/script-src[^;]*'unsafe-inline'/);
@@ -371,7 +371,7 @@ test('トップページは外部shellと機能manifestの最新版確認をno-s
   expect(source).not.toMatch(/style-src[^;]*'unsafe-inline'/);
   expect(boot).toContain("fetch('./Index.html?insight_probe='+Date.now(),{cache:'no-store'})");
   expect(loader).toContain("fetch('./insight_shell_loader_v1.js?insight_manifest_probe='+Date.now(),{cache:'no-store'})");
-  expect(loader).toContain("fetch('./insight_payload_source_v1.html?v=20261127-monthly-save-feedback-1',{cache:'no-store'})");
+  expect(loader).toContain("fetch('./insight_payload_source_v1.html?v=20261128-analysis-wording-1',{cache:'no-store'})");
   expect(loader).toContain('function featureSignature(entries)');
   expect(source).toContain('https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js');
   expect(source).toContain('integrity="sha512-CQBWl4fJHWbryGE+Pc7UAxWMUMNMWzWxF4SQo9CgkJIN1kx6djDQZjh3Y8SZ1d+6I+1zze6Z7kHXO7q3UyZAWw=="');
@@ -3850,7 +3850,7 @@ test('発注予測の天気7日間と前年実績7日間は曜日で揃い、納
   await expect(weekCards).toHaveCount(7);
   await expect(page.locator('#ofWeekCards > .sc-average-card')).toHaveCount(1);
   await expect(page.locator('#ofWeekCards > .sc-average-card .sc-day-num')).toHaveText('6週平均');
-  await expect(page.locator('#pageOrderForecast .of-section').nth(2).locator('h2')).toHaveText('過去6週間の同曜日実績');
+  await expect(page.locator('#pageOrderForecast .of-section').nth(2).locator('h2')).toHaveText('過去6週の同曜日実績');
   const weeklyLayout=await page.evaluate(()=>{
     const grid=document.getElementById('ofWeekCards'),children=Array.from(grid.children),
       delivery=document.getElementById('ofDelivery').value,expected=InsightOrderForecast.dates(delivery).weeks;

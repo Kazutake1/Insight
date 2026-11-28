@@ -6,7 +6,7 @@ test.beforeEach(async({page})=>{
     if(!location.pathname.endsWith('-fixture'))return;
     window.__INSIGHT_SHELL_VERSION__=build;
     window.__INSIGHT_FEATURE_SIGNATURE__=features;
-  },{build:'20261128-daily-wording-build-145',features:'d710d11f'});
+  },{build:'20261128-analysis-wording-build-146',features:'6ddc4233'});
   await page.route(/https:\/\/(www\.jma\.go\.jp|[^/]*api\.open-meteo\.com)\//,route=>route.abort());
 });
 // The fixture server uses HTTP; keep the rest of the shell's CSP in effect.
@@ -3268,8 +3268,8 @@ test('a fully restarted browser keeps the adopted revision and holds the legacy 
       const page=context.pages()[0]??await context.newPage();
       await page.goto(url);
       await page.evaluate(()=>{
-        window.__INSIGHT_SHELL_VERSION__='20261128-daily-wording-build-145';
-        window.__INSIGHT_FEATURE_SIGNATURE__='d710d11f';
+        window.__INSIGHT_SHELL_VERSION__='20261128-analysis-wording-build-146';
+        window.__INSIGHT_FEATURE_SIGNATURE__='6ddc4233';
       });
       await page.addScriptTag({url:new URL('/insight_indexeddb_storage_v1.js',url).href});
       return {context,page};
@@ -3305,7 +3305,7 @@ async function openLegacyPwaFixture(page){
     contentType:'text/html',body:'<!doctype html><title>Fictional online migration page</title>'
   }));
   await page.route('**/tests/e2e/fixtures/Index.html?insight_migration_probe=*',route=>route.fulfill({
-    contentType:'text/html',body:'<!doctype html><meta name="insight-shell-version" content="20261128-daily-wording-build-145">'
+    contentType:'text/html',body:'<!doctype html><meta name="insight-shell-version" content="20261128-analysis-wording-build-146">'
   }));
   await page.goto(legacyPwaFixture);
   await page.addScriptTag({url:'/insight_indexeddb_storage_v1.js'});
@@ -3530,7 +3530,7 @@ test('cached legacy shell runs with its origin unavailable and adopted startup s
 });
 
 test('migration enforces the pinned environment before and after backup confirmation',async({page})=>{
-  const fixture='/forced-migration-gate-fixture',build='20261128-daily-wording-build-145';
+  const fixture='/forced-migration-gate-fixture',build='20261128-analysis-wording-build-146';
   await page.route('**'+fixture,route=>route.fulfill({
     contentType:'text/html',body:'<!doctype html><title>Fictional forced migration fixture</title>'
   }));
@@ -4340,7 +4340,7 @@ httpsTest('Draft Index rehearses migration, editing and recovery at the release 
       if(nav==='#navOrderForecast'){
         expect(await page.evaluate(()=>InsightOrderForecast.getState().storeId)).toBe(id);
         await expect(page.locator('#ofWeather .of-weather-card')).toHaveCount(7);
-        await page.getByRole('button',{name:'この納品日の比較用記録を保存'}).click();
+        await page.getByRole('button',{name:'比較用記録を保存'}).click();
         await expect(page.getByText('比較用の記録を保存しました。',{exact:true})).toBeVisible();
       }
       const previous=expected.snapshot;

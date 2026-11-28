@@ -267,10 +267,14 @@ test('サイドバーは分析AIだけを発注予測の直下へ移動しiPad�
     const before=await snapshot(page);
     await page.locator('#navOrderForecast').click();
     await expect(page.locator('#pageOrderForecast')).toHaveClass(/show/);
+    await expect(page.getByRole('heading',{name:'過去6週の同曜日実績',exact:true})).toBeVisible();
+    await expect(page.getByRole('heading',{name:'納品前7日間の実績',exact:true})).toBeVisible();
     await expect(page.locator('#navOrderForecast')).toHaveClass(/active/);
     await page.locator('#aiAnalysisToggle').click();
     await expect(page.locator('body')).toHaveClass(/ai-analysis-open/);
     await expect(page.locator('#aiAnalysisPanel')).toHaveAttribute('aria-hidden','false');
+    await expect(page.locator('#aiAnalysisPanel .ai-analysis-subtitle')).toHaveText('経営コメント');
+    await expect(page.locator('#aiAnalysisPanel .ai-analysis-foot')).toHaveCount(0);
     await page.locator('#aiAnalysisToggle').click();
     await expect(page.locator('body')).not.toHaveClass(/ai-analysis-open/);
     await expect(page.locator('#pageOrderForecast')).toHaveClass(/show/);
@@ -383,7 +387,7 @@ test('比較用記録は初回値を保持し実績データを書き換えな�
   });
   await page.locator('#navOrderForecast').click();
   await expect(page.locator('#ofWeather .of-weather-card')).toHaveCount(7);
-  const button=page.getByRole('button',{name:'この納品日の比較用記録を保存'});
+  const button=page.getByRole('button',{name:'比較用記録を保存'});
   await button.click();
   await expect(page.getByText('比較用の記録を保存しました。',{exact:true})).toBeVisible();
   await button.click();
