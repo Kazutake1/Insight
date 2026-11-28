@@ -1,0 +1,31 @@
+<!doctype html>
+<html lang="ja">
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="insight-shell-version" content="20261125-print-holiday-build-134">
+<title>Insight 25 MiB 架空データ検証</title>
+<h1>Insight 25 MiB 架空データ検証</h1>
+<p>検証専用のSafariタブを1枚だけ開いてください。実店舗のファイルは選択しないでください。</p>
+<p>日本語主体と英数字主体でそれぞれ実施します。処理中はSafariを閉じず、各操作の結果を記録してください。</p>
+<fieldset id="controls" disabled>
+  <legend>検証操作</legend>
+  <p><label>データの種類 <select id="encoding"><option value="japanese">日本語主体</option><option value="ascii">英数字主体</option></select></label></p>
+  <p><button id="seed">1. 架空25 MiBを連続保存</button></p>
+  <p><button id="download">2. 現在の暗号化バックアップを保存</button></p>
+  <p><label>3. 保存した現在のバックアップを選択 <input id="safety" type="file" accept=".json"></label></p>
+  <p><button id="cancel">4. 小容量への復元を取消</button>
+     <button id="restoreSmall">5. 小容量へ復元</button></p>
+  <p>もう一度 2 で小容量ファイルを保存し、3 に選び直してください。</p>
+  <p><label>6. 先に保存した25 MiB検証ファイルを選択 <input id="target" type="file" accept=".json"></label></p>
+  <p><button id="restoreLarge">7. 25 MiBへ復元</button>
+     <button id="restart">8. 再読み込みして確認</button></p>
+</fieldset>
+<p><output id="result" aria-live="polite"></output></p>
+<script src="check.js"></script>
+<script src="insight_storage_v1.js"></script>
+<script src="insight_data_health_v1.js"></script>
+<script src="insight_sales_count_v1.js" data-insight-recovery-model="true"></script>
+<script src="insight_backup_crypto_v1.js"></script>
+<script src="insight_backup_guard_v1.js"></script>
+<script src="insight_indexeddb_storage_v1.js"></script>
+</html>
