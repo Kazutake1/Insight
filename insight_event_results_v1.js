@@ -256,7 +256,7 @@
       summary.replaceChildren();summary.append(el('span','過去開催 '+data.occurrences.length+'回'));
       results.replaceChildren();
       var section=el('section',undefined,'er-section er-history-section');section.append(el('h2','過去開催一覧'));
-      if(!data.occurrences.length){section.append(el('div','過去の開催実績がありません。','er-empty'));results.append(section);return;}
+      if(!data.occurrences.length){section.append(el('div','過去実績なし','er-empty'));results.append(section);return;}
       var list=el('div',undefined,'er-history-list');
       data.occurrences.forEach(function(occurrence){
         var button=el('button',undefined,'er-occurrence');button.type='button';button.dataset.occurrenceId=occurrence.id;

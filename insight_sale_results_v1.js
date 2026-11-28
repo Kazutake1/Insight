@@ -222,7 +222,7 @@
     }
     function renderGroups(data){
       var area=doc.getElementById('srGroups');area.replaceChildren();
-      if(!data.groups.length){area.append(el('div','選択した条件のセール実績はありません。','sr-empty'));return;}
+      if(!data.groups.length){area.append(el('div','該当するセール実績なし','sr-empty'));return;}
       data.groups.forEach(function(group){
         var section=el('section',undefined,'sr-group'),head=el('div',undefined,'sr-group-head'),title=el('h2',group.summary),statsRow=el('div',undefined,'sr-group-stats');
         [
@@ -263,7 +263,7 @@
       scroller.removeAttribute('aria-label');
       scroller.scrollTop=0;
       count.hidden=true;
-      if(!data.occurrences.length){var tr=el('tr'),td=el('td','選択した条件のセール実績はありません。');td.colSpan=8;tr.append(td);body.append(tr);return;}
+      if(!data.occurrences.length){var tr=el('tr'),td=el('td','該当するセール実績なし');td.colSpan=8;tr.append(td);body.append(tr);return;}
       data.occurrences.forEach(function(occurrence){
         var tr=el('tr');
         var values=[

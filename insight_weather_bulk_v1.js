@@ -316,7 +316,7 @@ function install(){
   if(root.document.getElementById('insightWeatherBulkStart'))return true;
   var section=root.document.createElement('section');
   section.className='insight-settings-section insight-weather-bulk-section';
-  var h=root.document.createElement('h2');h.textContent='過去の天気を一括補完';
+  var h=root.document.createElement('h2');h.textContent='過去の天気を一括取得';
   var p=root.document.createElement('p');
   p.textContent='2023年1月1日〜本日。登録済み年度・日付の未入力欄だけ補完し、既存の天気・最高／最低気温、売上、客数は変更しません。';
   var note=root.document.createElement('p');note.className='insight-weather-bulk-note';
