@@ -147,9 +147,9 @@ async function start(){
   if(!workers||workers.controller||await workers.getRegistration(location.href))
     throw new Error('旧版のキャッシュ状態を確認できないため、起動と保存を停止しています。');
   await Promise.all([
-    import('./insight_indexeddb_storage_v1.js?v=20261128-startup-status-1'),
+    import('./insight_indexeddb_storage_v1.js?v=20261128-backup-wording-1'),
     import('./insight_indexeddb_migration_preview_v1.js?v=20261124-indexeddb-step3-1'),
-    import('./draft/insight_indexeddb_candidate_v1.js?v=20261128-startup-status-1')
+    import('./draft/insight_indexeddb_candidate_v1.js?v=20261128-backup-wording-1')
   ]);
   async function prepareRecovery(){
     const modules=['insight_storage_v1.js','insight_events_v1.js','insight_trip_overrides_v1.js','insight_sales_count_v1.js',
@@ -158,7 +158,8 @@ async function start(){
     await Promise.all(modules.map(name=>new Promise((resolve,reject)=>{
       const script=document.createElement('script');
       const src=orderedFeatureLoads.find(entry=>entry.startsWith('./'+name+'?'));
-      script.src=src??'./'+name+'?v=20261124-indexeddb-preview-7';
+      const version=name==='insight_indexeddb_recovery_preview_v1.js'?'20261128-backup-wording-1':'20261124-indexeddb-preview-7';
+      script.src=src??'./'+name+'?v='+version;
       script.dataset.insightRecoveryModel='true';
       script.onload=resolve;
       script.onerror=reject;

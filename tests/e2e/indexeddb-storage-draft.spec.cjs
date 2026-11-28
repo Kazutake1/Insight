@@ -6,7 +6,7 @@ test.beforeEach(async({page})=>{
     if(!location.pathname.endsWith('-fixture'))return;
     window.__INSIGHT_SHELL_VERSION__=build;
     window.__INSIGHT_FEATURE_SIGNATURE__=features;
-  },{build:'20261128-startup-status-build-143',features:'f0fcd0ba'});
+  },{build:'20261128-backup-wording-build-144',features:'f0fcd0ba'});
   await page.route(/https:\/\/(www\.jma\.go\.jp|[^/]*api\.open-meteo\.com)\//,route=>route.abort());
 });
 // The fixture server uses HTTP; keep the rest of the shell's CSP in effect.
@@ -3041,13 +3041,29 @@ test('real backup export and restore form verify files, cancel and reopen the co
   const target=await writeFictionalRecoveryFile(page,seed,password);
   const file=(content,name='Insight_261119_0900.json')=>({name,mimeType:'application/json',buffer:Buffer.from(content)});
   await page.evaluate(()=>mountRecoveryMode('export'));
-  const exportForm=page.getByRole('group',{name:'確定版の暗号化バックアップ'});
+  const exportForm=page.getByRole('group',{name:'暗号化バックアップ'});
+  await page.evaluate(()=>{
+    const storage=window.InsightIndexedDBStorageV1;
+    window.InsightIndexedDBStorageV1={...storage,downloadCommittedBackup:()=>new Promise((_,reject)=>{
+      window.failBackupExport=()=>{
+        window.InsightIndexedDBStorageV1=storage;
+        reject(new Error('Fictional download failure'));
+      };
+    })};
+  });
+  await exportForm.getByLabel('バックアップ用パスワード').fill(password);
+  await exportForm.getByLabel('パスワードの確認').fill(password);
+  await exportForm.getByRole('button',{name:'バックアップを作成'}).click();
+  await expect(page.getByRole('status')).toHaveText('バックアップ作成中');
+  await page.evaluate(()=>window.failBackupExport());
+  await expect(page.getByRole('status')).toHaveText('バックアップを作成できませんでした。');
+
   await exportForm.getByLabel('バックアップ用パスワード').fill(password);
   await exportForm.getByLabel('パスワードの確認').fill(password);
   const started=page.waitForEvent('download');
-  await exportForm.getByRole('button',{name:'暗号化してダウンロード'}).click();
+  await exportForm.getByRole('button',{name:'バックアップを作成'}).click();
   const download=await started;
-  await expect(page.getByRole('status')).toContainText('確定版 0');
+  await expect(page.getByRole('status')).toHaveText('バックアップを作成しました。');
   expect(download.suggestedFilename()).toMatch(/^Insight_\d{6}_\d{4}\.json$/);
   const safety=await fs.readFile(await download.path(),'utf8');
   const decoded=await page.evaluate(({safety,password})=>
@@ -3059,12 +3075,12 @@ test('real backup export and restore form verify files, cancel and reopen the co
   const screen=page.locator('#recoveryFixture');
   const closed=screen.getByLabel('旧版のInsightをすべて閉じました');
   const review=screen.getByRole('button',{name:'内容を表示'});
-  const approve=screen.getByRole('button',{name:'この内容を復元する'});
+  const approve=screen.getByRole('button',{name:'復元する',exact:true});
   async function fill(targetPassword){
-    await screen.getByLabel('復元する暗号化バックアップ',{exact:true}).setInputFiles(file(target));
+    await screen.getByLabel('復元するバックアップ',{exact:true}).setInputFiles(file(target));
     await screen.getByLabel('復元するバックアップのパスワード',{exact:true}).fill(targetPassword);
-    await screen.getByLabel('現在の確定版の暗号化バックアップ',{exact:true}).setInputFiles(file(safety));
-    await screen.getByLabel('現在の確定版のパスワード',{exact:true}).fill(password);
+    await screen.getByLabel('復元前のバックアップ',{exact:true}).setInputFiles(file(safety));
+    await screen.getByLabel('復元前のパスワード',{exact:true}).fill(password);
   }
   await fill('WrongFictional37');
   await review.click();
@@ -3085,6 +3101,7 @@ test('real backup export and restore form verify files, cancel and reopen the co
   await closed.check();
   await review.click();
   await expect(screen.getByText(/架空の復元対象/)).toBeVisible();
+  await expect(screen.getByText(/確認した確定版/)).toHaveCount(0);
   await approve.click();
   await expect(page.locator('output')).toHaveText('1');
   const restored=await committedInput(page);
@@ -3171,8 +3188,8 @@ test('adopted settings opens only isolated backup controls and reloads after res
   const [download]=await Promise.all([
     page.waitForEvent('download'),
     (async ()=>{
-      await dialog.getByRole('button',{name:'暗号化してダウンロード'}).click();
-      await expect(dialog.getByRole('status')).toContainText('確定版 0');
+      await dialog.getByRole('button',{name:'バックアップを作成'}).click();
+      await expect(dialog.getByRole('status')).toHaveText('バックアップを作成しました。');
     })()
   ]);
   const safety=await fs.readFile(await download.path(),'utf8');
@@ -3181,10 +3198,10 @@ test('adopted settings opens only isolated backup controls and reloads after res
 
   const file=content=>({name:'Insight_261119_0900.json',mimeType:'application/json',buffer:Buffer.from(content)});
   const restore=async ()=>{
-    await dialog.getByLabel('復元する暗号化バックアップ',{exact:true}).setInputFiles(file(target));
-    await dialog.getByLabel('現在の確定版の暗号化バックアップ',{exact:true}).setInputFiles(file(safety));
+    await dialog.getByLabel('復元するバックアップ',{exact:true}).setInputFiles(file(target));
+    await dialog.getByLabel('復元前のバックアップ',{exact:true}).setInputFiles(file(safety));
     await dialog.getByLabel('復元するバックアップのパスワード',{exact:true}).fill(password);
-    await dialog.getByLabel('現在の確定版のパスワード',{exact:true}).fill(password);
+    await dialog.getByLabel('復元前のパスワード',{exact:true}).fill(password);
     await dialog.getByLabel('旧版のInsightをすべて閉じました').check();
     await dialog.getByRole('button',{name:'内容を表示'}).click();
   };
@@ -3195,7 +3212,7 @@ test('adopted settings opens only isolated backup controls and reloads after res
   await expect(dialog.getByRole('status')).toHaveText('取り消しました。');
   expect(await committedInput(page)).toEqual({revision:0,snapshot:JSON.parse(seed.raw)});
   await restore();
-  await dialog.getByRole('button',{name:'この内容を復元する'}).click();
+  await dialog.getByRole('button',{name:'復元する',exact:true}).click();
   await expect(page.locator('output')).toHaveText('1');
   const peer=await openStoreSwitchPeer(context);
   try{
@@ -3251,7 +3268,7 @@ test('a fully restarted browser keeps the adopted revision and holds the legacy 
       const page=context.pages()[0]??await context.newPage();
       await page.goto(url);
       await page.evaluate(()=>{
-        window.__INSIGHT_SHELL_VERSION__='20261128-startup-status-build-143';
+        window.__INSIGHT_SHELL_VERSION__='20261128-backup-wording-build-144';
         window.__INSIGHT_FEATURE_SIGNATURE__='f0fcd0ba';
       });
       await page.addScriptTag({url:new URL('/insight_indexeddb_storage_v1.js',url).href});
@@ -3288,7 +3305,7 @@ async function openLegacyPwaFixture(page){
     contentType:'text/html',body:'<!doctype html><title>Fictional online migration page</title>'
   }));
   await page.route('**/tests/e2e/fixtures/Index.html?insight_migration_probe=*',route=>route.fulfill({
-    contentType:'text/html',body:'<!doctype html><meta name="insight-shell-version" content="20261128-startup-status-build-143">'
+    contentType:'text/html',body:'<!doctype html><meta name="insight-shell-version" content="20261128-backup-wording-build-144">'
   }));
   await page.goto(legacyPwaFixture);
   await page.addScriptTag({url:'/insight_indexeddb_storage_v1.js'});
@@ -3513,7 +3530,7 @@ test('cached legacy shell runs with its origin unavailable and adopted startup s
 });
 
 test('migration enforces the pinned environment before and after backup confirmation',async({page})=>{
-  const fixture='/forced-migration-gate-fixture',build='20261128-startup-status-build-143';
+  const fixture='/forced-migration-gate-fixture',build='20261128-backup-wording-build-144';
   await page.route('**'+fixture,route=>route.fulfill({
     contentType:'text/html',body:'<!doctype html><title>Fictional forced migration fixture</title>'
   }));
@@ -4259,28 +4276,28 @@ httpsTest('Draft Index rehearses migration, editing and recovery at the release 
   await checkSettingsBackupLayout(page,settings);
   await settings.getByLabel('バックアップ用パスワード').fill(password);
   await settings.getByLabel('パスワードの確認').fill('Mismatch123');
-  await settings.getByRole('button',{name:'暗号化してダウンロード'}).click();
+  await settings.getByRole('button',{name:'バックアップを作成'}).click();
   await expect(settings.getByRole('status')).toHaveText('パスワードが一致しません。');
   expect(await committedInput(page)).toEqual(beforeRestore);
   await settings.getByLabel('バックアップ用パスワード').fill(password);
   await settings.getByLabel('パスワードの確認').fill(password);
   const [exported]=await Promise.all([page.waitForEvent('download'),
-    settings.getByRole('button',{name:'暗号化してダウンロード'}).click()]);
+    settings.getByRole('button',{name:'バックアップを作成'}).click()]);
   const safety=await downloaded(exported);
-  await expect(settings.getByRole('status')).toContainText('確定版 3');
+  await expect(settings.getByRole('status')).toHaveText('バックアップを作成しました。');
   await settings.getByRole('button',{name:'閉じる'}).click();
   await page.locator('#restoreBtn').tap();
   await expect(settings).not.toHaveClass(/insight-backup-export/);
-  await settings.getByLabel('復元する暗号化バックアップ',{exact:true}).setInputFiles(file);
-  const restoreSafetyFile=settings.getByLabel('現在の確定版の暗号化バックアップ',{exact:true});
+  await settings.getByLabel('復元するバックアップ',{exact:true}).setInputFiles(file);
+  const restoreSafetyFile=settings.getByLabel('復元前のバックアップ',{exact:true});
   await expect(restoreSafetyFile).toHaveAttribute('required','');
   await restoreSafetyFile.setInputFiles(safety);
   await settings.getByLabel('復元するバックアップのパスワード',{exact:true}).fill(password);
-  await settings.getByLabel('現在の確定版のパスワード',{exact:true}).fill(password);
+  await settings.getByLabel('復元前のパスワード',{exact:true}).fill(password);
   await settings.getByLabel('旧版のInsightをすべて閉じました').check();
   await settings.getByRole('button',{name:'内容を表示'}).click();
   await expect(settings.getByText(/架空店舗A/)).toBeVisible();
-  await settings.getByRole('button',{name:'この内容を復元する'}).click();
+  await settings.getByRole('button',{name:'復元する',exact:true}).click();
   await expect(page.locator('#qi_売上')).toHaveValue('123');
   await expect(page.locator('#storeSel')).toHaveValue(seed.id);
   await page.waitForFunction(()=>window.InsightIndexedDBCandidateV1?.isAdopted()&&!document.body.inert&&
@@ -4516,7 +4533,7 @@ httpsTest('Draft Index rehearses migration, editing and recovery at the release 
   await page.goto(httpsInsight+'/Index.html');
   const recovery=page.locator('#loading');
   await expect(recovery.getByRole('heading',{name:'暗号化バックアップから復元'})).toBeVisible();
-  const confirmRestore=recovery.getByRole('button',{name:'この内容を復元する'});
+  const confirmRestore=recovery.getByRole('button',{name:'復元する',exact:true});
   async function previewBackup(passphrase){
     await recovery.getByLabel('暗号化バックアップ',{exact:true}).setInputFiles(safety);
     await recovery.getByLabel('バックアップのパスワード').fill(passphrase);
