@@ -447,7 +447,7 @@ test('カード印刷は店舗と期間とカテゴリーを絞り込み保存�
   await from.fill('2026-01-31');
   await to.fill('2026-01-30');
   await preview.click();
-  await expect(dialog.getByRole('status')).toHaveText('終了日を開始日以降に設定してください。');
+  await expect(dialog.getByRole('status')).toHaveText('期間を確認してください。');
   await expect(print).toBeDisabled();
 
   await to.fill('2026-02-05');
@@ -663,7 +663,7 @@ test('カード印刷は店舗と期間とカテゴリーを絞り込み保存�
   await noodles.check();
   await preview.click();
   await expect(sections.locator('h2')).toHaveText(['架空店舗A ／ おにぎり','架空店舗A ／ サンドイッチ']);
-  await expect(dialog.getByRole('status')).toHaveText('保存済みのカードがあるカテゴリーを表示しています。');
+  await expect(dialog.getByRole('status')).toHaveText('保存済みのカードのみ表示');
   await from.fill('2026-05-01');
   await to.fill('2026-05-01');
   await expect(print).toBeDisabled();

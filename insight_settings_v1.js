@@ -67,7 +67,7 @@
       var dirty=root.InsightQuickDateNavV1?.hasUnsavedInput?.()||
         root.InsightSalesCount?.hasUnsavedInput?.()||root.InsightInputDayNav?.hasUnsavedInput?.()||
         root.InsightIndexedDBSalesInputPreviewV1?.getConnectedStatus?.()?.hasUnsavedInput;
-      line(dirty?'未保存の入力があります。保存済みデータを計測しました。':'保存済みデータを計測しました。');
+      if(dirty)line('未保存の入力があります。保存済みデータを計測しました。');
       line('端末の空き容量やIndexedDBの保存可能量は含みません。');
     }
     result.append(section);
@@ -84,8 +84,7 @@
     result.setAttribute('role','status');
     var note=doc.createElement('small');
     var adopted=root.InsightIndexedDBCandidateV1?.isAdopted()===true;
-    note.textContent=(adopted?'店舗データはIndexedDBの現在の確定版が対象です。':'')+
-      '文字数×2バイトの参考値です。端末の空き容量や保存可能量を示すものではありません。発注予測の比較用記録は集計対象外です。';
+    note.textContent='概算値です。端末の空き容量・予測用記録は含みません。';
 
     function format(units){
       return (units*2/1048576).toFixed(3)+' MiB';
@@ -108,7 +107,7 @@
         var settingsUnits=measureSettingsUnits(storage);
         var labels=[
           '店舗データ（全店舗）：'+(primary===null?'未保存':format(primary)),
-          'その他のInsight設定：'+format(settingsUnits),
+          'その他の設定：'+format(settingsUnits),
           '合計（概算）：'+format((primary===null?0:primary)+settingsUnits)
         ];
         result.replaceChildren();
@@ -129,7 +128,7 @@
           result.append(unavailable);
         }
       }catch(_){
-        result.textContent='保存容量を計測できません。';
+        result.textContent='容量を確認できません。';
       }finally{
         measuring=false;
       }
@@ -165,7 +164,7 @@
     page.className='page insight-settings-page';
     page.innerHTML='<div class="page-header"><div class="page-title">設定</div></div>'+
       '<div class="insight-settings-content">'+
-        '<section class="insight-settings-section"><h2>データ管理</h2><p>バックアップ、復元、保存データの状態確認、CSVインポートを管理します。</p><div id="insightSettingsDataActions" class="insight-settings-actions"></div></section>'+
+        '<section class="insight-settings-section"><h2>データ管理</h2><div id="insightSettingsDataActions" class="insight-settings-actions"></div></section>'+
       '</div>';
 
     main.appendChild(page);

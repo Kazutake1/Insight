@@ -209,7 +209,7 @@
   function ensureOverlay(){
     if(overlay)return;
     overlay=document.createElement('div');overlay.id='insightDataHealthOverlay';overlay.hidden=true;
-    overlay.innerHTML='<div id="insightDataHealthDialog" role="dialog" aria-modal="true" aria-labelledby="insightDataHealthHeading"><h2 id="insightDataHealthHeading">保存データの状態</h2><p id="insightDataHealthSummary"></p><p id="insightDataHealthNote">この確認は読み取り専用です。保存データの修正・削除は行いません。</p><div id="insightDataHealthIssues"></div><div id="insightDataHealthActions"><button type="button" id="insightDataHealthClose">閉じる</button></div></div>';
+    overlay.innerHTML='<div id="insightDataHealthDialog" role="dialog" aria-modal="true" aria-labelledby="insightDataHealthHeading"><h2 id="insightDataHealthHeading">保存データの状態</h2><p id="insightDataHealthSummary"></p><p id="insightDataHealthNote">データは変更されません。</p><div id="insightDataHealthIssues"></div><div id="insightDataHealthActions"><button type="button" id="insightDataHealthClose">閉じる</button></div></div>';
     document.body.appendChild(overlay);
     overlay.querySelector('#insightDataHealthClose').onclick=function(){overlay.hidden=true;if(button)button.focus();};
     overlay.addEventListener('click',function(event){if(event.target===overlay)overlay.hidden=true;});
@@ -220,7 +220,7 @@
     var summary=overlay.querySelector('#insightDataHealthSummary');
     var issues=overlay.querySelector('#insightDataHealthIssues');
     if(report.status==='ok'){
-      summary.textContent='構造上の問題は見つかりませんでした。';
+      summary.textContent='保存形式に問題はありません。';
       applyStatusClass(summary,report);
       issues.innerHTML='';
       var ok=document.createElement('div');ok.className='insight-health-issue';ok.textContent='正式年度、日別データ、販売数・廃棄数、時間帯別客数、イベント・催事の保存構造を確認しました。';

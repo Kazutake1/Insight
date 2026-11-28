@@ -27,9 +27,9 @@ test('Index shellはinline script/styleを持たず外部assetへ分離する',(
   const boot=read('insight_shell_boot_v1.js');
   const loader=read('insight_shell_loader_v1.js');
   const css=read('insight_shell_v1.css');
-  assert.match(index,/insight_shell_boot_v1\.js\?v=20261128-backup-wording-build-144/);
-  assert.match(index,/insight_shell_loader_v1\.js\?v=20261128-backup-wording-1/);
-  assert.match(index,/insight_shell_v1\.css\?v=20261128-backup-wording-build-144/);
+  assert.match(index,/insight_shell_boot_v1\.js\?v=20261128-daily-wording-build-145/);
+  assert.match(index,/insight_shell_loader_v1\.js\?v=20261128-daily-wording-1/);
+  assert.match(index,/insight_shell_v1\.css\?v=20261128-daily-wording-build-145/);
   assert.doesNotMatch(index,/<script(?![^>]*\bsrc=)[^>]*>/i);
   assert.doesNotMatch(index,/<style\b/i);
   assert.doesNotMatch(index,/script-src[^;]*'unsafe-inline'/);
@@ -182,8 +182,8 @@ test('canonical payloadはinline script/styleを持たず外部assetを順序固
 
 test('トップページはキャッシュ抑止とシェル・機能manifestの自己更新を持つ',()=>{
   const index=readShell();
-  assert.match(index,/insight-shell-version" content="20261128-backup-wording-build-144/);
-  assert.match(index,/var BUILD="20261128-backup-wording-build-144"/);
+  assert.match(index,/insight-shell-version" content="20261128-daily-wording-build-145/);
+  assert.match(index,/var BUILD="20261128-daily-wording-build-145"/);
   assert.match(index,/Shell rule: bump BUILD whenever the loader/);
   assert.match(index,/Cache-Control" content="no-cache, no-store, must-revalidate/);
   assert.match(index,/insight_probe=/);
@@ -510,7 +510,7 @@ test('分析AIの対象年月をサイドバー切替後も固定し各ページ
   assert.ok(!tripInference.includes('localStorage.setItem')&&!tripInference.includes('InsightStorage.writeSnapshot')&&!tripInference.includes('persist('));
   assert.doesNotThrow(()=>new vm.Script(tripInference),'trip inference module should parse as JavaScript');
   assert.match(index,/insight_analysis_period_lock_v1\.js\?v=20261001-sync-owner/);
-  assert.match(index,/insight_sales_count_v1\.js\?v=20261126-save-response-1/);
+  assert.match(index,/insight_sales_count_v1\.js\?v=20261128-daily-wording-1/);
   assert.match(index,/insight_numeric_caret_v1\.js\?v=20261018-caret-end-1/);
   assert.match(presentation,/aiAnalysisTarget/);
   assert.match(css,/\.ai-workspace-period-label\{display:none!important\}/);
@@ -564,7 +564,7 @@ test('設定ページはサイドバー下部の管理項目を集約する',()=
   const index=readShell();
   const settings=fs.readFileSync(path.join(root,'insight_settings_v1.js'),'utf8');
   const css=read('insight_payload_core_v1.css');
-  assert.match(index,/insight_settings_v1\.js\?v=20261126-backup-usage-1/);
+  assert.match(index,/insight_settings_v1\.js\?v=20261128-daily-wording-1/);
   assert.ok(index.indexOf('insight_data_health_v1.js')<index.indexOf('insight_settings_v1.js'));
   assert.match(settings,/nav\.id='navSettings'/);
   assert.match(settings,/page\.id='pageSettings'/);
@@ -817,7 +817,7 @@ test('保存データ健全性チェックは読み取り専用で不整合を�
   const index=readShell();
   const health=read('insight_data_health_v1.js');
   const css=read('insight_payload_core_v1.css');
-  assert.match(index,/insight_data_health_v1\.js\?v=20261124-indexeddb-preview-7/);
+  assert.match(index,/insight_data_health_v1\.js\?v=20261128-daily-wording-1/);
   assert.ok(index.indexOf('insight_backup_guard_v1.js')<index.indexOf('insight_data_health_v1.js'));
   assert.match(health,/function check\(snapshot,eventValidator\)/);
   assert.match(health,/function checkEventRecords\(snapshot,issues,eventValidator\)/);
@@ -827,7 +827,7 @@ test('保存データ健全性チェックは読み取り専用で不整合を�
   assert.match(health,/dateYearCounts\(store\.hourlyCustomers,registered,'hourly'/);
   assert.match(health,/データ状態：正常/);
   assert.match(health,/データ状態：要確認/);
-  assert.match(health,/この確認は読み取り専用です/);
+  assert.match(health,/データは変更されません/);
   assert.match(css,/#insightDataHealthOverlay\{position:fixed;inset:0;z-index:26000/);
   assert.match(css,/#insightDataHealthDialog\{width:min\(620px,100%\);max-height:82vh/);
   assert.match(css,/\.insight-health-error strong\{color:#b42318\}\.insight-health-warning strong\{color:#a16207\}/);
@@ -1050,8 +1050,8 @@ test('セール実績ページは販売数入力直後に読み込み同一日�
   const index=readShell();
   const saleResults=read('insight_sale_results_v1.js');
   const sales=read('insight_sales_count_v1.js');
-  assert.match(index,/insight_sales_count_v1\.js\?v=20261126-save-response-1/);
-  assert.match(index,/insight_sale_results_v1\.js\?v=20261124-sale-details-1/);
+  assert.match(index,/insight_sales_count_v1\.js\?v=20261128-daily-wording-1/);
+  assert.match(index,/insight_sale_results_v1\.js\?v=20261128-daily-wording-1/);
   assert.ok(index.indexOf('insight_sales_count_v1.js')<index.indexOf('insight_sale_results_v1.js'));
   assert.ok(index.indexOf('insight_sale_results_v1.js')<index.indexOf('insight_page_period_sync_v1.js'));
   assert.match(saleResults,/id='navSaleResults'|nav\.id='navSaleResults'/);
@@ -1242,8 +1242,8 @@ test('販売数カテゴリーの対象便設定を全関連層で共有する',
   const analysis=read('insight_analysis_context_v1.js');
   const saleResults=read('insight_sale_results_v1.js');
   const pageAI=read('insight_ai_page_comments_v1.js');
-  assert.match(index,/insight_sales_count_v1\.js\?v=20261126-save-response-1/);
-  assert.match(index,/insight_sale_results_v1\.js\?v=20261124-sale-details-1/);
+  assert.match(index,/insight_sales_count_v1\.js\?v=20261128-daily-wording-1/);
+  assert.match(index,/insight_sale_results_v1\.js\?v=20261128-daily-wording-1/);
   assert.match(index,/insight_analysis_context_v1\.js\?v=20261004-special-demand/);
   assert.match(index,/insight_ai_page_comments_v1\.js\?v=20261001-decision-analysis/);
   assert.match(sales,/activeTrips:\[true,true,true\]/);

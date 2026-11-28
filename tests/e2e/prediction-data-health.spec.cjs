@@ -1,5 +1,5 @@
 const {test,expect}=require('@playwright/test');
-test('予測用データ品質チェックは設定画面から開け、データを変更しない',async({page})=>{
+test('予測データの確認は設定画面から開け、データを変更しない',async({page})=>{
   const errors=[];
   page.on('pageerror',error=>errors.push(error.message));
   await page.route('**/Index.html*',async route=>{
@@ -14,7 +14,7 @@ test('予測用データ品質チェックは設定画面から開け、デー�
   const before=await page.evaluate(()=>JSON.stringify(allStores));
   await page.locator('#insightPredictionDataButton').click();
   await expect(page.locator('#insightPredictionDataOverlay')).toBeVisible();
-  await expect(page.locator('#ipdhHeading')).toHaveText('予測用データ品質チェック');
+  await expect(page.locator('#ipdhHeading')).toHaveText('予測データの確認');
   await expect(page.locator('.ipdh-period')).toContainText('2025-09-01');
   await expect(page.locator('.ipdh-store').first()).toBeVisible();
   await expect(page.locator('.ipdh-table tbody tr').first()).toBeAttached();

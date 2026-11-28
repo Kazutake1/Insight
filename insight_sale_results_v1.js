@@ -291,7 +291,7 @@
           scroller.tabIndex=0;
           scroller.setAttribute('role','region');
           scroller.setAttribute('aria-label','セール実績一覧、全'+data.occurrences.length+'件。21件目以降は縦スクロール');
-          count.textContent='全'+data.occurrences.length+'件（21件目以降は一覧内をスクロール）';
+          count.textContent='全'+data.occurrences.length+'件';
           count.hidden=false;
         }
       }
