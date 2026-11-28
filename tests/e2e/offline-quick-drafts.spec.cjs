@@ -281,7 +281,7 @@ test('network request failure and a stale feature list both stop before writing'
   expect(state).toEqual({draft:'pending',record:{revision:4,snapshot:seed.snapshot}});
 });
 
-test('verified quick-entry reopens offline without controlling the actual normal app',async({page,context})=>{
+test('actual Insight entrances can reopen verified drafts offline and retain the online startup guard',async({page,context})=>{
   const directory=path.join(__dirname,'fixtures/offline-quick-start');
   const assetFiles={
     'index.html':path.join(directory,'index.html'),
@@ -291,6 +291,7 @@ test('verified quick-entry reopens offline without controlling the actual normal
   const assets=new Map(await Promise.all(Object.entries(assetFiles).map(async ([name,file])=>[name,await fs.readFile(file)])));
   const manifest=Object.fromEntries(Array.from(assets,([name,bytes])=>[name,createHash('sha256').update(bytes).digest('hex')]));
   const source=await fs.readFile(path.join(directory,'worker.js'),'utf8');
+  const navigationWorker=await fs.readFile(path.join(directory,'navigation-worker.js'));
   function workerRelease(build) {
     const release = createHash('sha256').update(source).update(JSON.stringify(manifest)).update(build).digest('hex');
     return source.replace('/* fixture-manifest */ null',JSON.stringify(manifest))
@@ -331,6 +332,10 @@ test('verified quick-entry reopens offline without controlling the actual normal
     }
     if(url.pathname==='/Insight/legacy-worker-fixture.js'){
       res.writeHead(200,{'Content-Type':contentTypes['.js']}).end("'use strict';");
+      return;
+    }
+    if(url.pathname==='/Insight/navigation-worker-fixture.js'){
+      res.writeHead(200,{'Content-Type':contentTypes['.js'],'Cache-Control':'no-store'}).end(navigationWorker);
       return;
     }
     const appFile=/^\/Insight\/((?:draft\/)?[a-zA-Z0-9_-]+\.(?:html|js|css))$/.exec(url.pathname)?.[1];
@@ -406,6 +411,49 @@ test('verified quick-entry reopens offline without controlling the actual normal
     const disconnectedNormal=await context.newPage();
     expect(await disconnectedNormal.goto(appUrl).then(()=>false,()=>true)).toBe(true);
     await disconnectedNormal.close();
+
+    disconnected=false;
+    const navigationScript=origin+'/Insight/navigation-worker-fixture.js';
+    await reopened.evaluate(async script=>{
+      await navigator.serviceWorker.register(script,{scope:'/Insight/',updateViaCache:'none'});
+    },navigationScript);
+    await expect.poll(()=>reopened.evaluate(async ()=>{
+      const registration=await navigator.serviceWorker.getRegistration('/Insight/Index.html');
+      return registration?.active?.state==='activated'?registration.active.scriptURL:null;
+    })).toBe(navigationScript);
+
+    disconnected=true;
+    for(const entrance of [origin+'/Insight/',appUrl]){
+      const offline=await context.newPage();
+      await offline.goto(entrance);
+      await expect(offline).toHaveURL(origin+scope);
+      await expect(offline.getByRole('status')).toHaveText('下書きを復元しました。');
+      await expect(offline.getByRole('spinbutton',{name:'売上（千円）'})).toHaveValue('267');
+      expect(await offline.evaluate(()=>({
+        controller:navigator.serviceWorker.controller?.scriptURL,
+        raw:localStorage.getItem('insight_v11'),
+        adoption:localStorage.getItem('insight_indexeddb_adoption_v1'),
+        storage:typeof window.InsightStorage,
+        indexedDBStorage:typeof window.InsightIndexedDBStorageV1
+      }))).toEqual({
+        controller:origin+scope+'worker.js',raw,adoption:null,storage:'undefined',indexedDBStorage:'undefined'
+      });
+      await offline.close();
+    }
+
+    disconnected=false;
+    const reconnected=await context.newPage();
+    await reconnected.goto(origin+'/Insight/');
+    await expect(reconnected).toHaveURL(appUrl);
+    await expect(reconnected.getByRole('status')).toContainText('旧版のキャッシュ状態を確認できないため、起動と保存を停止しています。');
+    expect(await reconnected.evaluate(()=>localStorage.getItem('insight_v11'))).toBe(raw);
+    expect(await reconnected.evaluate(async ()=>{
+      const registration=await navigator.serviceWorker.getRegistration();
+      return registration?.active?.scriptURL===navigator.serviceWorker.controller?.scriptURL&&await registration.unregister();
+    })).toBe(true);
+    await reconnected.close();
+
+    disconnected=true;
     await reopened.evaluate(async name=>{
       const cache=await caches.open(name);
       await cache.put('entry.mjs',new Response('/* invalid fixture asset */',{headers:{'Content-Type':'text/javascript'}}));
